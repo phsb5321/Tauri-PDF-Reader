@@ -1,0 +1,191 @@
+.library-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 24px;
+  overflow: hidden;
+}
+
+.library-view--loading,
+.library-view--error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.library-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.library-title {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.library-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.library-sort {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.library-sort label {
+  font-size: 14px;
+  color: var(--text-secondary, #666);
+}
+
+.library-sort select {
+  padding: 6px 12px;
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 6px;
+  font-size: 14px;
+  background: var(--bg-secondary, #fff);
+  cursor: pointer;
+}
+
+.library-view-toggle {
+  display: flex;
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.view-button {
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary, #666);
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.view-button:hover {
+  background: var(--hover-bg, #f5f5f5);
+}
+
+.view-button.active {
+  background: var(--primary-color, #2196f3);
+  color: white;
+}
+
+.view-button .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.library-grid {
+  display: grid;
+  gap: 16px;
+  overflow-y: auto;
+  flex: 1;
+  padding-bottom: 24px;
+}
+
+.library-grid--grid {
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+
+.library-grid--list {
+  grid-template-columns: 1fr;
+}
+
+.library-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 16px;
+  color: var(--text-secondary, #666);
+  text-align: center;
+}
+
+.library-empty .empty-icon {
+  width: 80px;
+  height: 80px;
+  opacity: 0.5;
+}
+
+.library-empty h2 {
+  margin: 0;
+  font-size: 20px;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.library-empty p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--loading-track, #e0e0e0);
+  border-top-color: var(--primary-color, #2196f3);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.error-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px;
+  background: var(--error-bg, #fff5f5);
+  border: 1px solid var(--error-border, #ffcdd2);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.error-message .error-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--error-bg, #ffebee);
+  border: 2px solid var(--error-color, #c62828);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: bold;
+  color: var(--error-color, #c62828);
+}
+
+.error-message button {
+  padding: 8px 16px;
+  background: var(--primary-color, #2196f3);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.error-message button:hover {
+  background: var(--primary-dark, #1976d2);
+}

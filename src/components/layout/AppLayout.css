@@ -1,0 +1,49 @@
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background: var(--bg-color);
+  color: var(--text-color);
+}
+
+.app-layout-header {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--toolbar-bg);
+  z-index: 100;
+}
+
+.app-layout-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.app-layout-sidebar {
+  flex-shrink: 0;
+  width: 280px;
+  border-right: 1px solid var(--border-color);
+  background: var(--bg-color);
+  overflow-y: auto;
+}
+
+.app-layout-sidebar.collapsed {
+  width: 0;
+}
+
+.app-layout-main {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--viewer-bg);
+}
+
+.app-layout-footer {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border-color);
+  background: var(--toolbar-bg);
+  z-index: 100;
+}

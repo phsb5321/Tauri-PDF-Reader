@@ -1,0 +1,76 @@
+.text-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: hidden;
+  pointer-events: auto;
+  user-select: text;
+  z-index: 2;
+}
+
+.text-layer-span {
+  position: absolute;
+  white-space: pre;
+  color: transparent;
+  pointer-events: all;
+  line-height: 1;
+  transform-origin: 0 0;
+}
+
+/* Selection styling */
+.text-layer-span::selection {
+  background-color: rgba(0, 120, 215, 0.3);
+}
+
+/* Highlight overlays */
+.highlight-group {
+  position: absolute;
+  pointer-events: all;
+  cursor: pointer;
+}
+
+.highlight-rect {
+  position: absolute;
+  opacity: 0.35;
+  mix-blend-mode: multiply;
+  transition: opacity 0.15s ease;
+  border-radius: 2px;
+}
+
+.highlight-group:hover .highlight-rect {
+  opacity: 0.5;
+}
+
+.highlight-group.selected .highlight-rect {
+  opacity: 0.5;
+  box-shadow: 0 0 0 2px var(--highlight-color, currentColor);
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .highlight-rect {
+    mix-blend-mode: screen;
+    opacity: 0.25;
+  }
+
+  .highlight-group:hover .highlight-rect {
+    opacity: 0.4;
+  }
+
+  .highlight-group.selected .highlight-rect {
+    opacity: 0.4;
+  }
+}
+
+[data-theme="dark"] .highlight-rect {
+  mix-blend-mode: screen;
+  opacity: 0.25;
+}
+
+[data-theme="dark"] .highlight-group:hover .highlight-rect {
+  opacity: 0.4;
+}
+
+[data-theme="dark"] .highlight-group.selected .highlight-rect {
+  opacity: 0.4;
+}

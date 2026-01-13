@@ -1,0 +1,42 @@
+.chunk-navigation {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chunk-nav-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.chunk-nav-button:hover:not(:disabled) {
+  background: var(--button-hover-bg);
+}
+
+.chunk-nav-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.chunk-nav-icon {
+  width: 14px;
+  height: 14px;
+  fill: var(--text-color);
+}
+
+.chunk-counter {
+  font-size: 12px;
+  color: var(--text-muted);
+  min-width: 50px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}

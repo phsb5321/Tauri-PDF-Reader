@@ -1,0 +1,73 @@
+.highlight-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.highlight-group {
+  position: relative;
+}
+
+.highlight-rect {
+  position: absolute;
+  pointer-events: auto;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: opacity 0.15s ease;
+  mix-blend-mode: multiply;
+}
+
+.highlight-rect:hover {
+  opacity: 0.8;
+}
+
+.highlight-group.selected .highlight-rect {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 1px;
+}
+
+.highlight-note-indicator {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: var(--accent-color);
+  cursor: pointer;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translate(2px, -2px);
+  transition: transform 0.1s ease, background-color 0.1s ease;
+}
+
+.highlight-note-indicator:hover {
+  transform: translate(2px, -2px) scale(1.1);
+  background: var(--accent-color);
+}
+
+.note-icon {
+  width: 10px;
+  height: 10px;
+  fill: white;
+}
+
+/* Dark mode: use screen blend mode instead */
+[data-theme="dark"] .highlight-rect,
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .highlight-rect {
+    mix-blend-mode: screen;
+    opacity: 0.5;
+  }
+}
+
+[data-theme="dark"] .highlight-rect:hover,
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .highlight-rect:hover {
+    opacity: 0.6;
+  }
+}

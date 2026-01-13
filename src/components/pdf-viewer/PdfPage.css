@@ -1,0 +1,91 @@
+.pdf-page {
+  position: relative;
+  display: block;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+.pdf-page--current {
+  outline: 2px solid var(--primary-color, #2196f3);
+  outline-offset: 2px;
+}
+
+.pdf-page--error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--error-background, #fff5f5);
+  border: 1px solid var(--error-border, #ffcdd2);
+}
+
+.pdf-page-canvas {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.pdf-page-loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.8);
+  z-index: 10;
+}
+
+.pdf-page-loading .loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--loading-track, #e0e0e0);
+  border-top-color: var(--primary-color, #2196f3);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.pdf-page-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  text-align: center;
+  color: var(--error-text, #c62828);
+}
+
+.pdf-page-error .error-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--error-background, #ffebee);
+  border: 2px solid currentColor;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.pdf-page-error p {
+  margin: 0;
+  font-weight: 500;
+}
+
+.pdf-page-error small {
+  color: var(--error-text-muted, #ef5350);
+  font-size: 12px;
+}

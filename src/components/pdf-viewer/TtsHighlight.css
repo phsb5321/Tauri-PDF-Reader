@@ -1,0 +1,51 @@
+.tts-highlight-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.tts-highlight-rect {
+  position: absolute;
+  background-color: rgba(255, 235, 59, 0.4);
+  border-radius: 2px;
+  transition: all 0.15s ease-out;
+  animation: tts-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes tts-pulse {
+  0%, 100% {
+    background-color: rgba(255, 235, 59, 0.4);
+  }
+  50% {
+    background-color: rgba(255, 235, 59, 0.6);
+  }
+}
+
+/* Dark mode adjustments */
+[data-theme="dark"] .tts-highlight-rect,
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .tts-highlight-rect {
+    background-color: rgba(255, 193, 7, 0.3);
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .tts-highlight-rect {
+    animation-name: tts-pulse-dark;
+  }
+}
+
+[data-theme="dark"] .tts-highlight-rect {
+  animation-name: tts-pulse-dark;
+}
+
+@keyframes tts-pulse-dark {
+  0%, 100% {
+    background-color: rgba(255, 193, 7, 0.3);
+  }
+  50% {
+    background-color: rgba(255, 193, 7, 0.5);
+  }
+}

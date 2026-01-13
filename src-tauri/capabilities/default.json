@@ -1,0 +1,15 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Default capabilities for PDF Reader",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "fs:default",
+    "fs:allow-read",
+    "dialog:default",
+    "dialog:allow-open",
+    "sql:default",
+    "shell:allow-open"
+  ]
+}

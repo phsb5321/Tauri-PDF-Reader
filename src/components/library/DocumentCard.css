@@ -1,0 +1,258 @@
+.document-card {
+  position: relative;
+  background: var(--bg-secondary, #fff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+
+.document-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.document-card.selected {
+  border-color: var(--primary-color, #2196f3);
+  box-shadow: 0 0 0 2px var(--primary-light, rgba(33, 150, 243, 0.2));
+}
+
+.document-card.missing {
+  opacity: 0.6;
+  border-color: var(--error-border, #ffcdd2);
+}
+
+/* Grid View */
+.document-card--grid {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.document-card--grid .document-card-thumbnail {
+  position: relative;
+  height: 120px;
+  background: var(--bg-tertiary, #f5f5f5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid var(--border-color, #e0e0e0);
+}
+
+.document-card--grid .pdf-icon {
+  width: 48px;
+  height: 48px;
+}
+
+.document-card--grid .document-card-progress-badge {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  padding: 2px 8px;
+  background: var(--primary-color, #2196f3);
+  color: white;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.document-card--grid .document-card-content {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.document-card--grid .document-card-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #1a1a1a);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-card--grid .document-card-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+}
+
+.document-card--grid .document-card-progress {
+  height: 4px;
+}
+
+.document-card--grid .document-card-delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+  color: var(--error-color, #c62828);
+}
+
+.document-card--grid:hover .document-card-delete {
+  opacity: 1;
+}
+
+.document-card--grid .document-card-delete:hover {
+  background: var(--error-bg, #ffebee);
+}
+
+/* List View */
+.document-card--list {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+}
+
+.document-card--list .document-card-icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.document-card--list .pdf-icon {
+  width: 32px;
+  height: 32px;
+}
+
+.document-card--list .document-card-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.document-card--list .document-card-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #1a1a1a);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-card--list .document-card-path {
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-card--list .document-card-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+  min-width: 100px;
+}
+
+.document-card--list .document-card-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 100px;
+}
+
+.document-card--list .progress-text {
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+  min-width: 32px;
+  text-align: right;
+}
+
+.document-card--list .document-card-delete {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s, background-color 0.2s;
+  color: var(--text-secondary, #666);
+}
+
+.document-card--list:hover .document-card-delete {
+  opacity: 1;
+}
+
+.document-card--list .document-card-delete:hover {
+  background: var(--error-bg, #ffebee);
+  color: var(--error-color, #c62828);
+}
+
+/* Shared Styles */
+.progress-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--progress-track, #e0e0e0);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--primary-color, #2196f3);
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+
+.delete-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* Context Menu */
+.document-card-context-menu {
+  position: absolute;
+  top: 100%;
+  right: 8px;
+  z-index: 100;
+  background: var(--bg-secondary, #fff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  min-width: 150px;
+}
+
+.document-card-context-menu button {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.document-card-context-menu button:hover {
+  background: var(--hover-bg, #f5f5f5);
+}
