@@ -1,0 +1,18 @@
+# Cargo configuration for tauri-pdf-reader backend
+
+[alias]
+# Run tests with coverage using cargo-llvm-cov
+test-cov = "llvm-cov --lcov --output-path target/coverage/lcov.info --features test-mocks"
+test-cov-html = "llvm-cov --html --features test-mocks"
+test-cov-text = "llvm-cov --features test-mocks"
+
+# Quick test alias with mocks
+test-mocks = "test --features test-mocks"
+
+[env]
+# Ensure consistent test behavior
+RUST_BACKTRACE = "1"
+
+[build]
+# Incremental compilation for faster builds
+incremental = true

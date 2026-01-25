@@ -1,5 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { useAiTts } from '../../hooks/useAiTts';
+import { useTtsWordHighlight } from '../../hooks/useTtsWordHighlight';
+import { useDocumentStore } from '../../stores/document-store';
+import { useAiTtsStore } from '../../stores/ai-tts-store';
+import { pdfService } from '../../services/pdf-service';
 import { AiVoiceSelector } from './AiVoiceSelector';
 import { AiSpeedSlider } from './AiSpeedSlider';
 import { AiTtsSettings } from './AiTtsSettings';
@@ -7,9 +11,10 @@ import './AiPlaybackBar.css';
 
 interface AiPlaybackBarProps {
   getText: () => Promise<string | null>;
+  enableHighlighting?: boolean;
 }
 
-export function AiPlaybackBar({ getText }: AiPlaybackBarProps) {
+export function AiPlaybackBar({ getText, enableHighlighting = true }: AiPlaybackBarProps) {
   const {
     initialized,
     playbackState,
@@ -19,12 +24,132 @@ export function AiPlaybackBar({ getText }: AiPlaybackBarProps) {
     stop,
     pause,
     resume,
+    clearError,
   } = useAiTts();
 
+  const { pdfDocument, currentPage, totalPages, setCurrentPage } = useDocumentStore();
   const [showSettings, setShowSettings] = useState(false);
+  // T033: Use store for autoPageEnabled (persisted setting)
+  const autoPageEnabled = useAiTtsStore((s) => s.autoPageEnabled);
+  const setAutoPageEnabled = useAiTtsStore((s) => s.setAutoPageEnabled);
+  const playingRef = useRef(false);
+  // Refs to avoid stale closure in handlePlaybackComplete (T029, T035)
+  const currentPageRef = useRef(currentPage);
+  const totalPagesRef = useRef(totalPages);
 
-  const isPlaying = playbackState === 'playing';
-  const isPaused = playbackState === 'paused';
+  // Keep refs in sync with current values
+  useEffect(() => {
+    currentPageRef.current = currentPage;
+    totalPagesRef.current = totalPages;
+  }, [currentPage, totalPages]);
+
+  // Get text for a specific page
+  const getPageText = useCallback(async (pageNum: number): Promise<string | null> => {
+    if (!pdfDocument) return null;
+    try {
+      const page = await pdfService.getPage(pdfDocument, pageNum);
+      const textContent = await page.getTextContent();
+      const text = textContent.items
+        .map((item) => ('str' in item ? item.str : ''))
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      return text || null;
+    } catch (err) {
+      console.error('Error extracting text for page', pageNum, err);
+      return null;
+    }
+  }, [pdfDocument]);
+
+  /**
+   * Scroll to make the current TTS word visible (T036)
+   *
+   * Finds the word highlight element and scrolls the PDF viewer to show it
+   * when it's near the edge of the viewport.
+   */
+  const scrollToWord = useCallback((_wordIndex: number, _word: string) => {
+    // Find the word highlight element
+    const highlight = document.querySelector('.tts-word-highlight');
+    if (!highlight) return;
+
+    const rect = highlight.getBoundingClientRect();
+    const container = document.querySelector('.pdf-viewer');
+    if (!container) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const margin = 100; // Pixels from edge to trigger scroll
+
+    // Check if word is near bottom edge
+    if (rect.bottom > containerRect.bottom - margin) {
+      highlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    // Check if word is near top edge
+    else if (rect.top < containerRect.top + margin) {
+      highlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, []);
+
+  // Handle multi-page continuation
+  // Uses refs to avoid stale closure (T029)
+  const handlePlaybackComplete = useCallback(async () => {
+    console.debug('[AiPlaybackBar] Playback complete, checking for next page');
+
+    if (!autoPageEnabled || !playingRef.current) {
+      playingRef.current = false;
+      return;
+    }
+
+    // Use refs for current state to avoid stale closures (T029, T035)
+    const page = currentPageRef.current;
+    const total = totalPagesRef.current;
+
+    // Check if there's a next page
+    if (page < total) {
+      const nextPage = page + 1;
+      console.debug('[AiPlaybackBar] Moving to next page:', nextPage);
+
+      // Navigate to next page
+      setCurrentPage(nextPage);
+
+      // Small delay to let page render, then continue TTS
+      setTimeout(async () => {
+        if (playingRef.current) {
+          const nextText = await getPageText(nextPage);
+          if (nextText && playingRef.current) {
+            await speakWithHighlight(nextText, nextPage);
+          } else {
+            playingRef.current = false;
+          }
+        }
+      }, 500);
+    } else {
+      console.debug('[AiPlaybackBar] Reached last page, stopping');
+      playingRef.current = false;
+    }
+  }, [autoPageEnabled, setCurrentPage, getPageText]);
+
+  // Word highlighting hook
+  const {
+    isActive: isHighlightActive,
+    isPaused: isHighlightPaused,
+    speakWithHighlight,
+    stop: stopHighlight,
+    pause: pauseHighlight,
+    resume: resumeHighlight,
+    currentWordIndex,
+    wordTimings,
+  } = useTtsWordHighlight({
+    onComplete: handlePlaybackComplete,
+    onWordChange: useCallback((wordIndex: number, word: string) => {
+      console.debug('[AiPlaybackBar] Word changed:', wordIndex, word);
+    }, []),
+    // Wire up scroll callback to keep current word visible (T037)
+    onScrollNeeded: scrollToWord,
+  });
+
+  // Derived state - use highlight state as primary when highlighting is enabled
+  const isPlaying = enableHighlighting ? (isHighlightActive && !isHighlightPaused) : playbackState === 'playing';
+  const isPaused = enableHighlighting ? isHighlightPaused : playbackState === 'paused';
   const isLoading = playbackState === 'loading';
   const canPlay = initialized && !error;
 
@@ -32,27 +157,46 @@ export function AiPlaybackBar({ getText }: AiPlaybackBarProps) {
     if (!canPlay) return;
 
     if (isPaused) {
-      await resume();
+      if (enableHighlighting) {
+        await resumeHighlight();
+      } else {
+        await resume();
+      }
     } else {
+      playingRef.current = true;
       const text = await getText();
       if (text) {
-        await speak(text);
+        if (enableHighlighting) {
+          await speakWithHighlight(text, currentPage);
+        } else {
+          await speak(text);
+        }
+      } else {
+        playingRef.current = false;
       }
     }
-  }, [canPlay, isPaused, getText, speak, resume]);
+  }, [canPlay, isPaused, getText, speak, resume, speakWithHighlight, resumeHighlight, enableHighlighting, currentPage]);
 
   const handlePause = useCallback(async () => {
-    await pause();
-  }, [pause]);
+    if (enableHighlighting) {
+      await pauseHighlight();
+    } else {
+      await pause();
+    }
+  }, [pause, pauseHighlight, enableHighlighting]);
 
   const handleStop = useCallback(async () => {
-    await stop();
-  }, [stop]);
+    playingRef.current = false;
+    if (enableHighlighting) {
+      await stopHighlight();
+    } else {
+      await stop();
+    }
+  }, [stop, stopHighlight, enableHighlighting]);
 
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't handle if user is typing in an input
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
       }
@@ -139,14 +283,40 @@ export function AiPlaybackBar({ getText }: AiPlaybackBarProps) {
         <button
           className="ai-playback-button"
           onClick={handleStop}
-          disabled={playbackState === 'idle'}
+          disabled={!isHighlightActive && playbackState === 'idle'}
           title="Stop (Esc)"
         >
           <svg viewBox="0 0 24 24" className="ai-playback-icon">
             <rect x="4" y="4" width="16" height="16" fill="currentColor" />
           </svg>
         </button>
+
+        {/* Auto-page toggle */}
+        <button
+          className={'ai-playback-button ai-playback-button-toggle ' + (autoPageEnabled ? 'active' : '')}
+          onClick={() => setAutoPageEnabled(!autoPageEnabled)}
+          title={autoPageEnabled ? 'Auto-page: ON' : 'Auto-page: OFF'}
+        >
+          <svg viewBox="0 0 24 24" className="ai-playback-icon">
+            <path d="M13 5l7 7-7 7M5 5l7 7-7 7" stroke="currentColor" strokeWidth="2" fill="none" />
+          </svg>
+        </button>
       </div>
+
+      {/* Word progress indicator */}
+      {(isHighlightActive || wordTimings.length > 0) && (
+        <div className="ai-playback-progress">
+          <div
+            className="ai-playback-progress-bar"
+            style={{
+              width: wordTimings.length > 0 ? ((currentWordIndex + 1) / wordTimings.length) * 100 + '%' : '0%',
+            }}
+          />
+          <span className="ai-playback-progress-text">
+            {currentWordIndex + 1} / {wordTimings.length} (Page {currentPage}/{totalPages})
+          </span>
+        </div>
+      )}
 
       <div className="ai-playback-settings-section">
         <AiVoiceSelector disabled={isPlaying} />
@@ -180,7 +350,12 @@ export function AiPlaybackBar({ getText }: AiPlaybackBarProps) {
       {error && (
         <div className="ai-playback-error">
           <span>{error}</span>
-          <button onClick={() => setShowSettings(true)}>Fix</button>
+          <button onClick={clearError} title="Dismiss error and try again">
+            Dismiss
+          </button>
+          <button onClick={() => setShowSettings(true)} title="Open settings to fix configuration">
+            Settings
+          </button>
         </div>
       )}
     </div>

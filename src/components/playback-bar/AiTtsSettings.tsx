@@ -1,9 +1,18 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useAiTts } from '../../hooks/useAiTts';
+import { aiTtsCacheInfo, aiTtsCacheClear, type AiTtsCacheInfo } from '../../lib/api/ai-tts';
 import './AiTtsSettings.css';
 
 interface AiTtsSettingsProps {
   onClose?: () => void;
+}
+
+/** Format bytes to human-readable string */
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
 }
 
 export function AiTtsSettings({ onClose }: AiTtsSettingsProps) {
@@ -11,6 +20,34 @@ export function AiTtsSettings({ onClose }: AiTtsSettingsProps) {
   const [inputKey, setInputKey] = useState(apiKey || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showKey, setShowKey] = useState(false);
+  const [cacheInfo, setCacheInfo] = useState<AiTtsCacheInfo | null>(null);
+  const [isClearingCache, setIsClearingCache] = useState(false);
+
+  // Load cache info on mount and after clearing
+  const loadCacheInfo = useCallback(async () => {
+    try {
+      const info = await aiTtsCacheInfo();
+      setCacheInfo(info);
+    } catch (err) {
+      console.error('Failed to load cache info:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCacheInfo();
+  }, [loadCacheInfo]);
+
+  const handleClearCache = useCallback(async () => {
+    setIsClearingCache(true);
+    try {
+      await aiTtsCacheClear();
+      await loadCacheInfo();
+    } catch (err) {
+      console.error('Failed to clear cache:', err);
+    } finally {
+      setIsClearingCache(false);
+    }
+  }, [loadCacheInfo]);
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -115,6 +152,35 @@ export function AiTtsSettings({ onClose }: AiTtsSettingsProps) {
           </button>
         </div>
       </form>
+
+      {/* Audio Cache Section */}
+      <div className="ai-tts-settings-section">
+        <h4>Audio Cache</h4>
+        <p className="ai-tts-settings-hint">
+          Generated audio is cached locally for instant playback.
+        </p>
+        {cacheInfo && (
+          <div className="ai-tts-cache-info">
+            <div className="ai-tts-cache-stat">
+              <span>Cached files:</span>
+              <strong>{cacheInfo.entryCount}</strong>
+            </div>
+            <div className="ai-tts-cache-stat">
+              <span>Cache size:</span>
+              <strong>{formatBytes(cacheInfo.totalSizeBytes)}</strong>
+            </div>
+          </div>
+        )}
+        <button
+          type="button"
+          className="ai-tts-settings-btn secondary"
+          onClick={handleClearCache}
+          disabled={isClearingCache || !cacheInfo?.entryCount}
+          title="Delete all cached audio files"
+        >
+          {isClearingCache ? 'Clearing...' : 'Clear Cache'}
+        </button>
+      </div>
     </div>
   );
 }

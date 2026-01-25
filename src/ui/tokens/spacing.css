@@ -1,0 +1,16 @@
+/* Spacing Tokens
+ * 4px base scale for consistent spacing throughout the app
+ */
+
+:root {
+  --space-0: 0;
+  --space-1: 4px;    /* Tight spacing */
+  --space-2: 8px;    /* Default gap */
+  --space-3: 12px;   /* Medium spacing */
+  --space-4: 16px;   /* Section spacing */
+  --space-5: 20px;   /* Medium-large */
+  --space-6: 24px;   /* Large spacing */
+  --space-8: 32px;   /* Panel padding */
+  --space-10: 40px;  /* Section breaks */
+  --space-12: 48px;  /* Page margins */
+}

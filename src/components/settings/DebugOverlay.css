@@ -1,0 +1,91 @@
+/* Debug Overlay - semi-transparent corner overlay */
+.debug-overlay {
+  position: fixed;
+  top: 60px;
+  right: 16px;
+  z-index: var(--z-floating);
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  min-width: 180px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+
+.debug-overlay-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.debug-section {
+  margin-bottom: 8px;
+}
+
+.debug-section:last-child {
+  margin-bottom: 0;
+}
+
+.debug-section-title {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 4px;
+  letter-spacing: 0.5px;
+}
+
+.debug-overlay-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 0;
+}
+
+.debug-label {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.debug-value {
+  font-weight: 500;
+  color: #4CAF50;
+}
+
+.debug-value.debug-warning {
+  color: #FFC107;
+}
+
+/* Dark theme adjustments */
+[data-theme="light"] .debug-overlay {
+  background: rgba(255, 255, 255, 0.95);
+  color: #333;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] .debug-overlay-header {
+  color: #333;
+  border-bottom-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .debug-section-title {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="light"] .debug-label {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="light"] .debug-value {
+  color: #2196F3;
+}
+
+[data-theme="light"] .debug-value.debug-warning {
+  color: #FF9800;
+}

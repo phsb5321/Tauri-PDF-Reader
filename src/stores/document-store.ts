@@ -2,6 +2,11 @@ import { create } from 'zustand';
 import type { Document, Highlight } from '../lib/schemas';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 
+/**
+ * Fit mode for automatic zoom calculation
+ */
+export type FitMode = 'none' | 'fit-width' | 'fit-page';
+
 interface DocumentState {
   // Current document
   currentDocument: Document | null;
@@ -14,6 +19,7 @@ interface DocumentState {
 
   // Zoom
   zoomLevel: number;
+  fitMode: FitMode;
 
   // Loading states
   isLoading: boolean;
@@ -37,6 +43,7 @@ interface DocumentState {
   setTotalPages: (total: number) => void;
   setScrollPosition: (position: number) => void;
   setZoomLevel: (zoom: number) => void;
+  setFitMode: (mode: FitMode) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   setHasTextLayer: (hasText: boolean) => void;
@@ -55,7 +62,8 @@ const initialState = {
   currentPage: 1,
   totalPages: 0,
   scrollPosition: 0,
-  zoomLevel: 1.0,
+  zoomLevel: 1.5, // Default to 150% for better readability
+  fitMode: 'none' as FitMode, // No automatic fit by default
   isLoading: false,
   error: null as string | null,
   hasTextLayer: null as boolean | null,
@@ -104,8 +112,11 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
   setZoomLevel: (zoom) => {
     const clampedZoom = Math.max(0.25, Math.min(4.0, zoom));
-    set({ zoomLevel: clampedZoom });
+    // Setting zoom manually clears fit mode
+    set({ zoomLevel: clampedZoom, fitMode: 'none' });
   },
+
+  setFitMode: (mode) => set({ fitMode: mode }),
 
   setLoading: (loading) => set({ isLoading: loading }),
 

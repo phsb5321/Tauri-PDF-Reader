@@ -45,13 +45,16 @@
 
 .zoom-select {
   padding: 0.25rem 0.5rem;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-color, #444);
   border-radius: 4px;
-  background: var(--input-bg);
-  color: var(--text-color);
+  background: var(--input-bg, #2a2a2a);
+  color: var(--text-color, #ffffff);
   font-size: 0.875rem;
   cursor: pointer;
   min-width: 80px;
+  /* Ensure text is visible in WebKitGTK */
+  -webkit-appearance: menulist;
+  appearance: menulist;
 }
 
 .zoom-select:focus {
@@ -64,4 +67,15 @@
   color: var(--text-muted);
   min-width: 40px;
   text-align: center;
+}
+
+/* Fix for dropdown options on Linux/WebKitGTK */
+.zoom-select option,
+.zoom-select optgroup {
+  background: var(--color-bg-primary, #1e1e1e);
+  color: var(--color-text-primary, #ffffff);
+}
+
+.zoom-select optgroup {
+  font-weight: bold;
 }

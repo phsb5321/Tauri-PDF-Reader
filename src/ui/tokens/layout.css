@@ -1,0 +1,25 @@
+/* Layout Tokens
+ * Fixed dimensions for consistent layout
+ */
+
+:root {
+  /* Fixed heights */
+  --height-toolbar: 48px;
+  --height-footer: 32px;
+
+  /* Sidebar dimensions */
+  --width-sidebar: 280px;
+  --width-sidebar-min: 200px;
+  --width-sidebar-max: 400px;
+
+  /* Panel dimensions */
+  --width-panel: 320px;
+  --width-panel-min: 240px;
+  --width-panel-max: 480px;
+
+  /* Component heights */
+  --button-height: 36px;
+  --button-height-sm: 28px;
+  --button-height-lg: 44px;
+  --input-height: 36px;
+}

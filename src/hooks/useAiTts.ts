@@ -12,6 +12,8 @@ import {
   onAiTtsStarted,
   onAiTtsCompleted,
   onAiTtsStopped,
+  onAiTtsPaused,
+  onAiTtsResumed,
   onAiTtsError,
 } from '../lib/tauri-invoke';
 import { useAiTtsStore } from '../stores/ai-tts-store';
@@ -54,7 +56,12 @@ export function useAiTts() {
       store.setInitialized(false, message);
     } finally {
       initializingRef.current = false;
-      store.setPlaybackState('idle');
+      // Only reset to idle if we're still in loading state from init
+      // Don't clobber playing/paused states from ongoing playback
+      const currentState = store.playbackState;
+      if (currentState === 'loading') {
+        store.setPlaybackState('idle');
+      }
     }
   }, [store]);
 
@@ -67,40 +74,79 @@ export function useAiTts() {
 
   // Subscribe to TTS events
   useEffect(() => {
-    const unsubscribers: Promise<() => void>[] = [];
+    const unsubscribers: (() => void)[] = [];
+    let mounted = true;
 
-    unsubscribers.push(
-      onAiTtsStarted((event) => {
-        store.setPlaybackState('playing');
-        store.setCurrentText(event.text);
-      })
-    );
+    // Setup event listeners
+    const setupListeners = async () => {
+      try {
+        const unsub1 = await onAiTtsStarted((event) => {
+          if (mounted) {
+            console.debug('[TTS] State transition: -> playing (started event)', { text: event.text.substring(0, 50) });
+            store.setPlaybackState('playing');
+            store.setCurrentText(event.text);
+          }
+        });
+        if (mounted) unsubscribers.push(unsub1);
 
-    unsubscribers.push(
-      onAiTtsCompleted(() => {
-        store.setPlaybackState('idle');
-        store.setCurrentText(null);
-      })
-    );
+        const unsub2 = await onAiTtsCompleted(() => {
+          if (mounted) {
+            console.debug('[TTS] State transition: -> idle (completed event)');
+            store.setPlaybackState('idle');
+            store.setCurrentText(null);
+          }
+        });
+        if (mounted) unsubscribers.push(unsub2);
 
-    unsubscribers.push(
-      onAiTtsStopped(() => {
-        store.setPlaybackState('idle');
-        store.setCurrentText(null);
-      })
-    );
+        const unsub3 = await onAiTtsStopped(() => {
+          if (mounted) {
+            console.debug('[TTS] State transition: -> idle (stopped event)');
+            store.setPlaybackState('idle');
+            store.setCurrentText(null);
+          }
+        });
+        if (mounted) unsubscribers.push(unsub3);
 
-    unsubscribers.push(
-      onAiTtsError((event) => {
-        store.setError(event.error);
-        store.setPlaybackState('error');
-      })
-    );
+        const unsub4 = await onAiTtsPaused(() => {
+          if (mounted) {
+            console.debug('[TTS] State transition: -> paused (paused event)');
+            store.setPlaybackState('paused');
+          }
+        });
+        if (mounted) unsubscribers.push(unsub4);
+
+        const unsub5 = await onAiTtsResumed(() => {
+          if (mounted) {
+            console.debug('[TTS] State transition: -> playing (resumed event)');
+            store.setPlaybackState('playing');
+          }
+        });
+        if (mounted) unsubscribers.push(unsub5);
+
+        const unsub6 = await onAiTtsError((event) => {
+          if (mounted) {
+            console.debug('[TTS] State transition: -> error (error event)', { error: event.error });
+            store.setError(event.error);
+            store.setPlaybackState('error');
+          }
+        });
+        if (mounted) unsubscribers.push(unsub6);
+      } catch (error) {
+        console.error('Failed to setup TTS event listeners:', error);
+      }
+    };
+
+    setupListeners();
 
     return () => {
-      unsubscribers.forEach(async (unsub) => {
-        const fn = await unsub;
-        fn();
+      mounted = false;
+      // Synchronously call all unsubscribe functions
+      unsubscribers.forEach((unsub) => {
+        try {
+          unsub();
+        } catch (error) {
+          console.error('Error unsubscribing from TTS event:', error);
+        }
       });
     };
   }, [store]);
@@ -120,7 +166,9 @@ export function useAiTts() {
         await aiTtsSpeak(text, store.selectedVoiceId ?? undefined);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        console.debug('[TTS] State transition: -> error (speak failed)', { error: message });
         store.setError(message);
+        store.setPlaybackState('error');
       }
     },
     [store]
@@ -139,22 +187,24 @@ export function useAiTts() {
   // Pause playback
   const pause = useCallback(async () => {
     try {
+      console.debug('[TTS] Pause requested');
       await aiTtsPause();
-      store.setPlaybackState('paused');
+      // State will be set by the ai-tts:paused event listener
     } catch (error) {
       console.error('Failed to pause TTS:', error);
     }
-  }, [store]);
+  }, []);
 
   // Resume playback
   const resume = useCallback(async () => {
     try {
+      console.debug('[TTS] Resume requested');
       await aiTtsResume();
-      store.setPlaybackState('playing');
+      // State will be set by the ai-tts:resumed event listener
     } catch (error) {
       console.error('Failed to resume TTS:', error);
     }
-  }, [store]);
+  }, []);
 
   // Toggle play/pause
   const togglePlayback = useCallback(async () => {
@@ -201,6 +251,12 @@ export function useAiTts() {
     }
   }, [store]);
 
+  // Clear error and reset to idle state (T025)
+  const clearError = useCallback(() => {
+    console.debug('[TTS] Clearing error state');
+    store.clearError();
+  }, [store]);
+
   return {
     // State
     initialized: store.initialized,
@@ -223,5 +279,6 @@ export function useAiTts() {
     setVoice,
     setSpeed,
     refreshState,
+    clearError,
   };
 }

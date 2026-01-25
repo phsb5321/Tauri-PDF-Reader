@@ -1,3 +1,6 @@
+/* Design System Tokens */
+@import '../ui/tokens/index.css';
+
 :root {
   font-family:
     Inter,

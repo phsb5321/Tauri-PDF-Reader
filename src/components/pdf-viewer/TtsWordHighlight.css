@@ -1,0 +1,50 @@
+/**
+ * TTS Word Highlight Styles
+ *
+ * Uses CSS Custom Highlight API for native text highlighting.
+ * Teal color scheme similar to VoxPage.
+ */
+
+.tts-word-highlight-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
+  overflow: visible;
+}
+
+/* CSS Custom Highlight API - word-level highlight */
+::highlight(tts-current-word) {
+  background-color: rgba(13, 148, 136, 0.35);
+  color: inherit;
+}
+
+/* Dark mode - slightly higher opacity for visibility */
+@media (prefers-color-scheme: dark) {
+  ::highlight(tts-current-word) {
+    background-color: rgba(20, 184, 166, 0.45);
+  }
+}
+
+/* Debug display for current word - compact, unobtrusive */
+.tts-word-debug {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(0, 0, 0, 0.75);
+  color: rgba(255, 255, 255, 0.95);
+  padding: 6px 14px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-weight: 500;
+  z-index: 99999;
+  pointer-events: none;
+  white-space: nowrap;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}

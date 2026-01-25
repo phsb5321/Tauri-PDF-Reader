@@ -1,0 +1,98 @@
+/* IconButton Component
+ * Square button for icon-only actions
+ */
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--button-height);
+  height: var(--button-height);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-md);
+  background-color: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.icon-button:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+.icon-button:hover:not(:disabled) {
+  background-color: var(--color-button-bg-hover);
+  color: var(--color-text-primary);
+}
+
+/* Variants */
+.icon-button--default {
+  background-color: transparent;
+}
+
+.icon-button--primary {
+  background-color: var(--color-accent);
+  color: var(--color-text-inverse);
+}
+
+.icon-button--primary:hover:not(:disabled) {
+  background-color: var(--color-accent-hover);
+  color: var(--color-text-inverse);
+}
+
+.icon-button--ghost {
+  background-color: transparent;
+}
+
+/* Sizes */
+.icon-button--sm {
+  width: var(--button-height-sm);
+  height: var(--button-height-sm);
+}
+
+.icon-button--sm .icon-button__icon {
+  width: 16px;
+  height: 16px;
+}
+
+.icon-button--lg {
+  width: var(--button-height-lg);
+  height: var(--button-height-lg);
+}
+
+.icon-button--lg .icon-button__icon {
+  width: 24px;
+  height: 24px;
+}
+
+/* States */
+.icon-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.icon-button--active {
+  background-color: var(--color-accent-alpha);
+  color: var(--color-accent);
+}
+
+.icon-button--active:hover:not(:disabled) {
+  background-color: var(--color-accent-alpha);
+}
+
+/* Icon */
+.icon-button__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+
+.icon-button__icon svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}

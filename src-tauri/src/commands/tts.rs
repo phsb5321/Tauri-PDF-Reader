@@ -50,12 +50,14 @@ pub struct ListVoicesResponse {
 
 /// Initialize the TTS engine
 #[tauri::command]
+#[specta::specta]
 pub fn tts_init(state: State<'_, TtsEngine>) -> Result<TtsInitResponse, String> {
     state.init()
 }
 
 /// List available voices
 #[tauri::command]
+#[specta::specta]
 pub fn tts_list_voices(state: State<'_, TtsEngine>) -> Result<ListVoicesResponse, String> {
     let voices = state.list_voices()?;
     Ok(ListVoicesResponse { voices })
@@ -63,6 +65,7 @@ pub fn tts_list_voices(state: State<'_, TtsEngine>) -> Result<ListVoicesResponse
 
 /// Speak text
 #[tauri::command]
+#[specta::specta]
 pub fn tts_speak(
     state: State<'_, TtsEngine>,
     text: String,
@@ -80,6 +83,7 @@ pub struct SpeakLongResponse {
 
 /// Speak long text by splitting into chunks with progress events
 #[tauri::command]
+#[specta::specta]
 pub fn tts_speak_long(
     app: AppHandle,
     state: State<'_, TtsEngine>,
@@ -92,6 +96,7 @@ pub fn tts_speak_long(
 
 /// Stop speaking
 #[tauri::command]
+#[specta::specta]
 pub fn tts_stop(state: State<'_, TtsEngine>) -> Result<StopResponse, String> {
     let success = state.stop()?;
     Ok(StopResponse { success })
@@ -99,6 +104,7 @@ pub fn tts_stop(state: State<'_, TtsEngine>) -> Result<StopResponse, String> {
 
 /// Pause speaking
 #[tauri::command]
+#[specta::specta]
 pub fn tts_pause(state: State<'_, TtsEngine>) -> Result<PauseResponse, String> {
     let (success, supported) = state.pause()?;
     Ok(PauseResponse { success, supported })
@@ -106,6 +112,7 @@ pub fn tts_pause(state: State<'_, TtsEngine>) -> Result<PauseResponse, String> {
 
 /// Resume speaking
 #[tauri::command]
+#[specta::specta]
 pub fn tts_resume(state: State<'_, TtsEngine>) -> Result<ResumeResponse, String> {
     let success = state.resume()?;
     Ok(ResumeResponse { success })
@@ -113,6 +120,7 @@ pub fn tts_resume(state: State<'_, TtsEngine>) -> Result<ResumeResponse, String>
 
 /// Set voice
 #[tauri::command]
+#[specta::specta]
 pub fn tts_set_voice(
     state: State<'_, TtsEngine>,
     voice_id: String,
@@ -126,19 +134,25 @@ pub fn tts_set_voice(
 
 /// Set speech rate
 #[tauri::command]
+#[specta::specta]
 pub fn tts_set_rate(state: State<'_, TtsEngine>, rate: f64) -> Result<SetRateResponse, String> {
     let rate = state.set_rate(rate)?;
-    Ok(SetRateResponse { success: true, rate })
+    Ok(SetRateResponse {
+        success: true,
+        rate,
+    })
 }
 
 /// Get current TTS state
 #[tauri::command]
+#[specta::specta]
 pub fn tts_get_state(state: State<'_, TtsEngine>) -> Result<TtsStateResponse, String> {
     state.get_state()
 }
 
 /// Check TTS capabilities
 #[tauri::command]
+#[specta::specta]
 pub fn tts_check_capabilities(state: State<'_, TtsEngine>) -> Result<TtsCapabilities, String> {
     state.get_capabilities()
 }

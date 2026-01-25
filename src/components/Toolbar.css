@@ -1,18 +1,23 @@
+/* Toolbar Component
+ * Refactored to use design system tokens
+ * @see docs/ui/DESIGN_SYSTEM.md
+ */
+
 .toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.5rem 1rem;
-  background: var(--toolbar-bg);
-  border-bottom: 1px solid var(--border-color);
-  height: 48px;
+  padding: 0 var(--space-4);
+  background: var(--color-bg-toolbar);
+  border-bottom: 1px solid var(--color-border);
+  height: var(--height-toolbar);
   flex-shrink: 0;
 }
 
 .toolbar-section {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .toolbar-left {
@@ -32,20 +37,27 @@
 .toolbar-button {
   display: flex;
   align-items: center;
-  gap: 0.375rem;
-  padding: 0.375rem 0.75rem;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  background: var(--button-bg);
-  color: var(--text-color);
-  font-size: 0.875rem;
+  gap: var(--space-2);
+  height: var(--button-height);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-button-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-family);
+  font-size: var(--text-sm);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--transition-fast);
 }
 
 .toolbar-button:hover:not(:disabled) {
-  background: var(--button-hover-bg);
-  border-color: var(--accent-color);
+  background: var(--color-button-bg-hover);
+  border-color: var(--color-accent);
+}
+
+.toolbar-button:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
 }
 
 .toolbar-button:active:not(:disabled) {
@@ -68,12 +80,12 @@
 }
 
 .button-text {
-  font-weight: 500;
+  font-weight: var(--font-medium);
 }
 
 .document-title {
-  font-size: 0.875rem;
-  color: var(--text-muted);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
   max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -81,6 +93,6 @@
 }
 
 .open-button .toolbar-icon {
-  fill: var(--accent-color);
-  stroke: var(--accent-color);
+  fill: var(--color-accent);
+  stroke: var(--color-accent);
 }

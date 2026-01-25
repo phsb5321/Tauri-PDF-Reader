@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
 /// Represents a PDF document in the user's library
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Document {
     pub id: String,
@@ -17,7 +18,7 @@ pub struct Document {
 }
 
 /// Represents a rectangle for highlight positioning (page coordinates)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Rect {
     pub x: f64,
@@ -27,7 +28,7 @@ pub struct Rect {
 }
 
 /// Represents a text highlight within a document
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Highlight {
     pub id: String,
@@ -42,7 +43,7 @@ pub struct Highlight {
 }
 
 /// Input for creating a new highlight
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateHighlightInput {
     pub document_id: String,
@@ -53,7 +54,9 @@ pub struct CreateHighlightInput {
 }
 
 /// Input for updating a highlight
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Note: Used by specta type generation for frontend bindings
+#[allow(dead_code)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateHighlightInput {
     pub color: Option<String>,
@@ -61,7 +64,9 @@ pub struct UpdateHighlightInput {
 }
 
 /// TTS voice information
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Note: Used by specta type generation for frontend bindings
+#[allow(dead_code)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct VoiceInfo {
     pub id: String,
@@ -70,7 +75,9 @@ pub struct VoiceInfo {
 }
 
 /// TTS engine state
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Note: Used by specta type generation for frontend bindings
+#[allow(dead_code)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TtsState {
     pub is_speaking: bool,
@@ -80,6 +87,7 @@ pub struct TtsState {
     pub rate: f64,
 }
 
+#[allow(dead_code)]
 impl Default for TtsState {
     fn default() -> Self {
         Self {
@@ -93,7 +101,9 @@ impl Default for TtsState {
 }
 
 /// TTS initialization response
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Note: Used by specta type generation for frontend bindings
+#[allow(dead_code)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TtsInitResponse {
     pub available: bool,
@@ -103,34 +113,34 @@ pub struct TtsInitResponse {
 }
 
 /// Response types for commands
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ListHighlightsResponse {
     pub highlights: Vec<Highlight>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct BatchCreateResponse {
     pub highlights: Vec<Highlight>,
     pub created: i32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DeleteResponse {
     pub success: bool,
     pub deleted: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportResponse {
     pub content: String,
     pub filename: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FileExistsResponse {
     pub exists: bool,

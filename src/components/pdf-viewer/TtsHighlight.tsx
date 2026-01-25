@@ -44,12 +44,9 @@ export function TtsHighlight({
     const rects: HighlightRect[] = [];
 
     let wordIndex = 0;
-    let accumulatedText = '';
 
     for (const item of textItems) {
       if (!item.str.trim()) continue;
-
-      accumulatedText += item.str + ' ';
 
       // Check if this text item contains words from the chunk
       const itemWords = item.str.toLowerCase().split(/\s+/).filter(w => w);

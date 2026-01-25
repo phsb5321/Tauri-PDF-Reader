@@ -2,11 +2,16 @@
 //!
 //! Provides structured logging with JSON output for production builds
 //! and human-readable format for development.
+//!
+//! Note: Currently using tracing crate directly; this module is kept for
+//! future structured logging features.
 
-use std::sync::Mutex;
+#![allow(dead_code)]
+
 use chrono::Utc;
-use serde::{Deserialize, Serialize};
 use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
+use std::sync::Mutex;
 
 /// Maximum number of log entries to keep in memory
 const MAX_LOG_ENTRIES: usize = 1000;
@@ -70,7 +75,9 @@ struct LogBuffer {
 
 impl LogBuffer {
     fn new() -> Self {
-        Self { entries: Vec::new() }
+        Self {
+            entries: Vec::new(),
+        }
     }
 
     fn push(&mut self, entry: LogEntry) {
@@ -197,7 +204,10 @@ pub fn format_logs_for_export(entries: &[LogEntry]) -> String {
                 Some(c) => format!(" | {}", serde_json::to_string(c).unwrap_or_default()),
                 None => String::new(),
             };
-            format!("[{}] {} {} - {}{}", e.timestamp, e.level, e.target, e.message, context_str)
+            format!(
+                "[{}] {} {} - {}{}",
+                e.timestamp, e.level, e.target, e.message, context_str
+            )
         })
         .collect::<Vec<_>>()
         .join("\n")

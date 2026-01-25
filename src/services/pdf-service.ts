@@ -1,5 +1,27 @@
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy, type PDFPageProxy } from 'pdfjs-dist';
-import { convertFileSrc } from '@tauri-apps/api/core';
+
+// Check if running in Tauri environment
+function isTauriAvailable(): boolean {
+  return typeof window !== 'undefined' &&
+         '__TAURI_INTERNALS__' in window &&
+         window.__TAURI_INTERNALS__ !== undefined;
+}
+
+// Dynamic import for Tauri fs plugin (only in Tauri context)
+async function readFileFromTauri(filePath: string): Promise<Uint8Array> {
+  if (!isTauriAvailable()) {
+    throw new Error('Not running in Tauri environment. Please use the desktop app to open local files.');
+  }
+  const { readFile } = await import('@tauri-apps/plugin-fs');
+  return readFile(filePath);
+}
+
+// Extend Window interface for Tauri
+declare global {
+  interface Window {
+    __TAURI_INTERNALS__?: unknown;
+  }
+}
 
 // Define TextItem interface for PDF.js text content
 interface PdfTextItem {
@@ -19,6 +41,8 @@ export interface PageRenderOptions {
   canvas: HTMLCanvasElement;
   scale: number;
   page: PDFPageProxy;
+  /** Optional output scale override (for quality modes). If not provided, uses RenderPolicy. */
+  outputScale?: number;
 }
 
 // Type guard for TextItem
@@ -42,30 +66,42 @@ export interface TextContent {
 export const pdfService = {
   /**
    * Load a PDF document from a local file path
-   * Uses Tauri's asset protocol for secure local file access
+   * Uses Tauri's fs plugin to read the file as binary data
    */
   async loadDocument(filePath: string): Promise<PDFDocumentProxy> {
-    // Convert local file path to asset URL for Tauri
-    const assetUrl = convertFileSrc(filePath);
+    console.log('[PDF Service] Loading document:', filePath);
 
     try {
+      // Read the file as binary data using Tauri's fs plugin
+      console.log('[PDF Service] Reading file with fs plugin...');
+      console.log('[PDF Service] Tauri available:', isTauriAvailable());
+      const fileData = await readFileFromTauri(filePath);
+      console.log('[PDF Service] File read successfully, size:', fileData.byteLength, 'bytes');
+
+      console.log('[PDF Service] Creating PDF document...');
       const loadingTask = getDocument({
-        url: assetUrl,
+        data: fileData,
         // Enable built-in CMap support for better character rendering
         cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',
         cMapPacked: true,
       });
 
       const pdf = await loadingTask.promise;
+      console.log('[PDF Service] PDF loaded successfully, pages:', pdf.numPages);
       return pdf;
     } catch (error) {
+      console.error('[PDF Service] Error loading PDF:', error);
       // Handle common PDF errors
       if (error instanceof Error) {
+        console.error('[PDF Service] Error message:', error.message);
         if (error.message.includes('password')) {
           throw new Error('PDF_PASSWORD_REQUIRED: This PDF is password protected');
         }
         if (error.message.includes('Invalid PDF')) {
           throw new Error('PDF_INVALID: The file is not a valid PDF or is corrupted');
+        }
+        if (error.message.includes('denied') || error.message.includes('permission')) {
+          throw new Error('PDF_ACCESS_DENIED: Cannot access the file. Check file permissions.');
         }
       }
       throw error;
@@ -97,26 +133,76 @@ export const pdfService = {
 
   /**
    * Render a PDF page to a canvas
+   * Uses the official PDF.js HiDPI approach with transform matrix
+   * Reference: https://mozilla.github.io/pdf.js/examples/
+   *
+   * @param options.canvas - Canvas element to render to
+   * @param options.scale - Zoom level (1.0 = 100%)
+   * @param options.page - PDF.js page object
+   * @param options.outputScale - Optional output scale override (for quality modes)
+   * @returns RenderTask that can be cancelled
    */
-  async renderPage(options: PageRenderOptions): Promise<void> {
-    const { canvas, scale, page } = options;
+  renderPage(options: PageRenderOptions): { promise: Promise<void>; cancel: () => void } {
+    const { canvas, scale, page, outputScale: providedOutputScale } = options;
+
+    // Get viewport at the desired scale
     const viewport = page.getViewport({ scale });
 
-    // Set canvas dimensions
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
+    // Support HiDPI screens
+    // If outputScale is provided (from RenderPolicy), use it; otherwise use DPR with 2x minimum
+    const devicePixelRatio = window.devicePixelRatio || 1;
+    const outputScale = providedOutputScale ?? Math.max(devicePixelRatio, 2);
 
-    const context = canvas.getContext('2d');
+    // Set canvas physical dimensions (scaled for HiDPI)
+    canvas.width = Math.floor(viewport.width * outputScale);
+    canvas.height = Math.floor(viewport.height * outputScale);
+
+    // Set canvas CSS dimensions (logical size on screen)
+    canvas.style.width = `${Math.floor(viewport.width)}px`;
+    canvas.style.height = `${Math.floor(viewport.height)}px`;
+
+    // Get hardware-accelerated 2D context with optimal settings
+    const context = canvas.getContext('2d', {
+      alpha: false,           // Opaque canvas - faster rendering (PDF.js uses opaque background)
+      desynchronized: true,   // Direct GPU→display path (critical for Tauri WebView performance)
+      willReadFrequently: false, // Keep GPU acceleration enabled
+    });
     if (!context) {
       throw new Error('Could not get canvas 2D context');
     }
 
+    // Enable high-quality image rendering
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = 'high';
+
+    // Create transform matrix for HiDPI rendering
+    const transform: [number, number, number, number, number, number] | undefined =
+      outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : undefined;
+
     const renderContext = {
       canvasContext: context,
-      viewport,
+      transform: transform,
+      viewport: viewport,
     };
 
-    await page.render(renderContext).promise;
+    // Return both the promise and a cancel function
+    const renderTask = page.render(renderContext);
+
+    return {
+      promise: renderTask.promise.then(() => {}),
+      cancel: () => {
+        renderTask.cancel();
+      },
+    };
+  },
+
+  /**
+   * Legacy async renderPage (for backward compatibility)
+   * @deprecated Use renderPage() which returns a cancellable task
+   */
+  async renderPageAsync(options: PageRenderOptions): Promise<void> {
+    const { promise } = this.renderPage(options);
+    await promise;
   },
 
   /**

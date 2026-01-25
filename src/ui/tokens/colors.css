@@ -1,0 +1,113 @@
+/* Color Tokens
+ * Semantic color definitions for the design system
+ * Dark mode overrides at the bottom
+ */
+
+:root {
+  /* Background colors */
+  --color-bg: #ffffff;
+  --color-bg-surface: #f8f9fa;
+  --color-bg-toolbar: #f8f9fa;
+  --color-bg-viewer: #e8e8e8;
+  --color-bg-overlay: rgba(0, 0, 0, 0.5);
+
+  /* Text colors */
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #666666;
+  --color-text-inverse: #ffffff;
+
+  /* Interactive colors */
+  --color-accent: #3b82f6;
+  --color-accent-hover: #2563eb;
+  --color-accent-alpha: rgba(59, 130, 246, 0.2);
+
+  /* Semantic colors */
+  --color-error: #dc2626;
+  --color-warning: #f59e0b;
+  --color-success: #10b981;
+  --color-info: #3b82f6;
+
+  /* UI Element colors */
+  --color-border: #e0e0e0;
+  --color-border-focus: #3b82f6;
+  --color-button-bg: #ffffff;
+  --color-button-bg-hover: #f0f0f0;
+  --color-input-bg: #ffffff;
+
+  /* TTS Highlight color */
+  --color-tts-highlight: rgba(59, 130, 246, 0.15);
+}
+
+/* Dark mode - System preference */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    /* Background colors */
+    --color-bg: #1a1a1a;
+    --color-bg-surface: #252525;
+    --color-bg-toolbar: #252525;
+    --color-bg-viewer: #1a1a1a;
+    --color-bg-overlay: rgba(0, 0, 0, 0.7);
+
+    /* Text colors */
+    --color-text-primary: #f6f6f6;
+    --color-text-secondary: #999999;
+    --color-text-inverse: #1a1a1a;
+
+    /* Interactive colors */
+    --color-accent: #60a5fa;
+    --color-accent-hover: #93c5fd;
+    --color-accent-alpha: rgba(96, 165, 250, 0.2);
+
+    /* Semantic colors */
+    --color-error: #f87171;
+    --color-warning: #fbbf24;
+    --color-success: #34d399;
+    --color-info: #60a5fa;
+
+    /* UI Element colors */
+    --color-border: #3a3a3a;
+    --color-border-focus: #60a5fa;
+    --color-button-bg: #2a2a2a;
+    --color-button-bg-hover: #3a3a3a;
+    --color-input-bg: #2a2a2a;
+
+    /* TTS Highlight color */
+    --color-tts-highlight: rgba(96, 165, 250, 0.2);
+  }
+}
+
+/* Dark mode - Explicit preference */
+[data-theme="dark"] {
+  /* Background colors */
+  --color-bg: #1a1a1a;
+  --color-bg-surface: #252525;
+  --color-bg-toolbar: #252525;
+  --color-bg-viewer: #1a1a1a;
+  --color-bg-overlay: rgba(0, 0, 0, 0.7);
+
+  /* Text colors */
+  --color-text-primary: #f6f6f6;
+  --color-text-secondary: #999999;
+  --color-text-inverse: #1a1a1a;
+
+  /* Interactive colors */
+  --color-accent: #60a5fa;
+  --color-accent-hover: #93c5fd;
+  --color-accent-alpha: rgba(96, 165, 250, 0.2);
+
+  /* Semantic colors */
+  --color-error: #f87171;
+  --color-warning: #fbbf24;
+  --color-success: #34d399;
+  --color-info: #60a5fa;
+
+  /* UI Element colors */
+  --color-border: #3a3a3a;
+  --color-border-focus: #60a5fa;
+  --color-button-bg: #2a2a2a;
+  --color-button-bg-hover: #3a3a3a;
+  --color-input-bg: #2a2a2a;
+
+  /* TTS Highlight color */
+  --color-tts-highlight: rgba(96, 165, 250, 0.2);
+}

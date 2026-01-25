@@ -25,10 +25,27 @@ export function HighlightToolbar({
   const toolbarRef = useRef<HTMLDivElement>(null);
   const [adjustedPosition, setAdjustedPosition] = useState<{ x: number; y: number } | null>(null);
 
-  // Calculate position to keep toolbar within viewport
+  // Calculate initial position based on selected rects (doesn't need ref)
+  const initialPosition = position && selectedRects.length > 0
+    ? {
+        x: selectedRects[0].x + selectedRects[0].width / 2 - 60, // Approximate toolbar width / 2
+        y: selectedRects[0].y - 50, // Position above selection
+      }
+    : position;
+
+  // Debug logging
+  console.debug('[HighlightToolbar] Render state:', {
+    hasPosition: !!position,
+    hasInitialPosition: !!initialPosition,
+    hasAdjustedPosition: !!adjustedPosition,
+    selectedRectsCount: selectedRects.length,
+    position,
+    initialPosition,
+  });
+
+  // Calculate position to keep toolbar within viewport (after toolbar renders)
   useEffect(() => {
     if (!position || !toolbarRef.current || !containerRef.current) {
-      setAdjustedPosition(null);
       return;
     }
 
@@ -66,6 +83,11 @@ export function HighlightToolbar({
 
     setAdjustedPosition({ x: adjustedX, y: adjustedY });
   }, [position, selectedRects, containerRef]);
+
+  // Reset adjusted position when position changes (new selection)
+  useEffect(() => {
+    setAdjustedPosition(null);
+  }, [position?.x, position?.y]);
 
   // Handle click outside to cancel
   useEffect(() => {
@@ -109,7 +131,10 @@ export function HighlightToolbar({
     [onHighlight]
   );
 
-  if (!position || !adjustedPosition) {
+  // Use adjusted position if available, otherwise use initial position
+  const displayPosition = adjustedPosition || initialPosition;
+
+  if (!position || !displayPosition) {
     return null;
   }
 
@@ -118,8 +143,8 @@ export function HighlightToolbar({
       ref={toolbarRef}
       className="highlight-toolbar"
       style={{
-        left: `${adjustedPosition.x}px`,
-        top: `${adjustedPosition.y}px`,
+        left: `${displayPosition.x}px`,
+        top: `${displayPosition.y}px`,
       }}
       role="toolbar"
       aria-label="Highlight colors"

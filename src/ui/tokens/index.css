@@ -1,0 +1,14 @@
+/* Design System Tokens
+ * Import this file in src/styles/index.css or src/main.tsx
+ * All token files are imported in dependency order
+ */
+
+/* Core tokens (no dependencies) */
+@import './colors.css';
+@import './spacing.css';
+@import './typography.css';
+@import './radii.css';
+@import './shadows.css';
+@import './z-index.css';
+@import './motion.css';
+@import './layout.css';

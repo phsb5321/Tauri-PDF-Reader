@@ -5,6 +5,7 @@ import { HighlightSettings } from './HighlightSettings';
 import { ThemeToggle } from './ThemeToggle';
 import { KeyboardShortcuts } from './KeyboardShortcuts';
 import { TelemetrySettings } from './TelemetrySettings';
+import { RenderSettings } from './RenderSettings';
 import './SettingsPanel.css';
 
 interface SettingsPanelProps {
@@ -12,7 +13,7 @@ interface SettingsPanelProps {
   onClose: () => void;
 }
 
-type SettingsSection = 'appearance' | 'tts' | 'highlights' | 'telemetry' | 'shortcuts';
+type SettingsSection = 'appearance' | 'rendering' | 'tts' | 'highlights' | 'telemetry' | 'shortcuts';
 
 export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   const [activeSection, setActiveSection] = useState<SettingsSection>('appearance');
@@ -62,6 +63,13 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
               <span>Appearance</span>
             </button>
             <button
+              className={`settings-nav-item ${activeSection === 'rendering' ? 'active' : ''}`}
+              onClick={() => setActiveSection('rendering')}
+            >
+              <RenderingIcon />
+              <span>Rendering</span>
+            </button>
+            <button
               className={`settings-nav-item ${activeSection === 'tts' ? 'active' : ''}`}
               onClick={() => setActiveSection('tts')}
             >
@@ -93,6 +101,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
 
           <div className="settings-content">
             {activeSection === 'appearance' && <ThemeToggle />}
+            {activeSection === 'rendering' && <RenderSettings />}
             {activeSection === 'tts' && <TtsSettings />}
             {activeSection === 'highlights' && <HighlightSettings />}
             {activeSection === 'shortcuts' && <KeyboardShortcuts />}
@@ -168,6 +177,17 @@ function ChartIcon() {
     <svg viewBox="0 0 24 24" className="nav-icon" aria-hidden="true">
       <path
         d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+function RenderingIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="nav-icon" aria-hidden="true">
+      <path
+        d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14zM5 15h14v2H5zm0-4h14v2H5zm0-4h14v2H5z"
         fill="currentColor"
       />
     </svg>

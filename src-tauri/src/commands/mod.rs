@@ -1,5 +1,5 @@
-pub mod library;
 pub mod highlights;
+pub mod library;
 pub mod settings;
 
 #[cfg(feature = "native-tts")]
