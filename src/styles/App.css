@@ -1,69 +1,30 @@
-/* CSS Variables */
+/* Legacy CSS Variables (deprecated)
+ * These map to the new design system tokens for backwards compatibility.
+ * New code should use tokens from src/ui/tokens/ directly.
+ * @see docs/ui/DESIGN_SYSTEM.md for migration guide
+ */
 :root {
-  /* Colors */
-  --bg-color: #ffffff;
-  --toolbar-bg: #f8f9fa;
-  --viewer-bg: #e8e8e8;
-  --border-color: #e0e0e0;
-  --text-color: #1a1a1a;
-  --text-muted: #666666;
-  --accent-color: #3b82f6;
-  --accent-color-alpha: rgba(59, 130, 246, 0.2);
-  --error-color: #dc2626;
+  /* Legacy color aliases - map to new tokens */
+  --bg-color: var(--color-bg);
+  --toolbar-bg: var(--color-bg-toolbar);
+  --viewer-bg: var(--color-bg-viewer);
+  --border-color: var(--color-border);
+  --text-color: var(--color-text-primary);
+  --text-muted: var(--color-text-secondary);
+  --accent-color: var(--color-accent);
+  --accent-color-alpha: var(--color-accent-alpha);
+  --error-color: var(--color-error);
 
-  /* Interactive elements */
-  --button-bg: #ffffff;
-  --button-hover-bg: #f0f0f0;
-  --input-bg: #ffffff;
+  /* Legacy interactive element aliases */
+  --button-bg: var(--color-button-bg);
+  --button-hover-bg: var(--color-button-bg-hover);
+  --input-bg: var(--color-input-bg);
 }
 
-/* Dark mode */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg-color: #1a1a1a;
-    --toolbar-bg: #252525;
-    --viewer-bg: #1a1a1a;
-    --border-color: #3a3a3a;
-    --text-color: #f6f6f6;
-    --text-muted: #999999;
-    --accent-color: #60a5fa;
-    --accent-color-alpha: rgba(96, 165, 250, 0.2);
-    --error-color: #f87171;
-    --button-bg: #2a2a2a;
-    --button-hover-bg: #3a3a3a;
-    --input-bg: #2a2a2a;
-  }
-}
-
-[data-theme="dark"] {
-  --bg-color: #1a1a1a;
-  --toolbar-bg: #252525;
-  --viewer-bg: #1a1a1a;
-  --border-color: #3a3a3a;
-  --text-color: #f6f6f6;
-  --text-muted: #999999;
-  --accent-color: #60a5fa;
-  --accent-color-alpha: rgba(96, 165, 250, 0.2);
-  --error-color: #f87171;
-  --button-bg: #2a2a2a;
-  --button-hover-bg: #3a3a3a;
-  --input-bg: #2a2a2a;
-}
-
-[data-theme="light"] {
-  --bg-color: #ffffff;
-  --toolbar-bg: #f8f9fa;
-  --viewer-bg: #e8e8e8;
-  --border-color: #e0e0e0;
-  --text-color: #1a1a1a;
-  --text-muted: #666666;
-  --accent-color: #3b82f6;
-  --accent-color-alpha: rgba(59, 130, 246, 0.2);
-  --error-color: #dc2626;
-  --button-bg: #ffffff;
-  --button-hover-bg: #f0f0f0;
-  --input-bg: #ffffff;
-}
+/* Note: Dark mode handling is now in src/ui/tokens/colors.css
+ * The legacy dark mode rules below are kept for reference but
+ * should not be needed since tokens auto-switch in dark mode.
+ */
 
 /* Global styles */
 *,

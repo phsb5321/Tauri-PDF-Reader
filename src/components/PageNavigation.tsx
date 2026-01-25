@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useDocumentStore } from '../stores/document-store';
-import { libraryService } from '../services/library-service';
+import { useAiTtsStore } from '../stores/ai-tts-store';
+import { aiTtsStop } from '../lib/tauri-invoke';
+import { commands } from '../lib/bindings';
 import './PageNavigation.css';
 
 export function PageNavigation() {
   const { currentDocument, currentPage, totalPages, setCurrentPage } = useDocumentStore();
+  const playbackState = useAiTtsStore((state) => state.playbackState);
   const [inputValue, setInputValue] = useState(String(currentPage));
 
   // Sync input value with current page
@@ -15,18 +18,33 @@ export function PageNavigation() {
   const saveProgress = useCallback(async (page: number) => {
     if (currentDocument) {
       try {
-        await libraryService.updateProgress(currentDocument.id, page);
+        // Using tauri-specta generated bindings for type-safe command invocation
+        const result = await commands.libraryUpdateProgress(currentDocument.id, page, null, null);
+        if (result.status === 'error') {
+          console.error('Failed to save reading progress:', result.error);
+        }
       } catch (error) {
         console.error('Failed to save reading progress:', error);
       }
     }
   }, [currentDocument]);
 
-  const goToPage = useCallback((page: number) => {
+  const goToPage = useCallback(async (page: number) => {
     const clampedPage = Math.max(1, Math.min(page, totalPages));
+
+    // Stop TTS playback on page navigation (T023)
+    if (playbackState === 'playing' || playbackState === 'paused') {
+      try {
+        console.debug('[PageNavigation] Stopping TTS before page navigation');
+        await aiTtsStop();
+      } catch (error) {
+        console.error('[PageNavigation] Failed to stop TTS:', error);
+      }
+    }
+
     setCurrentPage(clampedPage);
     saveProgress(clampedPage);
-  }, [totalPages, setCurrentPage, saveProgress]);
+  }, [totalPages, setCurrentPage, saveProgress, playbackState]);
 
   const handlePrevPage = () => {
     if (currentPage > 1) {

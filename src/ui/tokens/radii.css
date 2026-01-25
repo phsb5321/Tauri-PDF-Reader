@@ -1,0 +1,12 @@
+/* Border Radius Tokens
+ * Consistent corner rounding across components
+ */
+
+:root {
+  --radius-none: 0;
+  --radius-sm: 4px;       /* Subtle rounding */
+  --radius-md: 8px;       /* Default for buttons, inputs */
+  --radius-lg: 12px;      /* Cards, panels */
+  --radius-xl: 16px;      /* Modals, large containers */
+  --radius-full: 9999px;  /* Circular elements */
+}

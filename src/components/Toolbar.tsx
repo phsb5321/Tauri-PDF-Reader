@@ -1,7 +1,7 @@
 import { open } from '@tauri-apps/plugin-dialog';
 import { useDocumentStore } from '../stores/document-store';
 import { pdfService } from '../services/pdf-service';
-import { libraryService } from '../services/library-service';
+import { commands } from '../lib/bindings';
 import { PageNavigation } from './PageNavigation';
 import { ZoomControls } from './ZoomControls';
 import './Toolbar.css';
@@ -45,27 +45,29 @@ export function Toolbar() {
       const pdf = await pdfService.loadDocument(filePath);
       setPdfDocument(pdf);
 
-      // Check if document exists in library
-      let document = await libraryService.getDocumentByPath(filePath);
+      // Check if document exists in library (using tauri-specta generated bindings)
+      const existingResult = await commands.libraryGetDocumentByPath(filePath);
+      let document = existingResult.status === 'ok' ? existingResult.data : null;
 
       if (document) {
         // Document exists, mark as opened and restore progress
-        document = await libraryService.openDocument(document.id);
-        setCurrentPage(document.currentPage);
+        const openResult = await commands.libraryOpenDocument(document.id);
+        if (openResult.status === 'ok') {
+          document = openResult.data;
+          setCurrentPage(document.currentPage);
+        }
       } else {
         // New document, add to library
-        document = await libraryService.addDocument({
-          filePath,
-          pageCount: pdf.numPages,
-        });
+        const addResult = await commands.libraryAddDocument(filePath, null, pdf.numPages);
+        if (addResult.status === 'error') {
+          throw new Error(addResult.error);
+        }
+        document = addResult.data;
       }
 
       // Update page count if it wasn't set
       if (!document.pageCount) {
-        await libraryService.updateDocument({
-          id: document.id,
-          pageCount: pdf.numPages,
-        });
+        await commands.libraryUpdateDocument(document.id, null, pdf.numPages, null);
         document = { ...document, pageCount: pdf.numPages };
       }
 

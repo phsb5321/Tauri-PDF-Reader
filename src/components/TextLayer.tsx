@@ -1,19 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { TextLayer as PdfJsTextLayer } from 'pdfjs-dist';
 import type { PDFPageProxy } from 'pdfjs-dist';
 import { useDocumentStore } from '../stores/document-store';
 import type { Rect } from '../lib/schemas';
+import { TtsWordHighlight } from './pdf-viewer/TtsWordHighlight';
 import './TextLayer.css';
-
-interface PdfTextContent {
-  items: unknown[];
-}
-
-interface TextItem {
-  str: string;
-  transform: number[];
-  width: number;
-  height: number;
-}
 
 interface TextLayerProps {
   page: PDFPageProxy;
@@ -27,20 +18,18 @@ export interface TextSelection {
   pageNumber: number;
 }
 
-// Type guard for TextItem
-function isTextItem(item: unknown): item is TextItem {
-  return (
-    typeof item === 'object' &&
-    item !== null &&
-    'str' in item &&
-    'transform' in item
-  );
+function clearContainer(container: HTMLElement): void {
+  while (container.firstChild) {
+    container.removeChild(container.firstChild);
+  }
 }
 
 export function TextLayer({ page, scale, onTextSelect }: TextLayerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [textContent, setTextContent] = useState<PdfTextContent | null>(null);
+  const textLayerDivRef = useRef<HTMLDivElement>(null);
+  const textLayerRef = useRef<PdfJsTextLayer | null>(null);
   const [isSelecting, setIsSelecting] = useState(false);
+  const [textLayerReady, setTextLayerReady] = useState(false);
 
   const { getHighlightsForPage, selectedHighlightId, setSelectedHighlight } =
     useDocumentStore();
@@ -49,22 +38,61 @@ export function TextLayer({ page, scale, onTextSelect }: TextLayerProps) {
   const highlights = getHighlightsForPage(pageNumber);
   const viewport = page.getViewport({ scale });
 
-  // Load text content
   useEffect(() => {
-    let cancelled = false;
+    const textLayerDiv = textLayerDivRef.current;
+    if (!textLayerDiv) return;
 
-    page.getTextContent().then((content) => {
-      if (!cancelled) {
-        setTextContent(content);
+    let cancelled = false;
+    setTextLayerReady(false);
+
+    if (textLayerRef.current) {
+      textLayerRef.current.cancel();
+      textLayerRef.current = null;
+    }
+
+    clearContainer(textLayerDiv);
+
+    const renderTextLayer = async () => {
+      try {
+        const textContent = await page.getTextContent();
+        if (cancelled) return;
+
+        textLayerDiv.style.setProperty('--scale-factor', String(scale));
+
+        textLayerRef.current = new PdfJsTextLayer({
+          container: textLayerDiv,
+          textContentSource: textContent,
+          viewport: viewport,
+        });
+
+        await textLayerRef.current.render();
+        
+        if (!cancelled) {
+          setTimeout(() => {
+            if (!cancelled) {
+              setTextLayerReady(true);
+            }
+          }, 50);
+        }
+      } catch (error) {
+        if (!cancelled && !(error instanceof Error && error.message.includes('cancel'))) {
+          console.error('[TextLayer] Error rendering text layer:', error);
+        }
       }
-    });
+    };
+
+    renderTextLayer();
 
     return () => {
       cancelled = true;
+      setTextLayerReady(false);
+      if (textLayerRef.current) {
+        textLayerRef.current.cancel();
+        textLayerRef.current = null;
+      }
     };
-  }, [page]);
+  }, [page, scale, viewport]);
 
-  // Handle text selection
   const handleMouseUp = useCallback(() => {
     if (!isSelecting) return;
     setIsSelecting(false);
@@ -75,7 +103,6 @@ export function TextLayer({ page, scale, onTextSelect }: TextLayerProps) {
     const selectedText = selection.toString().trim();
     if (!selectedText) return;
 
-    // Get selection rects relative to the container
     const range = selection.getRangeAt(0);
     const clientRects = range.getClientRects();
     const containerRect = containerRef.current.getBoundingClientRect();
@@ -83,7 +110,6 @@ export function TextLayer({ page, scale, onTextSelect }: TextLayerProps) {
     const rects: Rect[] = [];
     for (let i = 0; i < clientRects.length; i++) {
       const rect = clientRects[i];
-      // Convert to page coordinates (unscaled)
       rects.push({
         x: (rect.left - containerRect.left) / scale,
         y: (rect.top - containerRect.top) / scale,
@@ -106,7 +132,6 @@ export function TextLayer({ page, scale, onTextSelect }: TextLayerProps) {
     setSelectedHighlight(null);
   }, [setSelectedHighlight]);
 
-  // Handle highlight click
   const handleHighlightClick = useCallback(
     (highlightId: string) => {
       setSelectedHighlight(
@@ -116,46 +141,11 @@ export function TextLayer({ page, scale, onTextSelect }: TextLayerProps) {
     [selectedHighlightId, setSelectedHighlight]
   );
 
-  // Render text spans
-  const renderTextSpans = () => {
-    if (!textContent) return null;
-
-    return textContent.items.map((item, index) => {
-      if (!isTextItem(item)) return null;
-
-      // Transform: [scaleX, skewX, skewY, scaleY, translateX, translateY]
-      const [scaleX, , , scaleY, tx, ty] = item.transform;
-      const fontSize = Math.sqrt(scaleX * scaleX + scaleY * scaleY);
-      const fontHeight = fontSize * scale;
-
-      // Position in page coordinates, then scale
-      const left = tx * scale;
-      // PDF coordinates have origin at bottom-left, flip Y
-      const top = viewport.height - ty * scale - fontHeight;
-
-      return (
-        <span
-          key={index}
-          className="text-layer-span"
-          style={{
-            left: `${left}px`,
-            top: `${top}px`,
-            fontSize: `${fontHeight}px`,
-            transform: `scaleX(${item.width > 0 ? (item.width * scale) / (item.str.length * fontHeight * 0.5) : 1})`,
-          }}
-        >
-          {item.str}
-        </span>
-      );
-    });
-  };
-
-  // Render highlight overlays
   const renderHighlights = () => {
     return highlights.map((highlight) => (
       <div
         key={highlight.id}
-        className={`highlight-group ${selectedHighlightId === highlight.id ? 'selected' : ''}`}
+        className={'highlight-group ' + (selectedHighlightId === highlight.id ? 'selected' : '')}
         onClick={() => handleHighlightClick(highlight.id)}
       >
         {highlight.rects.map((rect, index) => (
@@ -163,10 +153,10 @@ export function TextLayer({ page, scale, onTextSelect }: TextLayerProps) {
             key={index}
             className="highlight-rect"
             style={{
-              left: `${rect.x * scale}px`,
-              top: `${rect.y * scale}px`,
-              width: `${rect.width * scale}px`,
-              height: `${rect.height * scale}px`,
+              left: rect.x * scale + 'px',
+              top: rect.y * scale + 'px',
+              width: rect.width * scale + 'px',
+              height: rect.height * scale + 'px',
               backgroundColor: highlight.color,
             }}
           />
@@ -178,21 +168,36 @@ export function TextLayer({ page, scale, onTextSelect }: TextLayerProps) {
   return (
     <div
       ref={containerRef}
-      className="text-layer"
+      className="text-layer-container"
       style={{
-        width: `${viewport.width}px`,
-        height: `${viewport.height}px`,
+        width: viewport.width + 'px',
+        height: viewport.height + 'px',
       }}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
     >
-      {renderHighlights()}
-      {renderTextSpans()}
+      <div
+        ref={textLayerDivRef}
+        className="textLayer"
+        style={{
+          width: viewport.width + 'px',
+          height: viewport.height + 'px',
+        }}
+      />
+      <div className="highlight-layer">
+        {renderHighlights()}
+      </div>
+      {/* TTS word highlight - renders when text layer is ready and TTS is active */}
+      {textLayerReady && (
+        <TtsWordHighlight
+          pageNumber={pageNumber}
+          scale={scale}
+        />
+      )}
     </div>
   );
 }
 
-// Hook for managing text selection and highlighting
 export function useTextSelection() {
   const [pendingSelection, setPendingSelection] = useState<TextSelection | null>(
     null

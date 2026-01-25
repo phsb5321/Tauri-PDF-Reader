@@ -3,30 +3,40 @@ import { ZOOM_LEVELS, ZOOM_MIN, ZOOM_MAX, ZOOM_STEP } from '../lib/constants';
 import './ZoomControls.css';
 
 export function ZoomControls() {
-  const { zoomLevel, setZoomLevel } = useDocumentStore();
+  const { zoomLevel, fitMode, setZoomLevel, setFitMode } = useDocumentStore();
 
   const handleZoomIn = () => {
-    const newZoom = Math.min(zoomLevel + ZOOM_STEP, ZOOM_MAX);
+    // Use larger step for bigger zoom levels
+    const step = zoomLevel >= 2.0 ? 0.5 : ZOOM_STEP;
+    const newZoom = Math.min(zoomLevel + step, ZOOM_MAX);
     setZoomLevel(newZoom);
   };
 
   const handleZoomOut = () => {
-    const newZoom = Math.max(zoomLevel - ZOOM_STEP, ZOOM_MIN);
+    // Use larger step for bigger zoom levels
+    const step = zoomLevel > 2.0 ? 0.5 : ZOOM_STEP;
+    const newZoom = Math.max(zoomLevel - step, ZOOM_MIN);
     setZoomLevel(newZoom);
   };
 
   const handleZoomSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
+
+    // Handle fit mode options
     if (value === 'fit-width' || value === 'fit-page') {
-      // These will be handled by the PdfViewer component
-      // For now, just use 100% as a fallback
-      setZoomLevel(1.0);
-    } else {
-      setZoomLevel(parseFloat(value));
+      setFitMode(value);
+      return;
     }
+
+    setZoomLevel(parseFloat(value));
   };
 
   const zoomPercentage = Math.round(zoomLevel * 100);
+
+  // Find closest zoom level for select dropdown
+  const closestZoomValue = ZOOM_LEVELS.reduce((prev, curr) =>
+    Math.abs(curr.value - zoomLevel) < Math.abs(prev.value - zoomLevel) ? curr : prev
+  ).value;
 
   return (
     <div className="zoom-controls">
@@ -45,18 +55,22 @@ export function ZoomControls() {
 
       <select
         className="zoom-select"
-        value={zoomLevel}
+        value={fitMode !== 'none' ? fitMode : closestZoomValue}
         onChange={handleZoomSelect}
         aria-label="Zoom level"
       >
-        {ZOOM_LEVELS.map((level) => (
-          <option key={level.value} value={level.value}>
-            {level.label}
-          </option>
-        ))}
+        <option value="fit-width">Fit Width</option>
+        <option value="fit-page">Fit Page</option>
+        <optgroup label="Zoom">
+          {ZOOM_LEVELS.map((level) => (
+            <option key={level.value} value={level.value}>
+              {level.label}
+            </option>
+          ))}
+        </optgroup>
       </select>
 
-      <span className="zoom-percentage">{zoomPercentage}%</span>
+      <span className="zoom-percentage" title="Current zoom level">{zoomPercentage}%</span>
 
       <button
         className="zoom-button"

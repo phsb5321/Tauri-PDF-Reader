@@ -8,7 +8,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: var(--z-modal);
 }
 
 .settings-panel {
@@ -342,4 +342,192 @@
   font-size: 12px;
   font-family: system-ui, -apple-system, sans-serif;
   color: var(--text-secondary, #666);
+}
+
+/* Quality Mode Options */
+.setting-group {
+  margin-bottom: 20px;
+}
+
+.setting-group:last-child {
+  margin-bottom: 0;
+}
+
+.setting-hint {
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.quality-mode-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.quality-mode-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 12px 16px;
+  border: 2px solid var(--border-color, #e0e0e0);
+  background: var(--bg-primary, #fff);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+}
+
+.quality-mode-option:hover {
+  border-color: var(--primary-color, #2196f3);
+  background: var(--hover-bg, #f5f5f5);
+}
+
+.quality-mode-option.active {
+  border-color: var(--primary-color, #2196f3);
+  background: var(--primary-light, rgba(33, 150, 243, 0.08));
+}
+
+.quality-mode-option:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.quality-mode-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.quality-mode-description {
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+}
+
+/* Slider container */
+.slider-container {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.settings-slider {
+  flex: 1;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--bg-tertiary, #e0e0e0);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+
+.settings-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: var(--primary-color, #2196f3);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.settings-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+
+.settings-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: var(--primary-color, #2196f3);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.slider-value {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #1a1a1a);
+  min-width: 50px;
+  text-align: right;
+}
+
+/* Restart notice */
+.restart-notice {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: var(--warning-bg, #fff3cd);
+  border: 1px solid var(--warning-border, #ffc107);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--warning-text, #856404);
+}
+
+/* Safe Mode Banner (FR-015) */
+.safe-mode-banner {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  background: var(--error-bg, #fef2f2);
+  border: 1px solid var(--error-border, #fecaca);
+  border-radius: 8px;
+}
+
+.safe-mode-icon {
+  font-size: 24px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.safe-mode-content {
+  flex: 1;
+}
+
+.safe-mode-content strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--error-text, #dc2626);
+  margin-bottom: 4px;
+}
+
+.safe-mode-content p {
+  font-size: 13px;
+  color: var(--text-secondary, #666);
+  margin: 0 0 12px;
+  line-height: 1.4;
+}
+
+.safe-mode-reset-btn {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #fff;
+  background: var(--primary-color, #2196f3);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.safe-mode-reset-btn:hover {
+  background: var(--primary-dark, #1976d2);
+}
+
+.safe-mode-reset-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Platform-specific note */
+.platform-note {
+  font-style: italic;
+  color: var(--text-tertiary, #999);
 }

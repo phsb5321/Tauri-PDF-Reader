@@ -8,3 +8,4 @@ export {
   EmptyState,
 } from './LoadingState';
 export { ScannedPdfWarning } from './ScannedPdfWarning';
+export { MemoryCapWarning } from './MemoryCapWarning';

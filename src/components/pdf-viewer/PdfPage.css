@@ -25,8 +25,26 @@
   position: absolute;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
+  /* Canvas dimensions are set by JavaScript for high-DPI rendering */
+}
+
+/* Annotation layer for links and interactive elements */
+.pdf-page-annotation-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: auto;
+  z-index: 4;
+}
+
+/* Style links in annotation layer */
+.pdf-page-annotation-layer a {
+  display: block;
+  position: absolute;
+}
+
+.pdf-page-annotation-layer a:hover {
+  background-color: rgba(255, 255, 0, 0.2);
 }
 
 .pdf-page-loading {

@@ -6,17 +6,50 @@
   overflow: auto;
   background: var(--viewer-bg);
   padding: 1rem;
+  /* Prevent selecting the viewer background */
+  user-select: none;
 }
 
 .pdf-page-container {
-  display: flex;
-  justify-content: center;
+  position: relative;
+  display: inline-block;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   background: white;
+  /* Prevent selecting the page container itself */
+  user-select: none;
 }
 
 .pdf-canvas {
   display: block;
+  /* Force GPU compositing for hardware acceleration */
+  transform: translateZ(0);
+  will-change: contents;
+  /* Optimize rendering - use optimizeQuality as primary with webkit fallback */
+  image-rendering: optimizeQuality;
+  /* Canvas should not be selectable */
+  user-select: none;
+  pointer-events: none;
+}
+
+/* Text layer overlay - positioned on top of canvas for text selection */
+.pdf-page-container .textLayer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: hidden;
+  /* Only text layer spans should be selectable */
+  user-select: text;
+}
+
+/* Ensure only actual text spans are selectable */
+.pdf-page-container .textLayer span {
+  user-select: text;
+}
+
+/* Prevent highlight overlays from being selected */
+.pdf-page-container .highlight-overlay,
+.pdf-page-container .tts-word-highlight-layer {
+  user-select: none;
 }
 
 /* Empty state */

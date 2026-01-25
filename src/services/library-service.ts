@@ -28,10 +28,11 @@ export const libraryService = {
    * Add a new document to the library
    */
   async addDocument(options: AddDocumentOptions): Promise<Document> {
+    // Tauri expects snake_case parameter names matching Rust function signatures
     return invoke<Document>('library_add_document', {
-      filePath: options.filePath,
+      file_path: options.filePath,
       title: options.title,
-      pageCount: options.pageCount,
+      page_count: options.pageCount,
     });
   },
 
@@ -46,25 +47,28 @@ export const libraryService = {
    * Get a document by file path
    */
   async getDocumentByPath(filePath: string): Promise<Document | null> {
-    return invoke<Document | null>('library_get_document_by_path', { filePath });
+    // Tauri expects snake_case parameter names matching Rust function signatures
+    return invoke<Document | null>('library_get_document_by_path', { file_path: filePath });
   },
 
   /**
    * Update reading progress for a document
    */
   async updateProgress(id: string, currentPage: number): Promise<void> {
-    return invoke<void>('library_update_progress', { id, currentPage });
+    // Tauri expects snake_case parameter names matching Rust function signatures
+    return invoke<void>('library_update_progress', { id, current_page: currentPage });
   },
 
   /**
    * Update document metadata
    */
   async updateDocument(options: UpdateDocumentOptions): Promise<void> {
+    // Tauri expects snake_case parameter names matching Rust function signatures
     return invoke<void>('library_update_document', {
       id: options.id,
       title: options.title,
-      pageCount: options.pageCount,
-      fileHash: options.fileHash,
+      page_count: options.pageCount,
+      file_hash: options.fileHash,
     });
   },
 
@@ -72,8 +76,9 @@ export const libraryService = {
    * List all documents in the library
    */
   async listDocuments(options: ListDocumentsOptions = {}): Promise<Document[]> {
+    // Tauri expects snake_case parameter names matching Rust function signatures
     return invoke<Document[]>('library_list_documents', {
-      orderBy: options.orderBy,
+      order_by: options.orderBy,
       limit: options.limit,
       offset: options.offset,
     });

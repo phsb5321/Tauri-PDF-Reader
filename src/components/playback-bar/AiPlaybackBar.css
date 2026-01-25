@@ -95,6 +95,33 @@
   }
 }
 
+/* Word progress indicator */
+.ai-playback-progress {
+  flex: 1;
+  max-width: 200px;
+  height: 4px;
+  background: var(--background-tertiary, #2a2a2a);
+  border-radius: 2px;
+  position: relative;
+  overflow: hidden;
+}
+
+.ai-playback-progress-bar {
+  height: 100%;
+  background: var(--accent-color, #7c3aed);
+  border-radius: 2px;
+  transition: width 0.1s ease-out;
+}
+
+.ai-playback-progress-text {
+  position: absolute;
+  right: 0;
+  top: -18px;
+  font-size: 11px;
+  color: var(--text-secondary, #888);
+  font-variant-numeric: tabular-nums;
+}
+
 .ai-playback-settings-section {
   display: flex;
   align-items: center;
@@ -108,7 +135,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: var(--z-modal);
 }
 
 .ai-playback-settings-container {
@@ -159,4 +186,47 @@
     width: 100%;
     justify-content: space-between;
   }
+}
+
+/* Auto-page toggle button */
+.ai-playback-button-toggle {
+  opacity: 0.5;
+}
+
+.ai-playback-button-toggle.active {
+  opacity: 1;
+  color: var(--accent-color, #7c3aed);
+}
+
+.ai-playback-button-toggle:hover {
+  opacity: 1;
+}
+
+/* Improved progress display */
+.ai-playback-progress {
+  flex: 1;
+  max-width: 300px;
+  height: 6px;
+  background: var(--background-tertiary, #2a2a2a);
+  border-radius: 3px;
+  position: relative;
+  overflow: visible;
+}
+
+.ai-playback-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-color, #7c3aed), #a855f7);
+  border-radius: 3px;
+  transition: width 0.15s ease-out;
+  box-shadow: 0 0 8px rgba(124, 58, 237, 0.4);
+}
+
+.ai-playback-progress-text {
+  position: absolute;
+  right: 0;
+  top: -20px;
+  font-size: 11px;
+  color: var(--text-secondary, #888);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }

@@ -1,3 +1,11 @@
+// Hexagonal architecture layers
+pub mod adapters;
+pub mod application;
+pub mod domain;
+pub mod ports;
+pub mod tauri_api;
+
+// Legacy modules (to be migrated)
 mod commands;
 mod db;
 mod services;
@@ -7,6 +15,149 @@ mod tts;
 
 #[cfg(feature = "elevenlabs-tts")]
 mod ai_tts;
+
+/// Hardware acceleration configuration module
+/// Handles platform-specific GPU acceleration settings and safe boot fallback
+mod hw_accel {
+    use std::fs;
+    use std::path::PathBuf;
+
+    /// Configuration file names
+    const HW_ACCEL_DISABLED_FLAG: &str = ".hw_accel_disabled";
+    const CRASH_FLAG: &str = ".crash_flag";
+    const SAFE_MODE_FLAG: &str = ".safe_mode";
+
+    /// Get the app data directory for storing configuration flags
+    fn get_config_dir() -> Option<PathBuf> {
+        dirs::data_local_dir().map(|p| p.join("com.voxpage.pdf-reader"))
+    }
+
+    /// Check if hardware acceleration should be disabled
+    /// Returns true if HW accel should be DISABLED (i.e., software rendering)
+    pub fn should_disable_hw_accel() -> bool {
+        let config_dir = match get_config_dir() {
+            Some(dir) => dir,
+            None => return false, // Default to enabled if can't determine
+        };
+
+        // Check for explicit disable flag
+        let disabled_flag = config_dir.join(HW_ACCEL_DISABLED_FLAG);
+        if disabled_flag.exists() {
+            tracing::info!("Hardware acceleration disabled by user preference");
+            return true;
+        }
+
+        // Check for safe mode (after crash)
+        let safe_mode_flag = config_dir.join(SAFE_MODE_FLAG);
+        if safe_mode_flag.exists() {
+            tracing::warn!("Safe mode enabled - hardware acceleration disabled");
+            return true;
+        }
+
+        // Check platform-specific defaults
+        #[cfg(target_os = "linux")]
+        {
+            // Default to software rendering on Linux due to WebKitGTK issues
+            tracing::info!("Linux detected - using software rendering by default");
+            return true;
+        }
+
+        #[cfg(not(target_os = "linux"))]
+        {
+            false
+        }
+    }
+
+    /// Set crash flag before potential crash-causing operation
+    pub fn set_crash_flag() {
+        if let Some(config_dir) = get_config_dir() {
+            let _ = fs::create_dir_all(&config_dir);
+            let crash_flag = config_dir.join(CRASH_FLAG);
+            let _ = fs::write(&crash_flag, "starting");
+        }
+    }
+
+    /// Clear crash flag after successful startup
+    pub fn clear_crash_flag() {
+        if let Some(config_dir) = get_config_dir() {
+            let crash_flag = config_dir.join(CRASH_FLAG);
+            let _ = fs::remove_file(crash_flag);
+        }
+    }
+
+    /// Check if app crashed on last startup and enable safe mode
+    /// Returns true if safe mode was activated
+    pub fn check_and_handle_crash() -> bool {
+        let config_dir = match get_config_dir() {
+            Some(dir) => dir,
+            None => return false,
+        };
+
+        let crash_flag = config_dir.join(CRASH_FLAG);
+        if crash_flag.exists() {
+            tracing::warn!("Crash flag detected from previous startup");
+
+            // Enable safe mode
+            let safe_mode_flag = config_dir.join(SAFE_MODE_FLAG);
+            let _ = fs::write(&safe_mode_flag, "enabled due to crash");
+
+            // Clean up crash flag
+            let _ = fs::remove_file(crash_flag);
+
+            return true;
+        }
+
+        false
+    }
+
+    /// Clear safe mode flag (called when user explicitly re-enables HW accel)
+    pub fn clear_safe_mode() {
+        if let Some(config_dir) = get_config_dir() {
+            let safe_mode_flag = config_dir.join(SAFE_MODE_FLAG);
+            let _ = fs::remove_file(safe_mode_flag);
+        }
+    }
+
+    /// Set hardware acceleration preference
+    pub fn set_hw_accel_enabled(enabled: bool) {
+        if let Some(config_dir) = get_config_dir() {
+            let _ = fs::create_dir_all(&config_dir);
+            let disabled_flag = config_dir.join(HW_ACCEL_DISABLED_FLAG);
+
+            if enabled {
+                // Remove the disabled flag
+                let _ = fs::remove_file(&disabled_flag);
+                // Also clear safe mode when explicitly enabling
+                clear_safe_mode();
+            } else {
+                // Create the disabled flag
+                let _ = fs::write(&disabled_flag, "disabled by user");
+            }
+        }
+    }
+
+    /// Check if safe mode is currently active
+    pub fn is_safe_mode_active() -> bool {
+        get_config_dir()
+            .map(|dir| dir.join(SAFE_MODE_FLAG).exists())
+            .unwrap_or(false)
+    }
+
+    /// Apply Linux-specific environment variables for WebKitGTK
+    #[cfg(target_os = "linux")]
+    pub fn apply_linux_env() {
+        if should_disable_hw_accel() {
+            // Disable GPU compositing for WebKitGTK
+            std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
+            tracing::info!("Set WEBKIT_DISABLE_COMPOSITING_MODE=1 for software rendering");
+        }
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    pub fn apply_linux_env() {
+        // No-op on non-Linux platforms
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -18,12 +169,13 @@ mod tests {
         let doc = Document {
             id: "abc123".to_string(),
             file_path: "/path/to/file.pdf".to_string(),
-            title: "Test Document".to_string(),
-            page_count: 10,
+            title: Some("Test Document".to_string()),
+            page_count: Some(10),
             current_page: 1,
             scroll_position: 0.0,
             last_tts_chunk_id: None,
-            last_opened_at: "2026-01-12T00:00:00Z".to_string(),
+            last_opened_at: Some("2026-01-12T00:00:00Z".to_string()),
+            file_hash: Some("hash123".to_string()),
             created_at: "2026-01-12T00:00:00Z".to_string(),
         };
         let json = serde_json::to_string(&doc).unwrap();
@@ -127,12 +279,19 @@ mod tests {
     }
 }
 
+use tauri_specta::{collect_commands, Builder};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use commands::library::*;
 use commands::highlights::*;
+use commands::library::*;
 use commands::settings::*;
-use services::logging::{get_debug_logs, clear_debug_logs, export_debug_logs};
+use services::logging::{clear_debug_logs, export_debug_logs, get_debug_logs};
+
+// Hexagonal architecture imports (v2 commands using new architecture)
+use tauri_api::{
+    settings_delete_v2, settings_get_all_v2, settings_get_v2, settings_set_batch_v2,
+    settings_set_v2,
+};
 
 #[cfg(feature = "native-tts")]
 use commands::tts::*;
@@ -149,6 +308,56 @@ pub fn run() {
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
+
+    // Check for crash from previous startup and enable safe mode if needed (FR-015)
+    let crashed_last_time = hw_accel::check_and_handle_crash();
+    if crashed_last_time {
+        tracing::warn!("Application crashed on last startup - entering safe mode");
+    }
+
+    // Apply Linux-specific environment variables before WebView creation
+    hw_accel::apply_linux_env();
+
+    // Set crash flag before WebView creation (cleared on successful startup)
+    hw_accel::set_crash_flag();
+
+    // Configure tauri-specta for type-safe commands
+    // Note: Commands using serde_json::Value are excluded as they're not compatible with specta type generation
+    // The v2 settings and logging commands will be added once their types are fully migrated
+    let specta_builder = Builder::<tauri::Wry>::new().commands(collect_commands![
+        // Library commands
+        library_add_document,
+        library_get_document,
+        library_get_document_by_path,
+        library_update_progress,
+        library_update_document,
+        library_list_documents,
+        library_remove_document,
+        library_open_document,
+        library_check_file_exists,
+        library_update_title,
+        library_relocate_document,
+        // Highlights commands
+        highlights_create,
+        highlights_batch_create,
+        highlights_list_for_page,
+        highlights_list_for_document,
+        highlights_get,
+        highlights_update,
+        highlights_delete,
+        highlights_delete_for_document,
+        highlights_export,
+    ]);
+
+    // Generate TypeScript bindings in development
+    // Using header to disable strict type checking for auto-generated code
+    #[cfg(debug_assertions)]
+    specta_builder
+        .export(
+            specta_typescript::Typescript::default().header("// @ts-nocheck\n/* eslint-disable */"),
+            "../src/lib/bindings.ts",
+        )
+        .expect("Failed to export TypeScript bindings");
 
     #[allow(unused_mut)]
     let mut builder = tauri::Builder::default()
@@ -197,12 +406,24 @@ pub fn run() {
             highlights_delete,
             highlights_delete_for_document,
             highlights_export,
-            // Settings commands
+            // Settings commands (legacy)
             settings_get,
             settings_set,
             settings_get_all,
             settings_delete,
             settings_set_batch,
+            // Settings commands (v2 - hexagonal architecture)
+            settings_get_v2,
+            settings_set_v2,
+            settings_get_all_v2,
+            settings_delete_v2,
+            settings_set_batch_v2,
+            // Render settings commands (type-safe)
+            get_render_settings,
+            update_render_settings,
+            // Hardware acceleration status commands
+            get_hw_accel_status,
+            clear_safe_mode,
             // Debug/logging commands
             get_debug_logs,
             clear_debug_logs,
@@ -238,6 +459,8 @@ pub fn run() {
             #[cfg(feature = "elevenlabs-tts")]
             ai_tts_speak,
             #[cfg(feature = "elevenlabs-tts")]
+            ai_tts_speak_with_timestamps,
+            #[cfg(feature = "elevenlabs-tts")]
             ai_tts_stop,
             #[cfg(feature = "elevenlabs-tts")]
             ai_tts_pause,
@@ -251,9 +474,49 @@ pub fn run() {
             ai_tts_get_state,
             #[cfg(feature = "elevenlabs-tts")]
             ai_tts_get_config,
+            // AI TTS cache commands
+            #[cfg(feature = "elevenlabs-tts")]
+            ai_tts_cache_info,
+            #[cfg(feature = "elevenlabs-tts")]
+            ai_tts_cache_clear,
+            #[cfg(feature = "elevenlabs-tts")]
+            ai_tts_cache_invalidate_voice,
+            // AI TTS pre-buffering
+            #[cfg(feature = "elevenlabs-tts")]
+            ai_tts_prebuffer,
         ])
-        .setup(|_app| {
+        .setup(|app| {
             tracing::info!("PDF Reader starting...");
+
+            // Clear crash flag on successful startup (FR-015 safe boot recovery)
+            hw_accel::clear_crash_flag();
+
+            // Log hardware acceleration status
+            if hw_accel::should_disable_hw_accel() {
+                tracing::info!("Running with software rendering (hardware acceleration disabled)");
+            } else {
+                tracing::info!("Running with hardware acceleration enabled");
+            }
+
+            if hw_accel::is_safe_mode_active() {
+                tracing::warn!("Safe mode is active - some features may be limited");
+            }
+
+            // Initialize TTS audio cache with app cache directory
+            #[cfg(feature = "elevenlabs-tts")]
+            {
+                use tauri::Manager;
+                if let Some(cache_dir) = app.path().app_cache_dir().ok() {
+                    let state = app.state::<AiTtsEngineState>();
+                    let engine = state.0.clone();
+                    // Spawn async task to initialize cache
+                    tauri::async_runtime::spawn(async move {
+                        let mut engine = engine.write().await;
+                        engine.init_cache(cache_dir);
+                    });
+                }
+            }
+
             Ok(())
         })
         .run(tauri::generate_context!())

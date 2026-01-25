@@ -1,6 +1,10 @@
 //! Audio playback using rodio
 //!
 //! Handles MP3 decoding and playback to system audio output.
+//!
+//! Note: This module is prepared for ElevenLabs TTS integration but not yet active.
+
+#![allow(dead_code)]
 
 use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink};
 use std::io::Cursor;
@@ -50,6 +54,8 @@ impl AudioPlayer {
 
     /// Play MP3 audio data
     pub fn play_mp3(&self, data: &[u8]) -> Result<(), String> {
+        tracing::info!("play_mp3 called with {} bytes of audio data", data.len());
+        
         self.ensure_stream()?;
 
         let mut state = self
@@ -59,6 +65,7 @@ impl AudioPlayer {
 
         // Stop any existing playback
         if let Some(sink) = state.sink.take() {
+            tracing::debug!("Stopping existing playback");
             sink.stop();
         }
 
@@ -72,16 +79,16 @@ impl AudioPlayer {
         let cursor = Cursor::new(data.to_vec());
 
         // Decode MP3
-        let source =
-            Decoder::new(cursor).map_err(|e| format!("DECODE_ERROR: Failed to decode MP3: {}", e))?;
+        tracing::debug!("Decoding MP3 audio...");
+        let source = Decoder::new(cursor)
+            .map_err(|e| format!("DECODE_ERROR: Failed to decode MP3: {}", e))?;
 
         // Create sink and play
-        let sink =
-            Sink::try_new(stream_handle).map_err(|e| format!("SINK_ERROR: {}", e))?;
+        tracing::debug!("Creating audio sink...");
+        let sink = Sink::try_new(stream_handle).map_err(|e| format!("SINK_ERROR: {}", e))?;
 
         sink.append(source);
-
-        tracing::debug!("Started audio playback");
+        tracing::info!("Audio playback started successfully, sink empty={}", sink.empty());
 
         state.sink = Some(sink);
 
@@ -199,11 +206,7 @@ impl AudioPlayer {
             Err(_) => return false,
         };
 
-        state
-            .sink
-            .as_ref()
-            .map(|s| s.is_paused())
-            .unwrap_or(false)
+        state.sink.as_ref().map(|s| s.is_paused()).unwrap_or(false)
     }
 }
 

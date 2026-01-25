@@ -84,21 +84,40 @@ export function usePageCache(
 
       try {
         const page = await pdfDocument.getPage(pageNumber);
+
+        // Get viewport at the desired scale
         const viewport = page.getViewport({ scale });
 
-        // Create offscreen canvas
-        const canvas = document.createElement('canvas');
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
+        // Support HiDPI screens - use 4x for maximum quality
+        const devicePixelRatio = window.devicePixelRatio || 1;
+        const outputScale = Math.max(devicePixelRatio, 4);
 
-        const context = canvas.getContext('2d');
+        // Create offscreen canvas at high-DPI resolution
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.floor(viewport.width * outputScale);
+        canvas.height = Math.floor(viewport.height * outputScale);
+
+        // Get hardware-accelerated 2D context with optimal settings
+        const context = canvas.getContext('2d', {
+          alpha: false,           // Opaque canvas - faster rendering
+          willReadFrequently: false, // Keep GPU acceleration enabled
+        });
         if (!context) {
           throw new Error('Could not get canvas 2D context');
         }
 
+        // Enable high-quality image rendering
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = 'high';
+
+        // Create transform matrix for HiDPI rendering (official PDF.js approach)
+        const transform: [number, number, number, number, number, number] | undefined =
+          outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : undefined;
+
         await page.render({
           canvasContext: context,
-          viewport,
+          transform: transform,
+          viewport: viewport,
         }).promise;
 
         // Cache the rendered page

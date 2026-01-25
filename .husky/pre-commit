@@ -1,0 +1,37 @@
+#!/bin/sh
+
+# Pre-commit hook for Tauri PDF Reader
+# Runs frontend lint-staged and backend checks
+
+set -e
+
+echo "🔍 Running pre-commit checks..."
+
+# Frontend checks via lint-staged
+echo "📦 Running lint-staged (TypeScript)..."
+pnpm lint-staged
+
+# TypeScript type checking
+echo "📝 Running TypeScript check..."
+pnpm typecheck
+
+# Backend checks (only if Rust files changed)
+if git diff --cached --name-only | grep -q "src-tauri/"; then
+  echo "🦀 Running Rust checks..."
+
+  # Format check
+  echo "  → cargo fmt --check"
+  cd src-tauri && cargo fmt --check
+
+  # Clippy linting
+  echo "  → cargo clippy"
+  cargo clippy -- -D warnings
+
+  # Run tests with test-mocks feature
+  echo "  → cargo test"
+  cargo test --features test-mocks
+
+  cd ..
+fi
+
+echo "✅ Pre-commit checks passed!"

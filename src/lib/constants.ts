@@ -10,17 +10,20 @@ export const HIGHLIGHT_COLORS = [
 export const DEFAULT_HIGHLIGHT_COLORS = HIGHLIGHT_COLORS.map((c) => c.hex);
 export const DEFAULT_HIGHLIGHT_COLOR = HIGHLIGHT_COLORS[0].hex;
 
-// Zoom levels
+// Zoom levels - higher defaults for better readability
 export const ZOOM_LEVELS = [
   { value: 0.5, label: '50%' },
   { value: 0.75, label: '75%' },
   { value: 1.0, label: '100%' },
   { value: 1.25, label: '125%' },
   { value: 1.5, label: '150%' },
+  { value: 1.75, label: '175%' },
   { value: 2.0, label: '200%' },
+  { value: 2.5, label: '250%' },
+  { value: 3.0, label: '300%' },
 ] as const;
 
-export const DEFAULT_ZOOM_LEVEL = 1.0;
+export const DEFAULT_ZOOM_LEVEL = 1.5; // 150% for better readability
 export const ZOOM_MIN = 0.25;
 export const ZOOM_MAX = 4.0;
 export const ZOOM_STEP = 0.25;
