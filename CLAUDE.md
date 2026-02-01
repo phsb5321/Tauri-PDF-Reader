@@ -262,3 +262,10 @@ sudo apt install -y \
 # TTS (Speech Dispatcher)
 sudo apt install -y speech-dispatcher libspeechd-dev
 ```
+
+## Active Technologies
+- TypeScript 5.6.x (frontend), Rust 2021 edition (backend) + React 18.3+, Zustand 5.x, Tauri 2.x, rodio 0.21+, id3 1.x (006-reading-session-audio-cache)
+- SQLite via tauri-plugin-sql (metadata) + filesystem (audio files) (006-reading-session-audio-cache)
+
+## Recent Changes
+- 006-reading-session-audio-cache: Added TypeScript 5.6.x (frontend), Rust 2021 edition (backend) + React 18.3+, Zustand 5.x, Tauri 2.x, rodio 0.21+, id3 1.x

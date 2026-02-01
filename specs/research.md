@@ -525,3 +525,454 @@ From spec.md, the following spikes should be completed before full implementatio
 - [Rust TTS Crate](https://docs.rs/tts/latest/tts/)
 - [tauri-plugin-sql](https://tauri.app/plugin/sql/)
 - [Tauri WebDriver Testing](https://tauri.app/develop/tests/webdriver/)
+
+---
+
+## Codebase Audit (2026-02-01)
+
+**Purpose**: Architecture & Professionalization Audit for US2 (Persistent Highlights) readiness  
+**Scope**: Full-stack analysis of Tauri PDF Reader codebase  
+**Conducted by**: OpenCode swarm (7 parallel auditors)
+
+---
+
+### Executive Summary
+
+The Tauri PDF Reader codebase demonstrates a **mature hexagonal architecture** with well-defined ports and adapters. The highlight infrastructure for US2 is **architecturally ready** with full type-safe IPC contracts via tauri-specta. However, several issues require attention before US2 implementation:
+
+| Category | Status | Key Finding |
+|----------|--------|-------------|
+| **Architecture** | 🟢 Strong | 95% hexagonal compliance, 2 boundary violations |
+| **Security** | 🟡 Needs Work | Overly permissive FS scope (`**/*`), `unsafe-eval` in CSP |
+| **Data Layer** | 🟡 Needs Work | PRAGMA config not applied, missing transactions |
+| **IPC Contracts** | 🟢 Strong | Highlight commands fully type-safe via tauri-specta |
+| **Testing** | 🟡 Partial | 80% coverage enforced, but E2E tests non-functional |
+| **UX/A11y** | 🟡 Partial | Good foundation, missing keyboard shortcuts & focus traps |
+
+**US2 Readiness**: HIGH - The architecture supports persistent highlights; fix P0 blockers first.
+
+---
+
+### 1. Codebase Architecture Findings
+
+#### Module Structure
+
+**Frontend (`src/`)**:
+```
+src/
+├── adapters/tauri/          # Type-safe IPC adapters ✓
+├── domain/                  # Pure business logic ✓
+│   ├── highlight/           # US2-ready: merge.ts with tests
+│   └── errors.ts            # AppError types
+├── ports/                   # Interface definitions ✓
+│   └── highlight-repository.port.ts  # US2-ready
+├── components/              # UI layer
+│   └── pdf-viewer/          # HighlightOverlay, HighlightToolbar
+├── stores/                  # Zustand (8 stores)
+├── hooks/                   # 19 hooks
+└── lib/
+    ├── bindings.ts          # Generated tauri-specta
+    └── api/                 # Legacy invoke wrappers (tech debt)
+```
+
+**Backend (`src-tauri/src/`)**:
+```
+src-tauri/src/
+├── commands/highlights/     # CRUD commands (type-safe)
+├── domain/highlight/        # Entities with tests
+├── ports/                   # Repository traits (mockall)
+├── adapters/sqlite/         # 3 of 5 adapters implemented
+└── application/             # Services with comprehensive tests
+```
+
+#### Hotspots (Complexity Concerns)
+
+| File | Lines | Issue | Severity |
+|------|-------|-------|----------|
+| `src/components/PdfViewer.tsx` | 620 | Too many responsibilities | HIGH |
+| `src/hooks/useTtsWordHighlight.ts` | 334 | Complex coordinate logic | MEDIUM |
+| `src/stores/session-store.ts` | 300 | Async complexity | MEDIUM |
+
+**Recommendation**: Split `PdfViewer.tsx` before US2 to reduce complexity in highlight integration.
+
+#### Boundary Violations (MUST FIX)
+
+| File | Line | Violation |
+|------|------|-----------|
+| `src/hooks/useHwAccelStatus.ts` | 9, 45, 61 | Direct `invoke()` in hooks layer |
+| `src/components/settings/DebugLogs.tsx` | 54 | Direct `invoke()` in components |
+
+**Fix**: Create `TauriHwAccelAdapter` implementing `HwAccelPort` interface.
+
+---
+
+### 2. Security Assessment
+
+#### Critical Issues (P0)
+
+| Issue | Risk | Fix |
+|-------|------|-----|
+| **FS scope `**/*`** | Full filesystem read access | Restrict to `$DOCUMENT/**/*.pdf`, `$HOME/**/*.pdf` |
+| **Asset protocol `**/*`** | Can load any file including secrets | Mirror FS scope restrictions |
+| **No deny rules** | Sensitive paths exposed | Add denies for `.ssh`, `.gnupg`, `/etc` |
+
+#### High Priority (P1)
+
+| Issue | Risk | Fix |
+|-------|------|-----|
+| **`unsafe-eval` in CSP** | XSS escalation | Replace with `'wasm-unsafe-eval'` |
+| **External CDN in CSP** | Supply chain risk | Remove `cdn.jsdelivr.net` or self-host |
+| **Unused `shell:allow-open`** | Process launch risk | Remove if not needed |
+
+#### Recommended Secure Configuration
+
+```json
+// src-tauri/capabilities/default.json
+{
+  "permissions": [
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        { "path": "$DOCUMENT/**/*.pdf" },
+        { "path": "$HOME/**/*.pdf" },
+        { "path": "$DOWNLOAD/**/*.pdf" }
+      ],
+      "deny": [
+        { "path": "$HOME/.ssh/**" },
+        { "path": "$HOME/.gnupg/**" },
+        { "path": "/etc/**" }
+      ]
+    }
+  ]
+}
+```
+
+**Source**: [Tauri Security Scopes](https://tauri.app/security/scope/)
+
+---
+
+### 3. PDF.js + Highlights Analysis
+
+#### Current Implementation (US2-Ready)
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Text Layer | ✅ | Proper PDF.js TextLayer with viewport scaling |
+| Selection Extraction | ⚠️ | Works but duplicates coordinate logic |
+| Coordinate Transforms | ✅ | `src/lib/coordinate-transform.ts` exists |
+| Highlight Rendering | ✅ | DOM-based with CSS `mix-blend-mode: multiply` |
+| Persistence Port | ✅ | `HighlightRepositoryPort` fully defined |
+
+#### Coordinate Storage Strategy
+
+Highlights are correctly stored in **PDF coordinates (scale=1.0)**:
+
+```
+User Selection (screen pixels)
+        ↓ ÷ scale
+PDF Coordinates → STORED IN DB
+        ↓ × scale (at render)
+Display Coordinates
+```
+
+**Why this matters**: Highlights survive zoom changes without recalculation.
+
+#### Recommendations for US2
+
+1. **Consolidate `Rect` type** - Currently defined in 3+ places
+2. **Use `coordinate-transform.ts`** consistently in selection extraction
+3. **Add selection preview** - Show temporary highlight during selection
+
+**Source**: [PDF.js Getting Started](https://mozilla.github.io/pdf.js/getting_started/)
+
+---
+
+### 4. SQLite/Data Layer Analysis
+
+#### Critical Issues (P0)
+
+| Issue | Impact | Fix |
+|-------|--------|-----|
+| **PRAGMA config not applied** | FK cascades broken, no WAL mode | Apply at connection time |
+| **No transaction in `highlights_batch_create`** | Partial data on failure | Wrap in `BEGIN`/`COMMIT` |
+
+```rust
+// Current: NO TRANSACTION (dangerous)
+pub async fn highlights_batch_create(...) {
+    for input in highlights {
+        sqlx::query("INSERT...").execute(&pool).await?; // Partial failure risk
+    }
+}
+
+// Fixed: With transaction
+let mut tx = pool.begin().await?;
+for input in highlights {
+    sqlx::query("INSERT...").execute(&mut *tx).await?;
+}
+tx.commit().await?;
+```
+
+#### Repository Architecture Gap
+
+| Repository | Port | Adapter | Status |
+|------------|------|---------|--------|
+| DocumentRepository | ✅ | ❌ | Commands use direct SQL |
+| HighlightRepository | ✅ | ❌ | Commands use direct SQL |
+| SettingsRepository | ✅ | ✅ | `SqliteSettingsRepo` |
+| SessionRepository | ✅ | ✅ | `SqliteSessionRepo` |
+
+**Recommendation**: Create `SqliteHighlightRepo` adapter for hexagonal compliance.
+
+#### Schema Assessment
+
+The `highlights` table is well-designed:
+```sql
+CREATE TABLE highlights (
+    id TEXT PRIMARY KEY,
+    document_id TEXT NOT NULL,
+    page_number INTEGER NOT NULL,
+    rects TEXT NOT NULL,           -- JSON array
+    color TEXT NOT NULL,
+    text_content TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+);
+CREATE INDEX idx_highlights_document_page ON highlights(document_id, page_number);
+```
+
+**Source**: [tauri-plugin-sql](https://v2.tauri.app/plugin/sql/)
+
+---
+
+### 5. IPC Contracts Assessment
+
+#### Type Safety Status
+
+**Highlight commands are fully type-safe** via tauri-specta:
+
+| Command | TypeScript Binding | Status |
+|---------|-------------------|--------|
+| `highlights_create` | `highlightsCreate()` | ✅ Type-safe |
+| `highlights_batch_create` | `highlightsBatchCreate()` | ✅ Type-safe |
+| `highlights_list_for_page` | `highlightsListForPage()` | ✅ Type-safe |
+| `highlights_update` | `highlightsUpdate()` | ✅ Type-safe |
+| `highlights_delete` | `highlightsDelete()` | ✅ Type-safe |
+| `highlights_export` | `highlightsExport()` | ✅ Type-safe |
+
+**Generated bindings**: `src/lib/bindings.ts` (auto-generated during `tauri dev`)
+
+#### Legacy Technical Debt
+
+| Area | Issue | Priority |
+|------|-------|----------|
+| `src/lib/api/*.ts` | 73 direct `invoke()` calls | P2 |
+| `src/services/library-service.ts` | Legacy service, 32 `invoke()` calls | P1 |
+| TTS/AI-TTS commands | Not registered with specta | P2 |
+
+#### Error Convention
+
+Commands use structured error codes:
+```rust
+"EMPTY_RECTS: Rects array cannot be empty"
+"DOCUMENT_NOT_FOUND: Document does not exist"
+"DATABASE_ERROR: {details}"
+```
+
+**Recommendation**: Parse error codes in frontend to map to `AppError` types.
+
+**Source**: [tauri-specta](https://github.com/specta-rs/tauri-specta)
+
+---
+
+### 6. Testing & Quality Gates
+
+#### Current Coverage
+
+| Layer | Tests | Threshold | Status |
+|-------|-------|-----------|--------|
+| Frontend (Vitest) | ~210 | 80% | ✅ Enforced |
+| Backend (Cargo) | ~146 | None | ⚠️ No threshold |
+| E2E | 0 (all skipped) | None | ❌ Not functional |
+
+#### CI Pipeline (`.github/workflows/ci.yml`)
+
+| Check | Command | Status |
+|-------|---------|--------|
+| TypeScript | `pnpm typecheck` | ✅ |
+| ESLint + Boundaries | `pnpm lint` | ✅ |
+| Frontend Tests | `pnpm test:run` | ✅ |
+| Coverage Gate | `pnpm test:coverage` | ✅ 80% |
+| Rust Clippy | `cargo clippy -- -D warnings` | ✅ |
+| Rust Tests | `cargo test --features test-mocks` | ✅ |
+
+#### Testing Gaps for US2
+
+| Missing | Priority | Effort |
+|---------|----------|--------|
+| `HighlightLayer.test.tsx` | HIGH | Medium |
+| `useTextSelection.test.ts` | HIGH | Medium |
+| Highlight CRUD integration test | HIGH | Medium |
+| E2E: Create/delete highlight | HIGH | High |
+
+**Source**: [Tauri WebDriver Testing](https://v2.tauri.app/develop/tests/webdriver/)
+
+---
+
+### 7. UX/Accessibility Findings
+
+#### Highlight UX (Good Foundation)
+
+| Component | Status |
+|-----------|--------|
+| `HighlightToolbar` | ✅ Complete with color swatches |
+| `HighlightOverlay` | ✅ DOM-based, CSS blend mode |
+| `HighlightContextMenu` | ✅ Delete, change color, add note |
+| `HighlightsPanel` | ✅ Grouped by page, export |
+
+#### Accessibility Gaps
+
+| Issue | WCAG | Fix |
+|-------|------|-----|
+| Missing focus trap in modals | 2.1.2 | Add focus trap to `NoteEditor` |
+| Toolbar not roving tabindex | 2.1.1 | Arrow key navigation between colors |
+| `--shadow-focus` token missing | 2.4.7 | Define in `tokens/shadows.css` |
+| No `aria-live` for announcements | 4.1.3 | Add live region for highlight CRUD |
+
+#### Missing Keyboard Shortcuts
+
+| Shortcut | Action | Priority |
+|----------|--------|----------|
+| `Ctrl+H` | Highlight with default color | HIGH |
+| `Ctrl+O` | Open file | HIGH |
+| `Ctrl+Z` | Undo | MEDIUM |
+
+**Source**: [WAI-ARIA Toolbar Pattern](https://www.w3.org/WAI/ARIA/apg/patterns/toolbar/)
+
+---
+
+### Decision Log (Tradeoffs)
+
+| Decision | Chosen | Alternative | Rationale |
+|----------|--------|-------------|-----------|
+| Highlight storage | PDF coordinates (scale=1.0) | Screen coordinates | Zoom-invariant, industry standard |
+| Highlight rendering | DOM-based | Canvas overlay | Preserves text selection, easier click handling |
+| Type generation | tauri-specta | Manual types | End-to-end type safety, auto-sync |
+| State management | Zustand | Redux/Jotai | Simple, performant, already in use |
+| Text selection | `getClientRects()` | PDF.js quads | Simpler, sufficient for rects |
+
+---
+
+### Prioritized Fix List (US2 Mapping)
+
+#### P0 - Critical (Must fix before US2)
+
+| ID | Issue | Impact on US2 | Effort | Task |
+|----|-------|---------------|--------|------|
+| P0-1 | Apply PRAGMA config (WAL, FK) | Cascade deletes may fail | Low | Before T038 |
+| P0-2 | Add transaction to batch_create | Partial highlight save | Low | Before T038 |
+| P0-3 | Fix `useHwAccelStatus` boundary violation | Lint failure | Low | Standalone |
+| P0-4 | Restrict FS scope to PDFs | Security risk | Low | Standalone |
+
+#### P1 - High (Should fix for US2)
+
+| ID | Issue | Impact | Effort | Task |
+|----|-------|--------|--------|------|
+| P1-1 | Add toast on highlight CRUD | No feedback to user | Low | T052 |
+| P1-2 | Add `Ctrl+H` shortcut | Slow workflow | Low | T051 |
+| P1-3 | Add focus trap to NoteEditor | A11y violation | Medium | T049 |
+| P1-4 | Create `HighlightLayer.test.tsx` | Coverage gap | Medium | T050 |
+| P1-5 | Remove `unsafe-eval` from CSP | Security | Medium | Standalone |
+
+#### P2 - Medium (Nice to have)
+
+| ID | Issue | Impact | Effort |
+|----|-------|--------|--------|
+| P2-1 | Split `PdfViewer.tsx` | Maintainability | High |
+| P2-2 | Consolidate `Rect` type definitions | Developer experience | Low |
+| P2-3 | Create `SqliteHighlightRepo` adapter | Architecture purity | Medium |
+| P2-4 | Add E2E test infrastructure | Regression safety | High |
+| P2-5 | Define `--shadow-focus` token | A11y completeness | Low |
+
+---
+
+### Source Links
+
+#### Official Documentation
+- [Tauri Security](https://tauri.app/security/) - Capabilities, CSP, scopes
+- [Tauri Permissions](https://tauri.app/security/permissions/) - Permission system
+- [tauri-plugin-sql](https://v2.tauri.app/plugin/sql/) - SQLite integration
+- [tauri-specta](https://github.com/specta-rs/tauri-specta) - Type-safe IPC
+- [Tauri WebDriver](https://v2.tauri.app/develop/tests/webdriver/) - E2E testing
+
+#### PDF.js
+- [Getting Started](https://mozilla.github.io/pdf.js/getting_started/)
+- [Examples](https://mozilla.github.io/pdf.js/examples/)
+
+#### Accessibility
+- [WAI-ARIA Toolbar Pattern](https://www.w3.org/WAI/ARIA/apg/patterns/toolbar/)
+- [WAI-ARIA Dialog Pattern](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/)
+- [WCAG 2.1 Guidelines](https://www.w3.org/TR/WCAG21/)
+
+#### SQLite Best Practices
+- [SQLite WAL Mode](https://www.sqlite.org/wal.html)
+- [sqlx documentation](https://docs.rs/sqlx/latest/sqlx/)
+
+---
+
+### Actionable Next Steps for `/speckit.plan` and `/speckit.tasks`
+
+#### Updates to `plan.md`
+
+1. **Add Security Hardening Phase** (before US2):
+   - Restrict FS/asset protocol scopes
+   - Remove `unsafe-eval` from CSP
+   - Remove unused `shell:allow-open`
+
+2. **Add Data Layer Fixes Phase** (before US2):
+   - Apply PRAGMA configuration at startup
+   - Wrap batch operations in transactions
+   - Create `SqliteHighlightRepo` adapter (optional)
+
+3. **Update Testing Strategy**:
+   - Add highlight component tests as prerequisite for T047-T054
+   - Document E2E infrastructure gap (defer to post-US2)
+
+#### Updates to `tasks.md`
+
+**Add new tasks before Phase 4 (US2 Highlights)**:
+
+```
+## Phase 3.5: US2 Prerequisites (Architecture Fixes)
+
+- [ ] T037.1 [P0] Apply PRAGMA config (WAL, FK) in src-tauri/src/db/mod.rs or tauri-plugin-sql config
+- [ ] T037.2 [P0] Wrap highlights_batch_create in transaction in src-tauri/src/commands/highlights/mod.rs
+- [ ] T037.3 [P0] Fix boundary violation: Create src/adapters/tauri/hw-accel.adapter.ts
+- [ ] T037.4 [P0] Restrict FS scope in src-tauri/capabilities/default.json to PDF directories only
+- [ ] T037.5 [P1] Remove unsafe-eval from CSP in src-tauri/tauri.conf.json
+
+**Checkpoint**: `pnpm verify` passes, security scan clean
+```
+
+**Modify existing US2 tasks**:
+
+```
+- [ ] T051 [US2] Add text selection handling + Ctrl+H shortcut in PdfViewer.tsx
+- [ ] T052 [US2] Implement highlight creation flow with toast feedback
+```
+
+**Add test tasks**:
+
+```
+- [ ] T054.1 [US2] Create src/__tests__/ui/HighlightLayer.test.tsx
+- [ ] T054.2 [US2] Create src/__tests__/hooks/useTextSelection.test.ts
+- [ ] T054.3 [US2] Add a11y: focus trap in NoteEditor, roving tabindex in HighlightToolbar
+```
+
+#### Recommended Task Order for US2
+
+1. **P0 Fixes** (T037.1-T037.5) - ~4 hours
+2. **Backend Highlights** (T038-T044) - Already in tasks.md
+3. **Frontend Services** (T045-T046) - Already in tasks.md
+4. **Component Tests** (T054.1-T054.2) - New
+5. **UI Components** (T047-T050) - Already in tasks.md
+6. **Integration + A11y** (T051-T053, T054.3) - Enhanced with shortcuts/toasts/a11y
