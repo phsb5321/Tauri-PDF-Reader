@@ -1,0 +1,56 @@
+/**
+ * CacheProgressBar Styles (T047)
+ */
+
+.cache-progress-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 80px;
+}
+
+.cache-progress-bar__track {
+  flex: 1;
+  height: 6px;
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.cache-progress-bar__fill {
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: var(--radius-sm);
+  transition: width var(--transition-normal);
+}
+
+.cache-progress-bar__label {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  min-width: 32px;
+  text-align: right;
+}
+
+/* Complete state */
+.cache-progress-bar--complete .cache-progress-bar__fill {
+  background: var(--color-success);
+}
+
+.cache-progress-bar--complete .cache-progress-bar__label {
+  color: var(--color-success);
+}
+
+/* Compact variant */
+.cache-progress-bar--compact {
+  min-width: 60px;
+  gap: var(--space-1);
+}
+
+.cache-progress-bar--compact .cache-progress-bar__track {
+  height: 4px;
+}
+
+.cache-progress-bar--compact .cache-progress-bar__label {
+  font-size: var(--text-xxs, 10px);
+  min-width: 24px;
+}

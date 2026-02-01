@@ -124,7 +124,7 @@ impl ElevenLabsClient {
     /// Create a new ElevenLabs client
     pub fn new(api_key: String) -> Self {
         tracing::info!("Creating ElevenLabs HTTP client with native-tls");
-        
+
         // ElevenLabs /with-timestamps endpoint can take 60+ seconds for long text
         let client = Client::builder()
             .timeout(std::time::Duration::from_secs(120))
@@ -141,7 +141,7 @@ impl ElevenLabsClient {
         let url = format!("{}/voices", BASE_URL);
 
         tracing::debug!("Fetching voices from: {}", url);
-        
+
         let response = self
             .client
             .get(&url)
@@ -159,8 +159,13 @@ impl ElevenLabsClient {
                 if e.is_timeout() {
                     tracing::error!("Request timed out");
                 }
-                format!("HTTP_ERROR: {} (is_connect={}, is_timeout={}, is_request={})", 
-                    e, e.is_connect(), e.is_timeout(), e.is_request())
+                format!(
+                    "HTTP_ERROR: {} (is_connect={}, is_timeout={}, is_request={})",
+                    e,
+                    e.is_connect(),
+                    e.is_timeout(),
+                    e.is_request()
+                )
             })?;
 
         if !response.status().is_success() {
@@ -345,7 +350,7 @@ impl ElevenLabsClient {
 
         let start_time = std::time::Instant::now();
         tracing::info!("Sending HTTP POST to {}", url);
-        
+
         let response = self
             .client
             .post(&url)
@@ -356,7 +361,12 @@ impl ElevenLabsClient {
             .await
             .map_err(|e| {
                 let elapsed = start_time.elapsed();
-                tracing::error!("HTTP request to {} failed after {:.2}s: {:?}", url, elapsed.as_secs_f64(), e);
+                tracing::error!(
+                    "HTTP request to {} failed after {:.2}s: {:?}",
+                    url,
+                    elapsed.as_secs_f64(),
+                    e
+                );
                 if let Some(source) = e.source() {
                     tracing::error!("Error source: {:?}", source);
                 }
@@ -364,14 +374,27 @@ impl ElevenLabsClient {
                     tracing::error!("Connection error - possible TLS/SSL issue");
                 }
                 if e.is_timeout() {
-                    tracing::error!("Request timed out after {:.2}s (timeout is 120s)", elapsed.as_secs_f64());
+                    tracing::error!(
+                        "Request timed out after {:.2}s (timeout is 120s)",
+                        elapsed.as_secs_f64()
+                    );
                 }
-                format!("HTTP_ERROR: {} (is_connect={}, is_timeout={}, is_request={}, elapsed={:.2}s)", 
-                    e, e.is_connect(), e.is_timeout(), e.is_request(), elapsed.as_secs_f64())
+                format!(
+                    "HTTP_ERROR: {} (is_connect={}, is_timeout={}, is_request={}, elapsed={:.2}s)",
+                    e,
+                    e.is_connect(),
+                    e.is_timeout(),
+                    e.is_request(),
+                    elapsed.as_secs_f64()
+                )
             })?;
 
         let elapsed = start_time.elapsed();
-        tracing::info!("HTTP response received in {:.2}s, status: {}", elapsed.as_secs_f64(), response.status());
+        tracing::info!(
+            "HTTP response received in {:.2}s, status: {}",
+            elapsed.as_secs_f64(),
+            response.status()
+        );
 
         if !response.status().is_success() {
             let status = response.status();
@@ -401,7 +424,10 @@ impl ElevenLabsClient {
             .decode(&tts_response.audio_base64)
             .map_err(|e| format!("BASE64_ERROR: {}", e))?;
 
-        tracing::debug!("Received {} bytes of audio with timestamps", audio_data.len());
+        tracing::debug!(
+            "Received {} bytes of audio with timestamps",
+            audio_data.len()
+        );
 
         // Convert character timings to word timings
         let (word_timings, total_duration) = match tts_response.alignment {
@@ -443,8 +469,16 @@ impl ElevenLabsClient {
 
         for (i, char_str) in alignment.characters.iter().enumerate() {
             let c = char_str.chars().next().unwrap_or(' ');
-            let start_time = alignment.character_start_times_seconds.get(i).copied().unwrap_or(0.0);
-            let end_time = alignment.character_end_times_seconds.get(i).copied().unwrap_or(0.0);
+            let start_time = alignment
+                .character_start_times_seconds
+                .get(i)
+                .copied()
+                .unwrap_or(0.0);
+            let end_time = alignment
+                .character_end_times_seconds
+                .get(i)
+                .copied()
+                .unwrap_or(0.0);
 
             if c.is_whitespace() || c == '\n' {
                 // End current word if we have one

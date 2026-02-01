@@ -1,12 +1,16 @@
-import { open } from '@tauri-apps/plugin-dialog';
-import { useDocumentStore } from '../stores/document-store';
-import { pdfService } from '../services/pdf-service';
-import { commands } from '../lib/bindings';
-import { PageNavigation } from './PageNavigation';
-import { ZoomControls } from './ZoomControls';
-import './Toolbar.css';
+import { useState } from "react";
+import { open } from "@tauri-apps/plugin-dialog";
+import { useDocumentStore } from "../stores/document-store";
+import { pdfService } from "../services/pdf-service";
+import { commands } from "../lib/bindings";
+import { PageNavigation } from "./PageNavigation";
+import { ZoomControls } from "./ZoomControls";
+import { SessionMenu } from "./session-menu/SessionMenu";
+import "./Toolbar.css";
 
 export function Toolbar() {
+  const [isSessionMenuOpen, setIsSessionMenuOpen] = useState(false);
+
   const {
     currentDocument,
     pdfDocument,
@@ -28,8 +32,8 @@ export function Toolbar() {
         multiple: false,
         filters: [
           {
-            name: 'PDF Documents',
-            extensions: ['pdf'],
+            name: "PDF Documents",
+            extensions: ["pdf"],
           },
         ],
       });
@@ -47,19 +51,24 @@ export function Toolbar() {
 
       // Check if document exists in library (using tauri-specta generated bindings)
       const existingResult = await commands.libraryGetDocumentByPath(filePath);
-      let document = existingResult.status === 'ok' ? existingResult.data : null;
+      let document =
+        existingResult.status === "ok" ? existingResult.data : null;
 
       if (document) {
         // Document exists, mark as opened and restore progress
         const openResult = await commands.libraryOpenDocument(document.id);
-        if (openResult.status === 'ok') {
+        if (openResult.status === "ok") {
           document = openResult.data;
           setCurrentPage(document.currentPage);
         }
       } else {
         // New document, add to library
-        const addResult = await commands.libraryAddDocument(filePath, null, pdf.numPages);
-        if (addResult.status === 'error') {
+        const addResult = await commands.libraryAddDocument(
+          filePath,
+          null,
+          pdf.numPages,
+        );
+        if (addResult.status === "error") {
           throw new Error(addResult.error);
         }
         document = addResult.data;
@@ -67,49 +76,84 @@ export function Toolbar() {
 
       // Update page count if it wasn't set
       if (!document.pageCount) {
-        await commands.libraryUpdateDocument(document.id, null, pdf.numPages, null);
+        await commands.libraryUpdateDocument(
+          document.id,
+          null,
+          pdf.numPages,
+          null,
+        );
         document = { ...document, pageCount: pdf.numPages };
       }
 
       setDocument(document);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to open PDF';
+      const message =
+        error instanceof Error ? error.message : "Failed to open PDF";
       setError(message);
-      console.error('Error opening PDF:', error);
+      console.error("Error opening PDF:", error);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleSessionRestored = () => {
+    // Close the session menu after restoring
+    setIsSessionMenuOpen(false);
+    // TODO: Open documents from the restored session
+  };
+
   return (
-    <div className="toolbar">
-      <div className="toolbar-section toolbar-left">
-        <button
-          className="toolbar-button open-button"
-          onClick={handleOpenFile}
-          disabled={isLoading}
-          title="Open PDF file"
-        >
-          <svg viewBox="0 0 24 24" className="toolbar-icon">
-            <path d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h6l2 2h6a2 2 0 012 2v10a2 2 0 01-2 2z" />
-          </svg>
-          <span className="button-text">Open</span>
-        </button>
+    <>
+      <div className="toolbar">
+        <div className="toolbar-section toolbar-left">
+          <button
+            className="toolbar-button sessions-button"
+            onClick={() => setIsSessionMenuOpen((open) => !open)}
+            title="Reading Sessions"
+            aria-pressed={isSessionMenuOpen}
+          >
+            <svg viewBox="0 0 24 24" className="toolbar-icon">
+              <path d="M4 4h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2z" />
+              <path d="M4 9h16" />
+              <path d="M9 4v5" />
+            </svg>
+            <span className="button-text">Sessions</span>
+          </button>
 
-        {currentDocument && (
-          <span className="document-title" title={currentDocument.filePath}>
-            {currentDocument.title || 'Untitled'}
-          </span>
-        )}
+          <button
+            className="toolbar-button open-button"
+            onClick={handleOpenFile}
+            disabled={isLoading}
+            title="Open PDF file"
+          >
+            <svg viewBox="0 0 24 24" className="toolbar-icon">
+              <path d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h6l2 2h6a2 2 0 012 2v10a2 2 0 01-2 2z" />
+            </svg>
+            <span className="button-text">Open</span>
+          </button>
+
+          {currentDocument && (
+            <span className="document-title" title={currentDocument.filePath}>
+              {currentDocument.title || "Untitled"}
+            </span>
+          )}
+        </div>
+
+        <div className="toolbar-section toolbar-center">
+          {pdfDocument && <PageNavigation />}
+        </div>
+
+        <div className="toolbar-section toolbar-right">
+          {pdfDocument && <ZoomControls />}
+        </div>
       </div>
 
-      <div className="toolbar-section toolbar-center">
-        {pdfDocument && <PageNavigation />}
-      </div>
-
-      <div className="toolbar-section toolbar-right">
-        {pdfDocument && <ZoomControls />}
-      </div>
-    </div>
+      {/* Session Menu Panel (T073) */}
+      <SessionMenu
+        isOpen={isSessionMenuOpen}
+        onClose={() => setIsSessionMenuOpen(false)}
+        onSessionRestored={handleSessionRestored}
+      />
+    </>
   );
 }

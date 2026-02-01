@@ -4,7 +4,8 @@
  * Type-safe implementations of repository ports using tauri-specta generated bindings.
  */
 
-export { TauriDocumentRepository } from './document-repository.adapter';
-export { TauriHighlightRepository } from './highlight-repository.adapter';
-export { TauriSettingsAdapter } from './settings.adapter';
-export { TauriTtsAdapter } from './tts.adapter';
+export { TauriDocumentRepository } from "./document-repository.adapter";
+export { TauriHighlightRepository } from "./highlight-repository.adapter";
+export { TauriSessionAdapter } from "./session.adapter";
+export { TauriSettingsAdapter } from "./settings.adapter";
+export { TauriTtsAdapter } from "./tts.adapter";

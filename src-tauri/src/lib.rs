@@ -282,6 +282,10 @@ mod tests {
 use tauri_specta::{collect_commands, Builder};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+use commands::audio_cache::*;
+use commands::audio_export::{
+    audio_export_cancel, audio_export_check_ready, audio_export_document, ExportState,
+};
 use commands::highlights::*;
 use commands::library::*;
 use commands::settings::*;
@@ -289,8 +293,10 @@ use services::logging::{clear_debug_logs, export_debug_logs, get_debug_logs};
 
 // Hexagonal architecture imports (v2 commands using new architecture)
 use tauri_api::{
-    settings_delete_v2, settings_get_all_v2, settings_get_v2, settings_set_batch_v2,
-    settings_set_v2,
+    session_add_document, session_create, session_delete, session_get, session_list,
+    session_remove_document, session_restore, session_touch, session_update,
+    session_update_document, settings_delete_v2, settings_get_all_v2, settings_get_v2,
+    settings_set_batch_v2, settings_set_v2,
 };
 
 #[cfg(feature = "native-tts")]
@@ -364,7 +370,8 @@ pub fn run() {
         .plugin(tauri_plugin_sql::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_shell::init());
+        .plugin(tauri_plugin_shell::init())
+        .manage(ExportState::new());
 
     // Register TTS state if feature enabled
     #[cfg(feature = "native-tts")]
@@ -484,6 +491,29 @@ pub fn run() {
             // AI TTS pre-buffering
             #[cfg(feature = "elevenlabs-tts")]
             ai_tts_prebuffer,
+            // Audio cache commands
+            audio_cache_get_coverage,
+            audio_cache_clear_document,
+            audio_cache_get_stats,
+            audio_cache_set_limit,
+            audio_cache_evict,
+            audio_cache_get_limit,
+            audio_cache_notify_coverage,
+            // Session commands (T062-T065)
+            session_create,
+            session_get,
+            session_list,
+            session_update,
+            session_delete,
+            session_restore,
+            session_add_document,
+            session_remove_document,
+            session_update_document,
+            session_touch,
+            // Audio export commands (T083-T084)
+            audio_export_check_ready,
+            audio_export_document,
+            audio_export_cancel,
         ])
         .setup(|app| {
             tracing::info!("PDF Reader starting...");

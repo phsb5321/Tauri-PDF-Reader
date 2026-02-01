@@ -178,8 +178,9 @@ impl SettingsValidator {
             }
             // Render quality mode - validate enum
             SettingKey::RenderQualityMode => {
-                let mode: String = serde_json::from_str(value)
-                    .map_err(|e| DomainError::validation(format!("Invalid quality mode value: {}", e)))?;
+                let mode: String = serde_json::from_str(value).map_err(|e| {
+                    DomainError::validation(format!("Invalid quality mode value: {}", e))
+                })?;
                 if !["performance", "balanced", "ultra"].contains(&mode.as_str()) {
                     return Err(DomainError::validation(format!(
                         "Invalid quality mode: {}. Expected performance, balanced, or ultra",
@@ -189,8 +190,9 @@ impl SettingsValidator {
             }
             // Render max megapixels - validate range
             SettingKey::RenderMaxMegapixels => {
-                let mp: u32 = serde_json::from_str(value)
-                    .map_err(|e| DomainError::validation(format!("Invalid megapixels value: {}", e)))?;
+                let mp: u32 = serde_json::from_str(value).map_err(|e| {
+                    DomainError::validation(format!("Invalid megapixels value: {}", e))
+                })?;
                 if mp < 8 || mp > 48 {
                     return Err(DomainError::validation(format!(
                         "Megapixels must be between 8 and 48, got {}",

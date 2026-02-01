@@ -25,4 +25,4 @@ pub mod audio_cache;
 pub mod sqlite;
 
 pub use audio_cache::{AudioCacheAdapter, CacheInfo, CachedTtsData, CachedWordTiming, ClearResult};
-pub use sqlite::SqliteSettingsRepo;
+pub use sqlite::{SqliteAudioCacheRepo, SqliteSessionRepo, SqliteSettingsRepo};

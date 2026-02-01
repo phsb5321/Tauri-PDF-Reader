@@ -263,15 +263,27 @@ pub async fn update_render_settings(
 
     // Save to database
     let settings_to_save = [
-        ("render.qualityMode", serde_json::json!(current.quality_mode)),
-        ("render.maxMegapixels", serde_json::json!(current.max_megapixels)),
-        ("render.hwAccelerationEnabled", serde_json::json!(current.hw_acceleration_enabled)),
-        ("render.debugOverlayEnabled", serde_json::json!(current.debug_overlay_enabled)),
+        (
+            "render.qualityMode",
+            serde_json::json!(current.quality_mode),
+        ),
+        (
+            "render.maxMegapixels",
+            serde_json::json!(current.max_megapixels),
+        ),
+        (
+            "render.hwAccelerationEnabled",
+            serde_json::json!(current.hw_acceleration_enabled),
+        ),
+        (
+            "render.debugOverlayEnabled",
+            serde_json::json!(current.debug_overlay_enabled),
+        ),
     ];
 
     for (key, value) in settings_to_save.iter() {
-        let value_str = serde_json::to_string(value)
-            .map_err(|e| format!("SERIALIZATION_ERROR: {}", e))?;
+        let value_str =
+            serde_json::to_string(value).map_err(|e| format!("SERIALIZATION_ERROR: {}", e))?;
 
         sqlx::query(
             "INSERT INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))
@@ -286,7 +298,8 @@ pub async fn update_render_settings(
 
     tracing::info!("Render settings updated: {:?}", current);
 
-    let restart_required = hw_acceleration_enabled.is_some() && current.hw_acceleration_enabled != old_hw_accel;
+    let restart_required =
+        hw_acceleration_enabled.is_some() && current.hw_acceleration_enabled != old_hw_accel;
 
     Ok(UpdateRenderSettingsResponse {
         success: true,

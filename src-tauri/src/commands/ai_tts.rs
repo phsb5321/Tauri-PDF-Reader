@@ -187,7 +187,10 @@ pub async fn ai_tts_speak_with_timestamps(
 
     tracing::info!("Speaking with timestamps: {} chars", text.len());
 
-    match engine.speak_with_timestamps(&text, voice_id.as_deref()).await {
+    match engine
+        .speak_with_timestamps(&text, voice_id.as_deref())
+        .await
+    {
         Ok(result) => {
             tracing::info!(
                 "TTS with timestamps ready: {} words, {:.2}s duration",
@@ -382,7 +385,7 @@ pub async fn ai_tts_cache_invalidate_voice(
 // =============================================================================
 
 /// Pre-generate and cache TTS audio without playing
-/// 
+///
 /// This is called when a PDF page loads to ensure instant playback when user clicks play.
 /// The audio is fetched from ElevenLabs and cached to disk, but not played.
 #[tauri::command]

@@ -72,6 +72,17 @@
   height: 32px;
 }
 
+/* Export button (T090) */
+.ai-playback-button-export {
+  width: 32px;
+  height: 32px;
+}
+
+.ai-playback-button-export .ai-playback-icon {
+  width: 16px;
+  height: 16px;
+}
+
 .ai-playback-icon {
   width: 20px;
   height: 20px;
