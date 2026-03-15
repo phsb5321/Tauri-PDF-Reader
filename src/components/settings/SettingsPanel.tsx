@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSettingsStore } from "../../stores/settings-store";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { TtsSettings } from "./TtsSettings";
 import { HighlightSettings } from "./HighlightSettings";
 import { ThemeToggle } from "./ThemeToggle";
@@ -27,6 +28,15 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   const [activeSection, setActiveSection] =
     useState<SettingsSection>("appearance");
   const { loadFromDatabase, dbInitialized } = useSettingsStore();
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Focus trap for accessibility
+  useFocusTrap({
+    containerRef: panelRef,
+    active: isOpen,
+    onEscape: onClose,
+    preventScroll: true,
+  });
 
   useEffect(() => {
     if (isOpen && !dbInitialized) {
@@ -46,14 +56,16 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     <div
       className="settings-backdrop"
       onClick={handleBackdropClick}
+      onKeyDown={(e) => e.key === "Escape" && onClose()}
       role="dialog"
       aria-modal="true"
       aria-labelledby="settings-title"
     >
-      <div className="settings-panel">
+      <div className="settings-panel" ref={panelRef}>
         <div className="settings-header">
           <h2 id="settings-title">Settings</h2>
           <button
+            type="button"
             className="settings-close"
             onClick={onClose}
             aria-label="Close settings"
@@ -65,6 +77,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
         <div className="settings-body">
           <nav className="settings-nav">
             <button
+              type="button"
               className={`settings-nav-item ${activeSection === "appearance" ? "active" : ""}`}
               onClick={() => setActiveSection("appearance")}
             >
@@ -72,6 +85,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
               <span>Appearance</span>
             </button>
             <button
+              type="button"
               className={`settings-nav-item ${activeSection === "rendering" ? "active" : ""}`}
               onClick={() => setActiveSection("rendering")}
             >
@@ -79,6 +93,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
               <span>Rendering</span>
             </button>
             <button
+              type="button"
               className={`settings-nav-item ${activeSection === "tts" ? "active" : ""}`}
               onClick={() => setActiveSection("tts")}
             >
@@ -86,6 +101,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
               <span>Text-to-Speech</span>
             </button>
             <button
+              type="button"
               className={`settings-nav-item ${activeSection === "cache" ? "active" : ""}`}
               onClick={() => setActiveSection("cache")}
             >
@@ -93,6 +109,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
               <span>Audio Cache</span>
             </button>
             <button
+              type="button"
               className={`settings-nav-item ${activeSection === "highlights" ? "active" : ""}`}
               onClick={() => setActiveSection("highlights")}
             >
@@ -100,6 +117,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
               <span>Highlights</span>
             </button>
             <button
+              type="button"
               className={`settings-nav-item ${activeSection === "shortcuts" ? "active" : ""}`}
               onClick={() => setActiveSection("shortcuts")}
             >
@@ -107,6 +125,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
               <span>Keyboard Shortcuts</span>
             </button>
             <button
+              type="button"
               className={`settings-nav-item ${activeSection === "telemetry" ? "active" : ""}`}
               onClick={() => setActiveSection("telemetry")}
             >

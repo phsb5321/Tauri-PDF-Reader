@@ -1,9 +1,10 @@
-import { useEffect, useCallback } from 'react';
-import { useLibraryStore } from '../../stores/library-store';
-import { DocumentCard } from './DocumentCard';
-import { SearchBar } from './SearchBar';
-import type { Document } from '../../lib/schemas';
-import './LibraryView.css';
+import { useEffect, useCallback } from "react";
+import { useLibraryStore } from "../../stores/library-store";
+import { DocumentCard } from "./DocumentCard";
+import { SearchBar } from "./SearchBar";
+import { EmptyState } from "../../ui/components/EmptyState/EmptyState";
+import type { Document } from "../../lib/schemas";
+import "./LibraryView.css";
 
 interface LibraryViewProps {
   onDocumentSelect: (document: Document) => void;
@@ -36,27 +37,27 @@ export function LibraryView({ onDocumentSelect }: LibraryViewProps) {
     (document: Document) => {
       setSelectedDocument(document.id);
     },
-    [setSelectedDocument]
+    [setSelectedDocument],
   );
 
   const handleDocumentOpen = useCallback(
     (document: Document) => {
       onDocumentSelect(document);
     },
-    [onDocumentSelect]
+    [onDocumentSelect],
   );
 
   const handleDocumentDelete = useCallback(
     async (documentId: string) => {
-      if (window.confirm('Remove this document from the library?')) {
+      if (window.confirm("Remove this document from the library?")) {
         try {
           await removeDocument(documentId);
         } catch (error) {
-          console.error('Failed to remove document:', error);
+          console.error("Failed to remove document:", error);
         }
       }
     },
-    [removeDocument]
+    [removeDocument],
   );
 
   if (isLoading) {
@@ -91,7 +92,9 @@ export function LibraryView({ onDocumentSelect }: LibraryViewProps) {
             <select
               id="sort-select"
               value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value as 'recent' | 'created' | 'title')}
+              onChange={(e) =>
+                setSortOrder(e.target.value as "recent" | "created" | "title")
+              }
             >
               <option value="recent">Recently Opened</option>
               <option value="created">Date Added</option>
@@ -100,16 +103,16 @@ export function LibraryView({ onDocumentSelect }: LibraryViewProps) {
           </div>
           <div className="library-view-toggle">
             <button
-              className={`view-button ${viewMode === 'grid' ? 'active' : ''}`}
-              onClick={() => setViewMode('grid')}
+              className={`view-button ${viewMode === "grid" ? "active" : ""}`}
+              onClick={() => setViewMode("grid")}
               title="Grid view"
               aria-label="Grid view"
             >
               <GridIcon />
             </button>
             <button
-              className={`view-button ${viewMode === 'list' ? 'active' : ''}`}
-              onClick={() => setViewMode('list')}
+              className={`view-button ${viewMode === "list" ? "active" : ""}`}
+              onClick={() => setViewMode("list")}
               title="List view"
               aria-label="List view"
             >
@@ -120,11 +123,11 @@ export function LibraryView({ onDocumentSelect }: LibraryViewProps) {
       </div>
 
       {documents.length === 0 ? (
-        <div className="library-empty">
-          <DocumentIcon />
-          <h2>No documents yet</h2>
-          <p>Open a PDF to add it to your library</p>
-        </div>
+        <EmptyState
+          title="No recent documents"
+          description="Open a PDF to add it to your library"
+          icon={<DocumentIcon />}
+        />
       ) : (
         <div className={`library-grid library-grid--${viewMode}`}>
           {documents.map((document) => (
@@ -147,7 +150,10 @@ export function LibraryView({ onDocumentSelect }: LibraryViewProps) {
 function GridIcon() {
   return (
     <svg viewBox="0 0 16 16" className="icon" aria-hidden="true">
-      <path d="M1 1h5v5H1V1zm0 6h5v5H1V7zm6-6h5v5H7V1zm0 6h5v5H7V7z" fill="currentColor" />
+      <path
+        d="M1 1h5v5H1V1zm0 6h5v5H1V7zm6-6h5v5H7V1zm0 6h5v5H7V7z"
+        fill="currentColor"
+      />
     </svg>
   );
 }
@@ -155,7 +161,10 @@ function GridIcon() {
 function ListIcon() {
   return (
     <svg viewBox="0 0 16 16" className="icon" aria-hidden="true">
-      <path d="M1 3h14v2H1V3zm0 4h14v2H1V7zm0 4h14v2H1v-2z" fill="currentColor" />
+      <path
+        d="M1 3h14v2H1V3zm0 4h14v2H1V7zm0 4h14v2H1v-2z"
+        fill="currentColor"
+      />
     </svg>
   );
 }

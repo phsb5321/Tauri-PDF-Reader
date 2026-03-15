@@ -16,6 +16,9 @@
   --z-base: 0;
   --z-canvas: 1;
   --z-text-layer: 2;
+  --z-highlight-layer: 3;
+  --z-annotation: 4;
+  --z-tts-highlight: 5;
   --z-highlight: 10;
 
   /* Interactive elements */
@@ -28,4 +31,7 @@
   --z-modal: 1000;
   --z-context-menu: 1001;
   --z-toast: 2000;
+
+  /* Extreme - for TTS word highlight that must be above everything */
+  --z-extreme: 99999;
 }

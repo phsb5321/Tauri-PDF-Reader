@@ -1,6 +1,7 @@
-import { useMemo, useCallback } from 'react';
-import type { Highlight } from '../../lib/schemas';
-import './HighlightsPanel.css';
+import { useMemo, useCallback } from "react";
+import { EmptyState } from "../../ui/components/EmptyState/EmptyState";
+import type { Highlight } from "../../lib/schemas";
+import "./HighlightsPanel.css";
 
 interface HighlightsPanelProps {
   highlights: Highlight[];
@@ -41,7 +42,7 @@ export function HighlightsPanel({
       e.stopPropagation();
       onHighlightDelete(highlightId);
     },
-    [onHighlightDelete]
+    [onHighlightDelete],
   );
 
   return (
@@ -70,18 +71,17 @@ export function HighlightsPanel({
 
       <div className="highlights-panel-content">
         {highlights.length === 0 ? (
-          <div className="highlights-panel-empty">
-            <HighlightIcon />
-            <p>No highlights yet</p>
-            <span>Select text in the PDF to create highlights</span>
-          </div>
+          <EmptyState
+            title="No highlights yet"
+            description="Select text in the PDF to create highlights"
+            variant="compact"
+            icon={<HighlightIcon />}
+          />
         ) : (
           <div className="highlights-list">
             {groupedHighlights.map(([pageNumber, pageHighlights]) => (
               <div key={pageNumber} className="highlights-page-group">
-                <div className="highlights-page-header">
-                  Page {pageNumber}
-                </div>
+                <div className="highlights-page-header">Page {pageNumber}</div>
                 {pageHighlights.map((highlight) => (
                   <HighlightItem
                     key={highlight.id}
@@ -113,24 +113,27 @@ function HighlightItem({
   onClick,
   onDelete,
 }: HighlightItemProps) {
-  const previewText = highlight.textContent || 'No text content';
+  const previewText = highlight.textContent || "No text content";
   const truncatedText =
-    previewText.length > 100 ? previewText.slice(0, 100) + '...' : previewText;
+    previewText.length > 100 ? previewText.slice(0, 100) + "..." : previewText;
 
   return (
     <div
-      className={`highlight-item ${isSelected ? 'selected' : ''}`}
+      className={`highlight-item ${isSelected ? "selected" : ""}`}
       onClick={onClick}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
+        if (e.key === "Enter" || e.key === " ") {
           onClick();
         }
       }}
     >
       <div className="highlight-item-content">
-        <div className="highlight-item-color-bar" style={{ backgroundColor: highlight.color }} />
+        <div
+          className="highlight-item-color-bar"
+          style={{ backgroundColor: highlight.color }}
+        />
         <div className="highlight-item-text">
           <span className="highlight-item-preview">{truncatedText}</span>
           {highlight.note && (

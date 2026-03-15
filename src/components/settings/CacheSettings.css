@@ -166,7 +166,7 @@
   background: var(--color-error, #ef4444);
   border: none;
   border-radius: var(--radius-md, 8px);
-  color: #fff;
+  color: var(--color-text-inverse);
   cursor: pointer;
   transition: background-color 0.15s;
 }

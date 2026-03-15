@@ -310,7 +310,7 @@
 .audio-export-dialog__button--primary {
   background: var(--color-primary, #2563eb);
   border: 1px solid var(--color-primary, #2563eb);
-  color: #fff;
+  color: var(--color-text-inverse);
 }
 
 .audio-export-dialog__button--primary:hover:not(:disabled) {

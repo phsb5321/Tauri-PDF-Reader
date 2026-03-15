@@ -2,7 +2,7 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   min-width: 200px;
 }
 
@@ -17,7 +17,7 @@
 
 .search-input {
   width: 100%;
-  padding: 8px 36px;
+  padding: var(--space-2) 36px;
   border: 1px solid var(--border-color, #ddd);
   border-radius: 20px;
   font-size: 14px;

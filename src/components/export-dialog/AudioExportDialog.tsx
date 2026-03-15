@@ -5,8 +5,10 @@
  * Includes readiness checking, format selection, and progress tracking.
  */
 
-import { useState, useCallback, useEffect } from "react";
-import { save } from "@tauri-apps/plugin-dialog";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { useFileDialog, FILE_FILTERS } from "../../hooks/useFileDialog";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
+import { useToastStore } from "../../stores/toast-store";
 import {
   audioExportCheckReady,
   audioExportDocument,
@@ -50,6 +52,16 @@ export function AudioExportDialog({
     useState<ChapterStrategy>("page");
   const [error, setError] = useState<string | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
+  const { saveFile } = useFileDialog();
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Focus trap for accessibility
+  useFocusTrap({
+    containerRef: dialogRef,
+    active: true,
+    onEscape: dialogState !== "exporting" ? onClose : undefined,
+    preventScroll: true,
+  });
 
   const {
     progress,
@@ -58,10 +70,12 @@ export function AudioExportDialog({
   } = useExportProgress({
     onComplete: () => {
       setDialogState("complete");
+      useToastStore.getState().success("Audio exported successfully");
     },
     onError: (err) => {
       setError(err);
       setDialogState("error");
+      useToastStore.getState().error(err);
     },
   });
 
@@ -93,13 +107,9 @@ export function AudioExportDialog({
       const extension = format === "mp3" ? "mp3" : "m4b";
       const defaultFileName = `${documentTitle.replace(/[^a-zA-Z0-9]/g, "_")}.${extension}`;
 
-      const filePath = await save({
+      const filePath = await saveFile({
         defaultPath: defaultFileName,
-        filters: [
-          format === "mp3"
-            ? { name: "MP3 Audio", extensions: ["mp3"] }
-            : { name: "M4B Audiobook", extensions: ["m4b"] },
-        ],
+        filters: [format === "mp3" ? FILE_FILTERS.MP3 : FILE_FILTERS.M4B],
       });
 
       if (!filePath) {
@@ -130,6 +140,7 @@ export function AudioExportDialog({
     chapterStrategy,
     voiceId,
     resetProgress,
+    saveFile,
   ]);
 
   const handleCancel = useCallback(async () => {
@@ -172,14 +183,18 @@ export function AudioExportDialog({
     <div
       className="audio-export-dialog-backdrop"
       onClick={handleBackdropClick}
+      onKeyDown={(e) =>
+        e.key === "Escape" && dialogState !== "exporting" && onClose()
+      }
       role="dialog"
       aria-modal="true"
       aria-labelledby="audio-export-dialog-title"
     >
-      <div className="audio-export-dialog">
+      <div className="audio-export-dialog" ref={dialogRef}>
         <div className="audio-export-dialog__header">
           <h2 id="audio-export-dialog-title">Export Audiobook</h2>
           <button
+            type="button"
             className="audio-export-dialog__close"
             onClick={onClose}
             aria-label="Close"
@@ -344,6 +359,7 @@ export function AudioExportDialog({
 
         <div className="audio-export-dialog__footer">
           <button
+            type="button"
             className="audio-export-dialog__button audio-export-dialog__button--secondary"
             onClick={onClose}
             disabled={dialogState === "exporting"}
@@ -352,6 +368,7 @@ export function AudioExportDialog({
           </button>
           {dialogState === "ready" && (
             <button
+              type="button"
               className="audio-export-dialog__button audio-export-dialog__button--primary"
               onClick={handleExport}
             >

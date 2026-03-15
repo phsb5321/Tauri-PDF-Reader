@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, useRef } from "react";
 import { useAiTts } from "../../hooks/useAiTts";
 import { useTtsWordHighlight } from "../../hooks/useTtsWordHighlight";
 import { useAudioCache } from "../../hooks/useAudioCache";
+import { useAnnounce, ANNOUNCEMENTS } from "../../hooks/useAnnounce";
 import { useDocumentStore } from "../../stores/document-store";
 import { useAiTtsStore } from "../../stores/ai-tts-store";
 import { pdfService } from "../../services/pdf-service";
@@ -176,6 +177,28 @@ export function AiPlaybackBar({
     : playbackState === "paused";
   const isLoading = playbackState === "loading";
   const canPlay = initialized && !error;
+
+  // Screen reader announcements for TTS state changes (T039)
+  const { announce } = useAnnounce();
+  const prevPlayingRef = useRef(isPlaying);
+  const prevPausedRef = useRef(isPaused);
+
+  useEffect(() => {
+    // Announce state changes for screen readers
+    if (isPlaying && !prevPlayingRef.current) {
+      announce(ANNOUNCEMENTS.ttsPlaying());
+    } else if (isPaused && !prevPausedRef.current) {
+      announce(ANNOUNCEMENTS.ttsPaused());
+    } else if (
+      !isPlaying &&
+      !isPaused &&
+      (prevPlayingRef.current || prevPausedRef.current)
+    ) {
+      announce(ANNOUNCEMENTS.ttsStopped());
+    }
+    prevPlayingRef.current = isPlaying;
+    prevPausedRef.current = isPaused;
+  }, [isPlaying, isPaused, announce]);
 
   const handlePlay = useCallback(async () => {
     if (!canPlay) return;

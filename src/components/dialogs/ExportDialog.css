@@ -8,7 +8,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: var(--z-modal);
 }
 
 .export-dialog {
@@ -27,7 +27,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
+  padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--border-color, #e0e0e0);
 }
 
@@ -67,13 +67,13 @@
 }
 
 .export-dialog-content {
-  padding: 20px;
+  padding: var(--space-5);
   flex: 1;
   overflow-y: auto;
 }
 
 .export-dialog-info {
-  margin: 0 0 20px;
+  margin: 0 0 var(--space-5);
   font-size: 14px;
   color: var(--text-secondary, #666);
   line-height: 1.5;
@@ -86,14 +86,14 @@
 .export-dialog-formats {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .export-format-option {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 12px;
+  gap: var(--space-3);
+  padding: var(--space-3);
   border: 1px solid var(--border-color, #e0e0e0);
   border-radius: 8px;
   cursor: pointer;
@@ -116,7 +116,7 @@
 .format-info {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .format-name {
@@ -133,9 +133,9 @@
 .export-dialog-error {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 16px;
-  padding: 12px;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding: var(--space-3);
   background: var(--error-bg, #fff5f5);
   border: 1px solid var(--error-border, #ffcdd2);
   border-radius: 8px;
@@ -152,13 +152,13 @@
 .export-dialog-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  padding: 16px 20px;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
   border-top: 1px solid var(--border-color, #e0e0e0);
 }
 
 .export-dialog-button {
-  padding: 10px 20px;
+  padding: 10px var(--space-5);
   border: none;
   border-radius: 6px;
   font-size: 14px;

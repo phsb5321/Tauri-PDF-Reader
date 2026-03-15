@@ -34,7 +34,7 @@
   top: 0;
   left: 0;
   pointer-events: auto;
-  z-index: 4;
+  z-index: var(--z-annotation);
 }
 
 /* Style links in annotation layer */
@@ -57,7 +57,7 @@
   align-items: center;
   justify-content: center;
   background: rgba(255, 255, 255, 0.8);
-  z-index: 10;
+  z-index: var(--z-highlight);
 }
 
 .pdf-page-loading .loading-spinner {

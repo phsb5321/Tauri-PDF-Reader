@@ -1,18 +1,24 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
-import { TextLayer as PdfJsTextLayer } from 'pdfjs-dist';
-import type { PDFPageProxy } from 'pdfjs-dist';
-import { useDocumentStore } from '../stores/document-store';
-import { useRenderStore } from '../stores/render-store';
-import { pdfService } from '../services/pdf-service';
-import { calculateRenderPlan, calculateFitWidthZoom, calculateFitPageZoom } from '../domain/rendering';
-import { ScannedPdfWarning, MemoryCapWarning } from './common';
-import { DebugOverlay } from './settings/DebugOverlay';
-import { useHighlightCreation } from './pdf-viewer/HighlightCreationHandler';
-import { HighlightOverlay } from './pdf-viewer/HighlightOverlay';
-import { TtsWordHighlight } from './pdf-viewer/TtsWordHighlight';
-import type { TextSelection } from './TextLayer';
-import type { Rect } from '../lib/schemas';
-import './PdfViewer.css';
+import { useEffect, useRef, useCallback, useState } from "react";
+import { TextLayer as PdfJsTextLayer } from "pdfjs-dist";
+import type { PDFPageProxy } from "pdfjs-dist";
+import { useDocumentStore } from "../stores/document-store";
+import { useRenderStore } from "../stores/render-store";
+import { pdfService } from "../services/pdf-service";
+import {
+  calculateRenderPlan,
+  calculateFitWidthZoom,
+  calculateFitPageZoom,
+} from "../domain/rendering";
+import { ScannedPdfWarning, MemoryCapWarning } from "./common";
+import { DebugOverlay } from "./settings/DebugOverlay";
+import { EmptyState } from "../ui/components/EmptyState/EmptyState";
+import { PdfSkeleton } from "./pdf-viewer/PdfSkeleton";
+import { useHighlightCreation } from "./pdf-viewer/HighlightCreationHandler";
+import { HighlightOverlay } from "./pdf-viewer/HighlightOverlay";
+import { TtsWordHighlight } from "./pdf-viewer/TtsWordHighlight";
+import type { TextSelection } from "./TextLayer";
+import type { Rect } from "../lib/schemas";
+import "./PdfViewer.css";
 
 // Padding around the PDF page
 const PAGE_PADDING = 40;
@@ -36,7 +42,7 @@ export function PdfViewer() {
   const pageContainerRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef<PDFPageProxy | null>(null);
   const textLayerInstanceRef = useRef<PdfJsTextLayer | null>(null);
-  const renderTaskRef = useRef<ReturnType<PDFPageProxy['render']> | null>(null);
+  const renderTaskRef = useRef<ReturnType<PDFPageProxy["render"]> | null>(null);
   const renderDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [warningDismissed, setWarningDismissed] = useState(false);
@@ -60,10 +66,19 @@ export function PdfViewer() {
   } = useDocumentStore();
 
   // Render settings and display info from render store
-  const { settings, displayInfo, currentRenderPlan, setDisplayInfo, setCurrentRenderPlan } = useRenderStore();
+  const {
+    settings,
+    displayInfo,
+    currentRenderPlan,
+    setDisplayInfo,
+    setCurrentRenderPlan,
+  } = useRenderStore();
 
   // Track viewport dimensions for highlight overlay
-  const [viewportDimensions, setViewportDimensions] = useState({ width: 0, height: 0 });
+  const [viewportDimensions, setViewportDimensions] = useState({
+    width: 0,
+    height: 0,
+  });
 
   // Get highlights for current page
   const highlights = getHighlightsForPage(currentPage);
@@ -77,28 +92,31 @@ export function PdfViewer() {
     scale: zoomLevel,
     containerRef: pageContainerRef as React.RefObject<HTMLElement>,
     onSuccess: (highlight) => {
-      console.debug('[PdfViewer] Highlight created successfully:', highlight.id);
+      console.debug(
+        "[PdfViewer] Highlight created successfully:",
+        highlight.id,
+      );
     },
     onError: (error) => {
-      console.error('[PdfViewer] Highlight creation error:', error);
+      console.error("[PdfViewer] Highlight creation error:", error);
     },
   });
 
   // Handle text selection from text layer
   const handleTextSelection = useCallback(() => {
-    console.debug('[PdfViewer] handleTextSelection called');
+    console.debug("[PdfViewer] handleTextSelection called");
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed || !pageContainerRef.current) {
-      console.debug('[PdfViewer] No valid selection or no container');
+      console.debug("[PdfViewer] No valid selection or no container");
       return;
     }
 
     const selectedText = selection.toString().trim();
     if (!selectedText) {
-      console.debug('[PdfViewer] No selected text');
+      console.debug("[PdfViewer] No selected text");
       return;
     }
-    console.debug('[PdfViewer] Selected text:', selectedText.substring(0, 50));
+    console.debug("[PdfViewer] Selected text:", selectedText.substring(0, 50));
 
     // Get selection rects relative to the page container
     const range = selection.getRangeAt(0);
@@ -123,56 +141,58 @@ export function PdfViewer() {
         rects,
         pageNumber: currentPage,
       };
-      console.debug('[PdfViewer] Forwarding selection to highlight handler:', {
+      console.debug("[PdfViewer] Forwarding selection to highlight handler:", {
         textLength: selectedText.length,
         rectsCount: rects.length,
         pageNumber: currentPage,
       });
       handleHighlightTextSelect(textSelection);
     } else {
-      console.debug('[PdfViewer] No rects found for selection');
+      console.debug("[PdfViewer] No rects found for selection");
     }
   }, [zoomLevel, currentPage, handleHighlightTextSelect]);
 
   // Use document-level mouseup to capture text selection
   useEffect(() => {
-    console.debug('[PdfViewer] Setting up mouseup listener');
+    console.debug("[PdfViewer] Setting up mouseup listener");
 
     const handleDocumentMouseUp = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
 
       // Use closest() for reliable page root detection (T015)
       // This works regardless of component tree structure
-      const pageRoot = target.closest('[data-page-number]');
+      const pageRoot = target.closest("[data-page-number]");
 
-      console.debug('[PdfViewer] Document mouseup fired', {
+      console.debug("[PdfViewer] Document mouseup fired", {
         target: target?.className,
-        pageRoot: pageRoot ? `page ${pageRoot.getAttribute('data-page-number')}` : 'none'
+        pageRoot: pageRoot
+          ? `page ${pageRoot.getAttribute("data-page-number")}`
+          : "none",
       });
 
       if (!pageRoot) {
-        console.debug('[PdfViewer] Click outside any page');
+        console.debug("[PdfViewer] Click outside any page");
         return;
       }
 
       // Check selection immediately
       const selection = window.getSelection();
-      console.debug('[PdfViewer] Selection state:', {
+      console.debug("[PdfViewer] Selection state:", {
         hasSelection: !!selection,
         isCollapsed: selection?.isCollapsed,
-        text: selection?.toString().substring(0, 30)
+        text: selection?.toString().substring(0, 30),
       });
 
       // Small delay to let the selection finalize
       setTimeout(handleTextSelection, 10);
     };
 
-    document.addEventListener('mouseup', handleDocumentMouseUp);
-    console.debug('[PdfViewer] Mouseup listener added');
+    document.addEventListener("mouseup", handleDocumentMouseUp);
+    console.debug("[PdfViewer] Mouseup listener added");
 
     return () => {
-      document.removeEventListener('mouseup', handleDocumentMouseUp);
-      console.debug('[PdfViewer] Mouseup listener removed');
+      document.removeEventListener("mouseup", handleDocumentMouseUp);
+      console.debug("[PdfViewer] Mouseup listener removed");
     };
   }, [handleTextSelection]);
 
@@ -180,10 +200,10 @@ export function PdfViewer() {
   const handleHighlightClick = useCallback(
     (highlight: { id: string }) => {
       setSelectedHighlight(
-        selectedHighlightId === highlight.id ? null : highlight.id
+        selectedHighlightId === highlight.id ? null : highlight.id,
       );
     },
-    [selectedHighlightId, setSelectedHighlight]
+    [selectedHighlightId, setSelectedHighlight],
   );
 
   // Render the current page with canvas + text layer
@@ -251,24 +271,26 @@ export function PdfViewer() {
       // Set text layer dimensions
       textLayerDiv.style.width = `${Math.floor(viewport.width)}px`;
       textLayerDiv.style.height = `${Math.floor(viewport.height)}px`;
-      textLayerDiv.style.setProperty('--scale-factor', String(zoomLevel));
+      textLayerDiv.style.setProperty("--scale-factor", String(zoomLevel));
 
       // Get hardware-accelerated 2D context with optimal settings
-      const context = canvas.getContext('2d', {
-        alpha: false,           // Opaque canvas - faster rendering
-        desynchronized: true,   // Direct to display - hardware accelerated
+      const context = canvas.getContext("2d", {
+        alpha: false, // Opaque canvas - faster rendering
+        desynchronized: true, // Direct to display - hardware accelerated
         willReadFrequently: false, // Keep GPU acceleration enabled
       });
       if (!context) {
-        throw new Error('Could not get canvas 2D context');
+        throw new Error("Could not get canvas 2D context");
       }
 
       // Enable high-quality image rendering
       context.imageSmoothingEnabled = true;
-      context.imageSmoothingQuality = 'high';
+      context.imageSmoothingQuality = "high";
 
       // Create transform matrix for HiDPI rendering using render plan's output scale
-      const transform: [number, number, number, number, number, number] | undefined =
+      const transform:
+        | [number, number, number, number, number, number]
+        | undefined =
         renderPlan.outputScale !== 1
           ? [renderPlan.outputScale, 0, 0, renderPlan.outputScale, 0, 0]
           : undefined;
@@ -294,20 +316,31 @@ export function PdfViewer() {
       await textLayerInstanceRef.current.render();
 
       console.log(
-        '[PdfViewer] Rendered page', currentPage,
-        'zoom:', zoomLevel,
-        'outputScale:', renderPlan.outputScale,
-        'megapixels:', renderPlan.megapixels.toFixed(2),
-        renderPlan.wasCapped ? '(CAPPED)' : ''
+        "[PdfViewer] Rendered page",
+        currentPage,
+        "zoom:",
+        zoomLevel,
+        "outputScale:",
+        renderPlan.outputScale,
+        "megapixels:",
+        renderPlan.megapixels.toFixed(2),
+        renderPlan.wasCapped ? "(CAPPED)" : "",
       );
     } catch (err) {
       // Ignore cancellation errors
-      if (err instanceof Error && err.message.includes('cancel')) {
+      if (err instanceof Error && err.message.includes("cancel")) {
         return;
       }
-      console.error('Error rendering page:', err);
+      console.error("Error rendering page:", err);
     }
-  }, [pdfDocument, currentPage, zoomLevel, settings, displayInfo, setCurrentRenderPlan]);
+  }, [
+    pdfDocument,
+    currentPage,
+    zoomLevel,
+    settings,
+    displayInfo,
+    setCurrentRenderPlan,
+  ]);
 
   // Debounced render to prevent thrash during continuous zoom/resize (T019)
   useEffect(() => {
@@ -355,30 +388,32 @@ export function PdfViewer() {
     updateDisplayInfo();
 
     // Listen for DPR changes (display switch detection)
-    const mediaQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+    const mediaQuery = window.matchMedia(
+      `(resolution: ${window.devicePixelRatio}dppx)`,
+    );
     const handleDprChange = () => {
-      console.log('[PdfViewer] DPR changed to:', window.devicePixelRatio);
+      console.log("[PdfViewer] DPR changed to:", window.devicePixelRatio);
       updateDisplayInfo();
     };
 
     // Use addEventListener with options for modern browsers
-    mediaQuery.addEventListener('change', handleDprChange);
+    mediaQuery.addEventListener("change", handleDprChange);
 
     // Listen for resize events
     const handleResize = () => {
       updateDisplayInfo();
     };
-    window.addEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
 
     return () => {
-      mediaQuery.removeEventListener('change', handleDprChange);
-      window.removeEventListener('resize', handleResize);
+      mediaQuery.removeEventListener("change", handleDprChange);
+      window.removeEventListener("resize", handleResize);
     };
   }, [setDisplayInfo]);
 
   // Recalculate zoom for fit modes on window resize (T027)
   useEffect(() => {
-    if (!pdfDocument || fitMode === 'none') return;
+    if (!pdfDocument || fitMode === "none") return;
 
     let cancelled = false;
 
@@ -397,7 +432,7 @@ export function PdfViewer() {
 
         let newZoom: number;
 
-        if (fitMode === 'fit-width') {
+        if (fitMode === "fit-width") {
           newZoom = calculateFitWidthZoom({
             pageWidth: baseViewport.width,
             pageHeight: baseViewport.height,
@@ -405,7 +440,7 @@ export function PdfViewer() {
             containerHeight,
             padding: 0, // Already subtracted
           });
-        } else if (fitMode === 'fit-page') {
+        } else if (fitMode === "fit-page") {
           newZoom = calculateFitPageZoom({
             pageWidth: baseViewport.width,
             pageHeight: baseViewport.height,
@@ -427,7 +462,7 @@ export function PdfViewer() {
           console.log(`[PdfViewer] ${fitMode} zoom:`, newZoom.toFixed(2));
         }
       } catch (err) {
-        console.error('Error calculating fit zoom:', err);
+        console.error("Error calculating fit zoom:", err);
       }
     };
 
@@ -436,7 +471,14 @@ export function PdfViewer() {
     return () => {
       cancelled = true;
     };
-  }, [pdfDocument, currentPage, fitMode, displayInfo.viewportWidth, displayInfo.viewportHeight, zoomLevel]);
+  }, [
+    pdfDocument,
+    currentPage,
+    fitMode,
+    displayInfo.viewportWidth,
+    displayInfo.viewportHeight,
+    zoomLevel,
+  ]);
 
   // Calculate fit-to-width scale when document loads
   const initialZoomSetRef = useRef(false);
@@ -449,18 +491,23 @@ export function PdfViewer() {
       try {
         const page = await pdfDocument.getPage(1);
         const viewport = page.getViewport({ scale: 1.0 });
-        const containerWidth = containerRef.current!.clientWidth - PAGE_PADDING * 2;
+        const containerWidth =
+          containerRef.current!.clientWidth - PAGE_PADDING * 2;
         const fitScale = containerWidth / viewport.width;
 
         // Set initial zoom to fit width (at least 1.0, max 2.0)
         const initialZoom = Math.max(1.0, Math.min(fitScale, 2.0));
         // Set fit-width mode by default
-        setFitMode('fit-width');
+        setFitMode("fit-width");
         useDocumentStore.setState({ zoomLevel: initialZoom });
         initialZoomSetRef.current = true;
-        console.log('[PdfViewer] Set initial zoom to:', initialZoom, '(fit-width)');
+        console.log(
+          "[PdfViewer] Set initial zoom to:",
+          initialZoom,
+          "(fit-width)",
+        );
       } catch (err) {
-        console.error('Error calculating fit-width:', err);
+        console.error("Error calculating fit-width:", err);
       }
     };
 
@@ -482,7 +529,7 @@ export function PdfViewer() {
         setHasTextLayer(hasText);
         setWarningDismissed(false);
       } catch (err) {
-        console.error('Error checking text layer:', err);
+        console.error("Error checking text layer:", err);
         setHasTextLayer(false);
       }
     };
@@ -495,64 +542,69 @@ export function PdfViewer() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!pdfDocument) return;
 
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
         return;
       }
 
       switch (e.key) {
-        case 'ArrowLeft':
-        case 'PageUp':
+        case "ArrowLeft":
+        case "PageUp":
           e.preventDefault();
           setCurrentPage(Math.max(1, currentPage - 1));
           break;
-        case 'ArrowRight':
-        case 'PageDown':
-        case ' ':
+        case "ArrowRight":
+        case "PageDown":
+        case " ":
           e.preventDefault();
           setCurrentPage(Math.min(pdfDocument.numPages, currentPage + 1));
           break;
-        case 'Home':
+        case "Home":
           e.preventDefault();
           setCurrentPage(1);
           break;
-        case 'End':
+        case "End":
           e.preventDefault();
           setCurrentPage(pdfDocument.numPages);
           break;
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [pdfDocument, currentPage, setCurrentPage]);
 
   // Empty state
   if (!pdfDocument && !isLoading && !error) {
     return (
       <div className="pdf-viewer-empty">
-        <div className="empty-state">
-          <svg viewBox="0 0 24 24" className="empty-icon">
-            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-            <polyline points="14 2 14 8 20 8" />
-            <line x1="16" y1="13" x2="8" y2="13" />
-            <line x1="16" y1="17" x2="8" y2="17" />
-            <polyline points="10 9 9 9 8 9" />
-          </svg>
-          <h2>No PDF Open</h2>
-          <p>Click &quot;Open&quot; to select a PDF file</p>
-        </div>
+        <EmptyState
+          title="Open a PDF to get started"
+          description="Press Ctrl+O or use the Open button in the toolbar"
+          icon={
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            >
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+              <polyline points="10 9 9 9 8 9" />
+            </svg>
+          }
+        />
       </div>
     );
   }
 
-  // Loading state
+  // Loading state - show skeleton placeholder
   if (isLoading) {
-    return (
-      <div className="pdf-viewer-loading">
-        <div className="loading-spinner" />
-        <p>Loading PDF...</p>
-      </div>
-    );
+    return <PdfSkeleton />;
   }
 
   // Error state
@@ -570,27 +622,29 @@ export function PdfViewer() {
     );
   }
 
-  const showScannedWarning = textLayerChecked && hasTextLayer === false && !warningDismissed;
-  const showMemoryWarning = currentRenderPlan?.wasCapped && !memoryWarningDismissed && settings.maxMegapixels > 0;
+  const showScannedWarning =
+    textLayerChecked && hasTextLayer === false && !warningDismissed;
+  const showMemoryWarning =
+    currentRenderPlan?.wasCapped &&
+    !memoryWarningDismissed &&
+    settings.maxMegapixels > 0;
 
   return (
     <div className="pdf-viewer" ref={containerRef}>
       {showScannedWarning && (
         <ScannedPdfWarning onDismiss={() => setWarningDismissed(true)} />
       )}
-      <div className="pdf-page-container" ref={pageContainerRef} data-page-number={currentPage}>
+      <div
+        className="pdf-page-container"
+        ref={pageContainerRef}
+        data-page-number={currentPage}
+      >
         {/* Canvas layer - visual rendering */}
         <canvas ref={canvasRef} className="pdf-canvas" />
         {/* Text layer - selectable text overlay (native mouseup listener in useEffect) */}
-        <div
-          ref={textLayerRef}
-          className="textLayer"
-        />
+        <div ref={textLayerRef} className="textLayer" />
         {/* TTS word highlight overlay - karaoke-style highlighting */}
-        <TtsWordHighlight
-          pageNumber={currentPage}
-          scale={zoomLevel}
-        />
+        <TtsWordHighlight pageNumber={currentPage} scale={zoomLevel} />
         {/* Highlight overlay */}
         {highlights.length > 0 && viewportDimensions.width > 0 && (
           <HighlightOverlay

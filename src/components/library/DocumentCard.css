@@ -48,7 +48,7 @@
   position: absolute;
   bottom: 8px;
   right: 8px;
-  padding: 2px 8px;
+  padding: 2px var(--space-2);
   background: var(--primary-color, #2196f3);
   color: white;
   border-radius: 12px;
@@ -57,10 +57,10 @@
 }
 
 .document-card--grid .document-card-content {
-  padding: 12px;
+  padding: var(--space-3);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .document-card--grid .document-card-title {
@@ -114,8 +114,8 @@
 .document-card--list {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
 }
 
 .document-card--list .document-card-icon {
@@ -170,7 +170,7 @@
 .document-card--list .document-card-progress {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   min-width: 100px;
 }
 
@@ -232,7 +232,7 @@
   position: absolute;
   top: 100%;
   right: 8px;
-  z-index: 100;
+  z-index: var(--z-floating);
   background: var(--bg-secondary, #fff);
   border: 1px solid var(--border-color, #e0e0e0);
   border-radius: 6px;
@@ -244,7 +244,7 @@
 .document-card-context-menu button {
   display: block;
   width: 100%;
-  padding: 10px 16px;
+  padding: 10px var(--space-4);
   border: none;
   background: transparent;
   text-align: left;

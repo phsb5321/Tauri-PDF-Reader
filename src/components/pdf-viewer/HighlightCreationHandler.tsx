@@ -8,12 +8,13 @@
  * 4. Clears selection after creation
  */
 
-import { useCallback, useState } from 'react';
-import { HighlightToolbar, calculateToolbarPosition } from './HighlightToolbar';
-import { useDocumentStore } from '../../stores/document-store';
-import { useHighlightPersistence } from '../../hooks/useHighlightPersistence';
-import type { TextSelection } from '../TextLayer';
-import type { Highlight, Rect } from '../../lib/schemas';
+import { useCallback, useState } from "react";
+import { HighlightToolbar, calculateToolbarPosition } from "./HighlightToolbar";
+import { useDocumentStore } from "../../stores/document-store";
+import { useHighlightPersistence } from "../../hooks/useHighlightPersistence";
+import { useToastStore } from "../../stores/toast-store";
+import type { TextSelection } from "../TextLayer";
+import type { Highlight, Rect } from "../../lib/schemas";
 
 /**
  * Generate a UUID v4 using the native crypto API
@@ -40,8 +41,10 @@ export function HighlightCreationHandler({
   onSuccess,
   onError,
 }: HighlightCreationHandlerProps) {
-  const [pendingSelection, setPendingSelection] = useState<TextSelection | null>(null);
+  const [pendingSelection, setPendingSelection] =
+    useState<TextSelection | null>(null);
   const { addHighlight } = useDocumentStore();
+  const toastSuccess = useToastStore((s) => s.success);
 
   const { createHighlight } = useHighlightPersistence({
     documentId,
@@ -50,7 +53,7 @@ export function HighlightCreationHandler({
 
   // Handle text selection from TextLayer
   const handleTextSelect = useCallback((selection: TextSelection) => {
-    console.debug('[HighlightCreationHandler] Text selected:', {
+    console.debug("[HighlightCreationHandler] Text selected:", {
       textLength: selection.text.length,
       rectsCount: selection.rects.length,
       pageNumber: selection.pageNumber,
@@ -62,7 +65,9 @@ export function HighlightCreationHandler({
   const handleHighlight = useCallback(
     (color: string) => {
       if (!pendingSelection || !documentId) {
-        console.warn('[HighlightCreationHandler] Cannot create highlight: missing selection or documentId');
+        console.warn(
+          "[HighlightCreationHandler] Cannot create highlight: missing selection or documentId",
+        );
         return;
       }
 
@@ -79,7 +84,7 @@ export function HighlightCreationHandler({
         updatedAt: null,
       };
 
-      console.debug('[HighlightCreationHandler] Creating highlight:', {
+      console.debug("[HighlightCreationHandler] Creating highlight:", {
         id: highlight.id,
         color,
         pageNumber: highlight.pageNumber,
@@ -94,12 +99,20 @@ export function HighlightCreationHandler({
 
       // Notify success callback
       onSuccess?.(highlight);
+      toastSuccess("Highlight created");
 
       // Clear selection
       setPendingSelection(null);
       window.getSelection()?.removeAllRanges();
     },
-    [pendingSelection, documentId, addHighlight, createHighlight, onSuccess]
+    [
+      pendingSelection,
+      documentId,
+      addHighlight,
+      createHighlight,
+      onSuccess,
+      toastSuccess,
+    ],
   );
 
   // Handle cancellation (click outside, Escape key)
@@ -146,9 +159,11 @@ export function useHighlightCreation({
   containerRef,
   onSuccess,
   onError,
-}: Omit<HighlightCreationHandlerProps, 'pageNumber'>) {
-  const [pendingSelection, setPendingSelection] = useState<TextSelection | null>(null);
+}: Omit<HighlightCreationHandlerProps, "pageNumber">) {
+  const [pendingSelection, setPendingSelection] =
+    useState<TextSelection | null>(null);
   const { addHighlight } = useDocumentStore();
+  const toastSuccess2 = useToastStore((s) => s.success);
 
   const { createHighlight } = useHighlightPersistence({
     documentId,
@@ -157,7 +172,7 @@ export function useHighlightCreation({
 
   // Handle text selection from TextLayer
   const handleTextSelect = useCallback((selection: TextSelection) => {
-    console.debug('[useHighlightCreation] Text selected:', {
+    console.debug("[useHighlightCreation] Text selected:", {
       textLength: selection.text.length,
       rectsCount: selection.rects.length,
       pageNumber: selection.pageNumber,
@@ -169,7 +184,9 @@ export function useHighlightCreation({
   const handleHighlight = useCallback(
     (color: string) => {
       if (!pendingSelection || !documentId) {
-        console.warn('[useHighlightCreation] Cannot create highlight: missing selection or documentId');
+        console.warn(
+          "[useHighlightCreation] Cannot create highlight: missing selection or documentId",
+        );
         return;
       }
 
@@ -186,7 +203,7 @@ export function useHighlightCreation({
         updatedAt: null,
       };
 
-      console.debug('[useHighlightCreation] Creating highlight:', {
+      console.debug("[useHighlightCreation] Creating highlight:", {
         id: highlight.id,
         color,
         pageNumber: highlight.pageNumber,
@@ -201,12 +218,20 @@ export function useHighlightCreation({
 
       // Notify success callback
       onSuccess?.(highlight);
+      toastSuccess2("Highlight created");
 
       // Clear selection
       setPendingSelection(null);
       window.getSelection()?.removeAllRanges();
     },
-    [pendingSelection, documentId, addHighlight, createHighlight, onSuccess]
+    [
+      pendingSelection,
+      documentId,
+      addHighlight,
+      createHighlight,
+      onSuccess,
+      toastSuccess2,
+    ],
   );
 
   // Handle cancellation (click outside, Escape key)

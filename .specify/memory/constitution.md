@@ -39,6 +39,7 @@ All code MUST follow the hexagonal architecture pattern with strict layer bounda
 Direct `invoke()` calls from `@tauri-apps/api/core` are FORBIDDEN in application code.
 
 All Tauri IPC MUST use one of:
+
 - Type-safe adapters in `src/adapters/tauri/`
 - Generated bindings: `import { commands } from '@/lib/bindings'`
 - API wrappers in `src/lib/api/`
@@ -92,18 +93,18 @@ Zustand stores MUST follow established patterns:
 
 ### Naming Conventions
 
-| Element | Convention | Example |
-|---------|------------|---------|
-| TS files | kebab-case | `document-repository.ts` |
-| React components | PascalCase | `PageNavigation.tsx` |
-| Interfaces/Types | PascalCase | `DocumentRepositoryPort` |
-| Functions | camelCase | `getDocumentById` |
-| Constants | SCREAMING_SNAKE | `VALID_TRANSITIONS` |
-| Rust files | snake_case | `document_repository.rs` |
-| Rust structs | PascalCase | `Document` |
-| Tauri commands | snake_case | `library_add_document` |
-| Ports | `*Port` suffix | `DocumentRepositoryPort` |
-| Adapters | `Tauri*` prefix | `TauriDocumentRepository` |
+| Element          | Convention      | Example                   |
+| ---------------- | --------------- | ------------------------- |
+| TS files         | kebab-case      | `document-repository.ts`  |
+| React components | PascalCase      | `PageNavigation.tsx`      |
+| Interfaces/Types | PascalCase      | `DocumentRepositoryPort`  |
+| Functions        | camelCase       | `getDocumentById`         |
+| Constants        | SCREAMING_SNAKE | `VALID_TRANSITIONS`       |
+| Rust files       | snake_case      | `document_repository.rs`  |
+| Rust structs     | PascalCase      | `Document`                |
+| Tauri commands   | snake_case      | `library_add_document`    |
+| Ports            | `*Port` suffix  | `DocumentRepositoryPort`  |
+| Adapters         | `Tauri*` prefix | `TauriDocumentRepository` |
 
 ### Error Handling
 
@@ -112,15 +113,33 @@ Zustand stores MUST follow established patterns:
 
 ## Development Workflow
 
+### Resource-Conscious Development (CRITICAL)
+
+**This machine runs multiple projects concurrently. ALWAYS minimize resource consumption.**
+
+1. **NEVER run full test suites unless absolutely necessary** - Use targeted tests for changed files only
+2. **NEVER run tests in parallel** - Sequential execution preserves system resources
+3. **NEVER use watch modes** - Use single-run commands (`test:run` not `test`)
+4. **NEVER run multiple heavy processes simultaneously** - Complete one before starting another
+5. **ALWAYS prefer lightweight checks first** - Run in order: lint → typecheck → targeted tests
+6. **ALWAYS close dev servers before running test suites** - Stop `pnpm tauri dev` first
+
 ### Verification Commands
 
 ```bash
+# PREFERRED ORDER (lightweight first)
+pnpm lint            # Step 1: ESLint including architecture boundaries
+pnpm typecheck       # Step 2: TypeScript strict mode check
+
+# Step 3: TARGETED tests only (prefer over full suite)
+pnpm test -- src/path/to/changed-file.test.ts  # Single test file (PREFERRED)
+cd src-tauri && cargo test specific_test_name --features test-mocks  # Single test (PREFERRED)
+
+# Step 4: Full suite ONLY before final commit (resource intensive)
 pnpm verify          # Full CI check (MUST pass before merge)
-pnpm lint            # ESLint including architecture boundaries
-pnpm typecheck       # TypeScript strict mode check
-pnpm test:run        # All frontend tests
-pnpm test:coverage   # Coverage with 80% threshold
-cd src-tauri && cargo test --features test-mocks  # Backend tests
+pnpm test:run        # All frontend tests - AVOID unless necessary
+pnpm test:coverage   # Coverage with 80% threshold - AVOID unless necessary
+cd src-tauri && cargo test --features test-mocks -j 1  # Backend tests, single thread
 cd src-tauri && cargo clippy -- -D warnings       # Rust linting
 ```
 
