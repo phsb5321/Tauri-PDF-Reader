@@ -170,7 +170,10 @@ impl AiTtsEngine {
             .or_else(|| config.voice_id.clone())
             .ok_or("NO_VOICE: No voice ID specified")?;
 
-        let model_id = config.model_id.clone().unwrap_or_else(|| "eleven_monolingual_v1".to_string());
+        let model_id = config
+            .model_id
+            .clone()
+            .unwrap_or_else(|| "eleven_monolingual_v1".to_string());
 
         // Update state
         {
@@ -184,7 +187,8 @@ impl AiTtsEngine {
 
         // Generate cache key
         let settings_hash = format!("{:.2}_{:.2}", config.stability, config.similarity_boost);
-        let cache_key = AudioCacheAdapter::generate_cache_key(text, &voice, &model_id, &settings_hash);
+        let cache_key =
+            AudioCacheAdapter::generate_cache_key(text, &voice, &model_id, &settings_hash);
 
         // Check cache first
         let audio_data = if let Some(cache) = &self.cache {
@@ -195,9 +199,7 @@ impl AiTtsEngine {
                 }
                 Ok(None) => {
                     tracing::debug!("Cache miss, fetching from ElevenLabs");
-                    let data = client
-                        .text_to_speech(text, &voice, Some(&model_id))
-                        .await?;
+                    let data = client.text_to_speech(text, &voice, Some(&model_id)).await?;
 
                     // Cache the audio (best-effort, ignore errors)
                     if let Err(e) = cache.set(&cache_key, &data) {
@@ -207,15 +209,11 @@ impl AiTtsEngine {
                 }
                 Err(e) => {
                     tracing::warn!("Cache error, fetching from API: {}", e);
-                    client
-                        .text_to_speech(text, &voice, Some(&model_id))
-                        .await?
+                    client.text_to_speech(text, &voice, Some(&model_id)).await?
                 }
             }
         } else {
-            client
-                .text_to_speech(text, &voice, Some(&model_id))
-                .await?
+            client.text_to_speech(text, &voice, Some(&model_id)).await?
         };
 
         // Play audio (non-blocking)
@@ -242,7 +240,10 @@ impl AiTtsEngine {
             .or_else(|| config.voice_id.clone())
             .ok_or("NO_VOICE: No voice ID specified")?;
 
-        let model_id = config.model_id.clone().unwrap_or_else(|| "eleven_monolingual_v1".to_string());
+        let model_id = config
+            .model_id
+            .clone()
+            .unwrap_or_else(|| "eleven_monolingual_v1".to_string());
 
         // Update state
         {
@@ -256,7 +257,8 @@ impl AiTtsEngine {
 
         // Generate cache key for timestamps
         let settings_hash = format!("{:.2}_{:.2}_ts", config.stability, config.similarity_boost);
-        let cache_key = AudioCacheAdapter::generate_cache_key(text, &voice, &model_id, &settings_hash);
+        let cache_key =
+            AudioCacheAdapter::generate_cache_key(text, &voice, &model_id, &settings_hash);
 
         // Check disk cache first (persists across app restarts)
         if let Some(disk_cache) = &self.cache {
@@ -345,7 +347,7 @@ impl AiTtsEngine {
     }
 
     /// Play raw MP3 audio data
-    /// 
+    ///
     /// This is called after speak_with_timestamps returns, allowing the command
     /// to emit a sync event right before playback starts.
     pub fn play_audio(&self, audio_data: &[u8]) -> Result<(), String> {
@@ -416,7 +418,7 @@ impl AiTtsEngine {
     }
 
     /// Pre-buffer TTS audio without playing
-    /// 
+    ///
     /// Fetches audio from ElevenLabs API (or cache) and stores in disk cache.
     /// Does NOT play the audio - just ensures it's cached for instant playback later.
     pub async fn prebuffer(
@@ -435,11 +437,15 @@ impl AiTtsEngine {
             .or_else(|| config.voice_id.clone())
             .ok_or("NO_VOICE: No voice ID specified")?;
 
-        let model_id = config.model_id.clone().unwrap_or_else(|| "eleven_monolingual_v1".to_string());
+        let model_id = config
+            .model_id
+            .clone()
+            .unwrap_or_else(|| "eleven_monolingual_v1".to_string());
 
         // Generate cache key for timestamps
         let settings_hash = format!("{:.2}_{:.2}_ts", config.stability, config.similarity_boost);
-        let cache_key = AudioCacheAdapter::generate_cache_key(text, &voice, &model_id, &settings_hash);
+        let cache_key =
+            AudioCacheAdapter::generate_cache_key(text, &voice, &model_id, &settings_hash);
 
         // Check if already cached
         if let Some(disk_cache) = &self.cache {
@@ -466,8 +472,11 @@ impl AiTtsEngine {
         }
 
         // Fetch from API
-        tracing::info!("Pre-buffering TTS from ElevenLabs API ({} chars)", text.len());
-        
+        tracing::info!(
+            "Pre-buffering TTS from ElevenLabs API ({} chars)",
+            text.len()
+        );
+
         let tts_result = client
             .text_to_speech_with_timestamps(text, &voice, Some(&model_id))
             .await?;

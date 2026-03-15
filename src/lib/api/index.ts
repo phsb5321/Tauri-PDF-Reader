@@ -17,7 +17,7 @@ export {
   libraryRemoveDocument,
   libraryOpenDocument,
   libraryCheckFileExists,
-} from './library';
+} from "./library";
 
 // Highlights API
 export {
@@ -31,7 +31,7 @@ export {
   highlightsDeleteForDocument,
   highlightsExport,
   type CreateHighlightInput,
-} from './highlights';
+} from "./highlights";
 
 // TTS API
 export {
@@ -52,7 +52,7 @@ export {
   type TtsChunkStartedEvent,
   type TtsChunkCompletedEvent,
   type TtsCompletedEvent,
-} from './tts';
+} from "./tts";
 
 // AI TTS API
 export {
@@ -92,7 +92,7 @@ export {
   type AiTtsErrorEvent,
   type WordTiming,
   type SpeakWithTimestampsResponse,
-} from './ai-tts';
+} from "./ai-tts";
 
 // Settings API
 export {
@@ -103,4 +103,42 @@ export {
   settingsSetBatch,
   type SettingResponse,
   type SettingsMap,
-} from './settings';
+} from "./settings";
+
+// Audio Cache API
+export {
+  audioCacheGetCoverage,
+  audioCacheClearDocument,
+  audioCacheGetStats,
+  audioCacheSetLimit,
+  audioCacheGetLimit,
+  audioCacheEvict,
+  audioCacheNotifyCoverage,
+  onCoverageUpdated,
+  type CoverageResponse,
+  type CacheStatsResponse,
+  type EvictionResponse,
+  type ClearDocumentResponse,
+  type CoverageUpdatedEvent,
+} from "./audio-cache";
+
+// Sessions API (T066-T068)
+export {
+  sessionCreate,
+  sessionGet,
+  sessionList,
+  sessionUpdate,
+  sessionDelete,
+  sessionRestore,
+  sessionAddDocument,
+  sessionRemoveDocument,
+  sessionUpdateDocument,
+  sessionTouch,
+} from "./sessions";
+
+// Audio Export API (T085-T086)
+export {
+  audioExportCheckReady,
+  audioExportDocument,
+  audioExportCancel,
+} from "./audio-export";

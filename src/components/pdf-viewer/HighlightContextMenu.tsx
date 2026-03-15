@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef } from 'react';
-import { HIGHLIGHT_COLORS } from '../../lib/constants';
-import type { Highlight } from '../../lib/schemas';
-import './HighlightContextMenu.css';
+import { useCallback, useEffect, useRef } from "react";
+import { HIGHLIGHT_COLORS } from "../../lib/constants";
+import { useToastStore } from "../../stores/toast-store";
+import type { Highlight } from "../../lib/schemas";
+import "./HighlightContextMenu.css";
 
 interface HighlightContextMenuProps {
   highlight: Highlight;
@@ -34,21 +35,21 @@ export function HighlightContextMenu({
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         onClose();
       }
     };
 
     // Delay to avoid immediate trigger
     const timeout = setTimeout(() => {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('keydown', handleKeyDown);
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleKeyDown);
     }, 50);
 
     return () => {
       clearTimeout(timeout);
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [onClose]);
 
@@ -77,7 +78,7 @@ export function HighlightContextMenu({
       onChangeColor(highlight.id, color);
       onClose();
     },
-    [highlight.id, onChangeColor, onClose]
+    [highlight.id, onChangeColor, onClose],
   );
 
   const handleNoteClick = useCallback(() => {
@@ -85,10 +86,13 @@ export function HighlightContextMenu({
     onClose();
   }, [highlight, onAddNote, onClose]);
 
+  const toastSuccess = useToastStore((s) => s.success);
+
   const handleDeleteClick = useCallback(() => {
     onDelete(highlight.id);
+    toastSuccess("Highlight deleted");
     onClose();
-  }, [highlight.id, onDelete, onClose]);
+  }, [highlight.id, onDelete, toastSuccess, onClose]);
 
   return (
     <div
@@ -108,7 +112,7 @@ export function HighlightContextMenu({
           {HIGHLIGHT_COLORS.map((color) => (
             <button
               key={color.id}
-              className={`context-menu-color-button ${highlight.color === color.hex ? 'selected' : ''}`}
+              className={`context-menu-color-button ${highlight.color === color.hex ? "selected" : ""}`}
               style={{ backgroundColor: color.hex }}
               onClick={() => handleColorClick(color.hex)}
               title={color.name}
@@ -128,7 +132,7 @@ export function HighlightContextMenu({
         role="menuitem"
       >
         <NoteIcon />
-        <span>{highlight.note ? 'Edit Note' : 'Add Note'}</span>
+        <span>{highlight.note ? "Edit Note" : "Add Note"}</span>
       </button>
 
       <div className="context-menu-divider" />

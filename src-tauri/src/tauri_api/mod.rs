@@ -19,8 +19,14 @@
 //! - Adapter implementations directly
 //! - Complex business logic
 
+pub mod sessions;
 pub mod settings;
 
+pub use sessions::{
+    session_add_document, session_create, session_delete, session_get, session_list,
+    session_remove_document, session_restore, session_touch, session_update,
+    session_update_document,
+};
 pub use settings::{
     settings_delete_v2, settings_get_all_v2, settings_get_v2, settings_set_batch_v2,
     settings_set_v2,

@@ -2,7 +2,7 @@
 //!
 //! Handles caching of TTS audio files to disk with metadata tracking.
 //! Cache key is generated from SHA256(text + voice_id + model_id + settings).
-//! 
+//!
 //! Cache structure:
 //! - `{cache_key}.mp3` - Audio data
 //! - `{cache_key}.json` - Timestamps and metadata (optional)
@@ -314,7 +314,10 @@ impl AudioCacheAdapter {
         };
 
         let word_timings: Vec<CachedWordTiming> = match serde_json::from_value(
-            metadata.get("wordTimings").cloned().unwrap_or(serde_json::Value::Array(vec![]))
+            metadata
+                .get("wordTimings")
+                .cloned()
+                .unwrap_or(serde_json::Value::Array(vec![])),
         ) {
             Ok(timings) => timings,
             Err(e) => {
@@ -442,7 +445,8 @@ impl AudioCacheAdapter {
                                 entry_count += 1;
 
                                 if let Ok(created) = metadata.created() {
-                                    let name = path.file_name().map(|n| n.to_string_lossy().to_string());
+                                    let name =
+                                        path.file_name().map(|n| n.to_string_lossy().to_string());
 
                                     if oldest_time.is_none() || created < oldest_time.unwrap() {
                                         oldest_time = Some(created);

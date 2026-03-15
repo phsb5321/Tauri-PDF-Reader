@@ -1,8 +1,17 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import type { AiVoiceInfo, AiTtsState as BackendTtsState } from '../lib/tauri-invoke';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import type {
+  AiVoiceInfo,
+  AiTtsState as BackendTtsState,
+} from "../lib/tauri-invoke";
+import type { CoverageResponse } from "../lib/api/audio-cache";
 
-export type AiTtsPlaybackState = 'idle' | 'playing' | 'paused' | 'loading' | 'error';
+export type AiTtsPlaybackState =
+  | "idle"
+  | "playing"
+  | "paused"
+  | "loading"
+  | "error";
 
 /**
  * Valid state transitions for TTS playback (T025)
@@ -11,11 +20,11 @@ export type AiTtsPlaybackState = 'idle' | 'playing' | 'paused' | 'loading' | 'er
  * Format: fromState -> [validNextStates]
  */
 const VALID_TRANSITIONS: Record<AiTtsPlaybackState, AiTtsPlaybackState[]> = {
-  idle: ['loading', 'error'],           // Can start loading or enter error
-  loading: ['playing', 'idle', 'error'], // Can start playing, cancel, or error
-  playing: ['paused', 'idle', 'error'],  // Can pause, stop, or error
-  paused: ['playing', 'idle', 'error'],  // Can resume, stop, or error
-  error: ['idle', 'loading'],            // Can reset to idle or retry
+  idle: ["loading", "error"], // Can start loading or enter error
+  loading: ["playing", "idle", "error"], // Can start playing, cancel, or error
+  playing: ["paused", "idle", "error"], // Can pause, stop, or error
+  paused: ["playing", "idle", "error"], // Can resume, stop, or error
+  error: ["idle", "loading"], // Can reset to idle or retry
 };
 
 interface AiTtsState {
@@ -37,6 +46,9 @@ interface AiTtsState {
   // Playback settings (T033)
   autoPageEnabled: boolean;
 
+  // Cache coverage (T042)
+  cacheCoverage: CoverageResponse | null;
+
   // Actions
   setApiKey: (key: string | null) => void;
   setInitialized: (initialized: boolean, error?: string) => void;
@@ -44,6 +56,7 @@ interface AiTtsState {
   setSelectedVoice: (voiceId: string | null) => void;
   setSpeed: (speed: number) => void;
   setAutoPageEnabled: (enabled: boolean) => void;
+  setCacheCoverage: (coverage: CoverageResponse | null) => void;
   setPlaybackState: (state: AiTtsPlaybackState) => void;
   /** Transition to next state with validation (T026) */
   transitionTo: (nextState: AiTtsPlaybackState, force?: boolean) => boolean;
@@ -59,19 +72,20 @@ const MIN_SPEED = 0.5;
 const MAX_SPEED = 2.0;
 
 // Default ElevenLabs voice (Rachel - good for narration)
-const DEFAULT_VOICE_ID = '21m00Tcm4TlvDq8ikWAM';
+const DEFAULT_VOICE_ID = "21m00Tcm4TlvDq8ikWAM";
 
 const initialState = {
   initialized: false,
   apiKey: null as string | null,
   initError: null as string | null,
-  playbackState: 'idle' as AiTtsPlaybackState,
+  playbackState: "idle" as AiTtsPlaybackState,
   currentText: null as string | null,
   error: null as string | null,
   voices: [] as AiVoiceInfo[],
   selectedVoiceId: DEFAULT_VOICE_ID,
   speed: DEFAULT_SPEED,
   autoPageEnabled: true, // T033: Default to enabled for multi-page TTS
+  cacheCoverage: null as CoverageResponse | null, // T042: Audio cache coverage for current document
 };
 
 export const useAiTtsStore = create<AiTtsState>()(
@@ -85,7 +99,7 @@ export const useAiTtsStore = create<AiTtsState>()(
         set({
           initialized,
           initError: error ?? null,
-          playbackState: initialized ? 'idle' : 'error',
+          playbackState: initialized ? "idle" : "error",
         }),
 
       setVoices: (voices) => {
@@ -94,7 +108,9 @@ export const useAiTtsStore = create<AiTtsState>()(
         const voiceExists = voices.some((v) => v.id === selectedVoiceId);
         set({
           voices,
-          selectedVoiceId: voiceExists ? selectedVoiceId : voices[0]?.id ?? null,
+          selectedVoiceId: voiceExists
+            ? selectedVoiceId
+            : (voices[0]?.id ?? null),
         });
       },
 
@@ -107,14 +123,21 @@ export const useAiTtsStore = create<AiTtsState>()(
 
       setAutoPageEnabled: (enabled) => set({ autoPageEnabled: enabled }),
 
+      setCacheCoverage: (coverage) => set({ cacheCoverage: coverage }),
+
       setPlaybackState: (state) => {
         // Direct state set - for backward compatibility and event-driven updates
         // Prefer transitionTo() for validated state changes
         const currentState = get().playbackState;
-        console.debug('[AiTtsStore] setPlaybackState:', currentState, '->', state);
+        console.debug(
+          "[AiTtsStore] setPlaybackState:",
+          currentState,
+          "->",
+          state,
+        );
         // Debug: Log stack trace when transitioning from playing to idle
-        if (currentState === 'playing' && state === 'idle') {
-          console.debug('[AiTtsStore] playing->idle stack:', new Error().stack);
+        if (currentState === "playing" && state === "idle") {
+          console.debug("[AiTtsStore] playing->idle stack:", new Error().stack);
         }
         set({ playbackState: state });
       },
@@ -127,12 +150,18 @@ export const useAiTtsStore = create<AiTtsState>()(
         if (!force && !validNextStates.includes(nextState)) {
           console.warn(
             `[AiTtsStore] Invalid state transition: ${currentState} -> ${nextState}. ` +
-            `Valid transitions: ${validNextStates.join(', ')}`
+              `Valid transitions: ${validNextStates.join(", ")}`,
           );
           return false;
         }
 
-        console.debug('[AiTtsStore] transitionTo:', currentState, '->', nextState, force ? '(forced)' : '');
+        console.debug(
+          "[AiTtsStore] transitionTo:",
+          currentState,
+          "->",
+          nextState,
+          force ? "(forced)" : "",
+        );
         set({ playbackState: nextState });
         return true;
       },
@@ -142,23 +171,23 @@ export const useAiTtsStore = create<AiTtsState>()(
       setError: (error) =>
         set({
           error,
-          playbackState: error ? 'error' : get().playbackState,
+          playbackState: error ? "error" : get().playbackState,
         }),
 
       clearError: () =>
         set({
           error: null,
-          playbackState: 'idle',
+          playbackState: "idle",
         }),
 
       updateFromBackend: (backendState) => {
         set({
           initialized: backendState.initialized,
           playbackState: backendState.isPlaying
-            ? 'playing'
+            ? "playing"
             : backendState.isPaused
-              ? 'paused'
-              : 'idle',
+              ? "paused"
+              : "idle",
           selectedVoiceId: backendState.currentVoiceId ?? get().selectedVoiceId,
         });
       },
@@ -172,7 +201,7 @@ export const useAiTtsStore = create<AiTtsState>()(
         }),
     }),
     {
-      name: 'ai-tts-storage',
+      name: "ai-tts-storage",
       partialize: (state) => ({
         // Only persist these fields
         apiKey: state.apiKey,
@@ -180,15 +209,22 @@ export const useAiTtsStore = create<AiTtsState>()(
         speed: state.speed,
         autoPageEnabled: state.autoPageEnabled,
       }),
-    }
-  )
+    },
+  ),
 );
 
 // Derived selectors
-export const selectIsPlaying = (state: AiTtsState) => state.playbackState === 'playing';
-export const selectIsPaused = (state: AiTtsState) => state.playbackState === 'paused';
-export const selectIsLoading = (state: AiTtsState) => state.playbackState === 'loading';
-export const selectCanPlay = (state: AiTtsState) => state.initialized && !state.error;
+export const selectIsPlaying = (state: AiTtsState) =>
+  state.playbackState === "playing";
+export const selectIsPaused = (state: AiTtsState) =>
+  state.playbackState === "paused";
+export const selectIsLoading = (state: AiTtsState) =>
+  state.playbackState === "loading";
+export const selectCanPlay = (state: AiTtsState) =>
+  state.initialized && !state.error;
 export const selectNeedsApiKey = (state: AiTtsState) => !state.apiKey;
 export const selectSelectedVoice = (state: AiTtsState) =>
   state.voices.find((v) => v.id === state.selectedVoiceId) ?? null;
+export const selectCacheCoverage = (state: AiTtsState) => state.cacheCoverage;
+export const selectCacheCoveragePercent = (state: AiTtsState) =>
+  state.cacheCoverage?.coveragePercent ?? 0;

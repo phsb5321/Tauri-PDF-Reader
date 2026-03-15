@@ -1,0 +1,126 @@
+/**
+ * SessionMenu Component Styles (T071)
+ */
+
+.session-menu {
+  z-index: var(--z-sidebar, 900);
+}
+
+.session-menu__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+  height: 100%;
+}
+
+.session-menu__active-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2, 8px) var(--space-3, 12px);
+  background: var(--color-primary-alpha, rgba(37, 99, 235, 0.1));
+  border-radius: var(--radius-md, 8px);
+  margin-bottom: var(--space-2, 8px);
+}
+
+.session-menu__active-label {
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: var(--font-medium, 500);
+  color: var(--color-primary, #2563eb);
+}
+
+.session-menu__loading,
+.session-menu__restoring {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2, 8px);
+  padding: var(--space-6, 24px);
+  color: var(--color-text-secondary, #666);
+  font-size: var(--text-sm, 0.875rem);
+}
+
+.session-menu__spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-border, #e5e7eb);
+  border-top-color: var(--color-primary, #2563eb);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.session-menu__error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  padding: var(--space-4, 16px);
+  text-align: center;
+}
+
+.session-menu__error p {
+  color: var(--color-error, #dc2626);
+  font-size: var(--text-sm, 0.875rem);
+  margin: 0;
+}
+
+.session-menu__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 4px);
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.session-menu__delete-confirm {
+  position: fixed;
+  bottom: var(--space-4, 16px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: var(--space-2, 8px) var(--space-4, 16px);
+  background: var(--color-bg-surface, #fff);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: var(--shadow-lg, 0 10px 25px rgba(0, 0, 0, 0.1));
+  font-size: var(--text-sm, 0.875rem);
+  color: var(--color-warning, #d97706);
+  animation: slideUpFade 0.2s ease-out;
+}
+
+@keyframes slideUpFade {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Ensure empty state fits well */
+.session-menu .empty-state {
+  padding: var(--space-6, 24px) var(--space-4, 16px);
+}
+
+.session-menu .empty-state__icon {
+  width: 48px;
+  height: 48px;
+}
+
+/* Dark mode support */
+[data-theme="dark"] .session-menu__delete-confirm {
+  background: var(--color-bg-surface-dark, #1f2937);
+  border-color: var(--color-border-dark, #4b5563);
+}
+
+[data-theme="dark"] .session-menu__active-indicator {
+  background: rgba(37, 99, 235, 0.2);
+}

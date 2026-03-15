@@ -5,15 +5,17 @@
  * Handles loading settings on mount and saving changes to the backend.
  */
 
-import { useCallback, useEffect, useRef } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { useCallback, useEffect, useRef } from "react";
+// TODO: Migrate to type-safe bindings when render_settings commands are added to tauri-specta
+// eslint-disable-next-line no-restricted-imports
+import { invoke } from "@tauri-apps/api/core";
 import {
   useRenderStore,
   selectRenderSettings,
   selectRenderStoreStatus,
-} from '../stores/render-store';
-import type { RenderSettings } from '../domain/rendering';
-import { RenderSettingsSchema } from '../domain/rendering';
+} from "../stores/render-store";
+import type { RenderSettings } from "../domain/rendering";
+import { RenderSettingsSchema } from "../domain/rendering";
 
 /**
  * Backend response for update render settings
@@ -37,7 +39,9 @@ export function useRenderSettings() {
   const resetSettings = useRenderStore((state) => state.resetSettings);
   const setLoading = useRenderStore((state) => state.setLoading);
   const setError = useRenderStore((state) => state.setError);
-  const setHasUnsavedChanges = useRenderStore((state) => state.setHasUnsavedChanges);
+  const setHasUnsavedChanges = useRenderStore(
+    (state) => state.setHasUnsavedChanges,
+  );
   const setPendingRestart = useRenderStore((state) => state.setPendingRestart);
 
   // Track if initial load has been done
@@ -55,14 +59,16 @@ export function useRenderSettings() {
       setError(null);
 
       try {
-        const response = await invoke<RenderSettings>('get_render_settings');
+        const response = await invoke<RenderSettings>("get_render_settings");
 
         // Validate response with Zod
         const validated = RenderSettingsSchema.parse(response);
         setSettings(validated);
       } catch (err) {
-        console.error('Failed to load render settings:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load settings');
+        console.error("Failed to load render settings:", err);
+        setError(
+          err instanceof Error ? err.message : "Failed to load settings",
+        );
         // Keep default settings on error
       } finally {
         setLoading(false);
@@ -82,12 +88,15 @@ export function useRenderSettings() {
     setError(null);
 
     try {
-      const response = await invoke<UpdateRenderSettingsResponse>('update_render_settings', {
-        qualityMode: settings.qualityMode,
-        maxMegapixels: settings.maxMegapixels,
-        hwAccelerationEnabled: settings.hwAccelerationEnabled,
-        debugOverlayEnabled: settings.debugOverlayEnabled,
-      });
+      const response = await invoke<UpdateRenderSettingsResponse>(
+        "update_render_settings",
+        {
+          qualityMode: settings.qualityMode,
+          maxMegapixels: settings.maxMegapixels,
+          hwAccelerationEnabled: settings.hwAccelerationEnabled,
+          debugOverlayEnabled: settings.debugOverlayEnabled,
+        },
+      );
 
       if (response.success) {
         setSettings(response.settings);
@@ -99,12 +108,12 @@ export function useRenderSettings() {
 
         return true;
       } else {
-        setError('Failed to save settings');
+        setError("Failed to save settings");
         return false;
       }
     } catch (err) {
-      console.error('Failed to save render settings:', err);
-      setError(err instanceof Error ? err.message : 'Failed to save settings');
+      console.error("Failed to save render settings:", err);
+      setError(err instanceof Error ? err.message : "Failed to save settings");
       return false;
     } finally {
       setLoading(false);
@@ -126,7 +135,7 @@ export function useRenderSettings() {
     <K extends keyof RenderSettings>(key: K, value: RenderSettings[K]) => {
       updateSettings({ [key]: value });
     },
-    [updateSettings]
+    [updateSettings],
   );
 
   /**
@@ -135,15 +144,18 @@ export function useRenderSettings() {
   const updateAndSave = useCallback(
     async <K extends keyof RenderSettings>(
       key: K,
-      value: RenderSettings[K]
+      value: RenderSettings[K],
     ): Promise<boolean> => {
       setLoading(true);
       setError(null);
 
       try {
-        const response = await invoke<UpdateRenderSettingsResponse>('update_render_settings', {
-          [key]: value,
-        });
+        const response = await invoke<UpdateRenderSettingsResponse>(
+          "update_render_settings",
+          {
+            [key]: value,
+          },
+        );
 
         if (response.success) {
           setSettings(response.settings);
@@ -154,18 +166,20 @@ export function useRenderSettings() {
 
           return true;
         } else {
-          setError('Failed to save setting');
+          setError("Failed to save setting");
           return false;
         }
       } catch (err) {
-        console.error('Failed to update render setting:', err);
-        setError(err instanceof Error ? err.message : 'Failed to update setting');
+        console.error("Failed to update render setting:", err);
+        setError(
+          err instanceof Error ? err.message : "Failed to update setting",
+        );
         return false;
       } finally {
         setLoading(false);
       }
     },
-    [setSettings, setLoading, setError, setPendingRestart]
+    [setSettings, setLoading, setError, setPendingRestart],
   );
 
   /**

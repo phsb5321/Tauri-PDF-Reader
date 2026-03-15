@@ -1,9 +1,11 @@
-import { useState, useCallback } from 'react';
-import { highlightsExport } from '../../lib/tauri-invoke';
-import { save } from '@tauri-apps/plugin-dialog';
-import './ExportDialog.css';
+import { useState, useCallback, useRef } from "react";
+import { highlightsExport } from "../../lib/tauri-invoke";
+import { useFileDialog, FILE_FILTERS } from "../../hooks/useFileDialog";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
+import { useToastStore } from "../../stores/toast-store";
+import "./ExportDialog.css";
 
-type ExportFormat = 'markdown' | 'json';
+type ExportFormat = "markdown" | "json";
 
 interface ExportDialogProps {
   documentId: string;
@@ -18,9 +20,19 @@ export function ExportDialog({
   highlightCount,
   onClose,
 }: ExportDialogProps) {
-  const [format, setFormat] = useState<ExportFormat>('markdown');
+  const [format, setFormat] = useState<ExportFormat>("markdown");
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { saveFile } = useFileDialog();
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Focus trap for accessibility
+  useFocusTrap({
+    containerRef: dialogRef,
+    active: true,
+    onEscape: onClose,
+    preventScroll: true,
+  });
 
   const handleExport = useCallback(async () => {
     setIsExporting(true);
@@ -31,30 +43,32 @@ export function ExportDialog({
       const result = await highlightsExport(documentId, format);
 
       // Show save dialog
-      const defaultFileName = `${documentTitle.replace(/[^a-zA-Z0-9]/g, '_')}_highlights.${format === 'markdown' ? 'md' : 'json'}`;
+      const defaultFileName = `${documentTitle.replace(/[^a-zA-Z0-9]/g, "_")}_highlights.${format === "markdown" ? "md" : "json"}`;
 
-      const filePath = await save({
+      const filePath = await saveFile({
         defaultPath: defaultFileName,
         filters: [
-          format === 'markdown'
-            ? { name: 'Markdown', extensions: ['md'] }
-            : { name: 'JSON', extensions: ['json'] },
+          format === "markdown" ? FILE_FILTERS.MARKDOWN : FILE_FILTERS.JSON,
         ],
       });
 
       if (filePath) {
         // Write to file using Tauri FS
-        const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+        const { writeTextFile } = await import("@tauri-apps/plugin-fs");
         await writeTextFile(filePath, result.content);
+        useToastStore.getState().success("Highlights exported");
         onClose();
       }
     } catch (err) {
-      console.error('Export failed:', err);
-      setError(err instanceof Error ? err.message : 'Failed to export highlights');
+      console.error("Export failed:", err);
+      const errorMsg =
+        err instanceof Error ? err.message : "Failed to export highlights";
+      setError(errorMsg);
+      useToastStore.getState().error(errorMsg);
     } finally {
       setIsExporting(false);
     }
-  }, [documentId, documentTitle, format, onClose]);
+  }, [documentId, documentTitle, format, onClose, saveFile]);
 
   const handleBackdropClick = useCallback(
     (e: React.MouseEvent) => {
@@ -62,21 +76,23 @@ export function ExportDialog({
         onClose();
       }
     },
-    [onClose]
+    [onClose],
   );
 
   return (
     <div
       className="export-dialog-backdrop"
       onClick={handleBackdropClick}
+      onKeyDown={(e) => e.key === "Escape" && onClose()}
       role="dialog"
       aria-modal="true"
       aria-labelledby="export-dialog-title"
     >
-      <div className="export-dialog">
+      <div className="export-dialog" ref={dialogRef}>
         <div className="export-dialog-header">
           <h2 id="export-dialog-title">Export Highlights</h2>
           <button
+            type="button"
             className="export-dialog-close"
             onClick={onClose}
             aria-label="Close"
@@ -88,8 +104,8 @@ export function ExportDialog({
 
         <div className="export-dialog-content">
           <p className="export-dialog-info">
-            Export {highlightCount} highlight{highlightCount !== 1 ? 's' : ''} from{' '}
-            <strong>{documentTitle}</strong>
+            Export {highlightCount} highlight{highlightCount !== 1 ? "s" : ""}{" "}
+            from <strong>{documentTitle}</strong>
           </p>
 
           <div className="export-dialog-formats">
@@ -98,8 +114,8 @@ export function ExportDialog({
                 type="radio"
                 name="format"
                 value="markdown"
-                checked={format === 'markdown'}
-                onChange={() => setFormat('markdown')}
+                checked={format === "markdown"}
+                onChange={() => setFormat("markdown")}
                 disabled={isExporting}
               />
               <div className="format-info">
@@ -115,8 +131,8 @@ export function ExportDialog({
                 type="radio"
                 name="format"
                 value="json"
-                checked={format === 'json'}
-                onChange={() => setFormat('json')}
+                checked={format === "json"}
+                onChange={() => setFormat("json")}
                 disabled={isExporting}
               />
               <div className="format-info">
@@ -138,6 +154,7 @@ export function ExportDialog({
 
         <div className="export-dialog-footer">
           <button
+            type="button"
             className="export-dialog-button export-dialog-button-secondary"
             onClick={onClose}
             disabled={isExporting}
@@ -145,11 +162,12 @@ export function ExportDialog({
             Cancel
           </button>
           <button
+            type="button"
             className="export-dialog-button export-dialog-button-primary"
             onClick={handleExport}
             disabled={isExporting || highlightCount === 0}
           >
-            {isExporting ? 'Exporting...' : 'Export'}
+            {isExporting ? "Exporting..." : "Export"}
           </button>
         </div>
       </div>

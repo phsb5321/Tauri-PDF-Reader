@@ -6,6 +6,47 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Tauri 2.x desktop PDF reader with text highlighting and native text-to-speech. Uses React/TypeScript frontend with Rust backend.
 
+## Resource-Conscious Development (CRITICAL)
+
+**This machine runs multiple projects concurrently. ALWAYS minimize resource consumption.**
+
+### Rules for AI Agents
+
+1. **NEVER run full test suites unless explicitly requested** - Use targeted tests
+2. **NEVER run tests in parallel** - Sequential execution only
+3. **NEVER use watch modes** - Use single-run commands
+4. **NEVER run multiple heavy processes simultaneously** - One at a time
+5. **ALWAYS close dev servers before running test suites**
+6. **ALWAYS prefer lightweight checks first** (lint -> typecheck -> targeted tests)
+
+### Preferred Order of Operations
+
+```bash
+# Step 1: Lightweight checks first
+pnpm lint
+pnpm typecheck
+
+# Step 2: Test ONLY the files you modified
+pnpm test -- src/path/to/changed-file.test.ts
+
+# Step 3: Backend tests ONLY if backend changed (single-threaded)
+cd src-tauri && cargo test specific_test_name --features test-mocks
+
+# Step 4: Full verification ONLY before final commit (and warn user first)
+pnpm verify
+```
+
+### Resource Flags
+
+```bash
+# Frontend: limit workers
+pnpm test -- --maxWorkers=1 src/path/to/file.test.ts
+
+# Backend: single-threaded
+cargo test --features test-mocks -j 1
+cargo build -j 2
+```
+
 ## Common Commands
 
 ```bash
@@ -25,26 +66,27 @@ pnpm typecheck
 pnpm lint
 pnpm lint:boundaries    # Hexagonal architecture boundaries only
 
-# Run full verification (all CI checks)
+# Run full verification (all CI checks) - RESOURCE INTENSIVE, use sparingly
 pnpm verify
 ```
 
 ### Testing
 
 ```bash
-# Frontend tests
-pnpm test:run                    # Run all frontend tests (201+)
-pnpm test                        # Watch mode
-pnpm test:arch                   # Architecture boundary tests only
-pnpm test -- src/path/to/file.test.ts  # Run specific test file
+# Frontend tests - PREFER TARGETED TESTS
+pnpm test -- src/path/to/file.test.ts  # Run specific test file (PREFERRED)
+pnpm test -- -t "test name"            # Run tests matching pattern
+pnpm test:arch                         # Architecture boundary tests only
+pnpm test:run                          # All frontend tests (201+) - AVOID unless necessary
+pnpm test                              # Watch mode - AVOID (uses continuous resources)
 
-# Backend tests
-cd src-tauri && cargo test --features test-mocks   # All backend tests (177+)
-cd src-tauri && cargo test test_name              # Run specific test
+# Backend tests - PREFER TARGETED TESTS
+cd src-tauri && cargo test test_name --features test-mocks   # Specific test (PREFERRED)
+cd src-tauri && cargo test --features test-mocks -j 1        # All tests, single thread
 
-# Coverage (80% threshold required)
-pnpm test:coverage
-cd src-tauri && cargo llvm-cov --features test-mocks
+# Coverage (80% threshold required) - RESOURCE INTENSIVE
+pnpm test:coverage                                  # AVOID unless necessary
+cd src-tauri && cargo llvm-cov --features test-mocks  # AVOID unless necessary
 ```
 
 ### Rust-specific Commands
@@ -262,3 +304,12 @@ sudo apt install -y \
 # TTS (Speech Dispatcher)
 sudo apt install -y speech-dispatcher libspeechd-dev
 ```
+
+## Active Technologies
+
+- TypeScript 5.6.x (frontend), Rust 2021 edition (backend) + React 18.3+, Zustand 5.x, Tauri 2.x, rodio 0.21+, id3 1.x (006-reading-session-audio-cache)
+- SQLite via tauri-plugin-sql (metadata) + filesystem (audio files) (006-reading-session-audio-cache)
+
+## Recent Changes
+
+- 006-reading-session-audio-cache: Added TypeScript 5.6.x (frontend), Rust 2021 edition (backend) + React 18.3+, Zustand 5.x, Tauri 2.x, rodio 0.21+, id3 1.x

@@ -5,8 +5,10 @@
  * This includes file-based flags that persist across app restarts.
  */
 
-import { useCallback, useEffect, useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { useCallback, useEffect, useState } from "react";
+// TODO: Migrate to type-safe bindings when hw_accel commands are added to tauri-specta
+// eslint-disable-next-line no-restricted-imports
+import { invoke } from "@tauri-apps/api/core";
 
 /**
  * Hardware acceleration status from backend
@@ -42,11 +44,11 @@ export function useHwAccelStatus() {
     setError(null);
 
     try {
-      const response = await invoke<HwAccelStatus>('get_hw_accel_status');
+      const response = await invoke<HwAccelStatus>("get_hw_accel_status");
       setStatus(response);
     } catch (err) {
-      console.error('Failed to get HW accel status:', err);
-      setError(err instanceof Error ? err.message : 'Failed to get status');
+      console.error("Failed to get HW accel status:", err);
+      setError(err instanceof Error ? err.message : "Failed to get status");
       // Keep default on error
     } finally {
       setIsLoading(false);
@@ -58,13 +60,15 @@ export function useHwAccelStatus() {
    */
   const clearSafeMode = useCallback(async (): Promise<boolean> => {
     try {
-      await invoke('clear_safe_mode');
+      await invoke("clear_safe_mode");
       // Refresh status
       await fetchStatus();
       return true;
     } catch (err) {
-      console.error('Failed to clear safe mode:', err);
-      setError(err instanceof Error ? err.message : 'Failed to clear safe mode');
+      console.error("Failed to clear safe mode:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to clear safe mode",
+      );
       return false;
     }
   }, [fetchStatus]);

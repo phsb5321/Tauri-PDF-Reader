@@ -95,6 +95,60 @@ pub const MIGRATIONS: &[&str] = &[
 
     INSERT OR IGNORE INTO _migrations (version, applied_at) VALUES (2, datetime('now'));
     "##,
+    // Migration 3: Reading Sessions and Enhanced Audio Cache
+    r##"
+    -- Reading Sessions Table
+    CREATE TABLE IF NOT EXISTS reading_sessions (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        last_accessed_at TEXT NOT NULL
+    );
+
+    -- Session Documents Junction Table
+    CREATE TABLE IF NOT EXISTS session_documents (
+        session_id TEXT NOT NULL,
+        document_id TEXT NOT NULL,
+        position INTEGER NOT NULL,
+        current_page INTEGER NOT NULL DEFAULT 1,
+        scroll_position REAL NOT NULL DEFAULT 0.0,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (session_id, document_id),
+        FOREIGN KEY (session_id) REFERENCES reading_sessions(id) ON DELETE CASCADE,
+        FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+    );
+
+    -- Enhance existing tts_cache_metadata with chunk tracking
+    -- Note: Using ALTER TABLE for backward compatibility
+    ALTER TABLE tts_cache_metadata ADD COLUMN chunk_index INTEGER;
+    ALTER TABLE tts_cache_metadata ADD COLUMN duration_ms INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE tts_cache_metadata ADD COLUMN total_chunks INTEGER;
+
+    -- Indexes for reading sessions performance
+    CREATE INDEX IF NOT EXISTS idx_reading_sessions_last_accessed
+        ON reading_sessions(last_accessed_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_session_documents_session
+        ON session_documents(session_id, position);
+
+    CREATE INDEX IF NOT EXISTS idx_tts_cache_document_page
+        ON tts_cache_metadata(document_id, page_number);
+
+    -- Cache settings table for configuration
+    CREATE TABLE IF NOT EXISTS cache_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    );
+
+    -- Insert default cache settings (5GB = 5368709120 bytes)
+    INSERT OR IGNORE INTO cache_settings (key, value, updated_at) VALUES
+        ('max_size_bytes', '5368709120', datetime('now')),
+        ('eviction_policy', 'lru', datetime('now'));
+
+    INSERT OR IGNORE INTO _migrations (version, applied_at) VALUES (3, datetime('now'));
+    "##,
 ];
 
 /// SQLite PRAGMA configuration for optimal performance

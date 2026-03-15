@@ -5,8 +5,8 @@
   right: 16px;
   z-index: var(--z-floating);
   background: rgba(0, 0, 0, 0.85);
-  color: #fff;
-  padding: 12px 16px;
+  color: var(--color-text-inverse);
+  padding: var(--space-3) var(--space-4);
   border-radius: 8px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 11px;
@@ -19,14 +19,14 @@
 .debug-overlay-header {
   font-size: 12px;
   font-weight: 600;
-  color: #fff;
-  margin-bottom: 8px;
+  color: var(--color-text-inverse);
+  margin-bottom: var(--space-2);
   padding-bottom: 6px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .debug-section {
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
 .debug-section:last-child {
@@ -38,7 +38,7 @@
   font-weight: 600;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.6);
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
   letter-spacing: 0.5px;
 }
 
@@ -55,22 +55,22 @@
 
 .debug-value {
   font-weight: 500;
-  color: #4CAF50;
+  color: var(--color-success);
 }
 
 .debug-value.debug-warning {
-  color: #FFC107;
+  color: var(--color-warning);
 }
 
 /* Dark theme adjustments */
 [data-theme="light"] .debug-overlay {
   background: rgba(255, 255, 255, 0.95);
-  color: #333;
+  color: var(--color-text-primary);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 [data-theme="light"] .debug-overlay-header {
-  color: #333;
+  color: var(--color-text-primary);
   border-bottom-color: rgba(0, 0, 0, 0.1);
 }
 
@@ -83,9 +83,9 @@
 }
 
 [data-theme="light"] .debug-value {
-  color: #2196F3;
+  color: var(--color-accent);
 }
 
 [data-theme="light"] .debug-value.debug-warning {
-  color: #FF9800;
+  color: var(--color-warning);
 }

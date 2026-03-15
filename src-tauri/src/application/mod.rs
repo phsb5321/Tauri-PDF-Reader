@@ -15,12 +15,18 @@
 //! - UI/presentation concerns
 //! - Specific adapter implementations
 
+pub mod audio_cache_service;
+pub mod audio_export_service;
 pub mod highlight_service;
 pub mod library_service;
+pub mod session_service;
 pub mod settings_service;
 pub mod tts_service;
 
+pub use audio_cache_service::AudioCacheService;
+pub use audio_export_service::AudioExportServiceImpl;
 pub use highlight_service::HighlightService;
 pub use library_service::LibraryService;
+pub use session_service::SessionService;
 pub use settings_service::SettingsService;
 pub use tts_service::TtsService;

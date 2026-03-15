@@ -1,0 +1,117 @@
+.dialog-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal);
+  animation: dialog-backdrop-in 0.15s ease-out;
+}
+
+@keyframes dialog-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.dialog {
+  background: var(--color-bg-surface);
+  border-radius: var(--radius-xl, 12px);
+  box-shadow: var(--shadow-xl, 0 8px 32px rgba(0, 0, 0, 0.2));
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: dialog-slide-in 0.2s ease-out;
+}
+
+@keyframes dialog-slide-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Size variants */
+.dialog--sm { width: 100%; max-width: 320px; }
+.dialog--md { width: 100%; max-width: 400px; }
+.dialog--lg { width: 100%; max-width: 560px; }
+.dialog--xl { width: 100%; max-width: 720px; }
+
+/* Header */
+.dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.dialog__title {
+  margin: 0;
+  font-size: var(--text-lg, 18px);
+  font-weight: var(--font-semibold, 600);
+  color: var(--color-text-primary);
+}
+
+.dialog__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-md, 6px);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.dialog__close:hover {
+  background: var(--color-button-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.dialog__close:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+.dialog__close svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Description */
+.dialog__description {
+  margin: 0;
+  padding: var(--space-3) var(--space-5) 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+/* Content */
+.dialog__content {
+  padding: var(--space-5);
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Footer */
+.dialog__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--color-border);
+}

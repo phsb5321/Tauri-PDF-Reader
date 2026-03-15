@@ -1,0 +1,25 @@
+/**
+ * SessionItem Component Styles (T070)
+ */
+
+.session-item__icon {
+  width: 20px;
+  height: 20px;
+  color: var(--color-text-secondary, #666);
+}
+
+.session-item__icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.session-item__time {
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--color-text-muted, #999);
+  white-space: nowrap;
+}
+
+/* Selected state enhancements */
+.list-row--selected .session-item__icon {
+  color: var(--color-primary, #2563eb);
+}

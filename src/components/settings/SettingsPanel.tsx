@@ -1,23 +1,42 @@
-import { useState, useEffect } from 'react';
-import { useSettingsStore } from '../../stores/settings-store';
-import { TtsSettings } from './TtsSettings';
-import { HighlightSettings } from './HighlightSettings';
-import { ThemeToggle } from './ThemeToggle';
-import { KeyboardShortcuts } from './KeyboardShortcuts';
-import { TelemetrySettings } from './TelemetrySettings';
-import { RenderSettings } from './RenderSettings';
-import './SettingsPanel.css';
+import { useState, useEffect, useRef } from "react";
+import { useSettingsStore } from "../../stores/settings-store";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
+import { TtsSettings } from "./TtsSettings";
+import { HighlightSettings } from "./HighlightSettings";
+import { ThemeToggle } from "./ThemeToggle";
+import { KeyboardShortcuts } from "./KeyboardShortcuts";
+import { TelemetrySettings } from "./TelemetrySettings";
+import { RenderSettings } from "./RenderSettings";
+import { CacheSettings } from "./CacheSettings";
+import "./SettingsPanel.css";
 
 interface SettingsPanelProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-type SettingsSection = 'appearance' | 'rendering' | 'tts' | 'highlights' | 'telemetry' | 'shortcuts';
+type SettingsSection =
+  | "appearance"
+  | "rendering"
+  | "tts"
+  | "cache"
+  | "highlights"
+  | "telemetry"
+  | "shortcuts";
 
 export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
-  const [activeSection, setActiveSection] = useState<SettingsSection>('appearance');
+  const [activeSection, setActiveSection] =
+    useState<SettingsSection>("appearance");
   const { loadFromDatabase, dbInitialized } = useSettingsStore();
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Focus trap for accessibility
+  useFocusTrap({
+    containerRef: panelRef,
+    active: isOpen,
+    onEscape: onClose,
+    preventScroll: true,
+  });
 
   useEffect(() => {
     if (isOpen && !dbInitialized) {
@@ -37,14 +56,16 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     <div
       className="settings-backdrop"
       onClick={handleBackdropClick}
+      onKeyDown={(e) => e.key === "Escape" && onClose()}
       role="dialog"
       aria-modal="true"
       aria-labelledby="settings-title"
     >
-      <div className="settings-panel">
+      <div className="settings-panel" ref={panelRef}>
         <div className="settings-header">
           <h2 id="settings-title">Settings</h2>
           <button
+            type="button"
             className="settings-close"
             onClick={onClose}
             aria-label="Close settings"
@@ -56,43 +77,57 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
         <div className="settings-body">
           <nav className="settings-nav">
             <button
-              className={`settings-nav-item ${activeSection === 'appearance' ? 'active' : ''}`}
-              onClick={() => setActiveSection('appearance')}
+              type="button"
+              className={`settings-nav-item ${activeSection === "appearance" ? "active" : ""}`}
+              onClick={() => setActiveSection("appearance")}
             >
               <PaletteIcon />
               <span>Appearance</span>
             </button>
             <button
-              className={`settings-nav-item ${activeSection === 'rendering' ? 'active' : ''}`}
-              onClick={() => setActiveSection('rendering')}
+              type="button"
+              className={`settings-nav-item ${activeSection === "rendering" ? "active" : ""}`}
+              onClick={() => setActiveSection("rendering")}
             >
               <RenderingIcon />
               <span>Rendering</span>
             </button>
             <button
-              className={`settings-nav-item ${activeSection === 'tts' ? 'active' : ''}`}
-              onClick={() => setActiveSection('tts')}
+              type="button"
+              className={`settings-nav-item ${activeSection === "tts" ? "active" : ""}`}
+              onClick={() => setActiveSection("tts")}
             >
               <SpeakerIcon />
               <span>Text-to-Speech</span>
             </button>
             <button
-              className={`settings-nav-item ${activeSection === 'highlights' ? 'active' : ''}`}
-              onClick={() => setActiveSection('highlights')}
+              type="button"
+              className={`settings-nav-item ${activeSection === "cache" ? "active" : ""}`}
+              onClick={() => setActiveSection("cache")}
+            >
+              <CacheIcon />
+              <span>Audio Cache</span>
+            </button>
+            <button
+              type="button"
+              className={`settings-nav-item ${activeSection === "highlights" ? "active" : ""}`}
+              onClick={() => setActiveSection("highlights")}
             >
               <HighlightIcon />
               <span>Highlights</span>
             </button>
             <button
-              className={`settings-nav-item ${activeSection === 'shortcuts' ? 'active' : ''}`}
-              onClick={() => setActiveSection('shortcuts')}
+              type="button"
+              className={`settings-nav-item ${activeSection === "shortcuts" ? "active" : ""}`}
+              onClick={() => setActiveSection("shortcuts")}
             >
               <KeyboardIcon />
               <span>Keyboard Shortcuts</span>
             </button>
             <button
-              className={`settings-nav-item ${activeSection === 'telemetry' ? 'active' : ''}`}
-              onClick={() => setActiveSection('telemetry')}
+              type="button"
+              className={`settings-nav-item ${activeSection === "telemetry" ? "active" : ""}`}
+              onClick={() => setActiveSection("telemetry")}
             >
               <ChartIcon />
               <span>Privacy & Data</span>
@@ -100,12 +135,13 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
           </nav>
 
           <div className="settings-content">
-            {activeSection === 'appearance' && <ThemeToggle />}
-            {activeSection === 'rendering' && <RenderSettings />}
-            {activeSection === 'tts' && <TtsSettings />}
-            {activeSection === 'highlights' && <HighlightSettings />}
-            {activeSection === 'shortcuts' && <KeyboardShortcuts />}
-            {activeSection === 'telemetry' && <TelemetrySettings />}
+            {activeSection === "appearance" && <ThemeToggle />}
+            {activeSection === "rendering" && <RenderSettings />}
+            {activeSection === "tts" && <TtsSettings />}
+            {activeSection === "cache" && <CacheSettings />}
+            {activeSection === "highlights" && <HighlightSettings />}
+            {activeSection === "shortcuts" && <KeyboardShortcuts />}
+            {activeSection === "telemetry" && <TelemetrySettings />}
           </div>
         </div>
       </div>
@@ -188,6 +224,17 @@ function RenderingIcon() {
     <svg viewBox="0 0 24 24" className="nav-icon" aria-hidden="true">
       <path
         d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14zM5 15h14v2H5zm0-4h14v2H5zm0-4h14v2H5z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+function CacheIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="nav-icon" aria-hidden="true">
+      <path
+        d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"
         fill="currentColor"
       />
     </svg>

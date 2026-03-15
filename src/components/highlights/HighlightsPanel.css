@@ -10,8 +10,8 @@
 .highlights-panel-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 16px;
+  gap: var(--space-2);
+  padding: var(--space-4);
   border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
 }
@@ -24,7 +24,7 @@
 }
 
 .highlights-panel-count {
-  padding: 2px 8px;
+  padding: 2px var(--space-2);
   background: var(--accent-color);
   color: white;
   font-size: 12px;
@@ -70,7 +70,7 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  padding: 32px;
+  padding: var(--space-8);
   text-align: center;
   color: var(--text-secondary);
 }
@@ -78,11 +78,11 @@
 .empty-icon {
   width: 48px;
   height: 48px;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
 }
 
 .highlights-panel-empty p {
-  margin: 0 0 4px;
+  margin: 0 0 var(--space-1);
   font-size: 14px;
   font-weight: 500;
   color: var(--text-color);
@@ -94,15 +94,15 @@
 
 /* Highlights list */
 .highlights-list {
-  padding: 8px;
+  padding: var(--space-2);
 }
 
 .highlights-page-group {
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 .highlights-page-header {
-  padding: 4px 8px;
+  padding: var(--space-1) var(--space-2);
   font-size: 11px;
   font-weight: 600;
   color: var(--text-tertiary);
@@ -114,9 +114,9 @@
 .highlight-item {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  padding: 10px 8px;
-  margin-bottom: 4px;
+  gap: var(--space-2);
+  padding: 10px var(--space-2);
+  margin-bottom: var(--space-1);
   border-radius: 8px;
   cursor: pointer;
   transition: background-color 0.1s ease;
@@ -167,7 +167,7 @@
   align-items: flex-start;
   gap: 6px;
   margin-top: 6px;
-  padding: 6px 8px;
+  padding: 6px var(--space-2);
   background: var(--bg-secondary);
   border-radius: 4px;
   font-size: 12px;

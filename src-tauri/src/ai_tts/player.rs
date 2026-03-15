@@ -55,7 +55,7 @@ impl AudioPlayer {
     /// Play MP3 audio data
     pub fn play_mp3(&self, data: &[u8]) -> Result<(), String> {
         tracing::info!("play_mp3 called with {} bytes of audio data", data.len());
-        
+
         self.ensure_stream()?;
 
         let mut state = self
@@ -88,7 +88,10 @@ impl AudioPlayer {
         let sink = Sink::try_new(stream_handle).map_err(|e| format!("SINK_ERROR: {}", e))?;
 
         sink.append(source);
-        tracing::info!("Audio playback started successfully, sink empty={}", sink.empty());
+        tracing::info!(
+            "Audio playback started successfully, sink empty={}",
+            sink.empty()
+        );
 
         state.sink = Some(sink);
 
