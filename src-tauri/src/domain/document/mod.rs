@@ -34,6 +34,7 @@ impl Document {
     ///
     /// # Errors
     /// Returns `DomainError::Validation` if any invariant is violated.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         id: String,
         file_path: String,

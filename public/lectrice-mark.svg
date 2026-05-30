@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="Lectrice">
+  <!-- App icon / favicon: Catppuccin crust tile + the voice mark in blue.
+       Mark = three nested chevrons (voice radiating). Strictly angular, monoline. -->
+  <rect x="0" y="0" width="96" height="96" rx="20" fill="#11111b"/>
+  <g stroke="#89b4fa" stroke-width="7" stroke-linecap="square" stroke-linejoin="miter" fill="none">
+    <path d="M22 34 L48 66 L74 34"/>
+    <path d="M32 34 L48 54 L64 34"/>
+    <path d="M41 34 L48 45 L55 34"/>
+  </g>
+</svg>

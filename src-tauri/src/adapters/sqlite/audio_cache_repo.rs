@@ -42,14 +42,12 @@ impl AudioCacheRepository for SqliteAudioCacheRepo {
         audio_data: Vec<u8>,
     ) -> Result<(), RepositoryError> {
         // Validate the entry
-        entry
-            .validate()
-            .map_err(|e| RepositoryError::ValidationError(e))?;
+        entry.validate().map_err(RepositoryError::ValidationError)?;
 
         // Store audio file on filesystem
         self.file_adapter
             .set(&entry.cache_key, &audio_data)
-            .map_err(|e| RepositoryError::IoError(e))?;
+            .map_err(RepositoryError::IoError)?;
 
         // Store metadata in SQLite
         sqlx::query(
@@ -136,7 +134,7 @@ impl AudioCacheRepository for SqliteAudioCacheRepo {
         let audio_data = match self
             .file_adapter
             .get(cache_key)
-            .map_err(|e| RepositoryError::IoError(e))?
+            .map_err(RepositoryError::IoError)?
         {
             Some(data) => data,
             None => {

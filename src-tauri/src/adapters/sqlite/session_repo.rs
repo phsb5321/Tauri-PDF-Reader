@@ -24,6 +24,7 @@ impl SqliteSessionRepo {
     }
 
     /// Load documents for a session from the junction table
+    #[allow(clippy::type_complexity)]
     async fn load_documents(
         &self,
         session_id: &str,
@@ -469,10 +470,10 @@ impl SessionRepository for SqliteSessionRepo {
         // Build the query dynamically
         let mut query = sqlx::query(&sql);
         for (i, _) in params.iter().enumerate() {
-            if i == 0 && input.current_page.is_some() {
-                query = query.bind(input.current_page.unwrap());
-            } else if input.scroll_position.is_some() {
-                query = query.bind(input.scroll_position.unwrap());
+            match (i, input.current_page, input.scroll_position) {
+                (0, Some(current_page), _) => query = query.bind(current_page),
+                (_, _, Some(scroll_position)) => query = query.bind(scroll_position),
+                _ => {}
             }
         }
         query = query.bind(session_id).bind(document_id);

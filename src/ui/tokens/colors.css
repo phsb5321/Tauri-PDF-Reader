@@ -1,113 +1,99 @@
-/* Color Tokens
- * Semantic color definitions for the design system
- * Dark mode overrides at the bottom
+/* Color Tokens — Lectrice brand
+ * Palette: Catppuccin (Latte = light, Mocha = dark).
+ * Token NAMES are stable; only values changed from the pre-brand Tailwind set.
+ * Brand rule: blue = the app · mauve (--color-speak) = the voice (active TTS).
+ * Hover/alpha derived with color-mix() so we never invent off-palette hex.
  */
 
 :root {
-  /* Background colors */
-  --color-bg: #ffffff;
-  --color-bg-surface: #f8f9fa;
-  --color-bg-toolbar: #f8f9fa;
-  --color-bg-viewer: #e8e8e8;
-  --color-bg-overlay: rgba(0, 0, 0, 0.5);
+  /* Background colors — Catppuccin Latte */
+  --color-bg: #eff1f5;          /* base */
+  --color-bg-surface: #e6e9ef;  /* mantle */
+  --color-bg-toolbar: #e6e9ef;  /* mantle */
+  --color-bg-viewer: #dce0e8;   /* crust — area behind the page */
+  --color-bg-overlay: rgba(76, 79, 105, 0.45);
 
   /* Text colors */
-  --color-text-primary: #1a1a1a;
-  --color-text-secondary: #666666;
-  --color-text-inverse: #ffffff;
+  --color-text-primary: #4c4f69;   /* text */
+  --color-text-secondary: #6c6f85; /* subtext0 */
+  --color-text-inverse: #eff1f5;
 
-  /* Interactive colors */
-  --color-accent: #3b82f6;
-  --color-accent-hover: #2563eb;
-  --color-accent-alpha: rgba(59, 130, 246, 0.2);
+  /* Interactive colors — blue is the app */
+  --color-accent: #1e66f5;         /* blue */
+  --color-accent-hover: color-mix(in srgb, var(--color-accent), var(--color-text-primary) 18%);
+  --color-accent-alpha: color-mix(in srgb, var(--color-accent) 20%, transparent);
+
+  /* Voice / TTS — mauve is the voice */
+  --color-speak: #8839ef;          /* mauve */
+  --color-speak-alpha: color-mix(in srgb, var(--color-speak) 16%, transparent);
 
   /* Semantic colors */
-  --color-error: #dc2626;
-  --color-warning: #f59e0b;
-  --color-success: #10b981;
-  --color-info: #3b82f6;
+  --color-error: #d20f39;    /* red */
+  --color-warning: #fe640b;  /* peach */
+  --color-success: #40a02b;  /* green */
+  --color-info: #1e66f5;     /* blue */
 
   /* UI Element colors */
-  --color-border: #e0e0e0;
-  --color-border-focus: #3b82f6;
-  --color-button-bg: #ffffff;
-  --color-button-bg-hover: #f0f0f0;
-  --color-input-bg: #ffffff;
+  --color-border: #ccd0da;        /* surface0 */
+  --color-border-focus: var(--color-accent);
+  --color-button-bg: #e6e9ef;     /* mantle */
+  --color-button-bg-hover: #dce0e8;
+  --color-input-bg: #e6e9ef;
 
-  /* TTS Highlight color */
-  --color-tts-highlight: rgba(59, 130, 246, 0.15);
+  /* TTS Highlight — the spoken sentence (voice = mauve) */
+  --color-tts-highlight: var(--color-speak-alpha);
 }
 
-/* Dark mode - System preference */
+/* Dark mode — System preference (Catppuccin Mocha) */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    /* Background colors */
-    --color-bg: #1a1a1a;
-    --color-bg-surface: #252525;
-    --color-bg-toolbar: #252525;
-    --color-bg-viewer: #1a1a1a;
-    --color-bg-overlay: rgba(0, 0, 0, 0.7);
+    --color-bg: #1e1e2e;          /* base */
+    --color-bg-surface: #181825;  /* mantle */
+    --color-bg-toolbar: #181825;  /* mantle */
+    --color-bg-viewer: #11111b;   /* crust */
+    --color-bg-overlay: rgba(17, 17, 27, 0.7);
 
-    /* Text colors */
-    --color-text-primary: #f6f6f6;
-    --color-text-secondary: #999999;
-    --color-text-inverse: #1a1a1a;
+    --color-text-primary: #cdd6f4;   /* text */
+    --color-text-secondary: #a6adc8; /* subtext0 */
+    --color-text-inverse: #11111b;
 
-    /* Interactive colors */
-    --color-accent: #60a5fa;
-    --color-accent-hover: #93c5fd;
-    --color-accent-alpha: rgba(96, 165, 250, 0.2);
+    --color-accent: #89b4fa;         /* blue */
+    --color-speak: #cba6f7;          /* mauve */
 
-    /* Semantic colors */
-    --color-error: #f87171;
-    --color-warning: #fbbf24;
-    --color-success: #34d399;
-    --color-info: #60a5fa;
+    --color-error: #f38ba8;    /* red */
+    --color-warning: #fab387;  /* peach */
+    --color-success: #a6e3a1;  /* green */
+    --color-info: #89b4fa;     /* blue */
 
-    /* UI Element colors */
-    --color-border: #3a3a3a;
-    --color-border-focus: #60a5fa;
-    --color-button-bg: #2a2a2a;
-    --color-button-bg-hover: #3a3a3a;
-    --color-input-bg: #2a2a2a;
-
-    /* TTS Highlight color */
-    --color-tts-highlight: rgba(96, 165, 250, 0.2);
+    --color-border: #313244;        /* surface0 */
+    --color-button-bg: #313244;     /* surface0 */
+    --color-button-bg-hover: #45475a;
+    --color-input-bg: #313244;
   }
 }
 
-/* Dark mode - Explicit preference */
+/* Dark mode — Explicit preference (Catppuccin Mocha) */
 [data-theme="dark"] {
-  /* Background colors */
-  --color-bg: #1a1a1a;
-  --color-bg-surface: #252525;
-  --color-bg-toolbar: #252525;
-  --color-bg-viewer: #1a1a1a;
-  --color-bg-overlay: rgba(0, 0, 0, 0.7);
+  --color-bg: #1e1e2e;
+  --color-bg-surface: #181825;
+  --color-bg-toolbar: #181825;
+  --color-bg-viewer: #11111b;
+  --color-bg-overlay: rgba(17, 17, 27, 0.7);
 
-  /* Text colors */
-  --color-text-primary: #f6f6f6;
-  --color-text-secondary: #999999;
-  --color-text-inverse: #1a1a1a;
+  --color-text-primary: #cdd6f4;
+  --color-text-secondary: #a6adc8;
+  --color-text-inverse: #11111b;
 
-  /* Interactive colors */
-  --color-accent: #60a5fa;
-  --color-accent-hover: #93c5fd;
-  --color-accent-alpha: rgba(96, 165, 250, 0.2);
+  --color-accent: #89b4fa;
+  --color-speak: #cba6f7;
 
-  /* Semantic colors */
-  --color-error: #f87171;
-  --color-warning: #fbbf24;
-  --color-success: #34d399;
-  --color-info: #60a5fa;
+  --color-error: #f38ba8;
+  --color-warning: #fab387;
+  --color-success: #a6e3a1;
+  --color-info: #89b4fa;
 
-  /* UI Element colors */
-  --color-border: #3a3a3a;
-  --color-border-focus: #60a5fa;
-  --color-button-bg: #2a2a2a;
-  --color-button-bg-hover: #3a3a3a;
-  --color-input-bg: #2a2a2a;
-
-  /* TTS Highlight color */
-  --color-tts-highlight: rgba(96, 165, 250, 0.2);
+  --color-border: #313244;
+  --color-button-bg: #313244;
+  --color-button-bg-hover: #45475a;
+  --color-input-bg: #313244;
 }

@@ -5,6 +5,10 @@
 //! Note: This module is prepared for ElevenLabs TTS integration but not yet active.
 
 #![allow(dead_code)]
+// PlayerState holds rodio Sink/OutputStream (both !Send/!Sync), so the
+// Arc<Mutex<_>> shared-ownership shape is intentional for this (currently
+// inactive) module. Suppress clippy's Rc suggestion rather than re-architect.
+#![allow(clippy::arc_with_non_send_sync)]
 
 use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink};
 use std::io::Cursor;
