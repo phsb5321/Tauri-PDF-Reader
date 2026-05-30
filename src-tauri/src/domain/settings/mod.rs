@@ -58,6 +58,7 @@ impl SettingKey {
         }
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Self {
         match s {
             "tts.voice" => SettingKey::TtsVoice,
@@ -80,16 +81,12 @@ impl SettingKey {
 /// Theme enumeration
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum Theme {
     Light,
     Dark,
+    #[default]
     System,
-}
-
-impl Default for Theme {
-    fn default() -> Self {
-        Theme::System
-    }
 }
 
 /// Settings validation functions
@@ -193,7 +190,7 @@ impl SettingsValidator {
                 let mp: u32 = serde_json::from_str(value).map_err(|e| {
                     DomainError::validation(format!("Invalid megapixels value: {}", e))
                 })?;
-                if mp < 8 || mp > 48 {
+                if !(8..=48).contains(&mp) {
                     return Err(DomainError::validation(format!(
                         "Megapixels must be between 8 and 48, got {}",
                         mp
@@ -214,16 +211,12 @@ impl SettingsValidator {
 /// Quality mode for PDF rendering
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum QualityMode {
     Performance,
+    #[default]
     Balanced,
     Ultra,
-}
-
-impl Default for QualityMode {
-    fn default() -> Self {
-        QualityMode::Balanced
-    }
 }
 
 impl QualityMode {
@@ -235,6 +228,7 @@ impl QualityMode {
         }
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "performance" => Some(QualityMode::Performance),

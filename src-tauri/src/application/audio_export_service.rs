@@ -372,9 +372,7 @@ impl<R: AudioCacheRepository + 'static> AudioExportService for AudioExportServic
         self.cancelled.store(false, Ordering::SeqCst);
 
         // Validate options
-        options
-            .validate()
-            .map_err(|e| ExportError::PathInvalid(e))?;
+        options.validate().map_err(ExportError::PathInvalid)?;
 
         // Report loading phase
         if let Some(ref callback) = progress_callback {

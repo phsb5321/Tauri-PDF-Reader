@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Tauri 2.x desktop PDF reader with text highlighting and native text-to-speech. Uses React/TypeScript frontend with Rust backend.
+**Lectrice** — a Tauri 2.x desktop PDF reader with text highlighting and native text-to-speech that reads documents aloud. React/TypeScript frontend, Rust backend. Brand system in `docs/brand/`. (Name: French for "a person employed to read aloud to someone" — the app is your lectrice.)
 
 ## Resource-Conscious Development (CRITICAL)
 

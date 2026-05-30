@@ -51,8 +51,6 @@ fn make_test_session(id: &str, name: &str) -> ReadingSession {
 /// Contract: session_create validates name and returns session
 #[tokio::test]
 async fn contract_create_returns_session() {
-    use mockall::predicate::*;
-
     let mut mock = MockSessionRepository::new();
     mock.expect_create().times(1).returning(|input| {
         Ok(ReadingSession {

@@ -29,7 +29,7 @@ mod hw_accel {
 
     /// Get the app data directory for storing configuration flags
     fn get_config_dir() -> Option<PathBuf> {
-        dirs::data_local_dir().map(|p| p.join("com.voxpage.pdf-reader"))
+        dirs::data_local_dir().map(|p| p.join("com.lectrice.reader"))
     }
 
     /// Check if hardware acceleration should be disabled
@@ -59,7 +59,7 @@ mod hw_accel {
         {
             // Default to software rendering on Linux due to WebKitGTK issues
             tracing::info!("Linux detected - using software rendering by default");
-            return true;
+            true
         }
 
         #[cfg(not(target_os = "linux"))]
@@ -156,126 +156,6 @@ mod hw_accel {
     #[cfg(not(target_os = "linux"))]
     pub fn apply_linux_env() {
         // No-op on non-Linux platforms
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_db_models_document_serialization() {
-        use db::models::Document;
-        let doc = Document {
-            id: "abc123".to_string(),
-            file_path: "/path/to/file.pdf".to_string(),
-            title: Some("Test Document".to_string()),
-            page_count: Some(10),
-            current_page: 1,
-            scroll_position: 0.0,
-            last_tts_chunk_id: None,
-            last_opened_at: Some("2026-01-12T00:00:00Z".to_string()),
-            file_hash: Some("hash123".to_string()),
-            created_at: "2026-01-12T00:00:00Z".to_string(),
-        };
-        let json = serde_json::to_string(&doc).unwrap();
-        // Verify camelCase serialization
-        assert!(json.contains("filePath"));
-        assert!(json.contains("pageCount"));
-        assert!(json.contains("currentPage"));
-        assert!(!json.contains("file_path"));
-    }
-
-    #[test]
-    fn test_db_models_highlight_serialization() {
-        use db::models::{Highlight, Rect};
-        let highlight = Highlight {
-            id: "uuid-123".to_string(),
-            document_id: "doc-456".to_string(),
-            page_number: 1,
-            rects: vec![Rect {
-                x: 0.0,
-                y: 0.0,
-                width: 100.0,
-                height: 20.0,
-            }],
-            color: "#FFEB3B".to_string(),
-            text_content: Some("highlighted text".to_string()),
-            note: None,
-            created_at: "2026-01-12T00:00:00Z".to_string(),
-            updated_at: None,
-        };
-        let json = serde_json::to_string(&highlight).unwrap();
-        // Verify camelCase serialization
-        assert!(json.contains("documentId"));
-        assert!(json.contains("pageNumber"));
-        assert!(json.contains("textContent"));
-        assert!(!json.contains("document_id"));
-    }
-
-    #[test]
-    fn test_db_models_rect_serialization() {
-        use db::models::Rect;
-        let rect = Rect {
-            x: 10.5,
-            y: 20.3,
-            width: 50.0,
-            height: 15.0,
-        };
-        let json = serde_json::to_string(&rect).unwrap();
-        let deserialized: Rect = serde_json::from_str(&json).unwrap();
-        assert_eq!(deserialized.x, rect.x);
-        assert_eq!(deserialized.y, rect.y);
-        assert_eq!(deserialized.width, rect.width);
-        assert_eq!(deserialized.height, rect.height);
-    }
-
-    #[test]
-    fn test_create_highlight_input_serialization() {
-        use db::models::{CreateHighlightInput, Rect};
-        let input = CreateHighlightInput {
-            document_id: "doc-123".to_string(),
-            page_number: 5,
-            rects: vec![Rect {
-                x: 0.0,
-                y: 0.0,
-                width: 100.0,
-                height: 20.0,
-            }],
-            color: "#4CAF50".to_string(),
-            text_content: Some("test text".to_string()),
-        };
-        let json = serde_json::to_string(&input).unwrap();
-        assert!(json.contains("documentId"));
-        assert!(json.contains("pageNumber"));
-    }
-
-    #[test]
-    fn test_update_highlight_input_serialization() {
-        use db::models::UpdateHighlightInput;
-        let input = UpdateHighlightInput {
-            color: Some("#F44336".to_string()),
-            note: Some("Updated note".to_string()),
-        };
-        let json = serde_json::to_string(&input).unwrap();
-        let deserialized: UpdateHighlightInput = serde_json::from_str(&json).unwrap();
-        assert_eq!(deserialized.color, input.color);
-        assert_eq!(deserialized.note, input.note);
-    }
-
-    #[test]
-    fn test_voice_info_serialization() {
-        use db::models::VoiceInfo;
-        let voice = VoiceInfo {
-            id: "voice-1".to_string(),
-            name: "English Voice".to_string(),
-            language: Some("en-US".to_string()),
-        };
-        let json = serde_json::to_string(&voice).unwrap();
-        let deserialized: VoiceInfo = serde_json::from_str(&json).unwrap();
-        assert_eq!(deserialized.id, voice.id);
-        assert_eq!(deserialized.name, voice.name);
-        assert_eq!(deserialized.language, voice.language);
     }
 }
 
@@ -536,7 +416,7 @@ pub fn run() {
             #[cfg(feature = "elevenlabs-tts")]
             {
                 use tauri::Manager;
-                if let Some(cache_dir) = app.path().app_cache_dir().ok() {
+                if let Ok(cache_dir) = app.path().app_cache_dir() {
                     let state = app.state::<AiTtsEngineState>();
                     let engine = state.0.clone();
                     // Spawn async task to initialize cache
@@ -551,4 +431,124 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_db_models_document_serialization() {
+        use db::models::Document;
+        let doc = Document {
+            id: "abc123".to_string(),
+            file_path: "/path/to/file.pdf".to_string(),
+            title: Some("Test Document".to_string()),
+            page_count: Some(10),
+            current_page: 1,
+            scroll_position: 0.0,
+            last_tts_chunk_id: None,
+            last_opened_at: Some("2026-01-12T00:00:00Z".to_string()),
+            file_hash: Some("hash123".to_string()),
+            created_at: "2026-01-12T00:00:00Z".to_string(),
+        };
+        let json = serde_json::to_string(&doc).unwrap();
+        // Verify camelCase serialization
+        assert!(json.contains("filePath"));
+        assert!(json.contains("pageCount"));
+        assert!(json.contains("currentPage"));
+        assert!(!json.contains("file_path"));
+    }
+
+    #[test]
+    fn test_db_models_highlight_serialization() {
+        use db::models::{Highlight, Rect};
+        let highlight = Highlight {
+            id: "uuid-123".to_string(),
+            document_id: "doc-456".to_string(),
+            page_number: 1,
+            rects: vec![Rect {
+                x: 0.0,
+                y: 0.0,
+                width: 100.0,
+                height: 20.0,
+            }],
+            color: "#FFEB3B".to_string(),
+            text_content: Some("highlighted text".to_string()),
+            note: None,
+            created_at: "2026-01-12T00:00:00Z".to_string(),
+            updated_at: None,
+        };
+        let json = serde_json::to_string(&highlight).unwrap();
+        // Verify camelCase serialization
+        assert!(json.contains("documentId"));
+        assert!(json.contains("pageNumber"));
+        assert!(json.contains("textContent"));
+        assert!(!json.contains("document_id"));
+    }
+
+    #[test]
+    fn test_db_models_rect_serialization() {
+        use db::models::Rect;
+        let rect = Rect {
+            x: 10.5,
+            y: 20.3,
+            width: 50.0,
+            height: 15.0,
+        };
+        let json = serde_json::to_string(&rect).unwrap();
+        let deserialized: Rect = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.x, rect.x);
+        assert_eq!(deserialized.y, rect.y);
+        assert_eq!(deserialized.width, rect.width);
+        assert_eq!(deserialized.height, rect.height);
+    }
+
+    #[test]
+    fn test_create_highlight_input_serialization() {
+        use db::models::{CreateHighlightInput, Rect};
+        let input = CreateHighlightInput {
+            document_id: "doc-123".to_string(),
+            page_number: 5,
+            rects: vec![Rect {
+                x: 0.0,
+                y: 0.0,
+                width: 100.0,
+                height: 20.0,
+            }],
+            color: "#4CAF50".to_string(),
+            text_content: Some("test text".to_string()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        assert!(json.contains("documentId"));
+        assert!(json.contains("pageNumber"));
+    }
+
+    #[test]
+    fn test_update_highlight_input_serialization() {
+        use db::models::UpdateHighlightInput;
+        let input = UpdateHighlightInput {
+            color: Some("#F44336".to_string()),
+            note: Some("Updated note".to_string()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let deserialized: UpdateHighlightInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.color, input.color);
+        assert_eq!(deserialized.note, input.note);
+    }
+
+    #[test]
+    fn test_voice_info_serialization() {
+        use db::models::VoiceInfo;
+        let voice = VoiceInfo {
+            id: "voice-1".to_string(),
+            name: "English Voice".to_string(),
+            language: Some("en-US".to_string()),
+        };
+        let json = serde_json::to_string(&voice).unwrap();
+        let deserialized: VoiceInfo = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.id, voice.id);
+        assert_eq!(deserialized.name, voice.name);
+        assert_eq!(deserialized.language, voice.language);
+    }
 }

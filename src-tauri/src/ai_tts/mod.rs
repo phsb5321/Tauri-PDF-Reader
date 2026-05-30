@@ -19,14 +19,10 @@ use tokio::sync::RwLock;
 /// Supported TTS providers
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum TtsProvider {
+    #[default]
     ElevenLabs,
-}
-
-impl Default for TtsProvider {
-    fn default() -> Self {
-        Self::ElevenLabs
-    }
 }
 
 /// Voice information
@@ -399,7 +395,7 @@ impl AiTtsEngine {
 
     /// Set speed (0.5 to 2.0)
     pub async fn set_speed(&self, speed: f32) -> Result<(), String> {
-        if speed < 0.5 || speed > 2.0 {
+        if !(0.5..=2.0).contains(&speed) {
             return Err("INVALID_SPEED: Speed must be between 0.5 and 2.0".to_string());
         }
         let mut config = self.config.write().await;

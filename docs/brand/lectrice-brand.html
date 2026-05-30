@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lectrice — Brand System v1.0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --crust:#11111b; --mantle:#181825; --base:#1e1e2e;
+    --surface0:#313244; --surface1:#45475a; --surface2:#585b70;
+    --overlay0:#6c7086; --overlay1:#7f849c; --overlay2:#9399b2;
+    --text:#cdd6f4; --subtext1:#bac2de; --subtext0:#a6adc8;
+    --mauve:#cba6f7; --red:#f38ba8; --peach:#fab387; --yellow:#f9e2af;
+    --green:#a6e3a1; --teal:#94e2d5; --sapphire:#74c7ec; --blue:#89b4fa; --lavender:#b4befe;
+    --accent:var(--blue);   /* the app */
+    --speak:var(--mauve);   /* the voice */
+    --font-display:'Space Grotesk',system-ui,sans-serif;
+    --font-body:'IBM Plex Sans',system-ui,sans-serif;
+    --font-mono:'IBM Plex Mono',ui-monospace,monospace;
+    --maxw:1080px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--crust);color:var(--text);font-family:var(--font-body);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased;font-feature-settings:"ss01"}
+  ::selection{background:var(--speak);color:var(--crust)}
+  a{color:var(--blue);text-decoration:none}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 32px}
+  .mono{font-family:var(--font-mono);font-size:12px;letter-spacing:.02em}
+  h2.sec{font-family:var(--font-display);font-weight:600;font-size:13px;letter-spacing:.22em;text-transform:uppercase;color:var(--subtext0);display:flex;align-items:baseline;gap:14px;margin-bottom:28px}
+  h2.sec .num{color:var(--accent);font-variant-numeric:tabular-nums}
+  h2.sec::after{content:"";flex:1;height:1px;background:var(--surface0)}
+  .topbar{position:sticky;top:0;z-index:50;background:rgba(17,17,27,.82);backdrop-filter:saturate(140%) blur(8px);border-bottom:1px solid var(--surface0)}
+  .topbar .wrap{display:flex;align-items:center;gap:14px;height:56px}
+  .topbar .mk{width:24px;height:24px;color:var(--accent)}
+  .topbar .nm{font-family:var(--font-display);font-weight:700;letter-spacing:-.01em;font-size:17px}
+  .topbar .tag{margin-left:auto;color:var(--overlay1)}
+  .mast{padding:96px 0 72px;border-bottom:1px solid var(--surface0)}
+  .lockup{display:flex;align-items:center;gap:30px;margin-bottom:34px}
+  .lockup .markbox{width:92px;height:92px;color:var(--accent);flex:none}
+  .lockup .word{font-family:var(--font-display);font-weight:700;font-size:78px;line-height:.92;letter-spacing:-.03em;color:var(--text)}
+  .mast .tagline{font-family:var(--font-display);font-weight:500;font-size:26px;color:var(--text);letter-spacing:-.01em;margin-bottom:8px}
+  .mast .explain{color:var(--speak);font-size:15px;font-family:var(--font-mono);letter-spacing:.02em;margin-bottom:18px}
+  .mast .pos{max-width:62ch;color:var(--subtext1);font-size:17px;line-height:1.65}
+  .mast .meta{margin-top:30px;display:flex;flex-wrap:wrap;gap:10px}
+  .chip{font-family:var(--font-mono);font-size:11.5px;color:var(--subtext0);border:1px solid var(--surface1);border-radius:4px;padding:5px 10px;background:var(--mantle)}
+  .chip b{color:var(--accent);font-weight:500}
+  .chip.x b{color:var(--red)}
+  section{padding:74px 0;border-bottom:1px solid var(--surface0)}
+  .marks{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+  .markcard{background:var(--mantle);border:1px solid var(--surface0);border-radius:8px;overflow:hidden;display:flex;flex-direction:column}
+  .markcard.rec{border-color:var(--accent)}
+  .markcard .canvas{aspect-ratio:4/3;display:grid;place-items:center;background:var(--base);border-bottom:1px solid var(--surface0);position:relative}
+  .markcard .canvas svg{width:96px;height:96px;color:var(--accent)}
+  .markcard .recflag{position:absolute;top:12px;left:12px;font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--crust);background:var(--accent);padding:3px 8px;border-radius:3px;font-weight:500}
+  .markcard .body{padding:18px 18px 20px}
+  .markcard .ttl{font-family:var(--font-display);font-weight:600;font-size:16px;display:flex;align-items:baseline;gap:8px}
+  .markcard .ttl .ix{font-family:var(--font-mono);font-size:12px;color:var(--accent)}
+  .markcard .desc{color:var(--subtext0);font-size:13.5px;margin-top:7px;line-height:1.55}
+  .markcard .use{margin-top:12px;font-family:var(--font-mono);font-size:11px;color:var(--overlay1)}
+  .markcard .use b{color:var(--subtext1);font-weight:400}
+  .usage{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:28px}
+  .ucell{background:var(--mantle);border:1px solid var(--surface0);border-radius:8px;padding:22px;text-align:center}
+  .ucell .lab{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--overlay1);margin-bottom:16px}
+  .ucell svg{width:52px;height:52px}
+  .tile{width:64px;height:64px;background:var(--accent);border-radius:14px;display:grid;place-items:center;margin:0 auto}
+  .tile svg{width:40px;height:40px;color:var(--crust)}
+  .tile.sharp{border-radius:0}
+  .clearspace{position:relative;display:inline-grid;place-items:center;padding:18px;outline:1px dashed var(--surface2)}
+  .words{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .wcell{background:var(--mantle);border:1px solid var(--surface0);border-radius:8px;padding:30px 28px;display:flex;align-items:center;gap:22px;min-height:118px}
+  .wcell.inv{background:var(--accent)}
+  .wcell.inv *{color:var(--crust)!important}
+  .wcell .mk{width:42px;height:42px;color:var(--accent);flex:none}
+  .wcell.stacked{flex-direction:column;align-items:flex-start;gap:14px}
+  .wm{font-family:var(--font-display);font-weight:700;font-size:34px;letter-spacing:-.02em;line-height:1;color:var(--text)}
+  .wcell .note{margin-left:auto;align-self:flex-start;font-family:var(--font-mono);font-size:10.5px;color:var(--overlay1);text-align:right;letter-spacing:.08em;text-transform:uppercase}
+  .ramp{display:grid;grid-template-columns:repeat(6,1fr);gap:0;border-radius:8px;overflow:hidden;border:1px solid var(--surface0)}
+  .swatch{padding:18px 14px;min-height:104px;display:flex;flex-direction:column;justify-content:flex-end}
+  .swatch .nm{font-family:var(--font-mono);font-size:12px;font-weight:500}
+  .swatch .hx{font-family:var(--font-mono);font-size:11px;opacity:.7}
+  .grp-title{font-family:var(--font-mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--overlay1);margin:30px 0 12px}
+  .accents{display:grid;grid-template-columns:repeat(8,1fr);gap:10px}
+  .acc{border-radius:6px;height:74px;display:flex;flex-direction:column;justify-content:flex-end;padding:10px;border:1px solid rgba(255,255,255,.05)}
+  .acc .nm{font-family:var(--font-mono);font-size:10.5px;color:var(--crust);font-weight:500}
+  .acc .hx{font-family:var(--font-mono);font-size:9.5px;color:rgba(17,17,27,.7)}
+  .keyidea{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:30px}
+  .kbox{border:1px solid var(--surface0);border-radius:8px;padding:22px 24px;background:var(--mantle)}
+  .kbox .h{font-family:var(--font-display);font-weight:600;font-size:15px;margin-bottom:8px;display:flex;align-items:center;gap:10px}
+  .kbox .h .dot{width:11px;height:11px;border-radius:50%}
+  .kbox p{color:var(--subtext0);font-size:13.5px}
+  .kbox code{font-family:var(--font-mono);font-size:12px;color:var(--text);background:var(--surface0);padding:1px 5px;border-radius:3px}
+  .typerow{border-top:1px solid var(--surface0);padding:30px 0;display:grid;grid-template-columns:150px 1fr;gap:34px;align-items:baseline}
+  .typerow:first-of-type{border-top:none}
+  .typerow .meta{font-family:var(--font-mono);font-size:11.5px;color:var(--overlay1);line-height:1.8}
+  .typerow .meta b{color:var(--subtext1);font-weight:500;display:block;font-size:13px;font-family:var(--font-body)}
+  .spec-display{font-family:var(--font-display);font-weight:700;font-size:46px;letter-spacing:-.02em;line-height:1.05}
+  .spec-body{font-family:var(--font-body);font-size:18px;color:var(--subtext1);max-width:60ch;line-height:1.6}
+  .spec-mono{font-family:var(--font-mono);font-size:16px;color:var(--text)}
+  .scale{display:flex;flex-wrap:wrap;align-items:baseline;gap:20px;margin-top:6px}
+  .scale span{font-family:var(--font-display);color:var(--text);line-height:1}
+  .scale .l{font-family:var(--font-mono);font-size:10px;color:var(--overlay1);display:block;margin-top:6px;letter-spacing:.06em}
+  .gm{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+  .panel{background:var(--mantle);border:1px solid var(--surface0);border-radius:8px;padding:26px}
+  .panel h3{font-family:var(--font-display);font-weight:600;font-size:15px;margin-bottom:18px;color:var(--text)}
+  .radii{display:flex;gap:14px;align-items:flex-end}
+  .rad{flex:1;text-align:center}
+  .rad .box{height:56px;background:var(--surface0);border:1px solid var(--surface2)}
+  .rad .l{font-family:var(--font-mono);font-size:10px;color:var(--overlay1);margin-top:8px;display:block}
+  .r0{border-radius:0}.r4{border-radius:4px}.r8{border-radius:8px}.r12{border-radius:12px;opacity:.4}.r16{border-radius:16px;opacity:.4}
+  .motionline{height:3px;background:var(--surface0);border-radius:2px;position:relative;margin:22px 0 8px}
+  .motionline .b{position:absolute;top:-4px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:0;animation:slide 2.6s var(--e) infinite alternate}
+  .e1{--e:cubic-bezier(0.4,0,0.2,1)} .e2{--e:cubic-bezier(0.68,-0.55,0.265,1.55)}
+  @keyframes slide{to{left:calc(100% - 11px)}}
+  .motcap{font-family:var(--font-mono);font-size:11px;color:var(--overlay1);display:flex;justify-content:space-between}
+  .banned{color:var(--red)} .ok{color:var(--green)}
+  .app{border:1px solid var(--surface1);border-radius:10px;overflow:hidden;box-shadow:0 24px 60px -20px rgba(0,0,0,.6);background:var(--base)}
+  .app .titlebar{background:var(--crust);height:42px;display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid var(--surface0)}
+  .lights{display:flex;gap:8px}
+  .lights i{width:11px;height:11px;border-radius:50%;display:block}
+  .app .tmark{width:18px;height:18px;color:var(--accent);margin-left:6px}
+  .app .tname{font-family:var(--font-display);font-weight:700;font-size:13.5px;letter-spacing:-.01em}
+  .app .tfile{margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--overlay1)}
+  .app .toolbar{height:48px;background:var(--mantle);border-bottom:1px solid var(--surface0);display:flex;align-items:center;gap:8px;padding:0 14px}
+  .tbtn{height:30px;min-width:30px;padding:0 9px;border-radius:4px;border:1px solid var(--surface1);background:var(--surface0);color:var(--subtext1);font-family:var(--font-mono);font-size:11.5px;display:flex;align-items:center;gap:6px;cursor:default}
+  .tbtn.play{background:var(--speak);border-color:var(--speak);color:var(--crust);font-weight:500}
+  .tbtn svg{width:13px;height:13px}
+  .tgap{flex:1}
+  .pagewrap{padding:34px 40px;display:flex;justify-content:center}
+  .page{background:#faf7f0;color:#1c1b22;width:100%;max-width:520px;border-radius:2px;padding:42px 46px;box-shadow:0 6px 24px -8px rgba(0,0,0,.5)}
+  .page h4{font-family:var(--font-display);font-weight:600;font-size:21px;margin-bottom:14px;color:#16151c}
+  .page p{font-family:Georgia,'Times New Roman',serif;font-size:14.5px;line-height:1.8;color:#36343f;margin-bottom:12px}
+  .page .reading{background:rgba(203,166,247,.32);box-shadow:0 0 0 1px rgba(203,166,247,.5);border-radius:2px;padding:1px 2px}
+  .wave{display:inline-flex;align-items:center;gap:2px;vertical-align:middle;margin-left:5px;height:14px}
+  .wave i{width:2px;background:var(--mauve);border-radius:1px;animation:eq 900ms ease-in-out infinite}
+  .wave i:nth-child(1){height:5px;animation-delay:0ms}.wave i:nth-child(2){height:12px;animation-delay:120ms}.wave i:nth-child(3){height:7px;animation-delay:240ms}.wave i:nth-child(4){height:13px;animation-delay:360ms}.wave i:nth-child(5){height:6px;animation-delay:480ms}
+  @keyframes eq{0%,100%{transform:scaleY(.5)}50%{transform:scaleY(1)}}
+  .playbar{height:50px;background:var(--crust);border-top:1px solid var(--surface0);display:flex;align-items:center;gap:14px;padding:0 18px}
+  .playbar .st{font-family:var(--font-mono);font-size:11.5px;color:var(--speak);display:flex;align-items:center;gap:8px}
+  .playbar .st .pulse{width:8px;height:8px;border-radius:50%;background:var(--speak);animation:pulse 1.4s ease-out infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(203,166,247,.5)}70%{box-shadow:0 0 0 7px rgba(203,166,247,0)}100%{box-shadow:0 0 0 0 rgba(203,166,247,0)}}
+  .prog{flex:1;height:3px;background:var(--surface0);border-radius:2px;overflow:hidden}
+  .prog i{display:block;height:100%;width:38%;background:var(--speak)}
+  .playbar .pg{font-family:var(--font-mono);font-size:11px;color:var(--overlay1);font-variant-numeric:tabular-nums}
+  .princ{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--surface0);border:1px solid var(--surface0);border-radius:8px;overflow:hidden}
+  .pr{background:var(--mantle);padding:26px 28px}
+  .pr .n{font-family:var(--font-mono);font-size:12px;color:var(--accent)}
+  .pr h3{font-family:var(--font-display);font-weight:600;font-size:17px;margin:8px 0 8px;letter-spacing:-.01em}
+  .pr p{color:var(--subtext0);font-size:14px;line-height:1.6}
+  .shipped{background:var(--mantle);border:1px solid var(--green);border-radius:8px;padding:28px 30px}
+  .shipped .h{font-family:var(--font-display);font-weight:600;font-size:15px;color:var(--green);display:flex;align-items:center;gap:10px;margin-bottom:18px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--surface0);vertical-align:top}
+  th{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--overlay1);font-weight:400}
+  td:first-child{width:30px;color:var(--green)}
+  td .f{font-family:var(--font-mono);font-size:11.5px;color:var(--subtext0)}
+  footer{padding:48px 0 80px;color:var(--overlay0)}
+  footer .wrap{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  footer .mk{width:18px;height:18px;color:var(--overlay1)}
+  footer .mono{color:var(--overlay0)}
+  @media(max-width:880px){
+    .marks,.usage,.words,.keyidea,.gm,.princ,.accents{grid-template-columns:1fr 1fr}
+    .ramp{grid-template-columns:repeat(3,1fr)}
+    .lockup .word{font-size:54px}.lockup .markbox{width:64px;height:64px}
+    .typerow{grid-template-columns:1fr;gap:12px}
+  }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="mk" viewBox="0 0 96 96">
+    <g stroke="currentColor" stroke-width="8.5" stroke-linecap="square" stroke-linejoin="miter" fill="none">
+      <path d="M18 30 L48 70 L78 30"/><path d="M30 30 L48 56 L66 30"/><path d="M40 30 L48 46 L56 30"/>
+    </g>
+  </symbol>
+</svg>
+
+<div class="topbar"><div class="wrap">
+  <svg class="mk"><use href="#mk"/></svg>
+  <span class="nm">Lectrice</span>
+  <span class="tag mono">Brand System · v1.0 · 2026-05-29</span>
+</div></div>
+
+<header class="mast"><div class="wrap">
+  <div class="lockup">
+    <svg class="markbox" viewBox="0 0 96 96"><use href="#mk"/></svg>
+    <div class="word">Lectrice</div>
+  </div>
+  <p class="tagline">Every page, read aloud.</p>
+  <p class="explain">lec·trice · the reader that reads to you</p>
+  <p class="pos"><strong>Lectrice</strong> is French for <em>a person employed to read aloud to someone</em>. The app is your lectrice: a local-first desktop PDF reader that reads documents aloud — highlight a passage, press play, and let it turn the page for you.</p>
+  <div class="meta">
+    <span class="chip">named: <b>French “reads aloud to you”</b></span>
+    <span class="chip x">vetted out: <b>VoxPage</b> (own ext) · <b>Lectern/Lector</b> (taken)</span>
+    <span class="chip">palette: <b>Catppuccin</b></span>
+    <span class="chip"><b>blue</b> = app · <span style="color:var(--mauve)">mauve</span> = voice</span>
+  </div>
+</div></header>
+
+<!-- 01 LOGO -->
+<section><div class="wrap">
+  <h2 class="sec"><span class="num">01</span> Logo · chosen mark + alternates</h2>
+  <div class="marks">
+    <div class="markcard rec">
+      <div class="canvas"><span class="recflag">Chosen</span><svg viewBox="0 0 96 96"><use href="#mk"/></svg></div>
+      <div class="body">
+        <div class="ttl"><span class="ix">A</span> Voice Channels</div>
+        <p class="desc">Three nested chevrons — a voice radiating / soundwave. Abstract, not a letter (Zed’s mark isn’t a literal “Z” either). Carries the brand at every size.</p>
+        <div class="use"><b>Use:</b> primary mark, everywhere</div>
+      </div>
+    </div>
+    <div class="markcard">
+      <div class="canvas">
+        <svg viewBox="0 0 96 96" fill="none">
+          <g stroke="currentColor" stroke-width="5" stroke-linejoin="miter" stroke-linecap="square">
+            <path d="M26 16 H58 L74 32 V80 H26 Z"/><path d="M58 16 V32 H74"/><path d="M36 46 H50"/><path d="M36 56 H48"/>
+          </g>
+          <g fill="currentColor"><rect x="56" y="50" width="3.4" height="8"/><rect x="62" y="44" width="3.4" height="20"/><rect x="68" y="48" width="3.4" height="12"/></g>
+        </svg>
+      </div>
+      <div class="body">
+        <div class="ttl"><span class="ix">B</span> Spoken Page</div>
+        <p class="desc">A folded document whose text-rules step out into a waveform. Literal “page → voice.” Explored; kept for docs/marketing where the PDF meaning must be explicit.</p>
+        <div class="use"><b>Use:</b> explanatory contexts</div>
+      </div>
+    </div>
+    <div class="markcard">
+      <div class="canvas">
+        <svg viewBox="0 0 96 96">
+          <rect x="8" y="8" width="80" height="80" rx="18" fill="currentColor"/>
+          <g stroke="#11111b" stroke-width="9" stroke-linecap="square" stroke-linejoin="miter" fill="none">
+            <path d="M30 34 L48 64 L66 34"/><path d="M40 30 L48 44 L56 30"/>
+          </g>
+        </svg>
+      </div>
+      <div class="body">
+        <div class="ttl"><span class="ix">C</span> Aperture Tile</div>
+        <p class="desc">The mark on an accent tile — the OS icon shape. This is what <code style="font-family:var(--font-mono);font-size:12px">tauri icon</code> generated into <code style="font-family:var(--font-mono);font-size:12px">src-tauri/icons/</code>.</p>
+        <div class="use"><b>Use:</b> app icon &amp; favicon</div>
+      </div>
+    </div>
+  </div>
+  <div class="usage">
+    <div class="ucell"><div class="lab">Clearspace</div><span class="clearspace"><svg viewBox="0 0 96 96" style="color:var(--accent)"><use href="#mk"/></svg></span></div>
+    <div class="ucell"><div class="lab">Min · 16px</div><svg viewBox="0 0 96 96" style="width:16px;height:16px;color:var(--text)"><use href="#mk"/></svg><div style="margin-top:14px"><svg viewBox="0 0 96 96" style="width:28px;height:28px;color:var(--text)"><use href="#mk"/></svg></div></div>
+    <div class="ucell"><div class="lab">Icon tile · rounded</div><div class="tile"><svg viewBox="0 0 96 96"><use href="#mk"/></svg></div></div>
+    <div class="ucell"><div class="lab">Icon tile · sharp</div><div class="tile sharp"><svg viewBox="0 0 96 96"><use href="#mk"/></svg></div></div>
+  </div>
+</div></section>
+
+<!-- 02 WORDMARK -->
+<section><div class="wrap">
+  <h2 class="sec"><span class="num">02</span> Wordmark &amp; lockups</h2>
+  <div class="words">
+    <div class="wcell"><svg class="mk"><use href="#mk"/></svg><span class="wm">Lectrice</span><span class="note">Horizontal<br/>primary</span></div>
+    <div class="wcell stacked"><svg class="mk"><use href="#mk"/></svg><span class="wm">Lectrice</span><span class="note" style="position:absolute;top:28px;right:28px;margin:0">Stacked</span></div>
+    <div class="wcell"><span class="wm">Lectrice</span><span class="note">Wordmark<br/>only</span></div>
+    <div class="wcell inv"><svg class="mk"><use href="#mk"/></svg><span class="wm">Lectrice</span><span class="note">Knockout<br/>on accent</span></div>
+  </div>
+  <p class="mono" style="color:var(--overlay1);margin-top:18px">Space Grotesk 700 · tracking −0.02em · monochrome wordmark, the mark carries the colour (Zed-style).</p>
+</div></section>
+
+<!-- 03 COLOR -->
+<section><div class="wrap">
+  <h2 class="sec"><span class="num">03</span> Color · Catppuccin Mocha</h2>
+  <div class="grp-title">Surfaces — dark-first reading ramp</div>
+  <div class="ramp">
+    <div class="swatch" style="background:#11111b"><span class="nm">crust</span><span class="hx">#11111b</span></div>
+    <div class="swatch" style="background:#181825"><span class="nm">mantle</span><span class="hx">#181825</span></div>
+    <div class="swatch" style="background:#1e1e2e"><span class="nm">base</span><span class="hx">#1e1e2e</span></div>
+    <div class="swatch" style="background:#313244"><span class="nm">surface0</span><span class="hx">#313244</span></div>
+    <div class="swatch" style="background:#45475a"><span class="nm">surface1</span><span class="hx">#45475a</span></div>
+    <div class="swatch" style="background:#585b70"><span class="nm">surface2</span><span class="hx">#585b70</span></div>
+  </div>
+  <div class="grp-title">Text</div>
+  <div class="ramp" style="grid-template-columns:repeat(4,1fr)">
+    <div class="swatch" style="background:#1e1e2e"><span class="nm" style="color:#cdd6f4">text</span><span class="hx" style="color:#cdd6f4">#cdd6f4</span></div>
+    <div class="swatch" style="background:#1e1e2e"><span class="nm" style="color:#bac2de">subtext1</span><span class="hx" style="color:#bac2de">#bac2de</span></div>
+    <div class="swatch" style="background:#1e1e2e"><span class="nm" style="color:#a6adc8">subtext0</span><span class="hx" style="color:#a6adc8">#a6adc8</span></div>
+    <div class="swatch" style="background:#1e1e2e"><span class="nm" style="color:#6c7086">overlay0</span><span class="hx" style="color:#6c7086">#6c7086</span></div>
+  </div>
+  <div class="grp-title">Accents &amp; semantic</div>
+  <div class="accents">
+    <div class="acc" style="background:#89b4fa"><span class="nm">blue</span><span class="hx">#89b4fa</span></div>
+    <div class="acc" style="background:#cba6f7"><span class="nm">mauve</span><span class="hx">#cba6f7</span></div>
+    <div class="acc" style="background:#94e2d5"><span class="nm">teal</span><span class="hx">#94e2d5</span></div>
+    <div class="acc" style="background:#74c7ec"><span class="nm">sapphire</span><span class="hx">#74c7ec</span></div>
+    <div class="acc" style="background:#b4befe"><span class="nm">lavender</span><span class="hx">#b4befe</span></div>
+    <div class="acc" style="background:#f38ba8"><span class="nm">red</span><span class="hx">#f38ba8</span></div>
+    <div class="acc" style="background:#fab387"><span class="nm">peach</span><span class="hx">#fab387</span></div>
+    <div class="acc" style="background:#a6e3a1"><span class="nm">green</span><span class="hx">#a6e3a1</span></div>
+  </div>
+  <div class="keyidea">
+    <div class="kbox"><div class="h"><span class="dot" style="background:var(--blue)"></span>Blue is the app — <code>#89b4fa</code></div><p>Primary accent: links, focus, primary action. Bridges Zed’s royal blue. The resting state.</p></div>
+    <div class="kbox"><div class="h"><span class="dot" style="background:var(--mauve)"></span>Mauve is the voice — <code>#cba6f7</code></div><p>Active TTS, the now-reading highlight (<code>--color-speak</code> @ 16%), playback. Speaking shifts blue → mauve.</p></div>
+  </div>
+</div></section>
+
+<!-- 04 TYPE -->
+<section><div class="wrap">
+  <h2 class="sec"><span class="num">04</span> Typography · self-hosted</h2>
+  <div class="typerow">
+    <div class="meta"><b>Space Grotesk</b>Display · wordmark<br/>500 / 700<br/><span style="color:var(--accent)">≈ Zed’s PP Agrandir</span></div>
+    <div>
+      <div class="spec-display">The reader that<br/>reads to you.</div>
+      <div class="scale"><span style="font-size:46px;font-weight:700">Aa<span class="l">display / 700</span></span><span style="font-size:30px;font-weight:600">Aa<span class="l">heading / 600</span></span><span style="font-size:20px;font-weight:500">Aa<span class="l">subhead / 500</span></span></div>
+    </div>
+  </div>
+  <div class="typerow">
+    <div class="meta"><b>IBM Plex Sans</b>Body · UI<br/>400 / 500 / 600<br/><span style="color:var(--accent)">Zed’s actual body face</span></div>
+    <div class="spec-body">The quick brown fox listens to the document. Humanist proportions, a real personality, and not Inter — Plex Sans carries UI labels, body copy, and the library at every size from 12 to 18px while staying legible on a dark reading surface.</div>
+  </div>
+  <div class="typerow">
+    <div class="meta"><b>IBM Plex Mono</b>Mono · data<br/>400 / 500<br/><span style="color:var(--accent)">≈ Zed’s Lilex</span></div>
+    <div class="spec-mono">page 03 / 24 · ⌘O ⌘H Space · #cba6f7 · 00:48 / 12:30 · com.lectrice.reader</div>
+  </div>
+</div></section>
+
+<!-- 05 GEOMETRY + MOTION -->
+<section><div class="wrap">
+  <h2 class="sec"><span class="num">05</span> Geometry &amp; motion</h2>
+  <div class="gm">
+    <div class="panel">
+      <h3>Radii — lean tight</h3>
+      <div class="radii">
+        <div class="rad"><div class="box r0"></div><span class="l">0 · logo</span></div>
+        <div class="rad"><div class="box r4"></div><span class="l">4 · chrome</span></div>
+        <div class="rad"><div class="box r8"></div><span class="l">8 · cards</span></div>
+        <div class="rad"><div class="box r12"></div><span class="l">12 · retire</span></div>
+        <div class="rad"><div class="box r16"></div><span class="l">16 · retire</span></div>
+      </div>
+      <p style="color:var(--subtext0);font-size:13px;margin-top:18px">Zed is angular. Cap brand surfaces at 8px; sharpen the logo to 0.</p>
+    </div>
+    <div class="panel">
+      <h3>Motion — ease-out only</h3>
+      <div class="e1"><div class="motionline"><span class="b"></span></div></div>
+      <div class="motcap"><span class="ok">✓ ease-out · cubic-bezier(0.4,0,0.2,1)</span><span>150–250ms</span></div>
+      <div class="e2" style="margin-top:18px;opacity:.55"><div class="motionline"><span class="b"></span></div></div>
+      <div class="motcap"><span class="banned">✕ bounce · retired in motion.css</span><span>aliased→ease-out</span></div>
+      <p style="color:var(--subtext0);font-size:13px;margin-top:18px">Only signature motion: the mauve speaking-pulse while TTS runs.</p>
+    </div>
+  </div>
+</div></section>
+
+<!-- 06 IN CONTEXT -->
+<section><div class="wrap">
+  <h2 class="sec"><span class="num">06</span> In context · the reader, speaking</h2>
+  <div class="app">
+    <div class="titlebar">
+      <div class="lights"><i style="background:var(--red)"></i><i style="background:var(--peach)"></i><i style="background:var(--green)"></i></div>
+      <svg class="tmark"><use href="#mk"/></svg>
+      <span class="tname">Lectrice</span>
+      <span class="tfile">on-reading-aloud.pdf</span>
+    </div>
+    <div class="toolbar">
+      <span class="tbtn">⌘O Open</span><span class="tbtn">‹</span><span class="tbtn">03 / 24</span><span class="tbtn">›</span><span class="tbtn">100%</span>
+      <span class="tgap"></span><span class="tbtn">Highlights</span>
+      <span class="tbtn play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l14 8-14 8z"/></svg>Speak</span>
+    </div>
+    <div class="pagewrap">
+      <div class="page">
+        <h4>On Reading Aloud</h4>
+        <p>For most of history, reading <em>was</em> reading aloud. Silent reading is the late invention; the page was always meant to be heard.</p>
+        <p><span class="reading">Lectrice holds onto that — it highlights the sentence it is speaking<span class="wave"><i></i><i></i><i></i><i></i><i></i></span></span> and keeps it in view, so your eyes can rest while the words keep moving.</p>
+        <p>When the page ends, it turns the page for you, and reads on.</p>
+      </div>
+    </div>
+    <div class="playbar">
+      <span class="st"><span class="pulse"></span>Speaking</span>
+      <div class="prog"><i></i></div>
+      <span class="pg">00:48 / 02:06 · page 03</span>
+    </div>
+  </div>
+  <p class="mono" style="color:var(--overlay1);margin-top:16px">Blue toolbar at rest · mauve the moment it speaks.</p>
+</div></section>
+
+<!-- 07 PRINCIPLES -->
+<section><div class="wrap">
+  <h2 class="sec"><span class="num">07</span> Voice &amp; principles</h2>
+  <div class="princ">
+    <div class="pr"><span class="n">01</span><h3>Local-first, quiet</h3><p>No accounts, no cloud, no telemetry chrome. The document is the hero.</p></div>
+    <div class="pr"><span class="n">02</span><h3>The voice is the feature</h3><p>Blue is the app, mauve is the voice. The speaking state is never hidden.</p></div>
+    <div class="pr"><span class="n">03</span><h3>Developer-grade restraint</h3><p>Mono for data, one accent, sharp geometry. Nothing decorative without information.</p></div>
+    <div class="pr"><span class="n">04</span><h3>Honest surfaces</h3><p>A real page, a real waveform, real progress. No fake book spines.</p></div>
+  </div>
+</div></section>
+
+<!-- SHIPPED -->
+<section><div class="wrap">
+  <div class="shipped">
+    <div class="h">✓ Shipped — applied to the codebase</div>
+    <table>
+      <thead><tr><th></th><th>Change</th><th>Where</th></tr></thead>
+      <tbody>
+        <tr><td>✓</td><td>Name <b>Lectrice</b> (collision-vetted)</td><td><span class="f">tauri.conf.json · index.html · README · package.json</span></td></tr>
+        <tr><td>✓</td><td>Identifier → <b>com.lectrice.reader</b></td><td><span class="f">tauri.conf.json</span></td></tr>
+        <tr><td>✓</td><td>Logo Mark A + all app icons</td><td><span class="f">src-tauri/icons/ (via tauri icon)</span></td></tr>
+        <tr><td>✓</td><td>Palette → Catppuccin + <b>--color-speak</b></td><td><span class="f">src/ui/tokens/colors.css</span></td></tr>
+        <tr><td>✓</td><td>Self-hosted Space Grotesk + IBM Plex</td><td><span class="f">typography.css · @fontsource</span></td></tr>
+        <tr><td>✓</td><td>Bounce retired · body font tokenized</td><td><span class="f">motion.css · App.css</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div></section>
+
+<footer><div class="wrap">
+  <svg class="mk"><use href="#mk"/></svg>
+  <span class="mono">Lectrice Brand System v1.0 — every page, read aloud</span>
+</div></footer>
+
+</body>
+</html>

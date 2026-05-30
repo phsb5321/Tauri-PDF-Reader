@@ -344,11 +344,11 @@ impl TextChunker {
     }
 
     /// Find chunk containing a specific text offset.
-    pub fn find_chunk_at_offset<'a>(
-        chunks: &'a [TextChunk],
+    pub fn find_chunk_at_offset(
+        chunks: &[TextChunk],
         page_number: i32,
         offset: usize,
-    ) -> Option<&'a TextChunk> {
+    ) -> Option<&TextChunk> {
         chunks.iter().find(|chunk| {
             chunk.page_number == page_number
                 && offset >= chunk.start_offset

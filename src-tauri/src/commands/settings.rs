@@ -247,7 +247,7 @@ pub async fn update_render_settings(
         current.quality_mode = v;
     }
     if let Some(v) = max_megapixels {
-        if v < 8 || v > 48 {
+        if !(8..=48).contains(&v) {
             return Err("VALIDATION_ERROR: maxMegapixels must be between 8 and 48".to_string());
         }
         current.max_megapixels = v;

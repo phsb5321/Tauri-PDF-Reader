@@ -11,7 +11,9 @@
   /* Easing functions */
   --easing-default: ease-out;
   --easing-smooth: cubic-bezier(0.4, 0, 0.2, 1);
-  --easing-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  /* Retired for Lectrice brand: ease-out only (anti-slop banlist).
+     Aliased to default so any legacy reference stops bouncing. */
+  --easing-bounce: var(--easing-default);
 
   /* Common transition presets */
   --transition-fast: var(--duration-fast) var(--easing-default);

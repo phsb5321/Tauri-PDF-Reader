@@ -144,6 +144,7 @@ pub async fn audio_export_check_ready(
 
 /// Export document audio to a file
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn audio_export_document(
     app: AppHandle,
     db: State<'_, DbInstances>,

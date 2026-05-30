@@ -341,7 +341,7 @@ mod tests {
         let mock = MockHighlightRepository::new();
 
         let service = HighlightService::new(mock);
-        let mut input1 = create_test_highlight_input();
+        let input1 = create_test_highlight_input();
         let mut input2 = create_test_highlight_input();
         input2.color = "invalid".to_string(); // Second highlight has invalid color
 

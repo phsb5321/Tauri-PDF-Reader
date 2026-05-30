@@ -1,6 +1,10 @@
-# Tauri PDF Reader
+# Lectrice
 
-A desktop PDF reader built with Tauri 2.x, featuring text highlighting and native text-to-speech.
+> Every page, read aloud.
+
+**Lectrice** is a local-first desktop PDF reader that reads documents aloud — highlight a passage, press play, and let it turn the page for you. Built with Tauri 2.x (React/TypeScript + Rust), with text highlighting and native text-to-speech.
+
+The name is French for _a person employed to read aloud to someone_ — the app is your lectrice. See [`docs/brand/`](docs/brand/) for the full brand system.
 
 ## Features
 
