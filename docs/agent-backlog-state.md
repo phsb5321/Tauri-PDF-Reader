@@ -1,49 +1,79 @@
 # Lectrice — Agent Backlog State
 
-> Durable handoff for the `/loop` / lectrice-forward workflow. Latest iteration first.
+> Durable handoff for the `/loop` / lectrice-forward workflow. Update every iteration.
 
-## Iteration — 2026-05-30 #3 (Spec 010: Word-Timing Tests + UTF-16 fix)
+## Iteration — 2026-05-30 (Spec 008: Security + Housekeeping)
 
-- **Branch:** `010-word-timing-tests` (off `origin/main` 7c5de09). Commit pending below.
-- **Slice:** P1 — harden the karaoke differentiator's core algorithm.
-- **Finding:** word-level karaoke is ALREADY built + wired (`useTtsWordHighlight`→
-  `AiPlaybackBar`; `TtsWordHighlight`→`PdfViewer`/`TextLayer`; backend
-  `text_to_speech_with_timestamps`→`chars_to_words`). The roadmap's "word-level
-  highlighting" was stale (already done). The gap: `chars_to_words` had ZERO tests.
-- **Change:** +8 fixture unit tests for `chars_to_words`. The tests + Codex
-  exposed a real bug → **fixed**: offsets were UTF-8 **bytes**
-  (`char_str.len()`) but the consumer `createWordRange` uses UTF-16 code units
-  → word highlight broke for non-ASCII (umlauts/accents/CJK). Fix:
-  `char_index += char_str.encode_utf16().count()`. ASCII byte-identical (no
-  regression); non-ASCII corrected.
-- **Verified:** `cargo fmt --check`, `cargo test chars_to_words` (8 pass),
-  `cargo clippy --all-targets -- -D warnings` clean. **Codex 2 rounds → Pass**
-  (`.claude/reviews/010-word-timing.md`).
-- **Residual:** end-to-end non-ASCII DOM highlight is GUI-gated (offset math +
-  consumer unit verified statically). GUI smoke follow-up.
-- **Next slice:** P0#5 bundle/profile smoke (run `pnpm tauri build` or document
-  blocker), OR S2 persisted-scope + library-reopen UI wiring (needs a UX
-  decision — better with Pedro), OR raise coverage floors (009 follow-up).
+### Branch / head
+- Worktree: `../tauri-pdf-reader-008-security-housekeeping`
+- Branch: `008-security-housekeeping` (off `origin/main` @ 7c5de09, "rebrand to Lectrice; repair backend CI" #5)
+- Main worktree left untouched (still on local `main` 6ccf946, dirty — see below).
 
-## Iteration — 2026-05-30 #2 (Spec 009: Coverage Gate) — branch `009-coverage-gate`, commit `5c98fc3`
+### Dirty worktree handling (main worktree, NOT this branch)
+The main worktree's "±25" state is NOT user work — it is filesystem deletions of
+committed files (all restorable from HEAD): the 9 `.claude/commands/speckit.*.md`,
+`.gitignore`, `.specify/templates/spec-template.md`, `e2e/critical-loop.spec.ts`,
+and the `spec.md` of specs 001–007; plus untracked generated dirs (`coverage/`,
+`src-tauri/gen/`, `.husky/_/`) that re-appeared because the deleted `.gitignore`
+stopped ignoring them, and `.opencode/` (competing-agent scaffolding).
+**Per hard constraint: NOT touched.** Work was isolated in a fresh worktree off
+clean `origin/main`. **Recommendation for Pedro:** in the main worktree,
+`git restore .gitignore .specify e2e specs .claude/commands` to recover the
+accidental deletions (everything is in HEAD; no data loss).
 
-- `vitest.config.ts` thresholds flat 80 → ratcheted floors (lines/stmts 42, functions 53, branches 80) — explicit, documented regression gate (`docs/coverage-budget.md`), NOT silent lowering. CI `Coverage check` now green (was red every run).
-- Measured: lines/stmts 42.44, functions 53.82, branches 87.96 (29 files / 486 tests). Verified rc=0. Codex PASS.
+### Selected slice
+P0 housekeeping metadata + Tauri security scope tightening + backend file-ingest hardening.
 
-## Iteration — 2026-05-30 #1 (Spec 008: Security + Housekeeping) — branch `008-security-housekeeping`, commit `93065ac`
+### Files changed (this branch)
+- `src-tauri/tauri.conf.json` — `assetProtocol.scope ["**/*"] -> []` (asset protocol unused; no `convertFileSrc`).
+- `src-tauri/capabilities/default.json` — `fs:scope ["**/*"] -> ["$APPLOCALDATA/**"]`; description "PDF Reader" -> "Lectrice".
+- `src-tauri/src/commands/library/db.rs` — `validate_pdf_path` (canonicalize + regular `.pdf`); `compute_file_hash` opens canonical + fstat-rechecks the open fd; 8 unit tests.
+- `src-tauri/src/commands/library/mod.rs` — `library_check_file_exists` gated through `validate_pdf_path`.
+- `src-tauri/Cargo.toml` — `authors ["VoxPage"] -> ["Pedro H S Balbino"]`; description -> Lectrice-specific.
+- `CLAUDE.md` — `rodio 0.21+ -> 0.20` (matches Cargo.toml).
+- New: `.claude/skills/lectrice-forward-loop/SKILL.md`, `.claude/commands/lectrice-forward.md`, `.claude/loop.md`, `.claude/reviews/008-*.md`, `specs/008-security-housekeeping/*`, this file.
 
-- Asset scope `["**/*"]→[]`; fs scope `["**/*"]→["$APPLOCALDATA/**"]`.
-- Backend `validate_pdf_path` (canonicalize + regular `.pdf` + fstat-on-open) gating `compute_file_hash` + `library_check_file_exists`; blocks `/dev/zero` DoS, `/etc/passwd` oracle, symlink masquerade, SQL existence oracle. 8 tests. Codex 4 rounds → Pass.
-- Cargo.toml authors/description; CLAUDE.md rodio 0.21→0.20.
-- Follow-ups: S2 persisted-scope (when reopen wired); S-provenance (backend hashes any readable `.pdf` named over IPC); WebView raw-SQL surface; build-smoke.
+### Spec Kit artifacts
+`specs/008-security-housekeeping/{spec,plan,tasks,checklist,risk-register,rollback}.md` (authored manually; speckit plugin + `.specify/scripts` available).
 
-## Standing context (all iterations)
+### Commands discovered
+- Frontend: `pnpm` at `~/.local/share/pnpm/pnpm`; `pnpm lint` / `lint:boundaries` / `typecheck` / `test` / `test:run` / `test:coverage` / `test:arch` / `verify` (./scripts/verify.sh).
+- Backend (needs nix-shell): `nix-shell -p pkg-config openssl alsa-lib gnumake gtk3 webkitgtk_4_1 libayatana-appindicator librsvg speechd --run '...'`; `cargo check` / `cargo fmt --check` / `cargo test --features test-mocks -j 1`.
+- `generate_context!` requires a `dist/` to exist — create a stub `dist/index.html` (gitignored) to `cargo check` without a frontend build.
+- codex 0.133, gh 2.92, node v22, cargo 1.95.
 
-- **Branches independent off `origin/main` (7c5de09), unmerged, awaiting Pedro's push/PR authorization.** Each carries its own `docs/agent-backlog-state.md` (this 010 copy is the cumulative latest); reconcile at merge. Loop workflow files live on 008.
-- **Main worktree dirty state = accidental deletions, untouched.** Recommend Pedro: `git restore .gitignore .specify e2e specs .claude/commands` (all in HEAD; no data loss).
-- **Build env:** pnpm at `~/.local/share/pnpm` (export PATH for git hooks too — husky pre-commit needs it); cargo/Tauri need `nix-shell -p pkg-config openssl alsa-lib gnumake gtk3 webkitgtk_4_1 libayatana-appindicator librsvg speechd`; `generate_context!`/`cargo test` need a `dist/` (stub `dist/index.html`, gitignored).
-- **Loop:** hourly cron `7 * * * *` (job 473ce7f0, session-only) runs one forward-loop iteration.
-- **Open worktrees to clean post-merge:** `-008-security-housekeeping`, `-009-coverage-gate`, `-010-word-timing-tests`.
+### Verification results
+- JSON valid (tauri.conf, capabilities). Metadata greps clean (no `VoxPage`, no `rodio 0.21`, no `**/*` in scopes).
+- `cargo check` rc=0 (validates capability JSON + Cargo.toml via `generate_context!`, with dist stub).
+- `cargo fmt --check` + `cargo clippy --all-targets --features test-mocks -- -D warnings` clean. `cargo test commands::library::db` -> **8 passed**.
+- Frontend lint/typecheck: n/a — zero TS source changed (config/metadata/docs); node_modules absent in fresh worktree.
+
+### Security impact
+- Removed whole-disk **asset** protocol scope (`[]`) — protocol was dead config.
+- Removed whole-disk **fs** scope -> `$APPLOCALDATA/**` (live opens ride the dialog runtime grant; `LibraryView` is unmounted so no reopen path needs broad scope).
+- Hardened the **backend file-ingest** surface (custom commands bypass fs scope): `validate_pdf_path` blocks `/dev/zero` (DoS), `/etc/passwd` (hash oracle), symlink masquerade, devices/dirs; fstat-on-open closes the read-path TOCTOU; `library_check_file_exists` no longer an existence oracle.
+
+### Coverage impact
+None — threshold left at 80% (vitest.config.ts). Honest baseline is far lower
+(snapshot ~42%); the ratchet-vs-write-tests decision is a dedicated P0#4 slice,
+not silently changed here.
+
+### Codex adversarial review
+4 rounds, `.claude/reviews/008-security-housekeeping-{round1,rounds2-4}.md`.
+Round 1 BLOCKER (backend arbitrary read) + rounds 2–3 MAJORs (symlink, SQL
+oracle, TOCTOU) all fixed. **Round 4 verdict: Pass.** 0 unresolved BLOCKER/MAJOR.
+
+### Remaining risks / follow-ups
+- **S2 — persisted-scope:** add `tauri-plugin-persisted-scope` (after `tauri_plugin_fs::init()`, lib.rs:252) when/if library-click reopen is wired; lets static fs scope stay at `$APPLOCALDATA`. Needs a GUI build + restart-reopen test.
+- **S-provenance:** backend still hashes any readable `.pdf` named over IPC (no picker-provenance). Bounded residual; full fix routes reads through fs-plugin scope or verifies provenance. Tracked (R11).
+- **WebView SQL surface:** consider dropping raw `sql:allow-execute` from the WebView capability in favor of typed commands.
+- **Build-smoke:** full `pnpm tauri build` not run (GUI/env gated) — run before any release.
+- **Coverage (P0#4):** decide ratchet vs. tests.
+- **Optional:** disable asset protocol entirely (`enable:false`) + trim CSP `asset:` (cosmetic); delete dead `pdf-storage-service.ts` or wire it.
+
+### Next slice
+Coverage gate decision (P0#4) OR persisted-scope+reopen wiring (S2). Then P1
+word-level karaoke highlighting + ElevenLabs stream-with-timestamps.
 
 ### Next command
-`/loop 60m /lectrice-forward` (scheduled) — next tick: P0#5 bundle smoke or S2 reopen wiring.
+`/loop 25m`
