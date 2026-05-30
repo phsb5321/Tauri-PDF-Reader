@@ -2,40 +2,48 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest iteration first.
 
-## Iteration — 2026-05-30 #2 (Spec 009: Coverage Gate)
+## Iteration — 2026-05-30 #3 (Spec 010: Word-Timing Tests + UTF-16 fix)
 
-- **Branch:** `009-coverage-gate` (off `origin/main` 7c5de09). Commit pending below.
-- **Slice:** P0#4 — make the coverage gate honest.
-- **Change:** `vitest.config.ts` thresholds flat `80` → ratcheted floors
-  `lines 42 / statements 42 / functions 53 / branches 80` (regression gate at
-  the measured baseline). New `docs/coverage-budget.md` (raise-only policy +
-  prioritized 0%-covered modules). Spec `specs/009-coverage-gate/*`.
-- **Why:** CI `Coverage check` (ci.yml:62, hard step) failed on every run at 80%
-  vs actual ~42% → the gate was ignored. Explicit + documented ratchet, NOT a
-  silent lowering; branches not lowered (87.96% > 80); target stays 80.
-- **Measured (7c5de09):** lines/statements 42.44, functions 53.82, branches 87.96 (29 files / 486 tests).
-- **Verified:** `pnpm test:coverage` rc=0, 486/486 pass, 0 threshold errors (was 3). No app/test source changed.
-- **Codex:** `.claude/reviews/009-coverage-gate.md` — PASS, 0 BLOCKER/MAJOR.
-- **Next slice:** S2 persisted-scope + library reopen wiring, OR P1 word-level
-  karaoke highlighting + ElevenLabs stream-with-timestamps (security slice 008
-  is done, so P1 is unblocked). Also pending: raise coverage floors as tests land.
+- **Branch:** `010-word-timing-tests` (off `origin/main` 7c5de09). Commit pending below.
+- **Slice:** P1 — harden the karaoke differentiator's core algorithm.
+- **Finding:** word-level karaoke is ALREADY built + wired (`useTtsWordHighlight`→
+  `AiPlaybackBar`; `TtsWordHighlight`→`PdfViewer`/`TextLayer`; backend
+  `text_to_speech_with_timestamps`→`chars_to_words`). The roadmap's "word-level
+  highlighting" was stale (already done). The gap: `chars_to_words` had ZERO tests.
+- **Change:** +8 fixture unit tests for `chars_to_words`. The tests + Codex
+  exposed a real bug → **fixed**: offsets were UTF-8 **bytes**
+  (`char_str.len()`) but the consumer `createWordRange` uses UTF-16 code units
+  → word highlight broke for non-ASCII (umlauts/accents/CJK). Fix:
+  `char_index += char_str.encode_utf16().count()`. ASCII byte-identical (no
+  regression); non-ASCII corrected.
+- **Verified:** `cargo fmt --check`, `cargo test chars_to_words` (8 pass),
+  `cargo clippy --all-targets -- -D warnings` clean. **Codex 2 rounds → Pass**
+  (`.claude/reviews/010-word-timing.md`).
+- **Residual:** end-to-end non-ASCII DOM highlight is GUI-gated (offset math +
+  consumer unit verified statically). GUI smoke follow-up.
+- **Next slice:** P0#5 bundle/profile smoke (run `pnpm tauri build` or document
+  blocker), OR S2 persisted-scope + library-reopen UI wiring (needs a UX
+  decision — better with Pedro), OR raise coverage floors (009 follow-up).
+
+## Iteration — 2026-05-30 #2 (Spec 009: Coverage Gate) — branch `009-coverage-gate`, commit `5c98fc3`
+
+- `vitest.config.ts` thresholds flat 80 → ratcheted floors (lines/stmts 42, functions 53, branches 80) — explicit, documented regression gate (`docs/coverage-budget.md`), NOT silent lowering. CI `Coverage check` now green (was red every run).
+- Measured: lines/stmts 42.44, functions 53.82, branches 87.96 (29 files / 486 tests). Verified rc=0. Codex PASS.
 
 ## Iteration — 2026-05-30 #1 (Spec 008: Security + Housekeeping) — branch `008-security-housekeeping`, commit `93065ac`
 
 - Asset scope `["**/*"]→[]`; fs scope `["**/*"]→["$APPLOCALDATA/**"]`.
-- Backend `validate_pdf_path` (canonicalize + regular `.pdf` + fstat-on-open) gating `compute_file_hash` + `library_check_file_exists`; blocks `/dev/zero` DoS, `/etc/passwd` oracle, symlink masquerade, SQL existence oracle. 8 tests.
+- Backend `validate_pdf_path` (canonicalize + regular `.pdf` + fstat-on-open) gating `compute_file_hash` + `library_check_file_exists`; blocks `/dev/zero` DoS, `/etc/passwd` oracle, symlink masquerade, SQL existence oracle. 8 tests. Codex 4 rounds → Pass.
 - Cargo.toml authors/description; CLAUDE.md rodio 0.21→0.20.
-- Verified: cargo check/fmt/clippy clean, `commands::library::db` 8 passed. Codex 4 rounds → Pass.
-- Tracked follow-ups: **S2** persisted-scope (after `tauri_plugin_fs::init()`, lib.rs:252, when reopen wired); **S-provenance** (backend hashes any readable `.pdf` named over IPC — needs picker provenance / fs-scope-routed reads); WebView raw-SQL surface; build-smoke (`pnpm tauri build` not run, GUI-gated).
-- Specs `specs/008-security-housekeeping/*`, reviews `.claude/reviews/008-*`.
+- Follow-ups: S2 persisted-scope (when reopen wired); S-provenance (backend hashes any readable `.pdf` named over IPC); WebView raw-SQL surface; build-smoke.
 
 ## Standing context (all iterations)
 
-- **Branches are independent off `origin/main` (7c5de09), unmerged, awaiting Pedro's push/PR authorization.** 008 and 009 each carry their own `docs/agent-backlog-state.md`; reconcile at merge. Loop workflow files (`.claude/skills/lectrice-forward-loop`, `.claude/commands/lectrice-forward`, `.claude/loop.md`) live on 008.
-- **Main worktree dirty state = accidental deletions, untouched.** Recommend Pedro: `git restore .gitignore .specify e2e specs .claude/commands` in the main worktree (all in HEAD; no data loss).
-- **Build env:** pnpm at `~/.local/share/pnpm`; cargo/Tauri need `nix-shell -p pkg-config openssl alsa-lib gnumake gtk3 webkitgtk_4_1 libayatana-appindicator librsvg speechd`; `generate_context!` needs a `dist/` (stub `dist/index.html`, gitignored).
+- **Branches independent off `origin/main` (7c5de09), unmerged, awaiting Pedro's push/PR authorization.** Each carries its own `docs/agent-backlog-state.md` (this 010 copy is the cumulative latest); reconcile at merge. Loop workflow files live on 008.
+- **Main worktree dirty state = accidental deletions, untouched.** Recommend Pedro: `git restore .gitignore .specify e2e specs .claude/commands` (all in HEAD; no data loss).
+- **Build env:** pnpm at `~/.local/share/pnpm` (export PATH for git hooks too — husky pre-commit needs it); cargo/Tauri need `nix-shell -p pkg-config openssl alsa-lib gnumake gtk3 webkitgtk_4_1 libayatana-appindicator librsvg speechd`; `generate_context!`/`cargo test` need a `dist/` (stub `dist/index.html`, gitignored).
 - **Loop:** hourly cron `7 * * * *` (job 473ce7f0, session-only) runs one forward-loop iteration.
+- **Open worktrees to clean post-merge:** `-008-security-housekeeping`, `-009-coverage-gate`, `-010-word-timing-tests`.
 
 ### Next command
-
-`/loop 60m /lectrice-forward` (already scheduled) — next tick picks S2 or P1.
+`/loop 60m /lectrice-forward` (scheduled) — next tick: P0#5 bundle smoke or S2 reopen wiring.

@@ -509,7 +509,12 @@ impl ElevenLabsClient {
                 current_word.push(c);
             }
 
-            char_index += char_str.len();
+            // Advance by UTF-16 code units, NOT bytes: char_start/char_end must
+            // index the spoken text the way JS string offsets and DOM Ranges do,
+            // so the frontend highlighter (TtsWordHighlight.createWordRange) maps
+            // words correctly for non-ASCII text (accents, CJK). For ASCII this
+            // equals the byte length, so ASCII behavior is unchanged.
+            char_index += char_str.encode_utf16().count();
         }
 
         // Don't forget the last word
@@ -551,5 +556,127 @@ mod tests {
         let settings = VoiceSettings::default();
         assert_eq!(settings.stability, 0.5);
         assert_eq!(settings.similarity_boost, 0.75);
+    }
+
+    // ---- chars_to_words: word-level timing (karaoke highlight core) ----
+
+    /// Build AlignmentData from (char, start_s, end_s) triples.
+    fn align(chars: &[(&str, f64, f64)]) -> AlignmentData {
+        AlignmentData {
+            characters: chars.iter().map(|(c, _, _)| (*c).to_string()).collect(),
+            character_start_times_seconds: chars.iter().map(|(_, s, _)| *s).collect(),
+            character_end_times_seconds: chars.iter().map(|(_, _, e)| *e).collect(),
+        }
+    }
+
+    /// Float compare with tolerance (avoids clippy::float_cmp; times are copied
+    /// verbatim from the alignment, so this is exact in practice).
+    fn close(a: f64, b: f64) -> bool {
+        (a - b).abs() < 1e-9
+    }
+
+    #[test]
+    fn chars_to_words_splits_on_space_with_correct_times_and_offsets() {
+        // "Hi there"
+        let a = align(&[
+            ("H", 0.0, 0.10),
+            ("i", 0.10, 0.20),
+            (" ", 0.20, 0.25),
+            ("t", 0.25, 0.30),
+            ("h", 0.30, 0.35),
+            ("e", 0.35, 0.40),
+            ("r", 0.40, 0.45),
+            ("e", 0.45, 0.50),
+        ]);
+        let w = ElevenLabsClient::chars_to_words("Hi there", &a);
+        assert_eq!(w.len(), 2);
+        assert_eq!(w[0].word, "Hi");
+        assert!(close(w[0].start_time, 0.0));
+        assert!(close(w[0].end_time, 0.20)); // end of last char before the space
+        assert_eq!(w[0].char_start, 0);
+        assert_eq!(w[0].char_end, 2);
+        assert_eq!(w[1].word, "there");
+        assert!(close(w[1].start_time, 0.25));
+        assert!(close(w[1].end_time, 0.50));
+        assert_eq!(w[1].char_start, 3);
+        assert_eq!(w[1].char_end, 8);
+    }
+
+    #[test]
+    fn chars_to_words_keeps_punctuation_attached() {
+        // Non-whitespace punctuation stays part of the word ("Hi," not "Hi").
+        let a = align(&[("H", 0.0, 0.1), ("i", 0.1, 0.2), (",", 0.2, 0.3)]);
+        let w = ElevenLabsClient::chars_to_words("Hi,", &a);
+        assert_eq!(w.len(), 1);
+        assert_eq!(w[0].word, "Hi,");
+        assert!(close(w[0].end_time, 0.3));
+    }
+
+    #[test]
+    fn chars_to_words_collapses_multiple_spaces() {
+        // Two spaces between words must not produce an empty word.
+        let a = align(&[
+            ("a", 0.0, 0.1),
+            (" ", 0.1, 0.15),
+            (" ", 0.15, 0.2),
+            ("b", 0.2, 0.3),
+        ]);
+        let w = ElevenLabsClient::chars_to_words("a  b", &a);
+        let words: Vec<&str> = w.iter().map(|t| t.word.as_str()).collect();
+        assert_eq!(words, vec!["a", "b"]);
+    }
+
+    #[test]
+    fn chars_to_words_ignores_leading_and_trailing_whitespace() {
+        let a = align(&[(" ", 0.0, 0.1), ("a", 0.1, 0.2), (" ", 0.2, 0.3)]);
+        let w = ElevenLabsClient::chars_to_words(" a ", &a);
+        assert_eq!(w.len(), 1);
+        assert_eq!(w[0].word, "a");
+        assert_eq!(w[0].char_start, 1);
+        assert_eq!(w[0].char_end, 2);
+    }
+
+    #[test]
+    fn chars_to_words_treats_newline_as_separator() {
+        let a = align(&[("a", 0.0, 0.1), ("\n", 0.1, 0.15), ("b", 0.15, 0.25)]);
+        let w = ElevenLabsClient::chars_to_words("a\nb", &a);
+        let words: Vec<&str> = w.iter().map(|t| t.word.as_str()).collect();
+        assert_eq!(words, vec!["a", "b"]);
+    }
+
+    #[test]
+    fn chars_to_words_empty_alignment_yields_no_words() {
+        let w = ElevenLabsClient::chars_to_words("", &align(&[]));
+        assert!(w.is_empty());
+    }
+
+    #[test]
+    fn chars_to_words_emits_final_word_without_trailing_space() {
+        // Exercises the "don't forget the last word" branch.
+        let a = align(&[("w", 0.0, 0.1), ("o", 0.1, 0.2), ("w", 0.2, 0.3)]);
+        let w = ElevenLabsClient::chars_to_words("wow", &a);
+        assert_eq!(w.len(), 1);
+        assert_eq!(w[0].word, "wow");
+        assert!(close(w[0].start_time, 0.0));
+        assert!(close(w[0].end_time, 0.3));
+        assert_eq!(w[0].char_start, 0);
+        assert_eq!(w[0].char_end, 3);
+    }
+
+    #[test]
+    fn chars_to_words_uses_utf16_offsets_matching_js_strings() {
+        // 'é' is 1 UTF-16 code unit (2 bytes in UTF-8). Offsets are counted in
+        // UTF-16 code units so they match JS string indices / DOM Ranges used by
+        // the frontend highlighter for non-ASCII text. (Regression guard for the
+        // byte-vs-UTF-16 offset bug found in spec 010.)
+        let a = align(&[("é", 0.0, 0.1), (" ", 0.1, 0.15), ("x", 0.15, 0.25)]);
+        let w = ElevenLabsClient::chars_to_words("é x", &a);
+        assert_eq!(w.len(), 2);
+        assert_eq!(w[0].word, "é");
+        assert_eq!(w[0].char_start, 0);
+        assert_eq!(w[0].char_end, 1); // 'é' = 1 UTF-16 code unit
+        assert_eq!(w[1].word, "x");
+        assert_eq!(w[1].char_start, 2);
+        assert_eq!(w[1].char_end, 3);
     }
 }
