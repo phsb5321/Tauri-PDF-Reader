@@ -6,7 +6,7 @@ mod db;
 
 use crate::db::models::{Document, FileExistsResponse};
 use chrono::Utc;
-use db::{compute_file_hash, get_pool};
+use db::{compute_file_hash, get_pool, validate_pdf_path};
 use std::path::Path;
 use tauri::State;
 use tauri_plugin_sql::DbInstances;
@@ -302,8 +302,11 @@ pub async fn library_check_file_exists(
     let doc = library_get_document(db, id).await?;
 
     match doc {
+        // Gate the existence probe through the same regular-`.pdf` validation
+        // used at ingest, so a maliciously-inserted row (e.g. via the SQL
+        // capability) cannot turn this into an arbitrary path existence oracle.
         Some(d) => Ok(FileExistsResponse {
-            exists: Path::new(&d.file_path).exists(),
+            exists: validate_pdf_path(&d.file_path).is_ok(),
             file_path: d.file_path,
         }),
         None => Err("NOT_FOUND: Document with ID not found".to_string()),

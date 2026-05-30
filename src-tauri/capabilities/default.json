@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default capabilities for PDF Reader",
+  "description": "Default capabilities for Lectrice",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -9,7 +9,7 @@
     "fs:allow-read-file",
     {
       "identifier": "fs:scope",
-      "allow": [{ "path": "**/*" }]
+      "allow": [{ "path": "$APPLOCALDATA/**" }]
     },
     "dialog:default",
     "dialog:allow-open",

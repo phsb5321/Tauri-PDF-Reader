@@ -1,8 +1,8 @@
 [package]
 name = "tauri-pdf-reader"
 version = "0.1.0"
-description = "A PDF reader with highlighting and text-to-speech"
-authors = ["VoxPage"]
+description = "Lectrice — a local-first desktop PDF reader with highlighting and high-quality text-to-speech"
+authors = ["Pedro H S Balbino"]
 edition = "2021"
 
 [lib]
