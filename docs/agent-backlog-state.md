@@ -2,6 +2,16 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #11 — 2026-05-31 (Spec 021: With-Timestamps Wire-Contract Fixtures, P1 #6)
+
+- **Branch:** `021-tts-timestamp-adapter` (off `origin/main` 8c366d7). Commit `409383c`. Local only — awaiting push/PR.
+- **Slice:** P1 #6 (ElevenLabs stream-with-timestamps adapter). Gap analysis (Explore agent) found #6 mostly DONE — typed model, `chars_to_words` (8 tests, UTF-16-safe), deterministic `_ts` cache key all exist. The one untested seam was the **API wire contract** (JSON `/with-timestamps` body → typed model). Added 2 fixture tests + a buffering-vs-streaming doc comment. ALL in `src-tauri/src/ai_tts/elevenlabs.rs` (1 file, +76).
+- **Tests:** `with_timestamps_response_deserializes_and_converts_end_to_end` (deserialize realistic JSON incl. ignored `normalized_alignment` → base64 decode → `chars_to_words` → assert words/times/duration) + `with_timestamps_response_tolerates_missing_alignment` (Option → None). No live API.
+- **Verified:** nix-shell `cargo fmt --check` clean; `clippy --all-targets --features test-mocks -D warnings` clean; new tests pass + `chars_to_words` suite green + full backend 0 failed. No frontend change.
+- **Codex:** `.claude/reviews/021-tts-timestamp-adapter.md` — VERDICT **PASS**, no BLOCKER/MAJOR/MINOR. Cross-checked the fixture vs ElevenLabs docs. Its TEST-GAP (add `normalized_alignment`) applied via amend `409383c`.
+- **Streaming note:** "stream-while-caching" is N/A for `/with-timestamps` (base64-in-JSON; needs full body for alignment). Upstream `/stream/with-timestamps` (chunked) documented as a future option, not wired.
+- **Next slice:** **P1 #7 karaoke highlight UI.** Consumer exists (`useTtsWordHighlight`, `TtsWordHighlight.tsx`, `tts-highlight-store`). Focus the UNVERIFIED quality reqs: no per-tick DOM thrash, punctuation/wrap/page-boundary handling, graceful sentence-level fallback, reduced-motion aware — add frontend tests for the word-at-time selection. Then P2 (pdf.js 5.x).
+
 ## Iteration #10 — 2026-05-31 (Spec 020: Persisted Scope, S2)
 
 - **Branch:** `020-persisted-scope` (off `origin/main` 8c366d7). Commit `42c1ef8`. Local only — awaiting push/PR.
@@ -44,11 +54,11 @@
 ## Standing context
 
 - **008–015 are MERGED** into `origin/main` (now at `8c366d7`, PRs #6–#13). 009's floors are now superseded by 019's ratchet (46/59/88/46) — the "bump after test branches land" follow-up is DONE.
-- **Unmerged branches awaiting push/PR:** `020-persisted-scope` (`42c1ef8`, this iter), `019-coverage-ratchet` (`42e5825`). Also local-only, NOT yet pushed: `016-cache-coverage-tests` / `017-domain-coverage-tests` (older base, more store/domain tests — rebase onto 8c366d7 + measure before they affect the floor), and `018-render-perf` (UNCOMMITTED desktop-integration: GPU compositing + niri decorations + AT-SPI app-menu export — Pedro-directed, separate from the loop; see [[lectrice-niri-desktop-integration]]). NOTE: 019 + 020 both edit `docs/agent-backlog-state.md` (cumulative); expect an add/add conflict on stacked merge — `git checkout --theirs` the latest, or merge oldest-first.
+- **Unmerged branches awaiting push/PR (loop, off 8c366d7):** `021-tts-timestamp-adapter` (`409383c`, this iter), `020-persisted-scope` (`42c1ef8`), `019-coverage-ratchet` (`42e5825`). Also local-only: `016-cache-coverage-tests` / `017-domain-coverage-tests` (older base — rebase onto 8c366d7 + measure before they affect the coverage floor), and `018-render-perf` (UNCOMMITTED desktop-integration: GPU compositing + niri decorations + AT-SPI app-menu export — Pedro-directed, separate from the loop; see [[lectrice-niri-desktop-integration]]). NOTE: 019/020/021 each carry the cumulative `docs/agent-backlog-state.md`; merge oldest-first or `git checkout --theirs` the latest to resolve the add/add.
 - **Main worktree dirty = accidental deletions, untouched, still on 6ccf946 (stale).** Recommend: `git restore .gitignore .specify e2e specs .claude/commands` then `git pull --ff-only`.
 - **Build env:** pnpm `~/.local/share/pnpm` (export PATH for husky); cargo/Tauri need the nix-shell; build needs a `dist/` stub; release ≈9 min; bundle toolchain absent. tsconfig EXCLUDES `*.test.ts` from `tsc`; non-exported store types cascade implicit-any in the LSP pre-install (resolves after `pnpm install`).
 - **Loop:** hourly cron `7 * * * *` (`473ce7f0`, session-only). Re-running `/loop 60m /lectrice-forward` does NOT duplicate.
-- **Open worktrees:** `-008-…`–`-015-…` already removed post-merge. Current: `-016-…`, `-017-…`, `-018-render-perf`, `-019-coverage-ratchet`, `-020-persisted-scope`, `-run` (detached dev-run @ 8c366d7; dev server currently stopped).
+- **Open worktrees:** `-008-…`–`-015-…` already removed post-merge. Current: `-016-…`, `-017-…`, `-018-render-perf`, `-019-coverage-ratchet`, `-020-persisted-scope`, `-021-tts-timestamp-adapter`, `-run` (detached dev-run @ 8c366d7; dev server currently stopped). Loop worktrees reuse `-run/node_modules` via symlink to skip redundant installs.
 
 ### Next command
 
