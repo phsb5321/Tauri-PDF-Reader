@@ -57,9 +57,14 @@ mod hw_accel {
         // Check platform-specific defaults
         #[cfg(target_os = "linux")]
         {
-            // Default to software rendering on Linux due to WebKitGTK issues
-            tracing::info!("Linux detected - using software rendering by default");
-            true
+            // Default to GPU compositing on Linux. The DMABUF renderer — the usual
+            // cause of blank/garbled WebKitGTK windows that previously motivated
+            // full software rendering — is disabled separately in apply_linux_env,
+            // so we keep GPU acceleration (sharp text + smooth scrolling) without
+            // the blank-window risk. A startup crash trips safe mode, which falls
+            // back to full software rendering on the next launch.
+            tracing::info!("Linux detected - GPU compositing enabled (DMABUF renderer disabled)");
+            false
         }
 
         #[cfg(not(target_os = "linux"))]
@@ -147,9 +152,18 @@ mod hw_accel {
     #[cfg(target_os = "linux")]
     pub fn apply_linux_env() {
         if should_disable_hw_accel() {
-            // Disable GPU compositing for WebKitGTK
+            // User preference / safe mode / post-crash fallback: full software
+            // rendering. Slower and softer, but maximally compatible.
             std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
-            tracing::info!("Set WEBKIT_DISABLE_COMPOSITING_MODE=1 for software rendering");
+            tracing::info!("Set WEBKIT_DISABLE_COMPOSITING_MODE=1 (software rendering fallback)");
+        } else {
+            // Default path: keep GPU compositing for sharp rendering and smooth
+            // scrolling, but disable the DMABUF renderer. DMABUF is the common
+            // cause of blank/garbled WebKitGTK windows on Wayland and with the
+            // proprietary Nvidia driver; turning it off keeps acceleration while
+            // avoiding that failure mode.
+            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+            tracing::info!("Set WEBKIT_DISABLE_DMABUF_RENDERER=1 (GPU compositing, DMABUF off)");
         }
     }
 
@@ -418,6 +432,105 @@ pub fn run() {
 
             if hw_accel::is_safe_mode_active() {
                 tracing::warn!("Safe mode is active - some features may be limited");
+            }
+
+            // On Linux, drop the GTK client-side decorations (the app-drawn
+            // titlebar with min/maximize/close buttons) so the Wayland compositor
+            // — e.g. niri — owns the window frame: its focus border, and
+            // move/close/fullscreen via compositor keybinds. Done here in setup,
+            // before the event loop presents the window, so there is no titlebar
+            // flash. macOS and Windows keep their native decorations from
+            // tauri.conf.json, where floating window managers expect them.
+            #[cfg(target_os = "linux")]
+            {
+                use tauri::Manager;
+                if let Some(window) = app.get_webview_window("main") {
+                    match window.set_decorations(false) {
+                        Ok(()) => tracing::info!(
+                            "Client-side decorations disabled; window frame is compositor-managed"
+                        ),
+                        Err(e) => {
+                            tracing::warn!("Failed to disable window decorations: {e}")
+                        }
+                    }
+                }
+            }
+
+            // Build a native application menu (File / View / Playback / Help)
+            // and attach it to the main window. On Linux this creates a real
+            // GtkMenuBar that the accessibility (AT-SPI) bus exports, so desktop
+            // services — e.g. a global-menu bar like noctalia-appmenu — can read
+            // and drive it instead of falling back to a synthetic menu. Custom
+            // items emit a "menu-action" event the frontend handles via the same
+            // code paths as the keyboard shortcuts; predefined items (Quit,
+            // About) carry their own behavior.
+            {
+                use tauri::menu::{MenuBuilder, PredefinedMenuItem, SubmenuBuilder};
+
+                let file = SubmenuBuilder::new(app, "File")
+                    .text("open", "Open PDF…")
+                    .text("settings", "Settings…")
+                    .separator()
+                    .item(&PredefinedMenuItem::quit(app, Some("Quit Lectrice"))?)
+                    .build()?;
+                let view = SubmenuBuilder::new(app, "View")
+                    .text("toggle-library", "Toggle Sidebar")
+                    .text("toggle-highlights", "Toggle Highlights")
+                    .separator()
+                    .text("find", "Find…")
+                    .build()?;
+                let playback = SubmenuBuilder::new(app, "Playback")
+                    .text("play-pause", "Play / Pause")
+                    .separator()
+                    .text("prev-page", "Previous Page")
+                    .text("next-page", "Next Page")
+                    .build()?;
+                let help = SubmenuBuilder::new(app, "Help")
+                    .item(&PredefinedMenuItem::about(
+                        app,
+                        Some("About Lectrice"),
+                        None,
+                    )?)
+                    .build()?;
+                let menu = MenuBuilder::new(app)
+                    .items(&[&file, &view, &playback, &help])
+                    .build()?;
+                app.set_menu(menu)?;
+
+                // On Linux, keep the menu registered (so GTK still exports it over
+                // AT-SPI for a global-menu bar like noctalia-appmenu) but hide the
+                // in-window GtkMenuBar, so the menu lives only in the compositor's
+                // top bar — macOS-style — and the window stays chrome-free. On
+                // macOS/Windows the menu stays in its native location.
+                #[cfg(target_os = "linux")]
+                {
+                    use tauri::Manager;
+                    if let Some(window) = app.get_webview_window("main") {
+                        if let Err(e) = window.hide_menu() {
+                            tracing::warn!("Failed to hide in-window menu bar: {e}");
+                        }
+                    }
+                }
+
+                app.on_menu_event(|app_handle, event| {
+                    use tauri::Emitter;
+                    let action = match event.id().0.as_str() {
+                        "open" => Some("open"),
+                        "settings" => Some("settings"),
+                        "toggle-library" => Some("toggle-library"),
+                        "toggle-highlights" => Some("toggle-highlights"),
+                        "find" => Some("find"),
+                        "play-pause" => Some("play-pause"),
+                        "prev-page" => Some("prev-page"),
+                        "next-page" => Some("next-page"),
+                        _ => None,
+                    };
+                    if let Some(action) = action {
+                        if let Err(e) = app_handle.emit("menu-action", action) {
+                            tracing::warn!("Failed to emit menu-action '{action}': {e}");
+                        }
+                    }
+                });
             }
 
             // Initialize TTS audio cache with app cache directory
