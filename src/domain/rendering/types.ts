@@ -5,7 +5,7 @@
  * These types define the interface between UI, domain, and persistence layers.
  */
 
-import { z } from 'zod';
+import { z } from "zod";
 
 // =============================================================================
 // Quality Mode
@@ -14,7 +14,7 @@ import { z } from 'zod';
 /**
  * Quality mode enum - predefined rendering quality profiles
  */
-export const QualityModeSchema = z.enum(['performance', 'balanced', 'ultra']);
+export const QualityModeSchema = z.enum(["performance", "balanced", "ultra"]);
 export type QualityMode = z.infer<typeof QualityModeSchema>;
 
 /**
@@ -38,7 +38,7 @@ export interface QualityModeConfig {
  */
 export const RenderSettingsSchema = z.object({
   /** Selected quality profile */
-  qualityMode: QualityModeSchema.default('ultra'),
+  qualityMode: QualityModeSchema.default("ultra"),
   /** Canvas size cap in megapixels (8-48) */
   maxMegapixels: z.number().min(0).max(500).default(0),
   /** GPU acceleration toggle (requires restart) */
@@ -53,7 +53,7 @@ export type RenderSettings = z.infer<typeof RenderSettingsSchema>;
  * Default render settings - Maximum quality by default
  */
 export const DEFAULT_RENDER_SETTINGS: RenderSettings = {
-  qualityMode: 'ultra',
+  qualityMode: "ultra",
   maxMegapixels: 0,
   hwAccelerationEnabled: true,
   debugOverlayEnabled: false,
@@ -65,7 +65,9 @@ export const DEFAULT_RENDER_SETTINGS: RenderSettings = {
 export const PLATFORM_DEFAULTS: Record<string, Partial<RenderSettings>> = {
   windows: { hwAccelerationEnabled: true },
   macos: { hwAccelerationEnabled: true },
-  linux: { hwAccelerationEnabled: false },
+  // Linux keeps GPU compositing on; the DMABUF renderer (the blank-window
+  // culprit) is disabled in the Rust hw_accel layer, not via full software mode.
+  linux: { hwAccelerationEnabled: true },
 };
 
 // =============================================================================
@@ -140,7 +142,9 @@ export const UpdateRenderSettingsResponseSchema = z.object({
   restartRequired: z.boolean(),
   settings: RenderSettingsSchema,
 });
-export type UpdateRenderSettingsResponse = z.infer<typeof UpdateRenderSettingsResponseSchema>;
+export type UpdateRenderSettingsResponse = z.infer<
+  typeof UpdateRenderSettingsResponseSchema
+>;
 
 // =============================================================================
 // Debug Overlay Data

@@ -157,7 +157,8 @@ impl Default for RenderSettings {
         Self {
             quality_mode: "balanced".to_string(),
             max_megapixels: 24,
-            hw_acceleration_enabled: cfg!(not(target_os = "linux")), // Default false on Linux
+            hw_acceleration_enabled: true, // GPU on by default on all platforms; on Linux the
+            // DMABUF renderer is disabled in lib.rs hw_accel rather than dropping to full software
             debug_overlay_enabled: false,
         }
     }
