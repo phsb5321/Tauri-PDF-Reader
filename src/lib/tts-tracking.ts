@@ -4,6 +4,10 @@
  */
 
 import type { TextChunk } from './text-chunking';
+import type { WordTiming } from './api/ai-tts';
+
+/** Speaking-rate model shared with estimateWordTimings (≈150 wpm at 1x). */
+const FALLBACK_WORDS_PER_MINUTE = 150;
 
 export interface TextPosition {
   pageNumber: number;
@@ -172,4 +176,105 @@ export function findTextItemForWord(
   }
 
   return null;
+}
+
+/** A sentence and its UTF-16 char offsets within the ORIGINAL text. */
+export interface SentenceSpan {
+  text: string;
+  charStart: number;
+  charEnd: number;
+}
+
+const SENTENCE_TERMINATORS = new Set([".", "!", "?"]);
+const TRAILING_CLOSERS = /["')\]]/;
+
+/**
+ * Segment `text` into sentences, tracking each sentence's `[charStart, charEnd)`
+ * offsets in the ORIGINAL text as JS string (UTF-16) indices — so a highlight
+ * overlay can build DOM ranges over the rendered text layer. Unlike
+ * text-chunking's splitIntoSentences (which normalizes whitespace first and
+ * therefore loses original offsets), this preserves them. Leading/trailing
+ * whitespace is excluded from the span; terminal punctuation is included. A
+ * trailing fragment without terminal punctuation becomes its own span.
+ */
+export function segmentSentencesWithOffsets(text: string): SentenceSpan[] {
+  const spans: SentenceSpan[] = [];
+  const n = text.length;
+  let i = 0;
+
+  while (i < n) {
+    while (i < n && /\s/.test(text[i])) i++; // skip leading whitespace
+    if (i >= n) break;
+    const start = i;
+
+    let j = i;
+    while (j < n) {
+      if (SENTENCE_TERMINATORS.has(text[j])) {
+        j++; // consume the terminator run + any closing quotes/brackets
+        while (j < n && (SENTENCE_TERMINATORS.has(text[j]) || TRAILING_CLOSERS.test(text[j]))) {
+          j++;
+        }
+        break;
+      }
+      j++;
+    }
+
+    let end = j; // trim any trailing whitespace captured by a punctuation-less tail
+    while (end > start && /\s/.test(text[end - 1])) end--;
+
+    if (text.slice(start, end).trim().length > 0) {
+      spans.push({ text: text.slice(start, end), charStart: start, charEnd: end });
+    }
+    i = j;
+  }
+
+  return spans;
+}
+
+/**
+ * Build coarse SENTENCE-level fallback timings for karaoke highlighting when
+ * real per-word timings are unavailable (e.g. ElevenLabs returned no alignment).
+ * Each sentence becomes one `WordTiming` (carrying its original-text UTF-16
+ * offsets) and the duration is spread across sentences proportional to their
+ * character length, so the highlight still advances roughly in step with audio.
+ *
+ * `totalDurationSeconds` is the known audio length; when `<= 0` (the typical
+ * no-alignment case, where the timestamps response also omits the duration) it
+ * is estimated from the word count at ≈150 wpm. Pure + deterministic; returns
+ * `[]` for empty/whitespace-only text or a non-positive resolved duration.
+ */
+export function buildSentenceFallbackTimings(
+  text: string,
+  totalDurationSeconds: number,
+): WordTiming[] {
+  const sentences = segmentSentencesWithOffsets(text);
+  if (sentences.length === 0) return [];
+
+  let duration = totalDurationSeconds;
+  if (!(duration > 0)) {
+    const wordCount = text.split(/\s+/).filter((w) => w.length > 0).length;
+    duration = (wordCount / FALLBACK_WORDS_PER_MINUTE) * 60;
+  }
+  if (!(duration > 0)) return [];
+
+  const totalChars = sentences.reduce((sum, s) => sum + s.text.length, 0);
+  const timings: WordTiming[] = [];
+  let elapsed = 0;
+
+  for (let i = 0; i < sentences.length; i++) {
+    const s = sentences[i];
+    const share = totalChars > 0 ? s.text.length / totalChars : 1 / sentences.length;
+    // The last sentence ends exactly at `duration` to avoid float drift.
+    const end = i === sentences.length - 1 ? duration : elapsed + share * duration;
+    timings.push({
+      word: s.text,
+      startTime: elapsed,
+      endTime: end,
+      charStart: s.charStart,
+      charEnd: s.charEnd,
+    });
+    elapsed = end;
+  }
+
+  return timings;
 }
