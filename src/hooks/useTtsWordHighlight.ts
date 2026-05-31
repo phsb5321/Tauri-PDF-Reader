@@ -15,6 +15,7 @@ import {
 import { onAiTtsPlaybackStarting } from '../lib/api/ai-tts';
 import { useTtsHighlightStore, selectIsHighlighting } from '../stores/tts-highlight-store';
 import { useAiTtsStore } from '../stores/ai-tts-store';
+import { findWordIndexAtTime } from '../lib/tts-tracking';
 
 export interface UseTtsWordHighlightOptions {
   /** Callback when a new word becomes active */
@@ -77,31 +78,8 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
       return;
     }
 
-    // Find current word based on elapsed time
-    let newWordIndex = -1;
-    for (let i = 0; i < state.wordTimings.length; i++) {
-      const word = state.wordTimings[i];
-      if (elapsed >= word.startTime && elapsed < word.endTime) {
-        newWordIndex = i;
-        break;
-      }
-      // Handle gap between words - keep last word highlighted
-      if (i < state.wordTimings.length - 1) {
-        const nextWord = state.wordTimings[i + 1];
-        if (elapsed >= word.endTime && elapsed < nextWord.startTime) {
-          newWordIndex = i;
-          break;
-        }
-      }
-    }
-
-    // If we're past all words, highlight the last one
-    if (newWordIndex === -1 && state.wordTimings.length > 0) {
-      const lastWord = state.wordTimings[state.wordTimings.length - 1];
-      if (elapsed >= lastWord.startTime) {
-        newWordIndex = state.wordTimings.length - 1;
-      }
-    }
+    // Find current word based on elapsed time (pure, unit-tested selection).
+    const newWordIndex = findWordIndexAtTime(elapsed, state.wordTimings);
 
     // Update if word changed
     if (newWordIndex !== lastWordIndexRef.current && newWordIndex >= 0) {
