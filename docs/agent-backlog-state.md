@@ -2,6 +2,28 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #17 — 2026-05-31 (Merge Train: integrate 019→026)
+
+- **Worktree/branch:** `../tauri-pdf-reader-merge-train` on `integrate/019-026-merge-train`, off `origin/main` 8c366d7. HEAD `288210c`. **Not pushed, no PR** (awaiting Pedro).
+- **Preserved before any cleanup:** `/tmp/lectrice-main-dirty-20260531-102454.patch` (+`-HEAD` variant; 4945-line deletion set), `/tmp/lectrice-main-status-20260531-102454.txt`, `/tmp/lectrice-018-render-perf-20260531-102454.patch` (178 lines). Dirty main left **UNTOUCHED**.
+- **Dirty-main classification:** 21 tracked DELETIONS (specs 001–007, `.specify`, `.gitignore`, `e2e/critical-loop.spec.ts`, 9 `.claude/commands/speckit.*`) = accidental, recoverable from HEAD; untracked generated (`coverage/`, `.husky/_/`, `src-tauri/gen/schemas/`, `.opencode/`, `.claude/scheduled_tasks.lock`). No 018 source in main.
+- **Stale loop stopped:** cron `473ce7f0` already gone (CronList empty, no tasks); killed 3 hung orphans — codex-019 (stdin-hang ~10h), 2 hung vitest (~6–7h).
+- **Branches verified:** all 8 branch cleanly off 8c366d7; impl hashes confirmed (42e5825/42c1ef8/409383c/612188e/2e1db32/954bdd5/f1c0619/3ab99a1). Per-branch overnight **Codex = PASS ×8** (`/tmp/lectrice-0NN-codex*.log`).
+- **Merge:** oldest-first 019→026 (019 fast-forward; 020–026 merge commits).
+- **Conflicts + resolutions:**
+  - `docs/agent-backlog-state.md` — conflicted every merge after 019; resolved `--theirs` after **verifying** the incoming side is a cumulative superset each time (stage-3 iteration count > stage-2). Final doc retains #8→#16.
+  - `src/lib/tts-tracking.ts` (024/025/026) — auto-merged; verified true **union** (findWordIndexAtTime, segmentSentencesWithOffsets, buildSentenceFallbackTimings, resolveCharRange, isPlaybackComplete all present, no loss).
+  - `src/hooks/useTtsWordHighlight.ts` (026) — mergiraf-resolved = union of 022 extraction + 026 zero-duration guard; verified via both branch diffs; collapsed a duplicate import.
+- **Checks (integration worktree):**
+  - Frontend: `typecheck` clean · `lint` 0 errors (99 pre-existing warnings) · `lint:boundaries` 0 errors · `test:arch` 12/12 · `test:coverage` **exit 0, 38 files / 589 tests, floors 46/59/88/46 held**.
+  - Backend (nix-shell): `cargo fmt --check` clean · `clippy --all-targets --features test-mocks -D warnings` clean · `cargo test --features test-mocks` all pass (contract 14+7, lib, doc-tests).
+  - Self-checks: capabilities/tauri.conf **unchanged** (no scope widening) · `bindings.ts` unchanged (no drift) · no new UI `invoke(` · no conflict markers · 018 code absent.
+- **Adversarial review:** per-slice **Codex PASS ×8** (real). **Final integration-diff Codex = BLOCKED** (`You've hit your usage limit … try again 2026-06-02 20:32`). Supplemented by an **independent Claude adversarial merge review → VERDICT PASS** (no BLOCKER/MAJOR/MINOR; verified all 8 vectors + evil-merge). ⚠ Re-run the final-diff Codex pass after quota reset to fully close the gate.
+- **018-render-perf:** preserved (patch above), uncommitted in its own worktree (`src-tauri/src/lib.rs` +123/-7, `commands/settings.rs`, `domain/rendering/types.ts`). Decision deferred to Pedro: commit-own-branch / split / hold.
+- **016/017:** STALE (base `7c5de09`, pre-8c366d7); merging as-is would revert 010–015 (−2401 lines). Recommend rebase-onto-8c366d7 + extract only new domain tests (cache-coverage/cache-entry/export-result/quality-mode). Drop deferred to Pedro.
+- **GUI-gated:** `docs/gui-validation-019-026.md` (karaoke end-to-end, restart-reopen, fallback no-early-skip, reduced-motion). Not run — needs Pedro + running app.
+- **Next:** Pedro pushes `integrate/019-026-merge-train` + opens PR(s); re-run final Codex pass post-quota; then GUI validation; then P2 (pdf.js 5.x / render cancellation / virtualization).
+
 ## Iteration #16 — 2026-05-31 (Spec 026: Guard TTS Completion Against Zero Duration)
 
 - **Branch:** `026-audio-duration` (off `origin/main` 8c366d7). Commit `3ab99a1`. Local only — awaiting push/PR.
@@ -19,14 +41,14 @@
 - **Verified:** `pnpm lint` 0 errors; `pnpm typecheck` exit 0; `vitest run …tts-range.test.ts` → 7/7. Codex ran `tsc` too.
 - **Codex:** `.claude/reviews/025-page-boundary.md` — VERDICT **PASS**. Caught a VACUOUS clamp test (start==last node → old-bug & fix identical) → replaced with `[5,3,4],6,10` distinguishing case; added `>total` off-page case. Both amended.
 - **#7 now logic-complete (unit level):** pt.1 selection (022) · pt.2 reduced-motion (023) · pt.3 fallback foundation (024) · pt.4 page-boundary (025). **NOT done: end-to-end GUI verification of karaoke during real playback (needs Pedro/running app).**
-- **Next slice:** small **backend "expose audio duration / playback-ended"** slice → unblocks **pt.3b** (wire the sentence fallback safely without cutting off audio). Then **P2 #8 pdf.js 5.x** (big migration). 
+- **Next slice:** small **backend "expose audio duration / playback-ended"** slice → unblocks **pt.3b** (wire the sentence fallback safely without cutting off audio). Then **P2 #8 pdf.js 5.x** (big migration).
 - **⚠️ STRONG RECOMMENDATION: pause new slices — 7 stacked loop branches (019–025) now await review/merge + the karaoke needs a GUI pass. Higher leverage to merge the batch + Pedro GUI-checks karaoke than to mine more sub-parts.**
 
 ## Iteration #14 — 2026-05-31 (Spec 024: Sentence-Level Karaoke Fallback, P1 #7 pt.3 foundation)
 
 - **Branch:** `024-karaoke-fallback` (off `origin/main` 8c366d7). Commit `954bdd5`. Local only — awaiting push/PR.
 - **Slice:** P1 #7 pt.3 foundation. When ElevenLabs returns no alignment the highlight shows nothing. Added pure `tts-tracking.ts` builders: `segmentSentencesWithOffsets(text)` (sentences with ORIGINAL-text UTF-16 offsets — `splitIntoSentences` normalizes whitespace + loses offsets, so can't reuse) and `buildSentenceFallbackTimings(text, totalDurationSeconds)` (one WordTiming/sentence, proportional spread, ~150 wpm estimate when duration ≤0). 2 files, +12 tests.
-- **Deliberately NOT wired** into the hook: the loop completes on `elapsed >= totalDuration → onComplete`, and the backend reports `total_duration=0` with no alignment — feeding fallback timings with an *estimated* duration could cut off real audio. Safe wiring needs a real audio-duration/playback-ended signal → **pt.3b**.
+- **Deliberately NOT wired** into the hook: the loop completes on `elapsed >= totalDuration → onComplete`, and the backend reports `total_duration=0` with no alignment — feeding fallback timings with an _estimated_ duration could cut off real audio. Safe wiring needs a real audio-duration/playback-ended signal → **pt.3b**.
 - **Verified:** `pnpm lint` 0 errors; `pnpm typecheck` exit 0; `vitest run …tts-fallback.test.ts` → 12/12 pass.
 - **Codex:** `.claude/reviews/024-karaoke-fallback.md` — VERDICT **PASS**, no findings; confirmed offsets correct + the deferral legitimate. Its TEST-GAP (unequal-length proportionality) added via amend.
 - **Next slice:** **P1 #7 pt.4 — page-boundary range handling** in `TtsWordHighlight.createWordRange` (a word/sentence range crossing a PDF page container fails silently; detect + degrade). pt.3b (wire fallback) is PARKED pending a real audio-duration signal (small backend change). After #7: **P2 pdf.js 5.x**.
