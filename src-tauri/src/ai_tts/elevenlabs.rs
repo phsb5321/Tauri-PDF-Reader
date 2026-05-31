@@ -327,6 +327,15 @@ impl ElevenLabsClient {
     ///
     /// Uses ElevenLabs' /with-timestamps endpoint to get character-level timing,
     /// then aggregates into word-level timing for text highlighting.
+    ///
+    /// Buffering vs. streaming: the /with-timestamps endpoint returns the audio
+    /// as base64 embedded in a JSON body alongside the character alignment, so
+    /// the full response is buffered — the word timings cannot be derived from a
+    /// partial stream. `text_to_speech_stream` (chunked transfer) is used only
+    /// for the plain-playback path. ElevenLabs does expose a chunked
+    /// /stream/with-timestamps endpoint (per-chunk audio + alignment); adopting
+    /// it for true stream-while-caching on the timestamped path is a future
+    /// option, not wired here.
     pub async fn text_to_speech_with_timestamps(
         &self,
         text: &str,
@@ -678,5 +687,72 @@ mod tests {
         assert_eq!(w[1].word, "x");
         assert_eq!(w[1].char_start, 2);
         assert_eq!(w[1].char_end, 3);
+    }
+
+    // ---- response wire-contract: ElevenLabs /with-timestamps JSON ----
+    // The chars_to_words tests above feed hand-built AlignmentData. These assert
+    // the API *wire contract* instead: a realistic /with-timestamps JSON body
+    // deserializes into our typed model (field names, base64 audio, optional
+    // alignment) and flows through chars_to_words exactly as the live adapter
+    // does it. The JSON is a fixture — no live API call.
+
+    #[test]
+    fn with_timestamps_response_deserializes_and_converts_end_to_end() {
+        // Includes `normalized_alignment` (which the real API returns and this
+        // adapter ignores) to prove deserialization tolerates the fuller wire
+        // shape — i.e. the struct does not strict-parse and reject extra fields.
+        let json = r#"{
+            "audio_base64": "aGVsbG8=",
+            "alignment": {
+                "characters": ["H", "i", " ", "y", "o", "u"],
+                "character_start_times_seconds": [0.0, 0.10, 0.20, 0.30, 0.45, 0.60],
+                "character_end_times_seconds": [0.10, 0.20, 0.30, 0.45, 0.60, 0.80]
+            },
+            "normalized_alignment": {
+                "characters": ["H", "i", " ", "y", "o", "u"],
+                "character_start_times_seconds": [0.0, 0.10, 0.20, 0.30, 0.45, 0.60],
+                "character_end_times_seconds": [0.10, 0.20, 0.30, 0.45, 0.60, 0.80]
+            }
+        }"#;
+
+        let resp: TtsWithTimestampsResponse =
+            serde_json::from_str(json).expect("with-timestamps body should deserialize");
+
+        // Audio arrives base64-encoded inside the JSON; it must decode to raw bytes.
+        use base64::{engine::general_purpose::STANDARD, Engine};
+        let audio = STANDARD
+            .decode(&resp.audio_base64)
+            .expect("audio_base64 should decode");
+        assert_eq!(audio, b"hello");
+
+        // Alignment present -> word timings via the same call the adapter makes.
+        let alignment = resp.alignment.expect("alignment present");
+        let words = ElevenLabsClient::chars_to_words("Hi you", &alignment);
+
+        assert_eq!(words.len(), 2);
+        assert_eq!(words[0].word, "Hi");
+        assert!(close(words[0].start_time, 0.0));
+        assert!(close(words[0].end_time, 0.20)); // end of 'i' (word before the space)
+        assert_eq!(words[1].word, "you");
+        assert!(close(words[1].start_time, 0.30)); // start of 'y'
+        assert!(close(words[1].end_time, 0.80)); // last char end (final word)
+
+        // total_duration the adapter reports is the last character end time.
+        let total = alignment
+            .character_end_times_seconds
+            .last()
+            .copied()
+            .unwrap_or(0.0);
+        assert!(close(total, 0.80));
+    }
+
+    #[test]
+    fn with_timestamps_response_tolerates_missing_alignment() {
+        // ElevenLabs may omit alignment; the Option field must yield None so the
+        // adapter returns empty word timings rather than failing to parse.
+        let json = r#"{ "audio_base64": "aGVsbG8=" }"#;
+        let resp: TtsWithTimestampsResponse =
+            serde_json::from_str(json).expect("body without alignment should deserialize");
+        assert!(resp.alignment.is_none());
     }
 }

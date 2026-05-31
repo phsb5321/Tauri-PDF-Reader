@@ -30,19 +30,19 @@ export default defineConfig({
         "src/main.tsx",
         "src/vite-env.d.ts",
       ],
-      // Coverage ratchet (009-coverage-gate, 2026-05-30).
-      // Floors are pinned to the MEASURED baseline at this commit, not an
-      // aspirational 80%. Before this, CI failed on every run (real coverage
-      // ~42% lines/statements vs an 80% gate), so the signal was ignored.
-      // These act as a REGRESSION gate — coverage may not drop below the floor
-      // — and MUST be ratcheted UP as tests are added, never silently down.
-      // `branches` stays at 80 because it is already met. Target: 80 across the
-      // board. Policy + plan: docs/coverage-budget.md.
+      // Coverage ratchet — last raised by 019-coverage-ratchet (2026-05-31).
+      // Floors are pinned just under the MEASURED baseline at this commit, not
+      // an aspirational 80%. They act as a REGRESSION gate — coverage may not
+      // drop below the floor — and MUST be ratcheted UP as tests are added,
+      // never silently down. Raised from 42/53/80/42 (009, 2026-05-30) after the
+      // 010–015 store-test branches merged; now measured: stmts 46.91 /
+      // branch 88.72 / funcs 59.58 / lines 46.91. Target: 80 across the board.
+      // Policy + ratchet history: docs/coverage-budget.md.
       thresholds: {
-        lines: 42,
-        functions: 53,
-        branches: 80,
-        statements: 42,
+        lines: 46,
+        functions: 59,
+        branches: 88,
+        statements: 46,
       },
     },
   },

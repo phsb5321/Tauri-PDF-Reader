@@ -250,6 +250,14 @@ pub fn run() {
         .plugin(tauri_plugin_sql::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        // persisted-scope MUST init AFTER fs so it can hook the fs plugin's
+        // scope. It serializes the fs plugin's CURRENT allowed patterns — the
+        // static $APPLOCALDATA/** plus the runtime per-file grants that
+        // dialog.open() adds for a picked PDF — and restores them on the next
+        // launch, so a library document reopens via readFile(originalPath)
+        // without re-prompting. It introduces NO new or broader pattern, so the
+        // effective scope is unchanged across restarts (no whole-disk exposure).
+        .plugin(tauri_plugin_persisted_scope::init())
         .plugin(tauri_plugin_shell::init())
         .manage(ExportState::new());
 
