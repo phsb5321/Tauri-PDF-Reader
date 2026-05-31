@@ -81,6 +81,53 @@ export function getCurrentWordIndex(
 }
 
 /**
+ * Find the active word index for `elapsedSeconds` against real (ElevenLabs)
+ * word timings — the karaoke "word under the playback head" selection.
+ *
+ * This is the pure extraction of the loop that previously lived inline in
+ * `useTtsWordHighlight`'s requestAnimationFrame callback; semantics are kept
+ * identical so it can be unit-tested independently of the rAF loop:
+ * - In-range: the word whose `[startTime, endTime)` contains `elapsedSeconds`.
+ * - Gap-fill: during a silent gap between word `i` and `i + 1`, hold word `i`.
+ * - Tail: once past the last word's `startTime`, hold the last word.
+ * - Returns `-1` before the first word starts (nothing highlighted yet), or
+ *   when there are no timings.
+ *
+ * Note this differs from `getCurrentWordIndex` above, which targets estimated
+ * chunk timings (`WordEstimate`) and returns `0` rather than `-1` pre-start.
+ * Accepts any `{ startTime, endTime }`-shaped timing so it is decoupled from the
+ * full `WordTiming` binding.
+ */
+export function findWordIndexAtTime(
+  elapsedSeconds: number,
+  wordTimings: ReadonlyArray<{ startTime: number; endTime: number }>
+): number {
+  for (let i = 0; i < wordTimings.length; i++) {
+    const word = wordTimings[i];
+    if (elapsedSeconds >= word.startTime && elapsedSeconds < word.endTime) {
+      return i;
+    }
+    // Gap between this word and the next — keep the previous word highlighted.
+    if (i < wordTimings.length - 1) {
+      const nextWord = wordTimings[i + 1];
+      if (elapsedSeconds >= word.endTime && elapsedSeconds < nextWord.startTime) {
+        return i;
+      }
+    }
+  }
+
+  // Past all words — hold the last one.
+  if (wordTimings.length > 0) {
+    const lastWord = wordTimings[wordTimings.length - 1];
+    if (elapsedSeconds >= lastWord.startTime) {
+      return wordTimings.length - 1;
+    }
+  }
+
+  return -1;
+}
+
+/**
  * Calculate reading position based on current chunk and progress
  */
 export function calculateReadingPosition(

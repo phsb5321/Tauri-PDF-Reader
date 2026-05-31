@@ -2,6 +2,15 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #12 — 2026-05-31 (Spec 022: Karaoke Word-at-Time Selection, P1 #7 pt.1)
+
+- **Branch:** `022-karaoke-ui` (off `origin/main` 8c366d7). Commit `612188e`. Local only — awaiting push/PR.
+- **Slice:** P1 #7 (karaoke highlight UI). Explore-agent gap analysis: consumer largely built; "no per-tick DOM thrash" already DONE. The core word-at-time selection was correct but baked into `useTtsWordHighlight`'s rAF callback (untestable). Extracted it verbatim → pure `findWordIndexAtTime(elapsedSeconds, wordTimings)` in `src/lib/tts-tracking.ts`; rewired the hook; added 7 unit tests. 3 files, frontend-only.
+- **Semantics (preserved):** in-range `[start,end)` → gap-fill (hold prev word in silent gaps) → tail (hold last past its start) → `-1` pre-first/empty. Structural `{startTime,endTime}` param (decoupled from `WordTiming` binding). Distinct from the chunk-path `getCurrentWordIndex` (returns 0 pre-start).
+- **Verified:** `pnpm lint` 0 errors; `pnpm typecheck` exit 0; `pnpm exec vitest run …tts-tracking.test.ts` → 7/7 pass. (`pnpm test` is WATCH — use `vitest run` / `test:run`.)
+- **Codex:** `.claude/reviews/022-karaoke-ui.md` — VERDICT **PASS**, no BLOCKER/MAJOR/MINOR; line-by-line confirmed behavior-preserving extraction.
+- **Next slice:** **P1 #7 pt.2 — reduced-motion** (guard `AiPlaybackBar` scroll-to-word `behavior:"smooth"` on `prefers-reduced-motion`, + test), then pt.3 sentence-level fallback (empty/sparse `wordTimings`), then pt.4 page-boundary range handling. After #7: P2 (pdf.js 5.x upgrade).
+
 ## Iteration #11 — 2026-05-31 (Spec 021: With-Timestamps Wire-Contract Fixtures, P1 #6)
 
 - **Branch:** `021-tts-timestamp-adapter` (off `origin/main` 8c366d7). Commit `409383c`. Local only — awaiting push/PR.
@@ -54,11 +63,11 @@
 ## Standing context
 
 - **008–015 are MERGED** into `origin/main` (now at `8c366d7`, PRs #6–#13). 009's floors are now superseded by 019's ratchet (46/59/88/46) — the "bump after test branches land" follow-up is DONE.
-- **Unmerged branches awaiting push/PR (loop, off 8c366d7):** `021-tts-timestamp-adapter` (`409383c`, this iter), `020-persisted-scope` (`42c1ef8`), `019-coverage-ratchet` (`42e5825`). Also local-only: `016-cache-coverage-tests` / `017-domain-coverage-tests` (older base — rebase onto 8c366d7 + measure before they affect the coverage floor), and `018-render-perf` (UNCOMMITTED desktop-integration: GPU compositing + niri decorations + AT-SPI app-menu export — Pedro-directed, separate from the loop; see [[lectrice-niri-desktop-integration]]). NOTE: 019/020/021 each carry the cumulative `docs/agent-backlog-state.md`; merge oldest-first or `git checkout --theirs` the latest to resolve the add/add.
+- **Unmerged branches awaiting push/PR (loop, off 8c366d7):** `022-karaoke-ui` (`612188e`, this iter), `021-tts-timestamp-adapter` (`409383c`), `020-persisted-scope` (`42c1ef8`), `019-coverage-ratchet` (`42e5825`). Also local-only: `016-cache-coverage-tests` / `017-domain-coverage-tests` (older base — rebase onto 8c366d7 + measure before they affect the coverage floor), and `018-render-perf` (UNCOMMITTED desktop-integration: GPU compositing + niri decorations + AT-SPI app-menu export — Pedro-directed, separate from the loop; see [[lectrice-niri-desktop-integration]]). NOTE: 019/020/021 each carry the cumulative `docs/agent-backlog-state.md`; merge oldest-first or `git checkout --theirs` the latest to resolve the add/add.
 - **Main worktree dirty = accidental deletions, untouched, still on 6ccf946 (stale).** Recommend: `git restore .gitignore .specify e2e specs .claude/commands` then `git pull --ff-only`.
 - **Build env:** pnpm `~/.local/share/pnpm` (export PATH for husky); cargo/Tauri need the nix-shell; build needs a `dist/` stub; release ≈9 min; bundle toolchain absent. tsconfig EXCLUDES `*.test.ts` from `tsc`; non-exported store types cascade implicit-any in the LSP pre-install (resolves after `pnpm install`).
 - **Loop:** hourly cron `7 * * * *` (`473ce7f0`, session-only). Re-running `/loop 60m /lectrice-forward` does NOT duplicate.
-- **Open worktrees:** `-008-…`–`-015-…` already removed post-merge. Current: `-016-…`, `-017-…`, `-018-render-perf`, `-019-coverage-ratchet`, `-020-persisted-scope`, `-021-tts-timestamp-adapter`, `-run` (detached dev-run @ 8c366d7; dev server currently stopped). Loop worktrees reuse `-run/node_modules` via symlink to skip redundant installs.
+- **Open worktrees:** `-008-…`–`-015-…` already removed post-merge. Current: `-016-…`, `-017-…`, `-018-render-perf`, `-019-coverage-ratchet`, `-020-persisted-scope`, `-021-tts-timestamp-adapter`, `-022-karaoke-ui`, `-run` (detached dev-run @ 8c366d7; dev server currently stopped). Loop worktrees reuse `-run/node_modules` via symlink to skip redundant installs.
 
 ### Next command
 
