@@ -2,6 +2,16 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #16 — 2026-05-31 (Spec 026: Guard TTS Completion Against Zero Duration)
+
+- **Branch:** `026-audio-duration` (off `origin/main` 8c366d7). Commit `3ab99a1`. Local only — awaiting push/PR.
+- **Planned slice was** "expose audio duration → unblock pt.3b" — found NOT a clean unit-slice (rodio MP3 `total_duration()` is usually `None`; backend "can't detect when audio finishes", `commands/ai_tts.rs:88`). Tracing the completion path surfaced a **real bug** instead, fixed here.
+- **Bug + fix:** missing-alignment response → `totalDuration 0` → the loop's `elapsed >= totalDuration` was true on frame 1 → `onComplete` → with auto-page, **skipped the page while audio just started**. Extracted pure `isPlaybackComplete(elapsed, totalDuration) = totalDuration > 0 && elapsed >= totalDuration`; hook uses it. 3 files, frontend-only.
+- **Verified:** `pnpm lint` 0 errors; `pnpm typecheck` exit 0; `vitest run …tts-playback-complete.test.ts` → 3/3.
+- **Codex:** `.claude/reviews/026-completion-guard.md` — VERDICT **PASS**, no findings; explicitly validated the trade-off (not-completing on duration-0 is safer than the premature skip).
+- **Next slice — GUI/architecture-gated (not a clean loop slice):** real **audio-finished detection** — poll `sink.empty()` on a thread in `player.rs` → emit `ai-tts:finished` → frontend drives completion/auto-advance off the event, not the timer. Unblocks pt.3b AND fixes the no-duration completion properly. Needs GUI verification (rodio not unit-testable). After it: **P2 #8 pdf.js 5.x**.
+- **⚠️ LOOP HAS HIT THE WALL: all remaining substantive work is GUI-gated (audio-finished, karaoke end-to-end verify), architecture-level, or a big migration (pdf.js 5.x). 8 stacked clean branches (019–026) await review/merge. STRONGEST recommendation yet: pause looping, batch-merge 019–026, decide on 018, GUI-verify karaoke. Further auto-loop iterations risk low-value churn.**
+
 ## Iteration #15 — 2026-05-31 (Spec 025: Page-Boundary-Safe Word Range, P1 #7 pt.4)
 
 - **Branch:** `025-page-boundary` (off `origin/main` 8c366d7). Commit `f1c0619`. Local only — awaiting push/PR.
@@ -90,11 +100,11 @@
 ## Standing context
 
 - **008–015 are MERGED** into `origin/main` (now at `8c366d7`, PRs #6–#13). 009's floors are now superseded by 019's ratchet (46/59/88/46) — the "bump after test branches land" follow-up is DONE.
-- **Unmerged branches awaiting push/PR (loop, off 8c366d7):** `025-page-boundary` (`f1c0619`, this iter), `024-karaoke-fallback` (`954bdd5`), `023-reduced-motion` (`2e1db32`), `022-karaoke-ui` (`612188e`), `021-tts-timestamp-adapter` (`409383c`), `020-persisted-scope` (`42c1ef8`), `019-coverage-ratchet` (`42e5825`). **7 stacked branches — STRONGLY recommend Pedro batch-review/merge now (merge oldest-first; each carries the cumulative backlog doc → `--theirs` the latest on conflict). Loop value is dropping vs. the review/GUI-verify backlog.** Also local-only: `016-cache-coverage-tests` / `017-domain-coverage-tests` (older base — rebase onto 8c366d7 + measure before they affect the coverage floor), and `018-render-perf` (UNCOMMITTED desktop-integration: GPU compositing + niri decorations + AT-SPI app-menu export — Pedro-directed, separate from the loop; see [[lectrice-niri-desktop-integration]]). NOTE: 019/020/021 each carry the cumulative `docs/agent-backlog-state.md`; merge oldest-first or `git checkout --theirs` the latest to resolve the add/add.
+- **Unmerged branches awaiting push/PR (loop, off 8c366d7):** `026-audio-duration` (`3ab99a1`, this iter), `025-page-boundary` (`f1c0619`), `024-karaoke-fallback` (`954bdd5`), `023-reduced-motion` (`2e1db32`), `022-karaoke-ui` (`612188e`), `021-tts-timestamp-adapter` (`409383c`), `020-persisted-scope` (`42c1ef8`), `019-coverage-ratchet` (`42e5825`). **7 stacked branches — STRONGLY recommend Pedro batch-review/merge now (merge oldest-first; each carries the cumulative backlog doc → `--theirs` the latest on conflict). Loop value is dropping vs. the review/GUI-verify backlog.** Also local-only: `016-cache-coverage-tests` / `017-domain-coverage-tests` (older base — rebase onto 8c366d7 + measure before they affect the coverage floor), and `018-render-perf` (UNCOMMITTED desktop-integration: GPU compositing + niri decorations + AT-SPI app-menu export — Pedro-directed, separate from the loop; see [[lectrice-niri-desktop-integration]]). NOTE: 019/020/021 each carry the cumulative `docs/agent-backlog-state.md`; merge oldest-first or `git checkout --theirs` the latest to resolve the add/add.
 - **Main worktree dirty = accidental deletions, untouched, still on 6ccf946 (stale).** Recommend: `git restore .gitignore .specify e2e specs .claude/commands` then `git pull --ff-only`.
 - **Build env:** pnpm `~/.local/share/pnpm` (export PATH for husky); cargo/Tauri need the nix-shell; build needs a `dist/` stub; release ≈9 min; bundle toolchain absent. tsconfig EXCLUDES `*.test.ts` from `tsc`; non-exported store types cascade implicit-any in the LSP pre-install (resolves after `pnpm install`).
 - **Loop:** hourly cron `7 * * * *` (`473ce7f0`, session-only). Re-running `/loop 60m /lectrice-forward` does NOT duplicate.
-- **Open worktrees:** `-008-…`–`-015-…` already removed post-merge. Current: `-016-…`, `-017-…`, `-018-render-perf`, `-019-coverage-ratchet`, `-020-persisted-scope`, `-021-tts-timestamp-adapter`, `-022-karaoke-ui`, `-023-reduced-motion`, `-024-karaoke-fallback`, `-025-page-boundary`, `-run` (detached dev-run @ 8c366d7; dev server currently stopped). Loop worktrees reuse `-run/node_modules` via symlink to skip redundant installs.
+- **Open worktrees:** `-008-…`–`-015-…` already removed post-merge. Current: `-016-…`, `-017-…`, `-018-render-perf`, `-019-coverage-ratchet`, `-020-persisted-scope`, `-021-tts-timestamp-adapter`, `-022-karaoke-ui`, `-023-reduced-motion`, `-024-karaoke-fallback`, `-025-page-boundary`, `-026-audio-duration`, `-run` (detached dev-run @ 8c366d7; dev server currently stopped). Loop worktrees reuse `-run/node_modules` via symlink to skip redundant installs.
 
 ### Next command
 

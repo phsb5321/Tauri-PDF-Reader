@@ -350,3 +350,23 @@ export function resolveCharRange(
   /* c8 ignore next -- unreachable: target <= total guarantees a hit above */
   return null;
 }
+
+/**
+ * Whether timer-driven TTS playback should be considered complete.
+ *
+ * Completion requires a POSITIVE known duration: `totalDurationSeconds > 0 &&
+ * elapsedSeconds >= totalDurationSeconds`. The duration guard is the important
+ * part — when ElevenLabs returns no alignment the duration is reported as 0,
+ * and the old check (`elapsed >= totalDuration`) was true on the very first
+ * animation frame, firing onComplete immediately and (with auto-page on)
+ * advancing the page while the audio had only just started. With no real
+ * duration there is nothing to time against, so the timer must NOT declare
+ * completion — that is the job of a real audio-finished signal (not yet wired;
+ * the backend currently cannot detect when playback ends).
+ */
+export function isPlaybackComplete(
+  elapsedSeconds: number,
+  totalDurationSeconds: number,
+): boolean {
+  return totalDurationSeconds > 0 && elapsedSeconds >= totalDurationSeconds;
+}
