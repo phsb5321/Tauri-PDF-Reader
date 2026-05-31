@@ -2,6 +2,17 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #10 — 2026-05-31 (Spec 020: Persisted Scope, S2)
+
+- **Branch:** `020-persisted-scope` (off `origin/main` 8c366d7). Commit `42c1ef8`. Local only — awaiting push/PR.
+- **Slice:** S2 (P0#3 follow-up from 008). Add `tauri-plugin-persisted-scope` (2.3.5) AFTER `tauri_plugin_fs::init()` so the runtime per-file fs grant from `dialog.open()` survives restart → library documents reopen via `readFile(originalPath)` without re-prompting.
+- **Scope-safety:** NO widening. Persists the fs plugin's existing `allowed_patterns()` (static `$APPLOCALDATA/**` + per-file runtime grants); introduces no new/broader pattern. Static fs + asset (`scope: []`) scopes untouched. No capability permission added (plugin has no commands). Local-only file, no network/telemetry.
+- **Files:** `src-tauri/Cargo.toml` (+dep), `Cargo.lock`, `src-tauri/src/lib.rs` (builder line + rationale comment). 3 files, +38.
+- **Verified (build):** nix-shell `cargo fmt --check` clean; `clippy --all-targets --features test-mocks -D warnings` clean; `cargo test --features test-mocks -j 1` → 273+ pass / 0 fail. persisted-scope 2.3.5 vs tauri 2.9.5. Frontend unchanged (no lint/typecheck delta).
+- **Codex:** `.claude/reviews/020-persisted-scope.md` — VERDICT **PASS**, no BLOCKER/MAJOR. 1 MINOR (comment overstated "only picked files") FIXED via amend `42c1ef8`; 1 MINOR informational (asset grants not persisted — fine, app uses readFile not asset protocol).
+- **REMAINING (manual GUI):** restart-reopen behavioral test — open a PDF from an arbitrary path, quit, relaunch, reopen from library; confirm no re-prompt. Not run (needs file-picker interaction); shipped build-verified per the loop's "ship narrowest safe + document remaining" allowance.
+- **Next slice:** **P1 word-level karaoke** — #6 ElevenLabs stream-with-timestamps adapter (typed audio-chunk + char-alignment model; group chars→words; stream-while-caching; deterministic cache key; fixture tests, no live API), then #7 karaoke highlight UI. Spec-Kit it.
+
 ## Iteration #9 — 2026-05-31 (Spec 019: Coverage Ratchet)
 
 - **Branch:** `019-coverage-ratchet` (off `origin/main` 8c366d7). Commit `42e5825`. Local only — awaiting push/PR.
@@ -33,11 +44,11 @@
 ## Standing context
 
 - **008–015 are MERGED** into `origin/main` (now at `8c366d7`, PRs #6–#13). 009's floors are now superseded by 019's ratchet (46/59/88/46) — the "bump after test branches land" follow-up is DONE.
-- **Unmerged branches awaiting push/PR:** `019-coverage-ratchet` (`42e5825`, this iter). Also local-only, NOT yet pushed: `016-cache-coverage-tests` / `017-domain-coverage-tests` (older base, more store/domain tests — rebase onto 8c366d7 + measure before they affect the floor), and `018-render-perf` (UNCOMMITTED desktop-integration: GPU compositing + niri decorations + AT-SPI app-menu export — Pedro-directed, separate from the loop; see [[lectrice-niri-desktop-integration]]).
+- **Unmerged branches awaiting push/PR:** `020-persisted-scope` (`42c1ef8`, this iter), `019-coverage-ratchet` (`42e5825`). Also local-only, NOT yet pushed: `016-cache-coverage-tests` / `017-domain-coverage-tests` (older base, more store/domain tests — rebase onto 8c366d7 + measure before they affect the floor), and `018-render-perf` (UNCOMMITTED desktop-integration: GPU compositing + niri decorations + AT-SPI app-menu export — Pedro-directed, separate from the loop; see [[lectrice-niri-desktop-integration]]). NOTE: 019 + 020 both edit `docs/agent-backlog-state.md` (cumulative); expect an add/add conflict on stacked merge — `git checkout --theirs` the latest, or merge oldest-first.
 - **Main worktree dirty = accidental deletions, untouched, still on 6ccf946 (stale).** Recommend: `git restore .gitignore .specify e2e specs .claude/commands` then `git pull --ff-only`.
 - **Build env:** pnpm `~/.local/share/pnpm` (export PATH for husky); cargo/Tauri need the nix-shell; build needs a `dist/` stub; release ≈9 min; bundle toolchain absent. tsconfig EXCLUDES `*.test.ts` from `tsc`; non-exported store types cascade implicit-any in the LSP pre-install (resolves after `pnpm install`).
 - **Loop:** hourly cron `7 * * * *` (`473ce7f0`, session-only). Re-running `/loop 60m /lectrice-forward` does NOT duplicate.
-- **Open worktrees:** `-008-…`–`-015-…` already removed post-merge. Current: `-016-…`, `-017-…`, `-018-render-perf`, `-019-coverage-ratchet`, `-run` (detached dev-run @ 8c366d7; dev server stopped this iter to free CPU for coverage).
+- **Open worktrees:** `-008-…`–`-015-…` already removed post-merge. Current: `-016-…`, `-017-…`, `-018-render-perf`, `-019-coverage-ratchet`, `-020-persisted-scope`, `-run` (detached dev-run @ 8c366d7; dev server currently stopped).
 
 ### Next command
 
