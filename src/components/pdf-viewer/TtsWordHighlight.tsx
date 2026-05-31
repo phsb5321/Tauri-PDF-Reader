@@ -10,6 +10,7 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import { useTtsHighlightStore, selectCurrentWord } from '../../stores/tts-highlight-store';
+import { resolveCharRange } from '../../lib/tts-tracking';
 import type { WordTiming } from '../../lib/api/ai-tts';
 import './TtsWordHighlight.css';
 
@@ -43,60 +44,30 @@ function createWordRange(
   charOffset: number,
   charLength: number
 ): Range | null {
-  // Use TreeWalker to find text nodes
+  // Collect the text-layer's text nodes in document order.
   const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null);
-  
-  let currentOffset = 0;
+  const nodes: Text[] = [];
   let node: Node | null;
-
   while ((node = walker.nextNode())) {
-    const textNode = node as Text;
-    const nodeText = textNode.textContent || '';
-    const nodeLength = nodeText.length;
-
-    if (currentOffset + nodeLength > charOffset) {
-      // Found the starting node
-      const startOffset = charOffset - currentOffset;
-      
-      try {
-        const range = document.createRange();
-        range.setStart(textNode, startOffset);
-
-        if (startOffset + charLength <= nodeLength) {
-          // Word fits within single text node
-          range.setEnd(textNode, startOffset + charLength);
-        } else {
-          // Word spans multiple text nodes - keep walking
-          let remainingLength = charLength - (nodeLength - startOffset);
-          let endNode: Node | null = textNode;
-
-          while ((endNode = walker.nextNode()) && remainingLength > 0) {
-            const endTextNode = endNode as Text;
-            const endNodeLength = endTextNode.textContent?.length || 0;
-
-            if (endNodeLength >= remainingLength) {
-              range.setEnd(endTextNode, remainingLength);
-              break;
-            }
-            remainingLength -= endNodeLength;
-          }
-
-          // If we couldn't find end, just highlight to end of start node
-          if (remainingLength > 0) {
-            range.setEnd(textNode, nodeLength);
-          }
-        }
-
-        return range;
-      } catch {
-        return null;
-      }
-    }
-
-    currentOffset += nodeLength;
+    nodes.push(node as Text);
   }
 
-  return null;
+  // Resolve the char range to (node, offset) pairs (pure + unit-tested). Returns
+  // null when the word starts beyond this page's text (it belongs to another
+  // page); when the word straddles the page boundary the end is clamped to the
+  // last node so the on-page portion still highlights.
+  const lengths = nodes.map((t) => (t.textContent ?? '').length);
+  const resolved = resolveCharRange(lengths, charOffset, charLength);
+  if (!resolved) return null;
+
+  try {
+    const range = document.createRange();
+    range.setStart(nodes[resolved.startIndex], resolved.startOffset);
+    range.setEnd(nodes[resolved.endIndex], resolved.endOffset);
+    return range;
+  } catch {
+    return null;
+  }
 }
 
 /**

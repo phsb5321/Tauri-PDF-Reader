@@ -126,3 +126,75 @@ export function findTextItemForWord(
 
   return null;
 }
+
+/** A character range resolved to (text-node index, local offset) start/end pairs. */
+export interface ResolvedCharRange {
+  startIndex: number;
+  startOffset: number;
+  endIndex: number;
+  endOffset: number;
+  /** true if the requested end ran past the available text and was clamped. */
+  clamped: boolean;
+}
+
+/**
+ * Resolve `[charOffset, charOffset + charLength)` over a sequence of text-node
+ * lengths into start/end (node index, local offset) pairs — the pure arithmetic
+ * behind createWordRange's TreeWalker. Returns `null` when `charOffset` lies
+ * beyond all the text (e.g. the word belongs to a different PDF page than this
+ * text layer). When the end runs past the available text it is clamped to the
+ * LAST node's end and `clamped` is set — so a word straddling a page boundary
+ * still highlights the portion present on this page, instead of highlighting
+ * only the first node (the prior bug) or failing outright.
+ */
+export function resolveCharRange(
+  nodeLengths: readonly number[],
+  charOffset: number,
+  charLength: number,
+): ResolvedCharRange | null {
+  if (charLength <= 0 || charOffset < 0) return null;
+
+  const total = nodeLengths.reduce((sum, n) => sum + n, 0);
+  if (charOffset >= total) return null; // start is off this text layer
+
+  // Locate the start node.
+  let acc = 0;
+  let startIndex = 0;
+  let startOffset = 0;
+  for (let i = 0; i < nodeLengths.length; i++) {
+    if (acc + nodeLengths[i] > charOffset) {
+      startIndex = i;
+      startOffset = charOffset - acc;
+      break;
+    }
+    acc += nodeLengths[i];
+  }
+
+  // Locate the end node, clamping to the last node when it overruns.
+  const target = charOffset + charLength;
+  if (target > total) {
+    const lastIndex = nodeLengths.length - 1;
+    return {
+      startIndex,
+      startOffset,
+      endIndex: lastIndex,
+      endOffset: nodeLengths[lastIndex],
+      clamped: true,
+    };
+  }
+  let acc2 = 0;
+  for (let i = 0; i < nodeLengths.length; i++) {
+    if (acc2 + nodeLengths[i] >= target) {
+      return {
+        startIndex,
+        startOffset,
+        endIndex: i,
+        endOffset: target - acc2,
+        clamped: false,
+      };
+    }
+    acc2 += nodeLengths[i];
+  }
+  /* c8 ignore next -- unreachable: target <= total guarantees a hit above */
+  return null;
+}
