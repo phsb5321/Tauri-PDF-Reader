@@ -6,6 +6,7 @@ import { useAnnounce, ANNOUNCEMENTS } from "../../hooks/useAnnounce";
 import { useDocumentStore } from "../../stores/document-store";
 import { useAiTtsStore } from "../../stores/ai-tts-store";
 import { pdfService } from "../../services/pdf-service";
+import { reducedMotionScrollBehavior } from "../../lib/reduced-motion";
 import { AiVoiceSelector } from "./AiVoiceSelector";
 import { AiSpeedSlider } from "./AiSpeedSlider";
 import { AiTtsSettings } from "./AiTtsSettings";
@@ -100,13 +101,17 @@ export function AiPlaybackBar({
     const containerRect = container.getBoundingClientRect();
     const margin = 100; // Pixels from edge to trigger scroll
 
+    // Respect prefers-reduced-motion: jump instantly instead of smooth-scrolling
+    // for users who opt out of motion.
+    const behavior = reducedMotionScrollBehavior();
+
     // Check if word is near bottom edge
     if (rect.bottom > containerRect.bottom - margin) {
-      highlight.scrollIntoView({ behavior: "smooth", block: "center" });
+      highlight.scrollIntoView({ behavior, block: "center" });
     }
     // Check if word is near top edge
     else if (rect.top < containerRect.top + margin) {
-      highlight.scrollIntoView({ behavior: "smooth", block: "center" });
+      highlight.scrollIntoView({ behavior, block: "center" });
     }
   }, []);
 
