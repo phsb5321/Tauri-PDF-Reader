@@ -15,6 +15,7 @@ import {
 import { onAiTtsPlaybackStarting } from '../lib/api/ai-tts';
 import { useTtsHighlightStore, selectIsHighlighting } from '../stores/tts-highlight-store';
 import { useAiTtsStore } from '../stores/ai-tts-store';
+import { isPlaybackComplete } from '../lib/tts-tracking';
 
 export interface UseTtsWordHighlightOptions {
   /** Callback when a new word becomes active */
@@ -67,8 +68,10 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
       });
     }
 
-    // Check if playback is complete
-    if (elapsed >= state.totalDuration) {
+    // Check if playback is complete. Guards totalDuration > 0 so a missing-
+    // alignment response (totalDuration 0) does NOT instantly "complete" on the
+    // first frame and (with auto-page) skip the page while audio just started.
+    if (isPlaybackComplete(elapsed, state.totalDuration)) {
       console.debug('[TtsWordHighlight] Playback complete');
       speakingRef.current = false;
       highlightStore.stopHighlighting();
