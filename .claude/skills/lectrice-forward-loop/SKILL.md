@@ -102,6 +102,40 @@ git diff --check
 
 Do not fake build success. If a build cannot run, document the exact missing dependency.
 
+## Verification ladder (climb every applicable rung; each is a runnable command, not a vibe)
+
+A claim is verified only by a rung that MECHANIZES it. Pick the lowest rung that
+proves the property; climb until the user-visible claim is asserted by code.
+
+1. **Arch / boundary** — `pnpm lint && pnpm lint:boundaries && pnpm typecheck`. No
+   direct `invoke()`; hexagonal layers intact.
+2. **State-machine (controlled clock)** — assert the model on a fake clock against
+   the PRODUCTION path. e.g. `pnpm test -- src/__tests__/integration/karaoke-sync.test.ts`.
+   This is how visual/audible features are proved: timing-model → highlight index →
+   playback state, mocked `performance.now` + `requestAnimationFrame`. **Pixels and
+   speakers are NEVER the oracle — the state machine is.**
+3. **Deadlock-bounded (Rust, timeout-guarded)** — for any `ai_tts/player.rs` change
+   or any `!Send`/`!Sync` rework: a test that FAILS-ON-HANG and proves no lock is
+   held across `sink.sleep_until_end()` (the old ~lines 106–120 trap), e.g.
+   `cargo test --features test-mocks ai_tts::player -- --test-threads=1`. A bounded
+   `pause`/`Ping` round-trip during playback is the no-deadlock proof. **This rung is
+   MANDATORY for player.rs / audio-thread changes — no merge without it.**
+4. **mockIPC headless E2E (jsdom, CI)** — `pnpm test -- e2e/critical-loop.spec.ts`.
+   Drives the real `lib/api`→`invoke` wire through the repo's IPC mock
+   (`mockInvoke` in `tests/setup.ts`) + controlled clock; asserts the critical-loop
+   state machine. Runs in CI with no GPU.
+5. **tauri-driver real E2E (opt-in, env-gated, legitimately blockable)** —
+   `pnpm test:e2e` under `nix-shell -p webkitgtk_4_1 xvfb …` + `Xvfb :99` +
+   `DISPLAY=:99` + software-rendering env. Drives the BUILT app via
+   tauri-driver→WebKitWebDriver. A `Failed to create session` timeout here is the
+   **documented WebKitGTK software-rendering trap (vimeflow#65)** — an ALLOWED
+   documented blocker, NOT a code failure and NOT "needs your eyes". Gate it behind
+   an env flag and record the blocker; rungs 1–4 still gate the merge.
+
+**TTS fixtures, never live:** assert grouped-word spans are monotonic and
+text-covering, and that the highlight index is derived from `start_time`; key
+fixtures by the existing SHA256 cache key. No live ElevenLabs call in a test.
+
 ## Mandatory Codex adversarial review
 
 After every logical change set, run Codex (non-mutating). Save the verdict under `.claude/reviews/`.
@@ -112,8 +146,11 @@ change set (git diff origin/main...HEAD) for Tauri v2 security/capabilities, loc
 hexagonal architecture, no-direct-invoke, Rust/TS correctness, file open/reopen behavior,
 asset/fs scope safety, persisted-scope ordering, generated binding drift, build/profile risk,
 coverage honesty, and docs accuracy. Attack for whole-disk exposure, broken library reopen,
-API-key leakage, over-broad capabilities, missing tests, release breakage. Return BLOCKER,
-MAJOR, MINOR, TEST GAPS, VERDICT. Do not edit files."
+API-key leakage, over-broad capabilities, missing tests, release breakage. ALSO judge — as a
+BLOCKER, same severity as a speculative/unproven fix (PR#595 parity) — whether this slice
+MECHANIZED its acceptance claim with a runnable assertion, or DEFERRED a verifiable property to a
+human ('looks synced' / 'should work' / 'needs your eyes'). The only legal human-defer is
+subjective aesthetic judgment. Return BLOCKER, MAJOR, MINOR, TEST GAPS, VERDICT. Do not edit files."
 ```
 
 Rules: any unresolved BLOCKER/MAJOR means NOT done. Fix or document an evidence-based false
@@ -132,3 +169,19 @@ Done only when: repo safety checked; Spec Kit/equivalent artifacts updated; impl
 OR an exact blocker produced; tests/checks run; security/privacy impact assessed; Codex review
 run; state updated; git status summarized. Do not end with "ready to implement" — implement the
 selected slice.
+
+### BANNED ending (non-negotiable)
+
+You may NOT end a slice with "needs your eyes" / "looks synced" / "should work" /
+"verified live in a prior session". End with exactly one of:
+
+- **(a) a runnable assertion** that mechanizes the claim — a verification-ladder rung
+  (above) whose command is recorded with its result; OR
+- **(b) a SPECIFIC documented blocker** — a named missing dependency, a headless-GPU
+  JS-eval/session hang (e.g. the vimeflow#65 WebKitGTK trap), or a live-API-only
+  property. Name it precisely and which rung it blocks.
+
+The ONLY legal human-defer is **subjective aesthetic judgment** (does it *feel*
+right), routed to a single ≤60-second GUI checklist — never a verifiable property
+(an index, a state transition, a timing relation, a no-hang). If a property is
+verifiable, you build the verification; you do not hand it to the human.
