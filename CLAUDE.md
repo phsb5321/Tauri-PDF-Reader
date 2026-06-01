@@ -47,6 +47,26 @@ cargo test --features test-mocks -j 1
 cargo build -j 2
 ```
 
+## Verification Discipline (NON-NEGOTIABLE)
+
+Every claim about behavior is proved by a runnable assertion, not a human glance.
+Full rules + exact commands: `.claude/skills/lectrice-forward-loop/SKILL.md`
+("Verification ladder" + "BANNED ending").
+
+- **Ladder (climb until the user-visible claim is asserted by code):** arch/boundary
+  → state-machine on a controlled clock (the production path; pixels/speakers are
+  NEVER the oracle — the state machine is) → deadlock-bounded Rust test (fails-on-hang)
+  → mockIPC headless E2E (jsdom, CI) → tauri-driver real E2E (opt-in, env-gated,
+  legitimately blockable by the WebKitGTK software-rendering trap vimeflow#65).
+- **Banned ending:** never finish a slice with "needs your eyes / looks synced /
+  should work". Finish with (a) a runnable assertion, or (b) a SPECIFIC documented
+  blocker. The only legal human-defer is subjective aesthetics → one ≤60s checklist.
+- **Deadlock gate (MANDATORY):** any `src-tauri/src/ai_tts/player.rs` or `!Send`/`!Sync`
+  change ships with a timeout-guarded test proving no lock is held across
+  `sink.sleep_until_end()`.
+- **Codex review:** also blocks (PR#595 parity) if a slice deferred a *verifiable*
+  property to a human instead of mechanizing it.
+
 ## Common Commands
 
 ```bash
