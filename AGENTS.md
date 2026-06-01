@@ -32,6 +32,17 @@ cd src-tauri && cargo test specific_test_name --features test-mocks
 pnpm verify
 ```
 
+## Merge Ownership (NON-NEGOTIABLE)
+
+**Done = MERGED, not PR-opened.** Self-merge the SAFE class — CI-green AND
+review-clean (no unresolved Codex BLOCKER/MAJOR) AND in-class (code/docs/config,
+≤1 service, revertible by one PR): `gh pr merge <n> --squash --delete-branch`,
+confirm `state == MERGED`. `BEHIND` → `gh pr update-branch <n>`; `DRAFT` → finish
+gating work + `gh pr ready <n>`. Escalate to the user only for: prod-deploy/
+migration, `.github/workflows`/CODEOWNERS/release-tags, irreversible/destructive,
+blast-radius > 1 service, MFA/secret/hardware/billing, or a required approval you
+cannot self-satisfy. NEVER `--admin`/`--no-verify`/force-push/direct-push to main.
+
 ## Quick Reference
 
 ```bash
