@@ -67,6 +67,25 @@ Full rules + exact commands: `.claude/skills/lectrice-forward-loop/SKILL.md`
 - **Codex review:** also blocks (PR#595 parity) if a slice deferred a *verifiable*
   property to a human instead of mechanizing it.
 
+## Merge Ownership (NON-NEGOTIABLE)
+
+**Done = MERGED, not PR-opened.** You own your PRs THROUGH merge. Do not park a
+green, reviewed PR with "awaits your merge" — merging it is YOUR job.
+
+- **Self-merge the SAFE class** — CI-green **AND** review-clean (no unresolved
+  Codex BLOCKER/MAJOR) **AND** in-class (code / docs / config, ≤1 service,
+  revertible by one PR):
+  `gh pr merge <n> --squash --delete-branch`, then confirm `state == MERGED`.
+  - `BEHIND` → `gh pr update-branch <n>` first. `DRAFT` → finish the gating work,
+    `gh pr ready <n>`, poll green, merge. `--auto` is NOT enabled on these repos —
+    merge directly once green.
+- **Escalate to Pedro (`[pending]`) ONLY for:** prod-deploy / DB migration;
+  changes to `.github/workflows` / CODEOWNERS / release tags; irreversible or
+  destructive ops; blast-radius > 1 service; MFA / secret / hardware / billing;
+  `niri` / `nh os switch`; or a required APPROVAL you cannot self-satisfy (an
+  author cannot approve their own PR).
+- **NEVER** `--admin` / `--no-verify` / force-push to / direct-push to `main`.
+
 ## Common Commands
 
 ```bash
