@@ -149,16 +149,30 @@ impl AudioPlayer {
     /// surface its recorded init error.
     pub fn play_mp3(&self, data: &[u8]) -> Result<(), String> {
         let (reply_tx, reply_rx) = channel();
-        self.send(Command::Play(data.to_vec(), reply_tx))?;
+        // A send failure means the thread is gone (e.g. backend init failed and it
+        // dropped the receiver) — surface its recorded init error, not a generic
+        // one. Same on a missing reply.
+        if self
+            .tx
+            .send(Command::Play(data.to_vec(), reply_tx))
+            .is_err()
+        {
+            return Err(self.recorded_error());
+        }
         match reply_rx.recv_timeout(Duration::from_secs(5)) {
             Ok(result) => result,
-            Err(_) => Err(self
-                .flags
-                .lock()
-                .ok()
-                .and_then(|f| f.last_error.clone())
-                .unwrap_or_else(|| "AUDIO_THREAD_UNRESPONSIVE".to_string())),
+            Err(_) => Err(self.recorded_error()),
         }
+    }
+
+    /// The audio thread's recorded error (e.g. a backend-init failure) if present,
+    /// else a generic unavailable message.
+    fn recorded_error(&self) -> String {
+        self.flags
+            .lock()
+            .ok()
+            .and_then(|f| f.last_error.clone())
+            .unwrap_or_else(|| "AUDIO_THREAD_UNAVAILABLE".to_string())
     }
 
     /// Stop playback. Returns once the audio thread has APPLIED the stop, so the
@@ -522,5 +536,17 @@ mod tests {
             "finished must not fire on an explicit stop"
         );
         assert!(!player.is_playing());
+    }
+
+    /// A backend-init failure (e.g. no audio device) must surface its SPECIFIC
+    /// error from play_mp3, not a generic "unavailable", even though the audio
+    /// thread records it and exits (Codex #6).
+    #[test]
+    fn play_mp3_surfaces_backend_init_error() {
+        let player =
+            AudioPlayer::with_backend(|| Err("AUDIO_INIT_ERROR: no device".to_string()), None);
+        std::thread::sleep(Duration::from_millis(50)); // let the thread record + exit
+        let err = player.play_mp3(b"x").unwrap_err();
+        assert!(err.contains("AUDIO_INIT_ERROR"), "got: {err}");
     }
 }
