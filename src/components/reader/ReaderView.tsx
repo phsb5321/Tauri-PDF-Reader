@@ -1,16 +1,68 @@
-import { useCallback } from 'react';
-import { AppLayout } from '../layout/AppLayout';
-import { Toolbar } from '../Toolbar';
-import { PdfViewer } from '../PdfViewer';
-import { AiPlaybackBar } from '../playback-bar/AiPlaybackBar';
-import { useDocumentStore } from '../../stores/document-store';
-import { pdfService } from '../../services/pdf-service';
-import { useAutoSave } from '../../hooks/useAutoSave';
-import { useTtsPrebuffer } from '../../hooks/useTtsPrebuffer';
-import './ReaderView.css';
+import { useCallback } from "react";
+import { AppLayout } from "../layout/AppLayout";
+import { Toolbar } from "../Toolbar";
+import { PdfViewer } from "../PdfViewer";
+import { AiPlaybackBar } from "../playback-bar/AiPlaybackBar";
+import { useDocumentStore } from "../../stores/document-store";
+import { useAiTtsStore } from "../../stores/ai-tts-store";
+import { pdfService } from "../../services/pdf-service";
+import { useAutoSave } from "../../hooks/useAutoSave";
+import { useTtsPrebuffer } from "../../hooks/useTtsPrebuffer";
+import { useOpenPdf } from "../../hooks/useOpenPdf";
+import { useMenuActions } from "../../hooks/useMenuActions";
+import { aiTtsPause, aiTtsResume, aiTtsStop } from "../../lib/tauri-invoke";
+import "./ReaderView.css";
 
 export function ReaderView() {
-  const { pdfDocument, currentPage, currentDocument, scrollPosition } = useDocumentStore();
+  const {
+    pdfDocument,
+    currentPage,
+    currentDocument,
+    scrollPosition,
+    setCurrentPage,
+  } = useDocumentStore();
+  const playbackState = useAiTtsStore((state) => state.playbackState);
+  const { openPdf } = useOpenPdf();
+
+  // The native menu (File / View / Playback / Help — exported over AT-SPI on
+  // Linux to a global menu bar) emits "menu-action" events. Wire the items that
+  // are backed by stores/services. Page navigation goes through the store
+  // (which clamps to [1, totalPages]); useAutoSave below persists the new page.
+  // Stop TTS first, mirroring PageNavigation's on-navigation guard.
+  const goToPageFromMenu = useCallback(
+    async (page: number) => {
+      if (playbackState === "playing" || playbackState === "paused") {
+        try {
+          await aiTtsStop();
+        } catch (error) {
+          console.error("Failed to stop TTS on menu navigation:", error);
+        }
+      }
+      setCurrentPage(page);
+    },
+    [playbackState, setCurrentPage],
+  );
+
+  // Toggle ongoing playback (playing <-> paused). Starting from idle needs the
+  // page text, so that stays with the playback bar's play button.
+  const handleMenuPlayPause = useCallback(async () => {
+    try {
+      if (playbackState === "playing") {
+        await aiTtsPause();
+      } else if (playbackState === "paused") {
+        await aiTtsResume();
+      }
+    } catch (error) {
+      console.error("Failed to toggle TTS from menu:", error);
+    }
+  }, [playbackState]);
+
+  useMenuActions({
+    onOpen: openPdf,
+    onPlayPause: handleMenuPlayPause,
+    onPrevPage: () => goToPageFromMenu(currentPage - 1),
+    onNextPage: () => goToPageFromMenu(currentPage + 1),
+  });
 
   // Auto-save reading progress
   useAutoSave({
@@ -39,18 +91,18 @@ export function ReaderView() {
       // Extract text from text items
       const text = textContent.items
         .map((item) => {
-          if ('str' in item) {
+          if ("str" in item) {
             return item.str;
           }
-          return '';
+          return "";
         })
-        .join(' ')
-        .replace(/\s+/g, ' ')
+        .join(" ")
+        .replace(/\s+/g, " ")
         .trim();
 
       return text || null;
     } catch (error) {
-      console.error('Error extracting text:', error);
+      console.error("Error extracting text:", error);
       return null;
     }
   }, [pdfDocument, currentPage]);
