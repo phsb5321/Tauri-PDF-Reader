@@ -42,10 +42,14 @@ pub trait AudioSink {
 
 /// Commands sent to the audio thread.
 enum Command {
-    Play(Vec<u8>),
+    /// Play these bytes; the thread replies with THIS play's decode/start result
+    /// (per-play, not a shared side channel).
+    Play(Vec<u8>, Sender<Result<(), String>>),
     Pause,
     Resume,
-    Stop,
+    /// Stop; the thread acks AFTER it has cleared `watching`, so once `stop()`
+    /// returns, on_finished can no longer fire for the stopped clip.
+    Stop(Sender<()>),
     SetVolume(f32),
     SetSpeed(f32),
     /// Liveness probe: the thread replies immediately. A wedged thread (the old
@@ -127,7 +131,9 @@ impl AudioPlayer {
     }
 
     /// Round-trip a `Ping` and wait up to `timeout` for the reply. `Ok(())` proves
-    /// the audio thread is processing commands (not wedged).
+    /// the audio thread is processing commands (not wedged). Used by tests + as a
+    /// liveness probe; play/stop now carry their own reply channels.
+    #[allow(dead_code)]
     pub fn ping(&self, timeout: Duration) -> Result<(), String> {
         let (reply_tx, reply_rx) = channel();
         self.send(Command::Ping(reply_tx))?;
@@ -136,26 +142,33 @@ impl AudioPlayer {
             .map_err(|_| "AUDIO_THREAD_UNRESPONSIVE".to_string())
     }
 
-    /// Queue MP3 bytes for playback. Non-blocking with respect to playback: it
-    /// returns once the audio thread has ACCEPTED the clip (a bounded liveness
-    /// round-trip), NOT when the audio finishes. A decode error surfaces here.
+    /// Queue MP3 bytes for playback. Blocks only until the audio thread has
+    /// decoded + started (or failed) THIS clip — bounded, never on playback
+    /// duration — and returns that clip's own result over a per-play reply
+    /// channel. A missing reply means the thread died (e.g. backend init failed);
+    /// surface its recorded init error.
     pub fn play_mp3(&self, data: &[u8]) -> Result<(), String> {
-        if let Ok(mut f) = self.flags.lock() {
-            f.last_error = None;
+        let (reply_tx, reply_rx) = channel();
+        self.send(Command::Play(data.to_vec(), reply_tx))?;
+        match reply_rx.recv_timeout(Duration::from_secs(5)) {
+            Ok(result) => result,
+            Err(_) => Err(self
+                .flags
+                .lock()
+                .ok()
+                .and_then(|f| f.last_error.clone())
+                .unwrap_or_else(|| "AUDIO_THREAD_UNRESPONSIVE".to_string())),
         }
-        self.send(Command::Play(data.to_vec()))?;
-        // Commands are processed in order, so a Ping reply means Play ran.
-        self.ping(Duration::from_secs(5))?;
-        if let Ok(f) = self.flags.lock() {
-            if let Some(e) = &f.last_error {
-                return Err(e.clone());
-            }
-        }
-        Ok(())
     }
 
+    /// Stop playback. Returns once the audio thread has APPLIED the stop, so the
+    /// finished callback cannot fire for the stopped clip after this returns.
     pub fn stop(&self) -> Result<(), String> {
-        self.send(Command::Stop)
+        let (ack_tx, ack_rx) = channel();
+        self.send(Command::Stop(ack_tx))?;
+        ack_rx
+            .recv_timeout(Duration::from_secs(2))
+            .map_err(|_| "AUDIO_THREAD_UNRESPONSIVE".to_string())
     }
     pub fn pause(&self) -> Result<(), String> {
         self.send(Command::Pause)
@@ -213,10 +226,10 @@ fn audio_thread(
     let mut watching = false;
     loop {
         match rx.recv_timeout(POLL_INTERVAL) {
-            Ok(Command::Play(data)) => {
+            Ok(Command::Play(data, reply)) => {
                 let result = sink.play_mp3(&data);
                 if let Ok(mut f) = flags.lock() {
-                    match result {
+                    match &result {
                         Ok(()) => {
                             f.playing = true;
                             f.paused = false;
@@ -225,11 +238,12 @@ fn audio_thread(
                         Err(e) => {
                             f.playing = false;
                             f.paused = false;
-                            f.last_error = Some(e);
+                            f.last_error = Some(e.clone());
                             watching = false;
                         }
                     }
                 }
+                let _ = reply.send(result);
             }
             Ok(Command::Pause) => {
                 sink.pause();
@@ -243,13 +257,14 @@ fn audio_thread(
                     f.paused = false;
                 }
             }
-            Ok(Command::Stop) => {
+            Ok(Command::Stop(ack)) => {
                 sink.stop();
                 watching = false;
                 if let Ok(mut f) = flags.lock() {
                     f.playing = false;
                     f.paused = false;
                 }
+                let _ = ack.send(());
             }
             Ok(Command::SetVolume(v)) => sink.set_volume(v),
             Ok(Command::SetSpeed(s)) => sink.set_speed(s),
