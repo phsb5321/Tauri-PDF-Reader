@@ -199,6 +199,25 @@ use commands::tts::*;
 #[cfg(feature = "elevenlabs-tts")]
 use commands::ai_tts::*;
 
+/// Map a native menu item id to the `menu-action` payload it emits. This is the
+/// real native-menu -> Rust wire that `app.on_menu_event` drives — extracted as a
+/// pure fn so it is unit-testable WITHOUT a window/AT-SPI menu (which WebDriver
+/// cannot click; the prior E2E faked this by emitting `menu-action` from the
+/// frontend). Must stay in sync with the SubmenuBuilder item ids in run().
+fn menu_action_for(id: &str) -> Option<&'static str> {
+    match id {
+        "open" => Some("open"),
+        "settings" => Some("settings"),
+        "toggle-library" => Some("toggle-library"),
+        "toggle-highlights" => Some("toggle-highlights"),
+        "find" => Some("find"),
+        "play-pause" => Some("play-pause"),
+        "prev-page" => Some("prev-page"),
+        "next-page" => Some("next-page"),
+        _ => None,
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tracing_subscriber::registry()
@@ -514,17 +533,7 @@ pub fn run() {
 
                 app.on_menu_event(|app_handle, event| {
                     use tauri::Emitter;
-                    let action = match event.id().0.as_str() {
-                        "open" => Some("open"),
-                        "settings" => Some("settings"),
-                        "toggle-library" => Some("toggle-library"),
-                        "toggle-highlights" => Some("toggle-highlights"),
-                        "find" => Some("find"),
-                        "play-pause" => Some("play-pause"),
-                        "prev-page" => Some("prev-page"),
-                        "next-page" => Some("next-page"),
-                        _ => None,
-                    };
+                    let action = menu_action_for(event.id().0.as_str());
                     if let Some(action) = action {
                         if let Err(e) = app_handle.emit("menu-action", action) {
                             tracing::warn!("Failed to emit menu-action '{action}': {e}");
@@ -557,6 +566,35 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The real native-menu -> Rust wire: every menu id the SubmenuBuilder
+    /// registers must map to its `menu-action` payload, and non-menu ids to None.
+    /// This is what `on_menu_event` dispatches; the prior tauri-driver E2E faked
+    /// it by emitting `menu-action` from the frontend via `window.__E2E__`.
+    /// Proven RED against a planted dropped arm (next-page -> None).
+    #[test]
+    fn menu_action_for_maps_every_native_menu_id() {
+        for id in [
+            "open",
+            "settings",
+            "toggle-library",
+            "toggle-highlights",
+            "find",
+            "play-pause",
+            "prev-page",
+            "next-page",
+        ] {
+            assert_eq!(
+                menu_action_for(id),
+                Some(id),
+                "native menu id {id} must dispatch its menu-action"
+            );
+        }
+        // Predefined items (Quit/About) and unknown ids emit nothing.
+        assert_eq!(menu_action_for("quit"), None);
+        assert_eq!(menu_action_for("about"), None);
+        assert_eq!(menu_action_for(""), None);
+    }
 
     #[test]
     fn test_db_models_document_serialization() {
