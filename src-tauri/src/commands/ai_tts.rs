@@ -281,22 +281,27 @@ pub async fn ai_tts_speak_with_timestamps(
 fn e2e_fixture_timings(text: &str) -> (Vec<WordTiming>, f64) {
     const PER_WORD: f64 = 0.4;
     let mut timings = Vec::new();
-    let mut cursor = 0usize;
+    let mut byte_cursor = 0usize;
     let mut t = 0.0_f64;
     for word in text.split_whitespace() {
-        let start = text[cursor..]
+        let byte_start = text[byte_cursor..]
             .find(word)
-            .map(|rel| cursor + rel)
-            .unwrap_or(cursor);
-        let end = start + word.len();
+            .map(|rel| byte_cursor + rel)
+            .unwrap_or(byte_cursor);
+        let byte_end = byte_start + word.len();
+        // Emit CHARACTER offsets (not byte offsets) so the marks match the
+        // production WordTiming contract / the frontend highlight ranges. Correct
+        // for non-ASCII too, not just the ASCII fixture.
+        let char_start = text[..byte_start].chars().count();
+        let char_end = char_start + word.chars().count();
         timings.push(WordTiming {
             word: word.to_string(),
             start_time: t,
             end_time: t + PER_WORD,
-            char_start: start,
-            char_end: end,
+            char_start,
+            char_end,
         });
-        cursor = end;
+        byte_cursor = byte_end;
         t += PER_WORD;
     }
     (timings, t)
