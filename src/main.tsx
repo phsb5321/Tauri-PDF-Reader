@@ -32,6 +32,15 @@ async function bootstrap() {
       </RepositoryProvider>
     </React.StrictMode>,
   );
+
+  // E2E native-path: init TTS (e2e-tts-fixture backend) + open the fixture PDF,
+  // then expose read-only window.__E2E_READ__. The test drives the REAL play
+  // button — no karaoke shim. Tree-shaken out unless VITE_E2E_NATIVE=true.
+  if (import.meta.env.VITE_E2E_NATIVE === "true") {
+    const { installE2ENativeBootstrap } =
+      await import("./e2e-native-bootstrap");
+    await installE2ENativeBootstrap();
+  }
 }
 
 bootstrap();
