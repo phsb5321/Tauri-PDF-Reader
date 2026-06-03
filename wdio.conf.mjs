@@ -20,7 +20,10 @@ let tauriDriver;
 export const config = {
   hostname: "127.0.0.1",
   port: 4444,
-  specs: ["./e2e/critical-loop.e2e.mjs"],
+  // Default to the critical-loop spec; override with E2E_SPEC for the
+  // native-play spec (which needs a binary built --features e2e-tts-fixture
+  // and a frontend built VITE_E2E_NATIVE=true).
+  specs: [process.env.E2E_SPEC || "./e2e/critical-loop.e2e.mjs"],
   maxInstances: 1,
   capabilities: [{ "tauri:options": { application: APP } }],
   reporters: ["spec"],

@@ -1,3 +1,12 @@
+// Safety guard: the `e2e-tts-fixture` feature stubs TTS (no network, no audio,
+// deterministic marks) for the native-play E2E. It must NEVER reach a shipped
+// (release) binary — fail the build if it is enabled without debug assertions
+// (e.g. `--release`, or a careless `--all-features --release`).
+#[cfg(all(feature = "e2e-tts-fixture", not(debug_assertions)))]
+compile_error!(
+    "e2e-tts-fixture is a test-only TTS stub and must not be enabled in a release build"
+);
+
 // Hexagonal architecture layers
 pub mod adapters;
 pub mod application;

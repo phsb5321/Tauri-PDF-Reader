@@ -34,6 +34,10 @@ export default defineConfig({
         // their own functions drag the coverage denominator below the ratchet.
         "e2e/**",
         "src/main.tsx",
+        // E2E-only bootstrap shim (VITE_E2E_NATIVE): drives the real play path for
+        // the tauri-driver native-play E2E, never imported by vitest. Same class
+        // as e2e/** — test infrastructure, excluded from the coverage denominator.
+        "src/e2e-native-bootstrap.ts",
         "src/vite-env.d.ts",
       ],
       // Coverage ratchet — last raised by 019-coverage-ratchet (2026-05-31).

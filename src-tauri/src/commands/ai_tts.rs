@@ -100,16 +100,30 @@ pub async fn ai_tts_init(
     state: State<'_, AiTtsEngineState>,
     api_key: String,
 ) -> Result<InitResponse, String> {
-    let mut engine = state.0.write().await;
+    // E2E fixture mode: succeed without contacting ElevenLabs so the real play
+    // button renders (canPlay = initialized && !error) under WebDriver/Xvfb.
+    #[cfg(feature = "e2e-tts-fixture")]
+    {
+        let _ = (&state, &api_key);
+        return Ok(InitResponse {
+            success: true,
+            voices_count: 1,
+        });
+    }
 
-    engine.init(api_key).await?;
+    #[cfg(not(feature = "e2e-tts-fixture"))]
+    {
+        let mut engine = state.0.write().await;
 
-    let voices = engine.list_voices().await?;
+        engine.init(api_key).await?;
 
-    Ok(InitResponse {
-        success: true,
-        voices_count: voices.len(),
-    })
+        let voices = engine.list_voices().await?;
+
+        Ok(InitResponse {
+            success: true,
+            voices_count: voices.len(),
+        })
+    }
 }
 
 /// List available voices
@@ -174,57 +188,123 @@ pub async fn ai_tts_speak_with_timestamps(
     text: String,
     voice_id: Option<String>,
 ) -> Result<SpeakWithTimestampsResponse, String> {
-    let engine = state.0.read().await;
-
-    // Emit started event (indicates TTS request is being processed)
-    let _ = app.emit(
-        "ai-tts:started",
-        TtsStartedEvent {
-            text: text.clone(),
-            voice_id: voice_id.clone().unwrap_or_default(),
-        },
-    );
-
-    tracing::info!("Speaking with timestamps: {} chars", text.len());
-
-    match engine
-        .speak_with_timestamps(&text, voice_id.as_deref())
-        .await
+    // E2E fixture mode: return deterministic marks + emit playback-starting with
+    // NO network and NO audio output. The real frontend karaoke loop then runs
+    // off these real marks against wall-clock — driven by the real play button.
+    #[cfg(feature = "e2e-tts-fixture")]
     {
-        Ok(result) => {
-            tracing::info!(
-                "TTS with timestamps ready: {} words, {:.2}s duration",
-                result.word_timings.len(),
-                result.total_duration
-            );
+        let _ = &state;
+        let (word_timings, total_duration) = e2e_fixture_timings(&text);
+        let _ = app.emit(
+            "ai-tts:started",
+            TtsStartedEvent {
+                text: text.clone(),
+                voice_id: voice_id.clone().unwrap_or_default(),
+            },
+        );
+        let _ = app.emit(
+            "ai-tts:playback-starting",
+            TtsPlaybackStartingEvent {
+                duration: total_duration,
+            },
+        );
+        return Ok(SpeakWithTimestampsResponse {
+            success: true,
+            word_timings,
+            total_duration,
+        });
+    }
 
-            // Emit playback-starting event RIGHT BEFORE starting audio
-            // Frontend should use this to sync highlight timer
-            let _ = app.emit(
-                "ai-tts:playback-starting",
-                TtsPlaybackStartingEvent {
-                    duration: result.total_duration,
-                },
-            );
+    #[cfg(not(feature = "e2e-tts-fixture"))]
+    {
+        let engine = state.0.read().await;
 
-            // Now start audio playback
-            if let Err(e) = engine.play_audio(&result.audio_data) {
-                tracing::error!("Failed to play audio: {}", e);
-                let _ = app.emit("ai-tts:error", TtsErrorEvent { error: e.clone() });
-                return Err(e);
+        // Emit started event (indicates TTS request is being processed)
+        let _ = app.emit(
+            "ai-tts:started",
+            TtsStartedEvent {
+                text: text.clone(),
+                voice_id: voice_id.clone().unwrap_or_default(),
+            },
+        );
+
+        tracing::info!("Speaking with timestamps: {} chars", text.len());
+
+        match engine
+            .speak_with_timestamps(&text, voice_id.as_deref())
+            .await
+        {
+            Ok(result) => {
+                tracing::info!(
+                    "TTS with timestamps ready: {} words, {:.2}s duration",
+                    result.word_timings.len(),
+                    result.total_duration
+                );
+
+                // Emit playback-starting event RIGHT BEFORE starting audio
+                // Frontend should use this to sync highlight timer
+                let _ = app.emit(
+                    "ai-tts:playback-starting",
+                    TtsPlaybackStartingEvent {
+                        duration: result.total_duration,
+                    },
+                );
+
+                // Now start audio playback
+                if let Err(e) = engine.play_audio(&result.audio_data) {
+                    tracing::error!("Failed to play audio: {}", e);
+                    let _ = app.emit("ai-tts:error", TtsErrorEvent { error: e.clone() });
+                    return Err(e);
+                }
+
+                Ok(SpeakWithTimestampsResponse {
+                    success: true,
+                    word_timings: result.word_timings,
+                    total_duration: result.total_duration,
+                })
             }
-
-            Ok(SpeakWithTimestampsResponse {
-                success: true,
-                word_timings: result.word_timings,
-                total_duration: result.total_duration,
-            })
-        }
-        Err(e) => {
-            let _ = app.emit("ai-tts:error", TtsErrorEvent { error: e.clone() });
-            Err(e)
+            Err(e) => {
+                let _ = app.emit("ai-tts:error", TtsErrorEvent { error: e.clone() });
+                Err(e)
+            }
         }
     }
+}
+
+/// Deterministic word timings for E2E fixture mode (no network, no audio).
+///
+/// Each whitespace-delimited word gets a fixed 0.4s slot, monotonically
+/// increasing, with char offsets into the original text. Used only by the
+/// `e2e-tts-fixture` build so the real frontend karaoke loop has real marks to
+/// follow against wall-clock.
+#[cfg(feature = "e2e-tts-fixture")]
+fn e2e_fixture_timings(text: &str) -> (Vec<WordTiming>, f64) {
+    const PER_WORD: f64 = 0.4;
+    let mut timings = Vec::new();
+    let mut byte_cursor = 0usize;
+    let mut t = 0.0_f64;
+    for word in text.split_whitespace() {
+        let byte_start = text[byte_cursor..]
+            .find(word)
+            .map(|rel| byte_cursor + rel)
+            .unwrap_or(byte_cursor);
+        let byte_end = byte_start + word.len();
+        // Emit CHARACTER offsets (not byte offsets) so the marks match the
+        // production WordTiming contract / the frontend highlight ranges. Correct
+        // for non-ASCII too, not just the ASCII fixture.
+        let char_start = text[..byte_start].chars().count();
+        let char_end = char_start + word.chars().count();
+        timings.push(WordTiming {
+            word: word.to_string(),
+            start_time: t,
+            end_time: t + PER_WORD,
+            char_start,
+            char_end,
+        });
+        byte_cursor = byte_end;
+        t += PER_WORD;
+    }
+    (timings, t)
 }
 
 /// Stop TTS playback
