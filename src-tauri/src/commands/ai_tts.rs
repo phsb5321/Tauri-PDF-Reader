@@ -289,11 +289,14 @@ fn e2e_fixture_timings(text: &str) -> (Vec<WordTiming>, f64) {
             .map(|rel| byte_cursor + rel)
             .unwrap_or(byte_cursor);
         let byte_end = byte_start + word.len();
-        // Emit CHARACTER offsets (not byte offsets) so the marks match the
-        // production WordTiming contract / the frontend highlight ranges. Correct
-        // for non-ASCII too, not just the ASCII fixture.
-        let char_start = text[..byte_start].chars().count();
-        let char_end = char_start + word.chars().count();
+        // Emit offsets in UTF-16 code units (NOT bytes, NOT Unicode scalar
+        // values) so the marks match the production WordTiming contract: the
+        // frontend consumes char_start/char_end as JavaScript string indices,
+        // which are UTF-16 code units. This matters only for astral-plane chars
+        // (e.g. an emoji is 1 Rust `char`/scalar but 2 UTF-16 units); the ASCII
+        // fixture is unaffected, but it keeps the contract exact.
+        let char_start = text[..byte_start].encode_utf16().count();
+        let char_end = char_start + word.encode_utf16().count();
         timings.push(WordTiming {
             word: word.to_string(),
             start_time: t,
@@ -505,5 +508,34 @@ pub async fn ai_tts_prebuffer(
                 total_duration: 0.0,
             })
         }
+    }
+}
+
+#[cfg(all(test, feature = "e2e-tts-fixture"))]
+mod tests {
+    use super::*;
+
+    /// The fixture marks must carry UTF-16 code-unit offsets (JS string indices),
+    /// not byte offsets and not Unicode scalar counts. Run with:
+    ///   cargo test --features e2e-tts-fixture e2e_fixture_timings_emits_utf16_offsets
+    #[test]
+    fn e2e_fixture_timings_emits_utf16_offsets() {
+        // "😀" is 4 UTF-8 bytes, 1 Rust char/scalar, but 2 UTF-16 code units.
+        let (marks, total) = e2e_fixture_timings("a 😀 bc");
+
+        assert_eq!(marks.len(), 3);
+        assert!((total - 1.2).abs() < 1e-9, "3 words * 0.4s");
+
+        // "a": [0, 1)
+        assert_eq!((marks[0].char_start, marks[0].char_end), (0, 1));
+        // "😀": starts after "a " (2 units), spans 2 UTF-16 units -> [2, 4)
+        assert_eq!((marks[1].char_start, marks[1].char_end), (2, 4));
+        // "bc": starts after "a 😀 " = 1 + 1 + 2 + 1 = 5 UTF-16 units -> [5, 7).
+        // A scalar (`chars().count()`) implementation would wrongly yield 4 here.
+        assert_eq!((marks[2].char_start, marks[2].char_end), (5, 7));
+
+        // Monotonic, non-overlapping timing slots.
+        assert!(marks[0].start_time < marks[1].start_time);
+        assert!(marks[1].start_time < marks[2].start_time);
     }
 }

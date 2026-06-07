@@ -20,9 +20,14 @@ let tauriDriver;
 export const config = {
   hostname: "127.0.0.1",
   port: 4444,
-  // Default to the critical-loop spec; override with E2E_SPEC for the
-  // native-play spec (which needs a binary built --features e2e-tts-fixture
-  // and a frontend built VITE_E2E_NATIVE=true).
+  // ONE spec per run, selected by E2E_SPEC. There is deliberately no glob /
+  // unified default suite: the two specs need mutually-exclusive build flags so
+  // they cannot share a binary —
+  //   critical-loop.e2e.mjs : VITE_E2E (window.__E2E__ bridge), default cargo.
+  //   native-play.e2e.mjs   : VITE_E2E_NATIVE + cargo --features e2e-tts-fixture.
+  // `pnpm test:e2e` runs critical-loop; `test:e2e:native` runs native-play;
+  // `test:e2e:all` runs both lanes back-to-back (scripts/e2e-all.sh). Neither
+  // lane runs in CI (WebKitGTK + a display — vimeflow#65).
   specs: [process.env.E2E_SPEC || "./e2e/critical-loop.e2e.mjs"],
   maxInstances: 1,
   capabilities: [{ "tauri:options": { application: APP } }],

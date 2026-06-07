@@ -21,7 +21,8 @@
     "verify": "./scripts/verify.sh",
     "prepare": "husky",
     "test:e2e": "wdio run wdio.conf.mjs",
-    "test:e2e:native": "bash scripts/e2e-native.sh"
+    "test:e2e:native": "bash scripts/e2e-native.sh",
+    "test:e2e:all": "bash scripts/e2e-all.sh"
   },
   "lint-staged": {
     "src/**/*.{ts,tsx}": [
