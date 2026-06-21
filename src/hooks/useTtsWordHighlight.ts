@@ -5,17 +5,20 @@
  * Uses requestAnimationFrame for smooth 60fps highlight updates.
  */
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from "react";
 import {
   aiTtsSpeakWithTimestamps,
   aiTtsStop,
   aiTtsPause,
   aiTtsResume,
-} from '../lib/tauri-invoke';
-import { onAiTtsPlaybackStarting, onAiTtsFinished } from '../lib/api/ai-tts';
-import { useTtsHighlightStore, selectIsHighlighting } from '../stores/tts-highlight-store';
-import { useAiTtsStore } from '../stores/ai-tts-store';
-import { findWordIndexAtTime, isPlaybackComplete } from '../lib/tts-tracking';
+} from "../lib/tauri-invoke";
+import { onAiTtsPlaybackStarting, onAiTtsFinished } from "../lib/api/ai-tts";
+import {
+  useTtsHighlightStore,
+  selectIsHighlighting,
+} from "../stores/tts-highlight-store";
+import { useAiTtsStore } from "../stores/ai-tts-store";
+import { findWordIndexAtTime, isPlaybackComplete } from "../lib/tts-tracking";
 
 export interface UseTtsWordHighlightOptions {
   /** Callback when a new word becomes active */
@@ -53,10 +56,10 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
         animationFrameRef.current = null;
       }
       highlightStore.stopHighlighting();
-      ttsStore.setPlaybackState('idle');
+      ttsStore.setPlaybackState("idle");
       options.onComplete?.();
     },
-    [highlightStore, ttsStore, options]
+    [highlightStore, ttsStore, options],
   );
 
   // Animation loop that updates current word based on elapsed time
@@ -64,7 +67,7 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
     const state = useTtsHighlightStore.getState();
 
     if (!state.isActive || state.playbackStartTime === null) {
-      console.debug('[TtsWordHighlight] Animation loop stopped - not active');
+      console.debug("[TtsWordHighlight] Animation loop stopped - not active");
       return;
     }
 
@@ -76,10 +79,19 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
 
     const elapsed = (performance.now() - state.playbackStartTime) / 1000; // Convert to seconds
 
+    // Word timings are 1×-relative, but at speed S the audio plays S× faster, so
+    // after `elapsed` real seconds the spoken position is `elapsed · S` into the
+    // 1× timeline. Select + complete against that audio-time (spec 039, FR-009).
+    const speed = useAiTtsStore.getState().speed;
+    const audioElapsed = elapsed * speed;
+
     // Debug: log every 60 frames (~1 second) to avoid spam
-    if (Math.floor(elapsed * 10) % 10 === 0 && Math.floor(elapsed) !== lastLoggedSecond.current) {
+    if (
+      Math.floor(elapsed * 10) % 10 === 0 &&
+      Math.floor(elapsed) !== lastLoggedSecond.current
+    ) {
       lastLoggedSecond.current = Math.floor(elapsed);
-      console.debug('[TtsWordHighlight] Animation tick', {
+      console.debug("[TtsWordHighlight] Animation tick", {
         elapsed: elapsed.toFixed(2),
         totalDuration: state.totalDuration,
         currentWordIndex: state.currentWordIndex,
@@ -92,13 +104,13 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
     // response (totalDuration 0) does NOT instantly "complete" on the first frame
     // and (with auto-page) skip the page while audio just started. The unknown-
     // duration case completes instead off the real `ai-tts:finished` event below.
-    if (isPlaybackComplete(elapsed, state.totalDuration)) {
-      completePlayback('duration reached');
+    if (isPlaybackComplete(audioElapsed, state.totalDuration)) {
+      completePlayback("duration reached");
       return;
     }
 
-    // Find current word based on elapsed time (pure, unit-tested selection).
-    const newWordIndex = findWordIndexAtTime(elapsed, state.wordTimings);
+    // Find current word based on audio time (pure, unit-tested selection).
+    const newWordIndex = findWordIndexAtTime(audioElapsed, state.wordTimings);
 
     // Update if word changed
     if (newWordIndex !== lastWordIndexRef.current && newWordIndex >= 0) {
@@ -119,9 +131,9 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
   // Start animation loop when highlighting becomes active
   useEffect(() => {
     const state = useTtsHighlightStore.getState();
-    
+
     if (state.isActive) {
-      console.debug('[TtsWordHighlight] Starting animation loop');
+      console.debug("[TtsWordHighlight] Starting animation loop");
       lastWordIndexRef.current = -1;
       if (animationFrameRef.current === null) {
         animationFrameRef.current = requestAnimationFrame(updateHighlight);
@@ -155,7 +167,7 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
       const startTime = performance.now();
       playbackStartTimeRef.current = startTime;
 
-      console.debug('[TtsWordHighlight] Playback starting event received', {
+      console.debug("[TtsWordHighlight] Playback starting event received", {
         duration: event.duration,
         capturedStartTime: startTime,
       });
@@ -164,7 +176,9 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
       // update the playback start time now
       const state = useTtsHighlightStore.getState();
       if (state.isActive) {
-        console.debug('[TtsWordHighlight] Updating playback start time (highlighting already active)');
+        console.debug(
+          "[TtsWordHighlight] Updating playback start time (highlighting already active)",
+        );
         state.setPlaybackStartTime(startTime);
       }
     }).then((unlisten) => {
@@ -194,7 +208,7 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
     let unlistenFn: (() => void) | null = null;
 
     onAiTtsFinished(() => {
-      completePlaybackRef.current('ai-tts:finished event');
+      completePlaybackRef.current("ai-tts:finished event");
     }).then((unlisten) => {
       unlistenFn = unlisten;
     });
@@ -210,13 +224,15 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
   const speakWithHighlight = useCallback(
     async (text: string, pageNumber: number, voiceId?: string) => {
       if (!ttsStore.initialized) {
-        console.warn('[TtsWordHighlight] TTS not initialized');
+        console.warn("[TtsWordHighlight] TTS not initialized");
         return false;
       }
 
       // Guard against double-calls from React StrictMode
       if (speakingRef.current) {
-        console.debug('[TtsWordHighlight] Already speaking, ignoring duplicate request');
+        console.debug(
+          "[TtsWordHighlight] Already speaking, ignoring duplicate request",
+        );
         return false;
       }
 
@@ -229,43 +245,56 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
       speakingRef.current = true;
       const currentRequestId = ++requestIdRef.current;
 
-      ttsStore.setPlaybackState('loading');
+      ttsStore.setPlaybackState("loading");
       ttsStore.setError(null);
 
       try {
-        console.debug('[TtsWordHighlight] Requesting TTS with timestamps', {
+        console.debug("[TtsWordHighlight] Requesting TTS with timestamps", {
           textLength: text.length,
           pageNumber,
           requestId: currentRequestId,
         });
 
-        const result = await aiTtsSpeakWithTimestamps(text, voiceId ?? ttsStore.selectedVoiceId ?? undefined);
+        const result = await aiTtsSpeakWithTimestamps(
+          text,
+          voiceId ?? ttsStore.selectedVoiceId ?? undefined,
+        );
 
         // Check if this request was superseded
         if (currentRequestId !== requestIdRef.current) {
-          console.debug('[TtsWordHighlight] Request superseded, ignoring result');
+          console.debug(
+            "[TtsWordHighlight] Request superseded, ignoring result",
+          );
           speakingRef.current = false;
           return false;
         }
 
         if (result.success) {
-          console.debug('[TtsWordHighlight] TTS response received', {
+          console.debug("[TtsWordHighlight] TTS response received", {
             wordCount: result.wordTimings.length,
             duration: result.totalDuration,
           });
 
           // Start highlighting - this triggers the animation loop via useEffect
-          highlightStore.startHighlighting(text, result.wordTimings, result.totalDuration, pageNumber);
-          
+          highlightStore.startHighlighting(
+            text,
+            result.wordTimings,
+            result.totalDuration,
+            pageNumber,
+          );
+
           // If we captured a playback start time from the event (which fires before response),
           // use that instead of the time set by startHighlighting
           if (playbackStartTimeRef.current !== null) {
-            console.debug('[TtsWordHighlight] Using captured playback start time from event:', playbackStartTimeRef.current);
+            console.debug(
+              "[TtsWordHighlight] Using captured playback start time from event:",
+              playbackStartTimeRef.current,
+            );
             highlightStore.setPlaybackStartTime(playbackStartTimeRef.current);
             playbackStartTimeRef.current = null; // Reset for next playback
           }
-          
-          ttsStore.setPlaybackState('playing');
+
+          ttsStore.setPlaybackState("playing");
           ttsStore.setCurrentText(text);
 
           // Manually start animation loop in case useEffect doesn't catch it
@@ -278,15 +307,18 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        console.error('[TtsWordHighlight] Failed to speak with timestamps:', message);
+        console.error(
+          "[TtsWordHighlight] Failed to speak with timestamps:",
+          message,
+        );
         ttsStore.setError(message);
-        ttsStore.setPlaybackState('error');
+        ttsStore.setPlaybackState("error");
         speakingRef.current = false;
       }
 
       return false;
     },
-    [highlightStore, ttsStore, updateHighlight]
+    [highlightStore, ttsStore, updateHighlight],
   );
 
   // Stop playback and highlighting
@@ -299,9 +331,9 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
       }
       await aiTtsStop();
       highlightStore.stopHighlighting();
-      ttsStore.setPlaybackState('idle');
+      ttsStore.setPlaybackState("idle");
     } catch (error) {
-      console.error('[TtsWordHighlight] Failed to stop:', error);
+      console.error("[TtsWordHighlight] Failed to stop:", error);
     }
   }, [highlightStore, ttsStore]);
 
@@ -310,9 +342,9 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
     try {
       await aiTtsPause();
       highlightStore.pauseHighlighting();
-      ttsStore.setPlaybackState('paused');
+      ttsStore.setPlaybackState("paused");
     } catch (error) {
-      console.error('[TtsWordHighlight] Failed to pause:', error);
+      console.error("[TtsWordHighlight] Failed to pause:", error);
     }
   }, [highlightStore, ttsStore]);
 
@@ -321,13 +353,13 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
     try {
       await aiTtsResume();
       highlightStore.resumeHighlighting();
-      ttsStore.setPlaybackState('playing');
+      ttsStore.setPlaybackState("playing");
       // Restart animation loop
       if (animationFrameRef.current === null) {
         animationFrameRef.current = requestAnimationFrame(updateHighlight);
       }
     } catch (error) {
-      console.error('[TtsWordHighlight] Failed to resume:', error);
+      console.error("[TtsWordHighlight] Failed to resume:", error);
     }
   }, [highlightStore, ttsStore, updateHighlight]);
 

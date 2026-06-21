@@ -303,4 +303,23 @@ mod tests {
         r.set(f32::NAN);
         assert_eq!(r.get(), 1.0);
     }
+
+    /// FR-008: a live speed change mid-stream keeps producing output — no
+    /// restart, no wedge. Pull a prefix at 2×, raise to 4× mid-stream, then drain
+    /// the rest; it must still yield samples.
+    #[test]
+    fn live_speed_change_keeps_producing() {
+        let ratio = SpeedRatio::new(2.0);
+        let mut src = StretchSource::new(sine_secs(2.0), ratio.clone());
+
+        let first: Vec<f32> = src.by_ref().take(20_000).collect();
+        assert!(!first.is_empty(), "should produce at the initial speed");
+
+        ratio.set(4.0); // live change, mid-stream
+        let rest: Vec<f32> = src.collect();
+        assert!(
+            !rest.is_empty(),
+            "must keep producing after a live speed change (no restart/wedge)"
+        );
+    }
 }
