@@ -2,6 +2,25 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #18 — 2026-06-20 (Restore momentum: merge train landed → close residual gaps)
+
+**Live state:** `origin/main` = **9fca5b8**, CI **green** (3 jobs). 0 open PRs, 0 open issues. Dormant since 06/06/2026 (~13d) — picked back up to close the residual gaps the merge train left.
+
+- **The "needs your eyes" verification gap is largely SOLVED in code** (Iteration #17 worried all remaining work was GUI-gated). What landed since:
+  - `029-audio-thread` (**#19**) — dedicated audio thread; the `play_mp3_blocking`-holds-lock-across-`sleep_until_end` **deadlock is gone**, no `unsafe`. Timeout-guarded player tests (`pause_is_prompt_during_playback`, `finished_callback_fires_when_sink_drains`, `stop_does_not_fire_finished`).
+  - `030-e2e-harness` (**#20**) + `031-mockipc-e2e` (**#21**) — tauri-driver critical-loop E2E (real button) + CI-runnable mockIPC E2E off jsdom (no GPU).
+  - `032-verification-rules` (**#22**) + `033-merge-ownership` (**#23**) — verification ladder / banned-ending / deadlock-gate + Merge-Ownership encoded into `CLAUDE.md` (persistent rules).
+  - `034-e2e-native-boundary` (**#24**) + `035-e2e-native-play` (**#25**) — mechanized the native menu→Rust wire + real play-button→TTS→karaoke-advance E2E.
+  - `036-issue26-followups` (**#27**) — UTF-16 fixture offsets + full `run-both` E2E target (resolved #26).
+  - Merge train itself: `integrate/019-026-merge-train` merged as **#14**; 016/017 as **#16**; 018-render-perf as **#15**.
+- **This iteration (restore momentum), Tier 1 bookkeeping — DONE:**
+  - Refreshed this doc (was stale by 7 merged PRs — Iteration #17 still claimed the merge train unpushed).
+  - Cleaned untracked main-worktree WIP (violated "main stays clean"): committed the `lectrice-merge-train` skill + command (reusable playbook; its 019→026 run is done but the pattern recurs), `.gitignore`d `.husky/_/` (husky runtime) + `.opencode/` (opencode scratch). → **PR 037**.
+  - **Pruned 19 merged remote branches** (008–018, 027–034, integrate/019-026 — all map to MERGED PRs #6–#27) + dead local `wip/pre-reorg-2026-05-11` (0 unique commits). Repo now has only `main`.
+- **This iteration, Tier 2 — IN FLIGHT (PR 038):** wire **audio-finished** as a real Tauri event. `player.rs::with_finished_callback` (was `dead_code`) → `AiTtsEngine` rebuilds its player with a callback that emits **`ai-tts:finished`**; frontend drives completion off the event, not the `elapsed >= totalDuration` timer estimate. Fixes the zero-duration premature page-skip properly (the 026 `isPlaybackComplete` guard was the interim protection). Headless integration assertion = the real proof.
+- **GUI-gated (queued for Pedro):** `docs/gui-validation-019-026.md` — the 8-step karaoke/audio pack. Marquee karaoke + audio-finished have **zero proof-of-record**; the one legitimately human-gated item. Needs `pnpm tauri dev` + Pedro.
+- **Next (Tier 3+):** release pipeline (no `.AppImage`/`.deb` yet — surface the release-tag workflow); then Kokoro offline-voice spike (the differentiator, fixture-verifiable); update `Prompt-Eng — Lectrice` (now ~80% implemented).
+
 ## Iteration #17 — 2026-05-31 (Merge Train: integrate 019→026)
 
 - **Worktree/branch:** `../tauri-pdf-reader-merge-train` on `integrate/019-026-merge-train`, off `origin/main` 8c366d7. HEAD `288210c`. **Not pushed, no PR** (awaiting Pedro).
