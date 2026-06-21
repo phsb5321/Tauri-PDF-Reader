@@ -6,6 +6,11 @@
 
 mod elevenlabs;
 mod player;
+// Pitch-preserving playback speed (spec 039). Wired into RodioSink +
+// AudioSink::set_speed in PR-C (T008); until then its public items are exercised
+// only by their own tests, so dead_code is allowed for the interim.
+#[allow(dead_code)]
+mod stretch;
 
 pub use elevenlabs::{ElevenLabsClient, TtsWithTimings, WordTiming};
 pub use player::AudioPlayer;
