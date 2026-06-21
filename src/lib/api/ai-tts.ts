@@ -181,10 +181,6 @@ export interface AiTtsStartedEvent {
   voiceId: string;
 }
 
-export interface AiTtsCompletedEvent {
-  success: boolean;
-}
-
 export interface AiTtsErrorEvent {
   error: string;
 }
@@ -197,10 +193,14 @@ export function onAiTtsStarted(
   return listen<AiTtsStartedEvent>('ai-tts:started', (event) => callback(event.payload));
 }
 
-export function onAiTtsCompleted(
-  callback: (event: AiTtsCompletedEvent) => void
-): Promise<UnlistenFn> {
-  return listen<AiTtsCompletedEvent>('ai-tts:completed', (event) => callback(event.payload));
+/**
+ * Listen for the audio-finished event — emitted by the backend when playback
+ * ends naturally (the rodio sink drains, with no explicit stop). This is the
+ * real completion signal; the frontend drives completion off it instead of a
+ * timer estimate, so it fires correctly even when the audio duration is unknown.
+ */
+export function onAiTtsFinished(callback: () => void): Promise<UnlistenFn> {
+  return listen('ai-tts:finished', () => callback());
 }
 
 export function onAiTtsStopped(callback: () => void): Promise<UnlistenFn> {

@@ -84,10 +84,10 @@ impl AudioPlayer {
     }
 
     /// Production player that invokes `on_finished` when playback ends naturally
-    /// (the sink drains without an explicit stop). Wire this to emit an
+    /// (the sink drains without an explicit stop). Wired via
+    /// `AiTtsEngine::set_finished_callback` in `lib.rs` setup to emit an
     /// `ai-tts:finished` event so the frontend can complete on the real signal
     /// instead of a timer estimate.
-    #[allow(dead_code)] // wiring to the Tauri AppHandle is a follow-up
     pub fn with_finished_callback(on_finished: Box<dyn Fn() + Send>) -> Self {
         Self::with_backend(
             || RodioSink::new().map(|s| Box::new(s) as Box<dyn AudioSink>),

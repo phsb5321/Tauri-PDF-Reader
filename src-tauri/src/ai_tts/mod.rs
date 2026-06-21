@@ -113,6 +113,17 @@ impl AiTtsEngine {
         }
     }
 
+    /// Rebuild the audio player so it invokes `on_finished` when playback ends
+    /// naturally (the sink drains without an explicit stop). Wired in `lib.rs`
+    /// setup to emit `ai-tts:finished`, so the frontend completes on the real
+    /// audio-end signal instead of a timer estimate.
+    ///
+    /// Called once at startup before any playback, so swapping the player (the
+    /// `new()` one was idle) is safe — its dropped thread joins cleanly.
+    pub fn set_finished_callback(&mut self, on_finished: Box<dyn Fn() + Send>) {
+        self.player = Arc::new(AudioPlayer::with_finished_callback(on_finished));
+    }
+
     /// Initialize cache with app cache directory
     pub fn init_cache(&mut self, cache_dir: PathBuf) {
         self.cache = Some(AudioCacheAdapter::new(cache_dir));

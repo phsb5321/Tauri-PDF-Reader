@@ -35,6 +35,8 @@ import { useAiTtsStore } from "../../stores/ai-tts-store";
 const h = vi.hoisted(() => ({
   /** The `ai-tts:playback-starting` callback the hook registers on mount. */
   playbackStartingCb: null as ((e: { duration: number }) => void) | null,
+  /** The `ai-tts:finished` callback the hook registers on mount. */
+  finishedCb: null as (() => void) | null,
   /** What `aiTtsSpeakWithTimestamps` resolves to for the next speak call. */
   speakResult: {
     success: true,
@@ -46,6 +48,10 @@ const h = vi.hoisted(() => ({
 vi.mock("../../lib/api/ai-tts", () => ({
   onAiTtsPlaybackStarting: vi.fn((cb: (e: { duration: number }) => void) => {
     h.playbackStartingCb = cb;
+    return Promise.resolve(() => {});
+  }),
+  onAiTtsFinished: vi.fn((cb: () => void) => {
+    h.finishedCb = cb;
     return Promise.resolve(() => {});
   }),
 }));
@@ -113,6 +119,7 @@ beforeEach(() => {
   frames = [];
   nextId = 0;
   h.playbackStartingCb = null;
+  h.finishedCb = null;
   h.speakResult = { success: true, wordTimings: [], totalDuration: 0 };
   vi.spyOn(performance, "now").mockImplementation(() => nowMs);
   vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
@@ -238,6 +245,40 @@ describe("karaoke sync — highlight index advances with the timing marks", () =
     expect(onComplete).not.toHaveBeenCalled();
     expect(store().isActive).toBe(true);
     expect(idx()).toBe(2); // index still tracks marks, held at the last word
+  });
+
+  it("completes off the ai-tts:finished event even when the duration is unknown", async () => {
+    const onComplete = vi.fn();
+    const { result } = renderHook(() => useTtsWordHighlight({ onComplete }));
+
+    // totalDuration 0 = missing alignment: the rAF timer NEVER completes (the 026
+    // guard, asserted above), so a passing assertion here can ONLY come from the
+    // real audio-finished event — proving completion (and any auto-page advance)
+    // is driven off the event, and that a no-alignment page no longer hangs.
+    await startViaProductionPath(
+      result.current.speakWithHighlight,
+      "alpha beta gamma",
+      marks(),
+      0,
+      0,
+      0,
+    );
+
+    // Frames well past the marks: timer stays silent under the 026 guard.
+    tick(500);
+    tick(5000);
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(store().isActive).toBe(true);
+
+    // Backend signals the rodio sink drained → completion fires off the event.
+    act(() => h.finishedCb?.());
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(store().isActive).toBe(false);
+    expect(idx()).toBe(-1);
+
+    // The event is idempotent vs the timer: a second fire does not re-complete.
+    act(() => h.finishedCb?.());
+    expect(onComplete).toHaveBeenCalledTimes(1);
   });
 
   it("documents leading-silence behavior: holds index 0 until the first mark starts", async () => {

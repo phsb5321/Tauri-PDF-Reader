@@ -12,7 +12,7 @@ import {
   aiTtsPause,
   aiTtsResume,
 } from '../lib/tauri-invoke';
-import { onAiTtsPlaybackStarting } from '../lib/api/ai-tts';
+import { onAiTtsPlaybackStarting, onAiTtsFinished } from '../lib/api/ai-tts';
 import { useTtsHighlightStore, selectIsHighlighting } from '../stores/tts-highlight-store';
 import { useAiTtsStore } from '../stores/ai-tts-store';
 import { findWordIndexAtTime, isPlaybackComplete } from '../lib/tts-tracking';
@@ -38,6 +38,26 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
   const lastLoggedSecond = useRef<number>(-1);
 
   const isHighlighting = useTtsHighlightStore(selectIsHighlighting);
+
+  // Complete the current playback session. Idempotent: the rAF timer path and
+  // the backend `ai-tts:finished` event can both reach here, but only the first
+  // one to observe an active session runs — the rest no-op via the isActive
+  // guard, so completion (and any auto-page advance) happens exactly once.
+  const completePlayback = useCallback(
+    (reason: string) => {
+      if (!useTtsHighlightStore.getState().isActive) return;
+      console.debug(`[TtsWordHighlight] Playback complete (${reason})`);
+      speakingRef.current = false;
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      highlightStore.stopHighlighting();
+      ttsStore.setPlaybackState('idle');
+      options.onComplete?.();
+    },
+    [highlightStore, ttsStore, options]
+  );
 
   // Animation loop that updates current word based on elapsed time
   const updateHighlight = useCallback(() => {
@@ -68,15 +88,12 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
       });
     }
 
-    // Check if playback is complete. Guards totalDuration > 0 so a missing-
-    // alignment response (totalDuration 0) does NOT instantly "complete" on the
-    // first frame and (with auto-page) skip the page while audio just started.
+    // Timer-estimated completion. Guards totalDuration > 0 so a missing-alignment
+    // response (totalDuration 0) does NOT instantly "complete" on the first frame
+    // and (with auto-page) skip the page while audio just started. The unknown-
+    // duration case completes instead off the real `ai-tts:finished` event below.
     if (isPlaybackComplete(elapsed, state.totalDuration)) {
-      console.debug('[TtsWordHighlight] Playback complete');
-      speakingRef.current = false;
-      highlightStore.stopHighlighting();
-      ttsStore.setPlaybackState('idle');
-      options.onComplete?.();
+      completePlayback('duration reached');
       return;
     }
 
@@ -97,7 +114,7 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
 
     // Continue animation loop
     animationFrameRef.current = requestAnimationFrame(updateHighlight);
-  }, [highlightStore, ttsStore, options]);
+  }, [highlightStore, ttsStore, options, completePlayback]);
 
   // Start animation loop when highlighting becomes active
   useEffect(() => {
@@ -150,6 +167,34 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
         console.debug('[TtsWordHighlight] Updating playback start time (highlighting already active)');
         state.setPlaybackStartTime(startTime);
       }
+    }).then((unlisten) => {
+      unlistenFn = unlisten;
+    });
+
+    return () => {
+      if (unlistenFn) {
+        unlistenFn();
+      }
+    };
+  }, []);
+
+  // Drive completion off the real audio-finished signal. The backend emits
+  // `ai-tts:finished` when the rodio sink drains naturally; completing here
+  // (not only on the rAF duration estimate) is what fixes the unknown-duration
+  // case — there the 026 guard intentionally suppresses timer completion (which
+  // would otherwise skip the page on frame 1), so the event is the ONLY honest
+  // completion signal. A ref keeps the subscription stable across renders while
+  // always invoking the latest completePlayback (avoids stale-closure auto-page).
+  const completePlaybackRef = useRef(completePlayback);
+  useEffect(() => {
+    completePlaybackRef.current = completePlayback;
+  }, [completePlayback]);
+
+  useEffect(() => {
+    let unlistenFn: (() => void) | null = null;
+
+    onAiTtsFinished(() => {
+      completePlaybackRef.current('ai-tts:finished event');
     }).then((unlisten) => {
       unlistenFn = unlisten;
     });
