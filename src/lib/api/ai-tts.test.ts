@@ -9,6 +9,7 @@
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
+import { listen } from "@tauri-apps/api/event";
 import { mockInvoke } from "../../../tests/setup";
 import * as api from "./ai-tts";
 
@@ -101,7 +102,7 @@ describe("ai-tts event subscriptions", () => {
     const noop = () => {};
     for (const sub of [
       api.onAiTtsStarted,
-      api.onAiTtsCompleted,
+      api.onAiTtsFinished,
       api.onAiTtsStopped,
       api.onAiTtsPaused,
       api.onAiTtsResumed,
@@ -111,5 +112,13 @@ describe("ai-tts event subscriptions", () => {
       const unlisten = await sub(noop);
       expect(typeof unlisten).toBe("function");
     }
+  });
+
+  it("onAiTtsFinished subscribes to the ai-tts:finished channel", async () => {
+    await api.onAiTtsFinished(() => {});
+    expect(listen).toHaveBeenCalledWith(
+      "ai-tts:finished",
+      expect.any(Function),
+    );
   });
 });

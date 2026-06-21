@@ -75,7 +75,7 @@ export {
   aiTtsPrebuffer,
   // Event listeners
   onAiTtsStarted,
-  onAiTtsCompleted,
+  onAiTtsFinished,
   onAiTtsStopped,
   onAiTtsPaused,
   onAiTtsResumed,
@@ -88,7 +88,6 @@ export {
   type AiTtsCacheClearResult,
   type AiTtsPrebufferResponse,
   type AiTtsStartedEvent,
-  type AiTtsCompletedEvent,
   type AiTtsErrorEvent,
   type WordTiming,
   type SpeakWithTimestampsResponse,

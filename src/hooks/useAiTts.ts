@@ -10,7 +10,7 @@ import {
   aiTtsSetSpeed,
   aiTtsGetState,
   onAiTtsStarted,
-  onAiTtsCompleted,
+  onAiTtsFinished,
   onAiTtsStopped,
   onAiTtsPaused,
   onAiTtsResumed,
@@ -89,9 +89,9 @@ export function useAiTts() {
         });
         if (mounted) unsubscribers.push(unsub1);
 
-        const unsub2 = await onAiTtsCompleted(() => {
+        const unsub2 = await onAiTtsFinished(() => {
           if (mounted) {
-            console.debug('[TTS] State transition: -> idle (completed event)');
+            console.debug('[TTS] State transition: -> idle (finished event)');
             store.setPlaybackState('idle');
             store.setCurrentText(null);
           }

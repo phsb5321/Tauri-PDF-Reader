@@ -551,19 +551,28 @@ pub fn run() {
                 });
             }
 
-            // Initialize TTS audio cache with app cache directory
+            // Initialize the TTS audio cache and wire the audio-finished signal.
             #[cfg(feature = "elevenlabs-tts")]
             {
-                use tauri::Manager;
-                if let Ok(cache_dir) = app.path().app_cache_dir() {
-                    let state = app.state::<AiTtsEngineState>();
-                    let engine = state.0.clone();
-                    // Spawn async task to initialize cache
-                    tauri::async_runtime::spawn(async move {
-                        let mut engine = engine.write().await;
+                use tauri::{Emitter, Manager};
+                let state = app.state::<AiTtsEngineState>();
+                let engine = state.0.clone();
+                let app_handle = app.handle().clone();
+                let cache_dir = app.path().app_cache_dir().ok();
+                // One async task: set the cache dir (if resolvable) and rebuild the
+                // player so a natural sink-drain emits `ai-tts:finished`. Runs at
+                // startup before any playback, so swapping the player is safe.
+                tauri::async_runtime::spawn(async move {
+                    let mut engine = engine.write().await;
+                    if let Some(cache_dir) = cache_dir {
                         engine.init_cache(cache_dir);
-                    });
-                }
+                    }
+                    engine.set_finished_callback(Box::new(move || {
+                        if let Err(e) = app_handle.emit("ai-tts:finished", ()) {
+                            tracing::warn!("Failed to emit ai-tts:finished: {e}");
+                        }
+                    }));
+                });
             }
 
             Ok(())
