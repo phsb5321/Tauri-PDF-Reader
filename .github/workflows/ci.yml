@@ -13,7 +13,7 @@ env:
 jobs:
   frontend:
     name: Frontend Checks
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, vm103]
     timeout-minutes: 10
 
     steps:
@@ -63,7 +63,7 @@ jobs:
 
   backend:
     name: Backend Checks
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, vm103]
     timeout-minutes: 15
 
     steps:
@@ -124,7 +124,7 @@ jobs:
 
   contract-tests:
     name: Contract Tests
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, vm103]
     timeout-minutes: 10
 
     steps:
