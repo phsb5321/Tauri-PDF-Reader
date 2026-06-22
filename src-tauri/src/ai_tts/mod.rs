@@ -6,6 +6,7 @@
 
 mod elevenlabs;
 mod player;
+mod stretch; // pitch-preserving playback speed (spec 039)
 
 pub use elevenlabs::{ElevenLabsClient, TtsWithTimings, WordTiming};
 pub use player::AudioPlayer;
@@ -404,10 +405,14 @@ impl AiTtsEngine {
         Ok(())
     }
 
-    /// Set speed (0.5 to 2.0)
+    /// Set speed. Pitch-preserving range (spec 039): 0.5×–4.5×.
     pub async fn set_speed(&self, speed: f32) -> Result<(), String> {
-        if !(0.5..=2.0).contains(&speed) {
-            return Err("INVALID_SPEED: Speed must be between 0.5 and 2.0".to_string());
+        if !(stretch::MIN_SPEED..=stretch::MAX_SPEED).contains(&speed) {
+            return Err(format!(
+                "INVALID_SPEED: Speed must be between {} and {}",
+                stretch::MIN_SPEED,
+                stretch::MAX_SPEED
+            ));
         }
         let mut config = self.config.write().await;
         config.speed = speed;

@@ -69,7 +69,8 @@ interface AiTtsState {
 
 const DEFAULT_SPEED = 1.0;
 const MIN_SPEED = 0.5;
-const MAX_SPEED = 2.0;
+// Pitch-preserving range (spec 039): speed up to 4.5× without pitch shift.
+const MAX_SPEED = 4.5;
 
 // Default ElevenLabs voice (Rachel - good for narration)
 const DEFAULT_VOICE_ID = "21m00Tcm4TlvDq8ikWAM";

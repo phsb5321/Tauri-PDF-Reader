@@ -135,6 +135,7 @@ beforeEach(() => {
     initialized: true,
     playbackState: "idle",
     error: null,
+    speed: 1.0, // reset so the speed test below does not leak into the others
   });
 });
 
@@ -185,6 +186,39 @@ describe("karaoke sync — highlight index advances with the timing marks", () =
     expect(onComplete).toHaveBeenCalledTimes(1);
     expect(store().isActive).toBe(false);
     expect(idx()).toBe(-1);
+  });
+
+  it("advances at 2× speed: boundaries are crossed at half the wall-clock (spec 039)", async () => {
+    useAiTtsStore.setState({ speed: 2.0 });
+    const onWordChange = vi.fn();
+    const { result } = renderHook(() => useTtsWordHighlight({ onWordChange }));
+
+    // 1×-relative marks (alpha[0,1) beta[1,2) gamma[2,3)). At 2× the audio plays
+    // twice as fast, so the loop selects by elapsed·speed (FR-009): each boundary
+    // is reached at HALF its 1× wall-clock time. Raw-elapsed code would fail here.
+    await startViaProductionPath(
+      result.current.speakWithHighlight,
+      "alpha beta gamma",
+      marks(),
+      3,
+      0,
+      0,
+    );
+    expect(idx()).toBe(0);
+
+    // Real 0.25s → audioElapsed 0.5s → still alpha.
+    tick(250);
+    expect(idx()).toBe(0);
+
+    // Past beta's halved boundary (1.0s ÷ 2 = 0.5s real) → beta.
+    tick(520);
+    expect(idx()).toBe(1);
+    expect(onWordChange).toHaveBeenLastCalledWith(1, "beta");
+
+    // Past gamma's halved boundary (2.0s ÷ 2 = 1.0s real) → gamma.
+    tick(1020);
+    expect(idx()).toBe(2);
+    expect(onWordChange).toHaveBeenLastCalledWith(2, "gamma");
   });
 
   it("holds the active word while paused and only advances once resumed elapsed crosses the next boundary", async () => {

@@ -11,6 +11,8 @@
 //! `on_finished` when playback ends naturally — the audio-finished signal the app
 //! previously lacked.
 
+use super::stretch::{SpeedRatio, StretchSource};
+use rodio::Source;
 use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
@@ -317,6 +319,9 @@ struct RodioSink {
     _stream: rodio::OutputStream,
     handle: rodio::OutputStreamHandle,
     sink: Option<rodio::Sink>,
+    /// Pitch-preserving playback-speed ratio shared with the active
+    /// `StretchSource`; `set_speed` writes it, the source reads it live.
+    speed: SpeedRatio,
 }
 
 impl RodioSink {
@@ -327,6 +332,7 @@ impl RodioSink {
             _stream: stream,
             handle,
             sink: None,
+            speed: SpeedRatio::default(),
         })
     }
 }
@@ -337,7 +343,10 @@ impl AudioSink for RodioSink {
             old.stop();
         }
         let cursor = std::io::Cursor::new(data.to_vec());
-        let source = rodio::Decoder::new(cursor).map_err(|e| format!("DECODE_ERROR: {e}"))?;
+        let decoder = rodio::Decoder::new(cursor).map_err(|e| format!("DECODE_ERROR: {e}"))?;
+        // Pitch-preserving speed: run the decoded audio through the time-stretch
+        // source (reports the native sample rate, so rodio plays at native pitch).
+        let source = StretchSource::new(decoder.convert_samples::<f32>(), self.speed.clone());
         let sink = rodio::Sink::try_new(&self.handle).map_err(|e| format!("SINK_ERROR: {e}"))?;
         sink.append(source);
         self.sink = Some(sink);
@@ -364,9 +373,10 @@ impl AudioSink for RodioSink {
         }
     }
     fn set_speed(&mut self, speed: f32) {
-        if let Some(s) = &self.sink {
-            s.set_speed(speed.clamp(0.5, 2.0));
-        }
+        // Route to the time-stretch ratio (pitch-preserving), NOT rodio's
+        // `Sink::set_speed` (which resamples and shifts pitch). The active
+        // StretchSource reads this handle live, so the change applies mid-clip.
+        self.speed.set(speed);
     }
     fn is_empty(&self) -> bool {
         self.sink.as_ref().map(|s| s.empty()).unwrap_or(true)
