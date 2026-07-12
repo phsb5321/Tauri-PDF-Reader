@@ -2,15 +2,29 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #20 — 2026-07-12 (Spec 039 SHIPPED + merged; restored-session re-verification; T017 closed)
+
+**Live state:** `origin/main` = **8617319**, clean, 0 open PRs. Spec 039 (pitch-preserving playback speed) is **merged and verified-done** — PRs **#30** (`feat(039)`), **#31** (`ci(040)` clang/libclang), **#32** (CodeQL) all landed. This iteration closes **T017** (this doc) and records the post-kill re-verification.
+
+- **Restored-session re-verification (all gates GREEN live on `main`, not asserted):** after a session kill+restore the merged 039 gates were re-run rather than trusted —
+  - Frontend: `pnpm exec vitest run src/__tests__/integration/karaoke-sync.test.ts` → **6/6** (incl. the 2× karaoke-sync boundary test); `.../unit/ai-tts-speed-range.test.ts` → **3/3**.
+  - Backend: `cargo test --lib --features elevenlabs-tts,test-mocks ai_tts::` → **20/20** — FFT pitch ≤3% + duration ÷speed ≤2% @ 0.5/1/2/4.5×, 1× bit-exact, clamp-to-band, live-change, **plus the 5 `player.rs` deadlock-gate tests** (no lock held across `sink.sleep_until_end()`). Cold build 11m46s (signalsmith C++ + bindgen).
+- **`signalsmith-stretch` is already wired** — `src-tauri/Cargo.toml:49` (`optional`, under the `elevenlabs-tts` feature) since 039. No further Cargo work pending.
+- **"spec-040" is a phantom — no new spec started.** A fleet-sweep prompt referenced `specs/040-*/tasks.md` + "add `signalsmith-stretch` to Cargo.toml" as new work; **no `specs/040-*` directory exists** and signalsmith is already present. The "040" was only PR #31's `ci(040)` commit-scope (the CI-clang change, spec-039 **T015** — merged). Fabricating a spec-040 would violate "no new substantive work without an explicit objective."
+- **Only remaining Lectrice work — all Pedro-gated:**
+  - **SC-004** intelligibility ≥90% @4.5× ear-check — `docs/gui-validation-019-026.md` step 10 (the one non-mechanizable gate).
+  - **Tier 3**: release pipeline (`.AppImage`/`.deb`), Kokoro offline-voice spike, promote tauri-driver E2E to a CI lane (touches `.github/workflows`).
+- **Env lessons** (also in [[lectrice-merge-train-019-026]] / [[lectrice-build-env-ci]]): `pnpm test` = vitest **watch** (hangs a background task indefinitely) → always `pnpm exec vitest run <file>`; backend cold build needs `dist/` present (for `generate_context!`) + libclang, and should be backgrounded + polled via TaskOutput (the completion-notification is flaky).
+
 ## Iteration #19 — 2026-06-21 (Spec 039: pitch-preserving playback speed — the last substantive backlog item)
 
-**Spec-Kit'd end to end + implemented (PR #30, DRAFT until #31 lands).** Decouples tempo from pitch on the AI-TTS path so playback reaches **4.5×** without the chipmunk effect (rodio `set_speed` resamples → pitch shift, capped at 2.0×).
+**Spec-Kit'd end to end + implemented — PR #30 (`feat(039)`) MERGED 22/06/2026 (see Iteration #20 for the shipped+verified state).** Decouples tempo from pitch on the AI-TTS path so playback reaches **4.5×** without the chipmunk effect (rodio `set_speed` resamples → pitch shift, capped at 2.0×).
 
 - **Specify → Plan → Tasks**: `specs/039-pitch-preserving-speed/{spec,research,plan,tasks}.md`. Engine chosen by **verified** research (SearXNG + repo clones): **`signalsmith-stretch` 0.1.3** (MIT end-to-end, streaming `process()`, maintained). Rejected: `rubato` (resampler→shifts pitch), `soundtouch` (LGPL). Pure-Rust `timestretch` = documented fallback (no C++/CI dep).
 - **PR-B (`feat(039)` `2201799`)** — `src-tauri/src/ai_tts/stretch.rs`: `SpeedRatio` (lock-free `Arc<AtomicU32>`, clamp 0.5–4.5) + `StretchSource<S: rodio::Source<Item=f32>>` that wraps the decoder, stretches via signalsmith, and **reports the source's native sample_rate** so rodio plays at native pitch. 1× = transparent bypass; cumulative output target keeps duration = in/speed. **Headless gate (no device, GREEN):** FFT dominant freq ≤3% of 440 Hz **and** duration ÷speed ≤2% at 0.5/1/2/4.5×; 1× bit-exact; clamp.
 - **PR-C (`feat(039)` `92eb279`)** — `player.rs`: `RodioSink::play_mp3` wraps `decoder.convert_samples::<f32>()` in `StretchSource` sharing a `SpeedRatio`; `AudioSink::set_speed` writes that handle (NOT rodio's pitch-shifting `Sink::set_speed`) → live + pitch-preserving. `mod.rs` validation → 4.5×. Frontend `ai-tts-store`/`AiSpeedSlider` → 4.5× + labels + `ai-tts-speed-range.test.ts`. **Deadlock gate stayed green** (set_speed→handle adds no lock); 284 backend tests pass.
 - **PR-D (this slice)** — `useTtsWordHighlight` selects words by **`elapsed · speed`** (1×-relative timings; FR-009); `karaoke-sync.test.ts` gains a 2× test (boundaries cross at half wall-clock) + speed reset; `stretch.rs` live-change keeps-producing test (FR-008). GUI step 10 added.
-- **GATES**: **PR #31 (`ci(040)`, Pedro)** — adds `clang/libclang` to CI so bindgen can build signalsmith; **`.github/workflows` = Pedro-merged, and it gates PR #30's CI green**. Once #31 merges → #30 goes green → self-merge. **SC-004 (intelligibility ≥90% @4.5×)** = the one human ear-check (`docs/gui-validation-019-026.md` step 10). Optional: T014 real-time soak.
+- **GATES (all cleared):** **PR #31 (`ci(040)`)** added `clang/libclang` to CI so bindgen can build signalsmith — **merged** (CI green on the self-hosted vm103 runner after the GH-hosted billing lock; see [[lectrice-merge-train-019-026]]); #30 then went green and merged. Remaining human gate = **SC-004 (intelligibility ≥90% @4.5×)** ear-check (`docs/gui-validation-019-026.md` step 10). Optional: T014 real-time soak.
 - **NEXT after 039 ships**: Tier 3 — release pipeline (no `.AppImage`/`.deb`), Kokoro offline-voice spike, tauri-driver→CI lane (Pedro-gated). See [[lectrice-merge-train-019-026]].
 
 ## Iteration #18 — 2026-06-20 (Restore momentum: merge train landed → close residual gaps)
