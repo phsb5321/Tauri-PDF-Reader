@@ -85,9 +85,9 @@ The moment `signalsmith-stretch` lands in `Cargo.toml` (T001), **CI cannot build
 ## Phase 6: Polish, gates & cross-cutting
 
 - [ ] **T014** [P] Real-time soak (risk #3): a longer `stretch.rs` test feeding a multi-second buffer at 4.5× confirms `process()` keeps the output buffer fed (no underrun) — stretch outruns playback.
-- [ ] **T015** ⚠️ **[Pedro-gated]** Add `clang libclang-dev` to the `apt-get install` lines of the **Backend** and **Contract** jobs in `.github/workflows/ci.yml` (bindgen needs libclang to build `signalsmith-stretch`). **Land this as its own tiny PR FIRST** — `.github/workflows` changes are not self-merge class (Merge-Ownership). All other PRs' CI stays red until this merges.
+- [x] **T015** Add `clang libclang-dev` to the `apt-get install` lines of the CI jobs in `.github/workflows/ci.yml` (bindgen needs libclang to build `signalsmith-stretch`). **DONE — merged as PR #31 (`ci(040)`)**, landed as its own Pedro-gated workflow PR before the impl PRs.
 - [ ] **T016** **[Pedro one-time]** Add a speed step to `docs/gui-validation-019-026.md`: at 4.5×, transcribe a sample, confirm ≥90% word recognition (SC-004 — the one non-mechanizable gate).
-- [ ] **T017** Update `docs/agent-backlog-state.md` — Iteration #19: spec 039 spec→plan→tasks→impl; pitch-preserving speed shipped; remaining backlog = Tier 3 (release pipeline, Kokoro, E2E→CI lane).
+- [x] **T017** Update `docs/agent-backlog-state.md` — **DONE** (Iteration #20): spec 039 spec→plan→tasks→impl shipped + merged (#30/#31/#32) + restored-session re-verified; remaining backlog = SC-004 ear-check + Tier 3 (release pipeline, Kokoro, E2E→CI lane).
 
 ---
 
