@@ -322,4 +322,72 @@ mod tests {
             "must keep producing after a live speed change (no restart/wedge)"
         );
     }
+
+    /// T014 — real-time soak (risk #3). Drains 10s of sine through the stretcher
+    /// at the *top* speed (4.5× = least output per input = most refill pressure)
+    /// via fixed device-sized pulls (~234 refill blocks), then mechanizes the
+    /// "stretch outruns playback (no underrun)" claim with a **wall-clock
+    /// oracle**: generating the sped-up buffer must take less wall time than the
+    /// buffer takes to play (real-time factor < 1), else a real device starves.
+    /// Also holds tempo ratio and pitch across the whole soak — not just the
+    /// short buffers the other tests exercise.
+    #[test]
+    fn soak_top_speed_no_underrun() {
+        let seconds = 10.0_f32;
+        let speed = MAX_SPEED; // 4.5×
+        let in_frames = seconds as f64 * SR as f64;
+        let mut src = StretchSource::new(sine_secs(seconds), SpeedRatio::new(speed));
+        assert_eq!(src.channels(), 1, "soak assumes mono: 1 sample == 1 frame");
+
+        // Model a device pulling fixed buffers; time the whole generation.
+        const PULL: usize = 1024;
+        let mut out: Vec<f32> = Vec::new();
+        let mut pulls = 0usize;
+        let start = std::time::Instant::now();
+        loop {
+            let chunk: Vec<f32> = src.by_ref().take(PULL).collect();
+            let n = chunk.len();
+            out.extend_from_slice(&chunk);
+            pulls += 1;
+            if n < PULL {
+                break; // natural end; only the tail pull may be short
+            }
+        }
+        let produce = start.elapsed();
+        assert!(pulls > 50, "soak should span many pulls, got {pulls}");
+
+        // No underrun (real-time oracle): the sped-up output plays for
+        // out_frames/SR seconds; generating it must beat that or a device
+        // starves mid-stream. The real-time factor (RTF = produce/playback) is
+        // faithful only in optimized builds — a debug build is ~15× slower and
+        // CI runs debug on a shared, contended runner — so enforce the true
+        // "outruns playback" bound (RTF < 1) in release, and a loose catastrophe
+        // bound (RTF < 5, still fails a wedged/O(n²)/regressed stretcher) in
+        // debug. Both are order-of-magnitude clear of a healthy signalsmith.
+        let play = Duration::from_secs_f64(out.len() as f64 / SR as f64);
+        let rtf = produce.as_secs_f64() / play.as_secs_f64();
+        let bound = if cfg!(debug_assertions) { 5.0 } else { 1.0 };
+        assert!(
+            rtf < bound,
+            "underrun: generated {} output frames in {produce:?}, but they play in {play:?} \
+             (RTF {rtf:.2} ≥ {bound} — stretcher too slow to outrun playback)",
+            out.len()
+        );
+
+        // Sustained tempo ratio over the full 10s (an early wedge → too few
+        // frames; the ratio, not just the pull count, is the correctness check).
+        let expected = in_frames / speed as f64;
+        let got = out.len() as f64;
+        assert!(
+            (got - expected).abs() / expected <= 0.02,
+            "soak: {got} frames vs expected {expected:.0} (>2% — starved or drifted over 10s)"
+        );
+
+        // Pitch held across the entire soak (analyzed over the full output).
+        let f = dominant_freq(&out, SR);
+        assert!(
+            (f - F0).abs() / F0 <= 0.03,
+            "soak: dominant {f:.1}Hz vs {F0}Hz (>3% — pitch drifted over 10s at {speed}×)"
+        );
+    }
 }
