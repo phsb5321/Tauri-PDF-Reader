@@ -84,7 +84,7 @@ The moment `signalsmith-stretch` lands in `Cargo.toml` (T001), **CI cannot build
 
 ## Phase 6: Polish, gates & cross-cutting
 
-- [ ] **T014** [P] Real-time soak (risk #3): a longer `stretch.rs` test feeding a multi-second buffer at 4.5× confirms `process()` keeps the output buffer fed (no underrun) — stretch outruns playback.
+- [x] **T014** [P] Real-time soak (risk #3): a longer `stretch.rs` test feeding a multi-second buffer at 4.5× confirms `process()` keeps the output buffer fed (no underrun) — stretch outruns playback. **DONE** — `soak_top_speed_no_underrun` drains 10s of sine at 4.5× via fixed device-sized pulls (~96 pulls / ~234 refill blocks) and mechanizes "outruns playback" with a **wall-clock RTF oracle** (generation time vs `out_frames/SR` playback time; RTF<1 release / <5 debug-CI catastrophe bound, dev-box RTF≈0.31). Also asserts sustained tempo ratio + pitch ≤3% across the whole soak. RED-proved live; GLM (different-family) review MINOR-only. Green (`cargo test ai_tts::stretch`).
 - [x] **T015** Add `clang libclang-dev` to the `apt-get install` lines of the CI jobs in `.github/workflows/ci.yml` (bindgen needs libclang to build `signalsmith-stretch`). **DONE — merged as PR #31 (`ci(040)`)**, landed as its own Pedro-gated workflow PR before the impl PRs.
 - [ ] **T016** **[Pedro one-time]** Add a speed step to `docs/gui-validation-019-026.md`: at 4.5×, transcribe a sample, confirm ≥90% word recognition (SC-004 — the one non-mechanizable gate).
 - [x] **T017** Update `docs/agent-backlog-state.md` — **DONE** (Iteration #20): spec 039 spec→plan→tasks→impl shipped + merged (#30/#31/#32) + restored-session re-verified; remaining backlog = SC-004 ear-check + Tier 3 (release pipeline, Kokoro, E2E→CI lane).
