@@ -11,6 +11,24 @@ env:
   RUST_BACKTRACE: "1"
 
 jobs:
+  alignment-gate:
+    name: Alignment Gate
+    if: github.event_name == 'pull_request'
+    runs-on: [self-hosted, Linux, X64, vm103]
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history for the --base diff
+
+      - name: Run alignment gate (PR diff vs base)
+        # Catches completion-theater (TODO/stub in "done" code), skipped/.only
+        # tests, added lint-suppressions, debug artifacts — the class no linter
+        # sees. Vendored from Pedro's experiments/alignment-gate (Standard —
+        # Project Quality & Alignment Enforcement). Zero-dep (git+grep+awk).
+        run: ./tools/alignment-gate.sh --base origin/${{ github.base_ref }}
+
   frontend:
     name: Frontend Checks
     runs-on: [self-hosted, Linux, X64, vm103]
