@@ -76,6 +76,12 @@ jobs:
       - name: Architecture tests
         run: pnpm test:arch
 
+      - name: Knip (dead-code detection)
+        # Whole-module-graph dead-code gate — catches unused files/exports/deps
+        # that tsc/ESLint structurally can't see. #1 agent-slop signature per
+        # Pedro's Standard — Project Quality & Alignment Enforcement.
+        run: pnpm knip
+
       - name: Coverage check
         run: pnpm test:coverage
 
