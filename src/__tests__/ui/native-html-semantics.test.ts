@@ -21,6 +21,14 @@ const NATIVE_SEMANTIC_SURFACES = [
 const REDUNDANT_NATIVE_ROLE =
   /\brole\s*=\s*(["'])(?:button|dialog|list|progressbar|presentation)\1/;
 
+const DIALOG_EVENT_SURFACES = [
+  "../../components/session-menu/CreateSessionDialog.tsx",
+  "../../components/sidebar/TableOfContents.tsx",
+  "../../ui/components/Dialog/Dialog.tsx",
+] as const;
+
+const DIALOG_JSX_INTERACTION = /<dialog\b[^>]*\bon(?:Click|KeyDown)\s*=/;
+
 describe("native HTML semantics", () => {
   it.each(NATIVE_SEMANTIC_SURFACES)(
     "%s uses its native element without a redundant role",
@@ -29,6 +37,15 @@ describe("native HTML semantics", () => {
 
       expect(source).toMatch(nativeElement);
       expect(source).not.toMatch(REDUNDANT_NATIVE_ROLE);
+    },
+  );
+
+  it.each(DIALOG_EVENT_SURFACES)(
+    "%s keeps mouse and keyboard listeners out of dialog JSX",
+    (path) => {
+      const source = readFileSync(new URL(path, import.meta.url), "utf8");
+
+      expect(source).not.toMatch(DIALOG_JSX_INTERACTION);
     },
   );
 });

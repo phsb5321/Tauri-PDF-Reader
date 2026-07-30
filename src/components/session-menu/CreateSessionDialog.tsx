@@ -9,6 +9,7 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "../../ui/components/Button/Button";
 import { validateSessionName } from "../../domain/sessions/session";
 import { useLibraryStore } from "../../stores/library-store";
+import { useDialogBackdropClose } from "../../hooks/useDialogBackdropClose";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import "./CreateSessionDialog.css";
 
@@ -44,6 +45,13 @@ export function CreateSessionDialog({
     active: isOpen,
     initialFocus: inputRef,
     preventScroll: true,
+    onEscape: onClose,
+  });
+
+  useDialogBackdropClose({
+    dialogRef,
+    active: isOpen,
+    onClose,
   });
 
   // Load documents when dialog opens
@@ -93,12 +101,6 @@ export function CreateSessionDialog({
     }
   };
 
-  const handleOverlayClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
   if (!isOpen) return null;
 
   return (
@@ -106,10 +108,6 @@ export function CreateSessionDialog({
       ref={dialogRef}
       open
       className="create-session-dialog__overlay"
-      onClick={handleOverlayClick}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") onClose();
-      }}
       aria-labelledby="create-session-title"
       aria-modal="true"
     >
