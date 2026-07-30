@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { TextLayer as PdfJsTextLayer } from 'pdfjs-dist';
-import type { PDFPageProxy } from 'pdfjs-dist';
-import { useDocumentStore } from '../stores/document-store';
-import type { Rect } from '../lib/schemas';
-import { TtsWordHighlight } from './pdf-viewer/TtsWordHighlight';
-import './TextLayer.css';
+import { useEffect, useRef, useState, useCallback } from "react";
+import { TextLayer as PdfJsTextLayer } from "pdfjs-dist";
+import type { PDFPageProxy } from "pdfjs-dist";
+import { useDocumentStore } from "../stores/document-store";
+import type { Rect } from "../lib/schemas";
+import { TtsWordHighlight } from "./pdf-viewer/TtsWordHighlight";
+import "./TextLayer.css";
 
 interface TextLayerProps {
   page: PDFPageProxy;
@@ -57,7 +57,7 @@ export function TextLayer({ page, scale, onTextSelect }: TextLayerProps) {
         const textContent = await page.getTextContent();
         if (cancelled) return;
 
-        textLayerDiv.style.setProperty('--scale-factor', String(scale));
+        textLayerDiv.style.setProperty("--scale-factor", String(scale));
 
         textLayerRef.current = new PdfJsTextLayer({
           container: textLayerDiv,
@@ -66,7 +66,7 @@ export function TextLayer({ page, scale, onTextSelect }: TextLayerProps) {
         });
 
         await textLayerRef.current.render();
-        
+
         if (!cancelled) {
           setTimeout(() => {
             if (!cancelled) {
@@ -75,8 +75,11 @@ export function TextLayer({ page, scale, onTextSelect }: TextLayerProps) {
           }, 50);
         }
       } catch (error) {
-        if (!cancelled && !(error instanceof Error && error.message.includes('cancel'))) {
-          console.error('[TextLayer] Error rendering text layer:', error);
+        if (
+          !cancelled &&
+          !(error instanceof Error && error.message.includes("cancel"))
+        ) {
+          console.error("[TextLayer] Error rendering text layer:", error);
         }
       }
     };
@@ -135,28 +138,35 @@ export function TextLayer({ page, scale, onTextSelect }: TextLayerProps) {
   const handleHighlightClick = useCallback(
     (highlightId: string) => {
       setSelectedHighlight(
-        selectedHighlightId === highlightId ? null : highlightId
+        selectedHighlightId === highlightId ? null : highlightId,
       );
     },
-    [selectedHighlightId, setSelectedHighlight]
+    [selectedHighlightId, setSelectedHighlight],
   );
 
   const renderHighlights = () => {
     return highlights.map((highlight) => (
       <div
         key={highlight.id}
-        className={'highlight-group ' + (selectedHighlightId === highlight.id ? 'selected' : '')}
+        className={
+          "highlight-group " +
+          (selectedHighlightId === highlight.id ? "selected" : "")
+        }
         onClick={() => handleHighlightClick(highlight.id)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ")
+            handleHighlightClick(highlight.id);
+        }}
       >
         {highlight.rects.map((rect, index) => (
           <div
             key={index}
             className="highlight-rect"
             style={{
-              left: rect.x * scale + 'px',
-              top: rect.y * scale + 'px',
-              width: rect.width * scale + 'px',
-              height: rect.height * scale + 'px',
+              left: rect.x * scale + "px",
+              top: rect.y * scale + "px",
+              width: rect.width * scale + "px",
+              height: rect.height * scale + "px",
               backgroundColor: highlight.color,
             }}
           />
@@ -170,8 +180,8 @@ export function TextLayer({ page, scale, onTextSelect }: TextLayerProps) {
       ref={containerRef}
       className="text-layer-container"
       style={{
-        width: viewport.width + 'px',
-        height: viewport.height + 'px',
+        width: viewport.width + "px",
+        height: viewport.height + "px",
       }}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
@@ -180,28 +190,22 @@ export function TextLayer({ page, scale, onTextSelect }: TextLayerProps) {
         ref={textLayerDivRef}
         className="textLayer"
         style={{
-          width: viewport.width + 'px',
-          height: viewport.height + 'px',
+          width: viewport.width + "px",
+          height: viewport.height + "px",
         }}
       />
-      <div className="highlight-layer">
-        {renderHighlights()}
-      </div>
+      <div className="highlight-layer">{renderHighlights()}</div>
       {/* TTS word highlight - renders when text layer is ready and TTS is active */}
       {textLayerReady && (
-        <TtsWordHighlight
-          pageNumber={pageNumber}
-          scale={scale}
-        />
+        <TtsWordHighlight pageNumber={pageNumber} scale={scale} />
       )}
     </div>
   );
 }
 
 export function useTextSelection() {
-  const [pendingSelection, setPendingSelection] = useState<TextSelection | null>(
-    null
-  );
+  const [pendingSelection, setPendingSelection] =
+    useState<TextSelection | null>(null);
 
   const handleTextSelect = useCallback((selection: TextSelection) => {
     setPendingSelection(selection);

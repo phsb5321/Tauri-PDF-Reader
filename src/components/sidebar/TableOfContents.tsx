@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useDocumentStore } from '../../stores/document-store';
-import { pdfService, OutlineItem } from '../../services/pdf-service';
-import './TableOfContents.css';
+import { useState, useEffect, useCallback } from "react";
+import { useDocumentStore } from "../../stores/document-store";
+import { pdfService, OutlineItem } from "../../services/pdf-service";
+import "./TableOfContents.css";
 
 interface TableOfContentsProps {
   isOpen: boolean;
@@ -23,7 +23,7 @@ export function TableOfContents({ isOpen, onClose }: TableOfContentsProps) {
         const pdfOutline = await pdfService.getOutline(pdfDocument);
         setOutline(pdfOutline);
       } catch (err) {
-        console.error('Failed to load outline:', err);
+        console.error("Failed to load outline:", err);
       } finally {
         setIsLoading(false);
       }
@@ -32,14 +32,17 @@ export function TableOfContents({ isOpen, onClose }: TableOfContentsProps) {
     loadOutline();
   }, [pdfDocument, isOpen]);
 
-  const handleItemClick = useCallback((pageNumber: number | null) => {
-    if (pageNumber !== null) {
-      setCurrentPage(pageNumber);
-    }
-  }, [setCurrentPage]);
+  const handleItemClick = useCallback(
+    (pageNumber: number | null) => {
+      if (pageNumber !== null) {
+        setCurrentPage(pageNumber);
+      }
+    },
+    [setCurrentPage],
+  );
 
   const toggleExpanded = useCallback((key: string) => {
-    setExpandedItems(prev => {
+    setExpandedItems((prev) => {
       const next = new Set(prev);
       if (next.has(key)) {
         next.delete(key);
@@ -59,7 +62,14 @@ export function TableOfContents({ isOpen, onClose }: TableOfContentsProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="toc-backdrop" onClick={handleBackdropClick}>
+    <div
+      className="toc-backdrop"
+      onClick={handleBackdropClick}
+      onKeyDown={(e) => {
+        if (e.key === "Escape")
+          handleBackdropClick(e as unknown as React.MouseEvent<HTMLDivElement>);
+      }}
+    >
       <div className="toc-panel">
         <div className="toc-header">
           <h2 className="toc-title">Table of Contents</h2>
@@ -132,12 +142,12 @@ function OutlineList({
 
         return (
           <li key={itemKey} className="toc-item">
-            <div className={`toc-item-row ${isCurrent ? 'current' : ''}`}>
+            <div className={`toc-item-row ${isCurrent ? "current" : ""}`}>
               {hasChildren && (
                 <button
-                  className={`toc-expand-btn ${isExpanded ? 'expanded' : ''}`}
+                  className={`toc-expand-btn ${isExpanded ? "expanded" : ""}`}
                   onClick={() => onToggleExpand(itemKey)}
-                  aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                  aria-label={isExpanded ? "Collapse" : "Expand"}
                 >
                   <ChevronIcon />
                 </button>
