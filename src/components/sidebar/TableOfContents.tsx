@@ -62,17 +62,21 @@ export function TableOfContents({ isOpen, onClose }: TableOfContentsProps) {
   if (!isOpen) return null;
 
   return (
-    <div
+    <dialog
+      open
       className="toc-backdrop"
       onClick={handleBackdropClick}
       onKeyDown={(e) => {
-        if (e.key === "Escape")
-          handleBackdropClick(e as unknown as React.MouseEvent<HTMLDivElement>);
+        if (e.key === "Escape") onClose();
       }}
+      aria-modal="true"
+      aria-labelledby="toc-title"
     >
       <div className="toc-panel">
         <div className="toc-header">
-          <h2 className="toc-title">Table of Contents</h2>
+          <h2 id="toc-title" className="toc-title">
+            Table of Contents
+          </h2>
           <button
             className="toc-close"
             onClick={onClose}
@@ -109,7 +113,7 @@ export function TableOfContents({ isOpen, onClose }: TableOfContentsProps) {
           )}
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }
 

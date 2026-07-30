@@ -19,11 +19,13 @@ interface CreateSessionDialogProps {
   preselectedDocumentIds?: string[];
 }
 
+const EMPTY_DOCUMENT_IDS: string[] = [];
+
 export function CreateSessionDialog({
   isOpen,
   onClose,
   onCreate,
-  preselectedDocumentIds = [],
+  preselectedDocumentIds = EMPTY_DOCUMENT_IDS,
 }: CreateSessionDialogProps) {
   const [name, setName] = useState("");
   const [selectedDocs, setSelectedDocs] = useState<string[]>(
@@ -41,7 +43,6 @@ export function CreateSessionDialog({
     containerRef: dialogRef,
     active: isOpen,
     initialFocus: inputRef,
-    onEscape: onClose,
     preventScroll: true,
   });
 
@@ -107,19 +108,12 @@ export function CreateSessionDialog({
       className="create-session-dialog__overlay"
       onClick={handleOverlayClick}
       onKeyDown={(e) => {
-        if (e.key === "Escape")
-          handleOverlayClick(
-            e as unknown as React.MouseEvent<HTMLDialogElement>,
-          );
+        if (e.key === "Escape") onClose();
       }}
       aria-labelledby="create-session-title"
       aria-modal="true"
     >
-      <div
-        className="create-session-dialog"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
+      <div className="create-session-dialog">
         <header className="create-session-dialog__header">
           <h2
             id="create-session-title"

@@ -55,6 +55,29 @@ function TestComponent({
   );
 }
 
+function renderAnnouncer(
+  props: Parameters<typeof TestComponent>[0] = {},
+): void {
+  render(<TestComponent {...props} />);
+}
+
+async function clickAndFlush(testId: string): Promise<void> {
+  await act(async () => {
+    screen.getByTestId(testId).click();
+    vi.advanceTimersByTime(16);
+  });
+}
+
+async function advanceTime(milliseconds: number): Promise<void> {
+  await act(async () => {
+    vi.advanceTimersByTime(milliseconds);
+  });
+}
+
+function expectCurrentMessage(message: string): void {
+  expect(screen.getByTestId("current-message")).toHaveTextContent(message);
+}
+
 describe("useAnnounce", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -65,293 +88,134 @@ describe("useAnnounce", () => {
   });
 
   describe("announce function", () => {
-    it("sets current announcement when called", async () => {
-      render(<TestComponent />);
-
-      await act(async () => {
-        screen.getByTestId("announce-btn").click();
-        // Wait for any requestAnimationFrame
-        vi.advanceTimersByTime(16);
-      });
-
-      expect(screen.getByTestId("current-message").textContent).toBe(
+    it.each([
+      [{}, "announce-btn", "Test message", "polite"],
+      [{}, "announce-assertive-btn", "Assertive message", "assertive"],
+      [
+        { defaultPriority: "assertive" as const },
+        "announce-btn",
         "Test message",
-      );
-    });
-
-    it("uses polite priority by default", async () => {
-      render(<TestComponent />);
-
-      await act(async () => {
-        screen.getByTestId("announce-btn").click();
-        vi.advanceTimersByTime(16);
-      });
-
-      expect(screen.getByTestId("current-priority").textContent).toBe("polite");
-    });
-
-    it("allows overriding priority to assertive", async () => {
-      render(<TestComponent />);
-
-      await act(async () => {
-        screen.getByTestId("announce-assertive-btn").click();
-        vi.advanceTimersByTime(16);
-      });
-
-      expect(screen.getByTestId("current-priority").textContent).toBe(
         "assertive",
-      );
-    });
+      ],
+    ])(
+      "announces %s via %s",
+      async (props, buttonId, expectedMessage, expectedPriority) => {
+        renderAnnouncer(props);
+        await clickAndFlush(buttonId);
 
-    it("respects defaultPriority option", async () => {
-      render(<TestComponent defaultPriority="assertive" />);
-
-      await act(async () => {
-        screen.getByTestId("announce-btn").click();
-        vi.advanceTimersByTime(16);
-      });
-
-      expect(screen.getByTestId("current-priority").textContent).toBe(
-        "assertive",
-      );
-    });
+        expectCurrentMessage(expectedMessage);
+        expect(screen.getByTestId("current-priority")).toHaveTextContent(
+          expectedPriority,
+        );
+      },
+    );
   });
 
   describe("clear function", () => {
     it("clears current announcement", async () => {
-      render(<TestComponent />);
+      renderAnnouncer();
+      await clickAndFlush("announce-btn");
+      expectCurrentMessage("Test message");
 
-      // First, make an announcement
-      await act(async () => {
-        screen.getByTestId("announce-btn").click();
-        vi.advanceTimersByTime(16);
-      });
-
-      expect(screen.getByTestId("current-message").textContent).toBe(
-        "Test message",
-      );
-
-      // Then clear it
-      await act(async () => {
-        screen.getByTestId("clear-btn").click();
-      });
-
-      expect(screen.getByTestId("current-message").textContent).toBe("none");
+      await clickAndFlush("clear-btn");
+      expectCurrentMessage("none");
     });
   });
 
   describe("auto-clear behavior", () => {
     it("auto-clears announcement after clearDelay", async () => {
-      render(<TestComponent clearDelay={1000} />);
+      renderAnnouncer({ clearDelay: 1000 });
+      await clickAndFlush("announce-btn");
+      await advanceTime(1000);
 
-      await act(async () => {
-        screen.getByTestId("announce-btn").click();
-        vi.advanceTimersByTime(16);
-      });
-
-      expect(screen.getByTestId("current-message").textContent).toBe(
-        "Test message",
-      );
-
-      // Advance time past the clear delay
-      await act(async () => {
-        vi.advanceTimersByTime(1000);
-      });
-
-      expect(screen.getByTestId("current-message").textContent).toBe("none");
+      expectCurrentMessage("none");
     });
 
     it("uses default clearDelay of 3000ms", async () => {
-      render(<TestComponent />);
+      renderAnnouncer();
+      await clickAndFlush("announce-btn");
+      await advanceTime(2999);
+      expectCurrentMessage("Test message");
 
-      await act(async () => {
-        screen.getByTestId("announce-btn").click();
-        vi.advanceTimersByTime(16);
-      });
-
-      expect(screen.getByTestId("current-message").textContent).toBe(
-        "Test message",
-      );
-
-      // Message should still be visible before 3000ms
-      await act(async () => {
-        vi.advanceTimersByTime(2999);
-      });
-
-      expect(screen.getByTestId("current-message").textContent).toBe(
-        "Test message",
-      );
-
-      // Message should be cleared after 3000ms
-      await act(async () => {
-        vi.advanceTimersByTime(1);
-      });
-
-      expect(screen.getByTestId("current-message").textContent).toBe("none");
+      await advanceTime(1);
+      expectCurrentMessage("none");
     });
 
     it("resets auto-clear timer on new announcement", async () => {
-      render(<TestComponent clearDelay={1000} />);
+      renderAnnouncer({ clearDelay: 1000 });
+      await clickAndFlush("announce-btn");
+      await advanceTime(500);
+      await clickAndFlush("announce-assertive-btn");
+      await advanceTime(500);
+      expectCurrentMessage("Assertive message");
 
-      await act(async () => {
-        screen.getByTestId("announce-btn").click();
-        vi.advanceTimersByTime(16);
-      });
-
-      // Advance 500ms
-      await act(async () => {
-        vi.advanceTimersByTime(500);
-      });
-
-      // Make another announcement
-      await act(async () => {
-        screen.getByTestId("announce-assertive-btn").click();
-        vi.advanceTimersByTime(16);
-      });
-
-      expect(screen.getByTestId("current-message").textContent).toBe(
-        "Assertive message",
-      );
-
-      // Original timer would have cleared at 1000ms, but new timer starts from second announcement
-      await act(async () => {
-        vi.advanceTimersByTime(500);
-      });
-
-      // Should still be visible
-      expect(screen.getByTestId("current-message").textContent).toBe(
-        "Assertive message",
-      );
-
-      // Clear after full delay from second announcement
-      await act(async () => {
-        vi.advanceTimersByTime(500);
-      });
-
-      expect(screen.getByTestId("current-message").textContent).toBe("none");
+      await advanceTime(500);
+      expectCurrentMessage("none");
     });
   });
 
   describe("AnnouncementRegion component", () => {
-    it("renders aria-live region with sr-only class", () => {
-      render(<TestComponent />);
+    it("renders a native status output with live-region attributes", () => {
+      renderAnnouncer();
+      const region = screen.getByRole("status");
 
-      const region = document.querySelector('[role="status"]');
+      expect(region.tagName).toBe("OUTPUT");
       expect(region).toBeInTheDocument();
       expect(region).toHaveClass("sr-only");
-    });
-
-    it("has aria-atomic attribute", () => {
-      render(<TestComponent />);
-
-      const region = document.querySelector('[role="status"]');
       expect(region).toHaveAttribute("aria-atomic", "true");
     });
 
-    it("displays current announcement message", async () => {
-      render(<TestComponent />);
+    it.each([
+      ["announce-btn", "Test message", "polite"],
+      ["announce-assertive-btn", "Assertive message", "assertive"],
+    ])(
+      "reflects %s in the live region",
+      async (buttonId, expectedMessage, expectedPriority) => {
+        renderAnnouncer();
+        await clickAndFlush(buttonId);
 
-      await act(async () => {
-        screen.getByTestId("announce-btn").click();
-        vi.advanceTimersByTime(16);
-      });
-
-      const region = document.querySelector('[role="status"]');
-      expect(region?.textContent).toBe("Test message");
-    });
-
-    it("uses polite aria-live for polite priority", async () => {
-      render(<TestComponent />);
-
-      await act(async () => {
-        screen.getByTestId("announce-btn").click();
-        vi.advanceTimersByTime(16);
-      });
-
-      const region = document.querySelector('[role="status"]');
-      expect(region).toHaveAttribute("aria-live", "polite");
-    });
-
-    it("uses assertive aria-live for assertive priority", async () => {
-      render(<TestComponent />);
-
-      await act(async () => {
-        screen.getByTestId("announce-assertive-btn").click();
-        vi.advanceTimersByTime(16);
-      });
-
-      const region = document.querySelector('[role="status"]');
-      expect(region).toHaveAttribute("aria-live", "assertive");
-    });
+        const region = screen.getByRole("status");
+        expect(region).toHaveTextContent(expectedMessage);
+        expect(region).toHaveAttribute("aria-live", expectedPriority);
+      },
+    );
   });
 
   describe("re-announcement of same message", () => {
     it("re-announces the same message by clearing and re-setting", async () => {
-      render(<TestComponent />);
+      renderAnnouncer();
+      await clickAndFlush("announce-btn");
+      await clickAndFlush("clear-btn");
+      await clickAndFlush("announce-btn");
 
-      // First announcement
-      await act(async () => {
-        screen.getByTestId("announce-btn").click();
-        vi.advanceTimersByTime(16);
-      });
-
-      expect(screen.getByTestId("current-message").textContent).toBe(
-        "Test message",
-      );
-
-      // Clear for tracking
-      await act(async () => {
-        screen.getByTestId("clear-btn").click();
-      });
-
-      // Second announcement of same message
-      await act(async () => {
-        screen.getByTestId("announce-btn").click();
-        vi.advanceTimersByTime(16);
-      });
-
-      // Should still work
-      expect(screen.getByTestId("current-message").textContent).toBe(
-        "Test message",
-      );
+      expectCurrentMessage("Test message");
     });
   });
 });
 
+const ANNOUNCEMENT_CASES: ReadonlyArray<
+  readonly [name: string, renderMessage: () => string, expected: string]
+> = [
+  ["page change", () => ANNOUNCEMENTS.pageChange(5, 20), "Page 5 of 20"],
+  ["zoom change", () => ANNOUNCEMENTS.zoomChange(125), "Zoom 125%"],
+  ["TTS playing", ANNOUNCEMENTS.ttsPlaying, "Playing"],
+  ["TTS paused", ANNOUNCEMENTS.ttsPaused, "Paused"],
+  ["TTS stopped", ANNOUNCEMENTS.ttsStopped, "Stopped"],
+  ["highlight added", ANNOUNCEMENTS.highlightAdded, "Highlight added"],
+  ["highlight removed", ANNOUNCEMENTS.highlightRemoved, "Highlight removed"],
+  ["settings saved", ANNOUNCEMENTS.settingsSaved, "Settings saved"],
+  [
+    "error",
+    () => ANNOUNCEMENTS.error("File not found"),
+    "Error: File not found",
+  ],
+];
+
 describe("ANNOUNCEMENTS templates", () => {
-  it("formats page change announcement", () => {
-    expect(ANNOUNCEMENTS.pageChange(5, 20)).toBe("Page 5 of 20");
-  });
-
-  it("formats zoom change announcement", () => {
-    expect(ANNOUNCEMENTS.zoomChange(125)).toBe("Zoom 125%");
-  });
-
-  it("formats TTS playing announcement", () => {
-    expect(ANNOUNCEMENTS.ttsPlaying()).toBe("Playing");
-  });
-
-  it("formats TTS paused announcement", () => {
-    expect(ANNOUNCEMENTS.ttsPaused()).toBe("Paused");
-  });
-
-  it("formats TTS stopped announcement", () => {
-    expect(ANNOUNCEMENTS.ttsStopped()).toBe("Stopped");
-  });
-
-  it("formats highlight added announcement", () => {
-    expect(ANNOUNCEMENTS.highlightAdded()).toBe("Highlight added");
-  });
-
-  it("formats highlight removed announcement", () => {
-    expect(ANNOUNCEMENTS.highlightRemoved()).toBe("Highlight removed");
-  });
-
-  it("formats settings saved announcement", () => {
-    expect(ANNOUNCEMENTS.settingsSaved()).toBe("Settings saved");
-  });
-
-  it("formats error announcement with message", () => {
-    expect(ANNOUNCEMENTS.error("File not found")).toBe("Error: File not found");
-  });
+  it.each(ANNOUNCEMENT_CASES)(
+    "formats %s announcements",
+    (_name, renderMessage, expected) => {
+      expect(renderMessage()).toBe(expected);
+    },
+  );
 });

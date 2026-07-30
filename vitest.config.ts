@@ -40,28 +40,22 @@ export default defineConfig({
         "src/e2e-native-bootstrap.ts",
         "src/vite-env.d.ts",
       ],
-      // Coverage ratchet — last raised by 019-coverage-ratchet (2026-05-31).
+      // Coverage ratchet — last raised by 052-sonar-gate (2026-07-30).
       // Floors are pinned just under the MEASURED baseline at this commit, not
       // an aspirational 80%. They act as a REGRESSION gate — coverage may not
       // drop below the floor — and MUST be ratcheted UP as tests are added,
-      // never silently down. Raised from 42/53/80/42 (009, 2026-05-30) after the
-      // 010–015 store-test branches merged. Target: 80 across the board.
+      // never silently down. Target: 80 across the board.
       // Policy + ratchet history: docs/coverage-budget.md.
       //
-      // 031 (2026-06-01): stmts/branch/lines all ROSE (now 51.38 / 90.37 / 51.38)
-      // — raised those is N/A since floors already below. funcs adjusted 59 -> 57:
-      // NOT a regression. The mockIPC E2E (e2e/critical-loop.spec.ts) drives the
-      // REAL lib/api/ai-tts.ts invoke wire that every other test mocked away, so
-      // that module's ~22 functions entered the denominator for the first time.
-      // We ratcheted funcs UP from 54.28 -> 57.84 by adding the api wire-contract
-      // test (src/lib/api/ai-tts.test.ts); the residual ~1pt is newly-measured
-      // real code, not lost coverage. Documented, not silent. Follow-up to push
-      // funcs back toward 59+: cover the remaining ai-tts.ts / prebuffer paths.
+      // 052 (2026-07-30): measured 57.52 / 89.97 / 60.32 / 57.52 for
+      // statements / branches / functions / lines. Added interaction coverage
+      // for the Sonar new-code accessibility fixes and raised every floor that
+      // increased. See docs/coverage-budget.md for earlier baselines.
       thresholds: {
-        lines: 46,
-        functions: 57,
-        branches: 88,
-        statements: 46,
+        lines: 57,
+        functions: 60,
+        branches: 89,
+        statements: 57,
       },
     },
   },

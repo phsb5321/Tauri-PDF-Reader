@@ -25,18 +25,6 @@ export function NoteEditor({ highlight, onSave, onClose }: NoteEditorProps) {
     }
   }, []);
 
-  // Handle escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
-
   // Handle click outside modal
   const handleBackdropClick = useCallback(
     (e: React.MouseEvent) => {
@@ -74,10 +62,7 @@ export function NoteEditor({ highlight, onSave, onClose }: NoteEditorProps) {
       className="note-editor-backdrop"
       onClick={handleBackdropClick}
       onKeyDown={(e) => {
-        if (e.key === "Escape")
-          handleBackdropClick(
-            e as unknown as React.MouseEvent<HTMLDialogElement>,
-          );
+        if (e.key === "Escape") onClose();
       }}
       aria-modal="true"
       aria-labelledby="note-editor-title"
