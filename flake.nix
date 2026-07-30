@@ -7,7 +7,10 @@
   };
 
   outputs = { self, nixpkgs, flake-utils }:
-    flake-utils.lib.eachDefaultSystem (system:
+    # Linux-only — the package list is the Tauri 2 GTK/webkitgtk desktop chain.
+    # eachDefaultSystem would let `nix flake check --all-systems` evaluate this
+    # on x86_64-darwin and fail (no webkitgtk_4_1 there).
+    flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (system:
       let
         pkgs = import nixpkgs { inherit system; };
 

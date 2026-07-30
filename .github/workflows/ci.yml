@@ -29,6 +29,11 @@ jobs:
         # Project Quality & Alignment Enforcement). Zero-dep (git+grep+awk).
         run: ./tools/alignment-gate.sh --base origin/${{ github.base_ref }}
 
+      - name: Alignment gate negative-control
+        # PR#595 parity: prove the gate CATCHES slop, not just PASSES on clean
+        # code. Creates a deliberate slop diff + asserts the gate fails.
+        run: ./tools/test/alignment-gate-negative-control.sh
+
   frontend:
     name: Frontend Checks
     runs-on: [self-hosted, Linux, X64, vm103]
@@ -77,9 +82,11 @@ jobs:
         run: pnpm test:arch
 
       - name: Knip (dead-code detection)
-        # Whole-module-graph dead-code gate — catches unused files/exports/deps
-        # that tsc/ESLint structurally can't see. #1 agent-slop signature per
-        # Pedro's Standard — Project Quality & Alignment Enforcement.
+        # Whole-module-graph dead-code gate for the TS frontend — catches unused
+        # files/exports/deps that tsc/ESLint structurally can't see. #1
+        # agent-slop signature per Pedro's Quality Enforcement Standard.
+        # Note: scope is the TS frontend; Rust backend + generated bindings are
+        # excluded (Rust has its own dead-code analysis via cargo clippy).
         run: pnpm knip
 
       - name: Coverage check
