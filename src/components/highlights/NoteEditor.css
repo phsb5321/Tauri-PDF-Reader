@@ -4,6 +4,14 @@
   left: 0;
   right: 0;
   bottom: 0;
+  width: auto;
+  max-width: none;
+  height: auto;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: inherit;
   z-index: var(--z-toast);
   display: flex;
   align-items: center;
@@ -70,7 +78,9 @@
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: background-color 0.1s ease, color 0.1s ease;
+  transition:
+    background-color 0.1s ease,
+    color 0.1s ease;
 }
 
 .note-editor-close:hover {
@@ -126,7 +136,9 @@
   line-height: 1.5;
   resize: vertical;
   min-height: 100px;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .note-editor-textarea:focus {
@@ -160,7 +172,9 @@
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.1s ease, transform 0.1s ease;
+  transition:
+    background-color 0.1s ease,
+    transform 0.1s ease;
 }
 
 .note-editor-button:active {

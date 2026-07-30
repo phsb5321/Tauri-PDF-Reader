@@ -45,7 +45,9 @@
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: background-color 0.1s ease, color 0.1s ease;
+  transition:
+    background-color 0.1s ease,
+    color 0.1s ease;
 }
 
 .highlights-panel-close:hover {
@@ -130,7 +132,7 @@
   background: var(--accent-color-light, rgba(59, 130, 246, 0.1));
 }
 
-.highlight-item:focus {
+.highlight-item-content:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--accent-color);
 }
@@ -140,6 +142,13 @@
   gap: 10px;
   flex: 1;
   min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 .highlight-item-color-bar {
@@ -199,7 +208,10 @@
   color: var(--text-tertiary);
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.1s ease, background-color 0.1s ease, color 0.1s ease;
+  transition:
+    opacity 0.1s ease,
+    background-color 0.1s ease,
+    color 0.1s ease;
   flex-shrink: 0;
 }
 

@@ -56,6 +56,16 @@ export function DocumentCard({
     setShowContextMenu(false);
   }, []);
 
+  const handlePrimaryKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLButtonElement>) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        onDoubleClick();
+      }
+    },
+    [onDoubleClick],
+  );
+
   const handleDelete = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -73,42 +83,46 @@ export function DocumentCard({
 
   if (viewMode === "list") {
     return (
-      <div
+      <article
         className={`document-card document-card--list ${isSelected ? "selected" : ""} ${fileExists === false ? "missing" : ""}`}
-        onClick={onClick}
-        onDoubleClick={onDoubleClick}
         onContextMenu={handleContextMenu}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") onDoubleClick();
-          if (e.key === " ") onClick();
-        }}
       >
-        <div className="document-card-icon">
-          <PdfIcon />
-        </div>
-        <div className="document-card-info">
-          <span className="document-card-title">
-            {document.title || fileName}
-          </span>
-          <span className="document-card-path" title={document.filePath}>
-            {fileName}
-          </span>
-        </div>
-        <div className="document-card-meta">
-          <span className="document-card-pages">
-            {document.currentPage}/{document.pageCount || "?"} pages
-          </span>
-          <span className="document-card-date">{lastOpened}</span>
-        </div>
-        <div className="document-card-progress">
-          <div className="progress-bar">
-            <div className="progress-fill" style={{ width: `${progress}%` }} />
-          </div>
-          <span className="progress-text">{progress}%</span>
-        </div>
         <button
+          type="button"
+          className="document-card-open"
+          onClick={onClick}
+          onDoubleClick={onDoubleClick}
+          onKeyDown={handlePrimaryKeyDown}
+        >
+          <div className="document-card-icon">
+            <PdfIcon />
+          </div>
+          <div className="document-card-info">
+            <span className="document-card-title">
+              {document.title || fileName}
+            </span>
+            <span className="document-card-path" title={document.filePath}>
+              {fileName}
+            </span>
+          </div>
+          <div className="document-card-meta">
+            <span className="document-card-pages">
+              {document.currentPage}/{document.pageCount || "?"} pages
+            </span>
+            <span className="document-card-date">{lastOpened}</span>
+          </div>
+          <div className="document-card-progress">
+            <div className="progress-bar">
+              <div
+                className="progress-fill"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <span className="progress-text">{progress}%</span>
+          </div>
+        </button>
+        <button
+          type="button"
           className="document-card-delete"
           onClick={handleDelete}
           title="Remove from library"
@@ -116,44 +130,51 @@ export function DocumentCard({
         >
           <DeleteIcon />
         </button>
-      </div>
+      </article>
     );
   }
 
   return (
-    <div
+    <article
       className={`document-card document-card--grid ${isSelected ? "selected" : ""} ${fileExists === false ? "missing" : ""}`}
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
       onContextMenu={handleContextMenu}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") onDoubleClick();
-        if (e.key === " ") onClick();
-      }}
     >
-      <div className="document-card-thumbnail">
-        <PdfIcon />
-        {progress > 0 && (
-          <div className="document-card-progress-badge">{progress}%</div>
-        )}
-      </div>
-      <div className="document-card-content">
-        <h3 className="document-card-title" title={document.title || fileName}>
-          {document.title || fileName}
-        </h3>
-        <p className="document-card-meta">
-          <span>{document.pageCount || "?"} pages</span>
-          <span>{lastOpened}</span>
-        </p>
-        <div className="document-card-progress">
-          <div className="progress-bar">
-            <div className="progress-fill" style={{ width: `${progress}%` }} />
+      <button
+        type="button"
+        className="document-card-open"
+        onClick={onClick}
+        onDoubleClick={onDoubleClick}
+        onKeyDown={handlePrimaryKeyDown}
+      >
+        <div className="document-card-thumbnail">
+          <PdfIcon />
+          {progress > 0 && (
+            <div className="document-card-progress-badge">{progress}%</div>
+          )}
+        </div>
+        <div className="document-card-content">
+          <h3
+            className="document-card-title"
+            title={document.title || fileName}
+          >
+            {document.title || fileName}
+          </h3>
+          <p className="document-card-meta">
+            <span>{document.pageCount || "?"} pages</span>
+            <span>{lastOpened}</span>
+          </p>
+          <div className="document-card-progress">
+            <div className="progress-bar">
+              <div
+                className="progress-fill"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
           </div>
         </div>
-      </div>
+      </button>
       <button
+        type="button"
         className="document-card-delete"
         onClick={handleDelete}
         title="Remove from library"
@@ -169,12 +190,18 @@ export function DocumentCard({
           onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
         >
-          <button onClick={onDoubleClick}>Open</button>
-          <button onClick={handleDelete}>Remove from Library</button>
-          <button onClick={handleCloseContextMenu}>Cancel</button>
+          <button type="button" onClick={onDoubleClick}>
+            Open
+          </button>
+          <button type="button" onClick={handleDelete}>
+            Remove from Library
+          </button>
+          <button type="button" onClick={handleCloseContextMenu}>
+            Cancel
+          </button>
         </div>
       )}
-    </div>
+    </article>
   );
 }
 

@@ -28,7 +28,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   const [activeSection, setActiveSection] =
     useState<SettingsSection>("appearance");
   const { loadFromDatabase, dbInitialized } = useSettingsStore();
-  const panelRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDialogElement>(null);
 
   // Focus trap for accessibility
   useFocusTrap({
@@ -53,15 +53,16 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   if (!isOpen) return null;
 
   return (
-    <div
+    <dialog
+      ref={panelRef}
+      open
       className="settings-backdrop"
       onClick={handleBackdropClick}
       onKeyDown={(e) => e.key === "Escape" && onClose()}
-      role="dialog"
       aria-modal="true"
       aria-labelledby="settings-title"
     >
-      <div className="settings-panel" ref={panelRef}>
+      <div className="settings-panel">
         <div className="settings-header">
           <h2 id="settings-title">Settings</h2>
           <button
@@ -145,7 +146,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
           </div>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }
 

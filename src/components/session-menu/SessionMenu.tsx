@@ -175,17 +175,18 @@ export function SessionMenu({
 
           {/* Session list */}
           {!isLoading && !error && sessions.length > 0 && (
-            <div className="session-menu__list" role="list">
+            <ul className="session-menu__list">
               {sessions.map((session) => (
-                <SessionItem
-                  key={session.id}
-                  session={session}
-                  selected={session.id === activeSessionId}
-                  onRestore={handleRestoreSession}
-                  onDelete={handleDeleteSession}
-                />
+                <li key={session.id}>
+                  <SessionItem
+                    session={session}
+                    selected={session.id === activeSessionId}
+                    onRestore={handleRestoreSession}
+                    onDelete={handleDeleteSession}
+                  />
+                </li>
               ))}
-            </div>
+            </ul>
           )}
 
           {/* Restoring indicator */}

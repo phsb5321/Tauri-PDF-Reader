@@ -118,18 +118,12 @@ function HighlightItem({
     previewText.length > 100 ? previewText.slice(0, 100) + "..." : previewText;
 
   return (
-    <div
-      className={`highlight-item ${isSelected ? "selected" : ""}`}
-      onClick={onClick}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          onClick();
-        }
-      }}
-    >
-      <div className="highlight-item-content">
+    <article className={`highlight-item ${isSelected ? "selected" : ""}`}>
+      <button
+        type="button"
+        className="highlight-item-content"
+        onClick={onClick}
+      >
         <div
           className="highlight-item-color-bar"
           style={{ backgroundColor: highlight.color }}
@@ -143,15 +137,16 @@ function HighlightItem({
             </div>
           )}
         </div>
-      </div>
+      </button>
       <button
+        type="button"
         className="highlight-item-delete"
         onClick={onDelete}
         aria-label="Delete highlight"
       >
         <DeleteIcon />
       </button>
-    </div>
+    </article>
   );
 }
 

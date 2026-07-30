@@ -33,13 +33,13 @@ export function ExportProgress({
   };
 
   return (
-    <div
-      className="export-progress"
-      role="progressbar"
-      aria-valuenow={progress.percent}
-      aria-valuemin={0}
-      aria-valuemax={100}
-    >
+    <div className="export-progress">
+      <progress
+        className="sr-only"
+        value={progress.percent}
+        max={100}
+        aria-label={phaseDescription}
+      />
       <div className="export-progress__header">
         <span className="export-progress__phase">{phaseDescription}</span>
         {!isComplete && !isError && progress.estimatedRemainingMs > 0 && (

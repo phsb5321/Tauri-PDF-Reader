@@ -5,6 +5,14 @@
 .create-session-dialog__overlay {
   position: fixed;
   inset: 0;
+  width: auto;
+  max-width: none;
+  height: auto;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: inherit;
   background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
@@ -88,7 +96,9 @@
   border-radius: var(--radius-md, 8px);
   background: var(--color-bg-input, #fff);
   color: var(--color-text-primary, #111);
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
 }
 
 .create-session-dialog__input:focus {
