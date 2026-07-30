@@ -1,4 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useDialogBackdropClose } from "../../hooks/useDialogBackdropClose";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { useDocumentStore } from "../../stores/document-store";
 import { pdfService, OutlineItem } from "../../services/pdf-service";
 import "./TableOfContents.css";
@@ -13,6 +15,20 @@ export function TableOfContents({ isOpen, onClose }: TableOfContentsProps) {
   const [outline, setOutline] = useState<OutlineItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  useFocusTrap({
+    containerRef: dialogRef,
+    active: isOpen,
+    preventScroll: true,
+    onEscape: onClose,
+  });
+
+  useDialogBackdropClose({
+    dialogRef,
+    active: isOpen,
+    onClose,
+  });
 
   useEffect(() => {
     async function loadOutline() {
@@ -53,22 +69,13 @@ export function TableOfContents({ isOpen, onClose }: TableOfContentsProps) {
     });
   }, []);
 
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
   if (!isOpen) return null;
 
   return (
     <dialog
+      ref={dialogRef}
       open
       className="toc-backdrop"
-      onClick={handleBackdropClick}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") onClose();
-      }}
       aria-modal="true"
       aria-labelledby="toc-title"
     >

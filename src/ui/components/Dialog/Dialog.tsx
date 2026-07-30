@@ -1,4 +1,5 @@
-import { useRef, useCallback, type ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
+import { useDialogBackdropClose } from "../../../hooks/useDialogBackdropClose";
 import { useFocusTrap } from "../../../hooks/useFocusTrap";
 import "./Dialog.css";
 
@@ -40,16 +41,15 @@ export function Dialog({
     containerRef: dialogRef,
     active: open,
     preventScroll: true,
+    onEscape: closeOnEscape ? onClose : undefined,
   });
 
-  const handleBackdropClick = useCallback(
-    (e: React.MouseEvent) => {
-      if (closeOnBackdrop && e.target === e.currentTarget) {
-        onClose();
-      }
-    },
-    [closeOnBackdrop, onClose],
-  );
+  useDialogBackdropClose({
+    dialogRef,
+    active: open,
+    enabled: closeOnBackdrop,
+    onClose,
+  });
 
   if (!open) return null;
 
@@ -58,10 +58,6 @@ export function Dialog({
       ref={dialogRef}
       open
       className="dialog-backdrop"
-      onClick={handleBackdropClick}
-      onKeyDown={(e) => {
-        if (closeOnEscape && e.key === "Escape") onClose();
-      }}
       aria-modal="true"
       aria-labelledby="dialog-title"
       aria-describedby={description ? "dialog-description" : undefined}

@@ -18,10 +18,6 @@ import { CreateSessionDialog } from "../../components/session-menu/CreateSession
 import type { Document } from "../../lib/schemas";
 import { useLibraryStore } from "../../stores/library-store";
 
-vi.mock("../../hooks/useFocusTrap", () => ({
-  useFocusTrap: vi.fn(),
-}));
-
 const DOCUMENT: Document = {
   id: "document-id",
   filePath: "/books/testing.pdf",
@@ -41,6 +37,7 @@ describe("CreateSessionDialog", () => {
   const loadDocuments = vi.fn().mockResolvedValue(undefined);
 
   beforeEach(() => {
+    loadDocuments.mockClear();
     act(() => {
       useLibraryStore.setState({
         documents: [DOCUMENT],
@@ -78,10 +75,20 @@ describe("CreateSessionDialog", () => {
     await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
     expect(onCreate).toHaveBeenCalledWith("Research", [DOCUMENT.id]);
     expect(loadDocuments).toHaveBeenCalledOnce();
+  });
 
-    fireEvent.keyDown(screen.getByLabelText("Session Name"), {
-      key: "Escape",
-    });
+  it("closes from the native dialog backdrop and Escape key", async () => {
+    const onClose = vi.fn();
+    render(<CreateSessionDialog isOpen onClose={onClose} onCreate={vi.fn()} />);
+    await waitFor(() => expect(loadDocuments).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(screen.getByLabelText("Session Name")).toHaveFocus(),
+    );
+
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(dialog);
+    fireEvent.keyDown(document, { key: "Escape" });
+
     expect(onClose).toHaveBeenCalledTimes(2);
   });
 

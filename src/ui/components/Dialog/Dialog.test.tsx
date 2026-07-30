@@ -89,6 +89,26 @@ describe("Dialog", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it("respects closeOnEscape", () => {
+    const onClose = vi.fn();
+    const { rerender } = render(
+      <Dialog {...defaultProps} onClose={onClose}>
+        Content
+      </Dialog>,
+    );
+
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(onClose).toHaveBeenCalledOnce();
+
+    rerender(
+      <Dialog {...defaultProps} onClose={onClose} closeOnEscape={false}>
+        Content
+      </Dialog>,
+    );
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
   it("applies size class", () => {
     render(
       <Dialog {...defaultProps} size="lg">
