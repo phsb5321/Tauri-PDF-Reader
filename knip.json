@@ -1,0 +1,35 @@
+{
+  "$schema": "https://unpkg.com/knip@latest/schema.json",
+  "entry": ["src/main.tsx", "src/App.tsx"],
+  "project": ["src/**/*.{ts,tsx}", "src-tauri/src/**/*.rs"],
+  "ignore": [
+    "src/lib/bindings.ts",
+    "src-tauri/gen/**",
+    "src-tauri/src/lib.rs",
+    "specs/**",
+    "docs/**",
+    "scripts/**",
+    "tools/**",
+    "e2e/**",
+    "tests/**",
+    "src/__tests__/**",
+    "src/**/*.test.{ts,tsx}",
+    "src/**/*.spec.{ts,tsx}"
+  ],
+  "ignoreBinaries": ["tauri", "cargo-tauri", "husky", "tsx"],
+  "ignoreDependencies": [
+    "@tauri-apps/cli",
+    "husky",
+    "lint-staged",
+    "@vitejs/plugin-react",
+    "@testing-library/jest-dom",
+    "@types/react",
+    "@types/react-dom",
+    "archunit",
+    "esbuild",
+    "globals",
+    "typescript-eslint"
+  ],
+  "exclude": ["exports", "types", "enumMembers", "nsExports", "nsTypes"],
+  "ignoreUnresolved": ["@/.*"]
+}
