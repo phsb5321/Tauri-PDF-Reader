@@ -74,8 +74,10 @@ jobs:
 
       # The quality gate BLOCKS: qualitygate.wait=true makes the action poll the
       # gate and FAIL the job if it is not green.
+      # SHA-pinned per Pedro's release-eng rules (matches interview-copilot's pin).
+      # v4.1.0 used actions/cache@v4.0.2 which GitHub auto-fails as deprecated.
       - name: SonarQube scan + quality-gate wait
-        uses: SonarSource/sonarqube-scan-action@v4.1.0
+        uses: SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995 # v8.1.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
