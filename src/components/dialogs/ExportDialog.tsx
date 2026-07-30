@@ -24,7 +24,7 @@ export function ExportDialog({
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { saveFile } = useFileDialog();
-  const dialogRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
 
   // Focus trap for accessibility
   useFocusTrap({
@@ -80,15 +80,16 @@ export function ExportDialog({
   );
 
   return (
-    <div
+    <dialog
+      ref={dialogRef}
+      open
       className="export-dialog-backdrop"
       onClick={handleBackdropClick}
       onKeyDown={(e) => e.key === "Escape" && onClose()}
-      role="dialog"
       aria-modal="true"
       aria-labelledby="export-dialog-title"
     >
-      <div className="export-dialog" ref={dialogRef}>
+      <div className="export-dialog">
         <div className="export-dialog-header">
           <h2 id="export-dialog-title">Export Highlights</h2>
           <button
@@ -171,7 +172,7 @@ export function ExportDialog({
           </button>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }
 

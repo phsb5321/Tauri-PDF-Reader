@@ -36,6 +36,7 @@
 }
 
 .cache-settings__success {
+  display: block;
   padding: var(--space-3, 12px);
   margin-bottom: var(--space-3, 12px);
   background: var(--color-success-bg, #ecfdf5);

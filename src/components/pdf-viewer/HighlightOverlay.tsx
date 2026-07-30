@@ -59,7 +59,8 @@ export function HighlightOverlay({
           data-highlight-id={highlight.id}
         >
           {highlight.rects.map((rect, index) => (
-            <div
+            <button
+              type="button"
               key={`${highlight.id}-${index}`}
               className="highlight-rect"
               style={{
@@ -70,16 +71,8 @@ export function HighlightOverlay({
                 backgroundColor: hexToRgba(highlight.color, 0.35),
               }}
               onClick={(e) => handleClick(highlight, e)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  handleClick(highlight, e as unknown as React.MouseEvent);
-                }
-              }}
               onDoubleClick={(e) => handleDoubleClick(highlight, e)}
               title={highlight.textContent || undefined}
-              role="button"
-              tabIndex={0}
               aria-label={`Highlight: ${highlight.textContent?.slice(0, 50) || "No text"}`}
             />
           ))}

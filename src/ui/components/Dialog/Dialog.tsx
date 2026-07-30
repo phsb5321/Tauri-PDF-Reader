@@ -34,7 +34,7 @@ export function Dialog({
   closeOnEscape = true,
   closeOnBackdrop = true,
 }: DialogProps) {
-  const dialogRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
 
   useFocusTrap({
     containerRef: dialogRef,
@@ -55,19 +55,16 @@ export function Dialog({
   if (!open) return null;
 
   return (
-    <div
+    <dialog
+      ref={dialogRef}
+      open
       className="dialog-backdrop"
       onClick={handleBackdropClick}
-      role="presentation"
+      aria-modal="true"
+      aria-labelledby="dialog-title"
+      aria-describedby={description ? "dialog-description" : undefined}
     >
-      <div
-        ref={dialogRef}
-        className={`dialog dialog--${size}`}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="dialog-title"
-        aria-describedby={description ? "dialog-description" : undefined}
-      >
+      <div className={`dialog dialog--${size}`}>
         <div className="dialog__header">
           <h2 id="dialog-title" className="dialog__title">
             {title}
@@ -96,6 +93,6 @@ export function Dialog({
         <div className="dialog__content">{children}</div>
         {footer && <div className="dialog__footer">{footer}</div>}
       </div>
-    </div>
+    </dialog>
   );
 }

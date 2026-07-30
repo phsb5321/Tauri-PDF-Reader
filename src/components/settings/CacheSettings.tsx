@@ -142,9 +142,7 @@ export function CacheSettings() {
       )}
 
       {successMessage && (
-        <div className="cache-settings__success" role="status">
-          {successMessage}
-        </div>
+        <output className="cache-settings__success">{successMessage}</output>
       )}
 
       {stats && (

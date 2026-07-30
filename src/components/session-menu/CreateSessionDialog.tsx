@@ -32,7 +32,7 @@ export function CreateSessionDialog({
   const [error, setError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const dialogRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
 
   const { documents, loadDocuments } = useLibraryStore();
 
@@ -101,20 +101,22 @@ export function CreateSessionDialog({
   if (!isOpen) return null;
 
   return (
-    <div
+    <dialog
+      ref={dialogRef}
+      open
       className="create-session-dialog__overlay"
       onClick={handleOverlayClick}
       onKeyDown={(e) => {
         if (e.key === "Escape")
-          handleOverlayClick(e as unknown as React.MouseEvent<HTMLDivElement>);
+          handleOverlayClick(
+            e as unknown as React.MouseEvent<HTMLDialogElement>,
+          );
       }}
+      aria-labelledby="create-session-title"
+      aria-modal="true"
     >
       <div
-        ref={dialogRef}
         className="create-session-dialog"
-        role="dialog"
-        aria-labelledby="create-session-title"
-        aria-modal="true"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
@@ -221,6 +223,6 @@ export function CreateSessionDialog({
           </footer>
         </form>
       </div>
-    </div>
+    </dialog>
   );
 }

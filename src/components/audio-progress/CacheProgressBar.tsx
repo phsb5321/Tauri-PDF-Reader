@@ -39,15 +39,14 @@ export function CacheProgressBar({
     .join(" ");
 
   return (
-    <div
-      className={classNames}
-      role="progressbar"
-      aria-valuenow={displayPercent}
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-label={`Audio cache coverage: ${displayPercent}%`}
-    >
-      <div className="cache-progress-bar__track">
+    <div className={classNames}>
+      <progress
+        className="sr-only"
+        value={displayPercent}
+        max={100}
+        aria-label={`Audio cache coverage: ${displayPercent}%`}
+      />
+      <div className="cache-progress-bar__track" aria-hidden="true">
         <div
           className="cache-progress-bar__fill"
           style={{ width: `${clampedPercent}%` }}

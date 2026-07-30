@@ -53,7 +53,7 @@ export function AudioExportDialog({
   const [error, setError] = useState<string | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
   const { saveFile } = useFileDialog();
-  const dialogRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
 
   // Focus trap for accessibility
   useFocusTrap({
@@ -180,17 +180,18 @@ export function AudioExportDialog({
   };
 
   return (
-    <div
+    <dialog
+      ref={dialogRef}
+      open
       className="audio-export-dialog-backdrop"
       onClick={handleBackdropClick}
       onKeyDown={(e) =>
         e.key === "Escape" && dialogState !== "exporting" && onClose()
       }
-      role="dialog"
       aria-modal="true"
       aria-labelledby="audio-export-dialog-title"
     >
-      <div className="audio-export-dialog" ref={dialogRef}>
+      <div className="audio-export-dialog">
         <div className="audio-export-dialog__header">
           <h2 id="audio-export-dialog-title">Export Audiobook</h2>
           <button
@@ -377,7 +378,7 @@ export function AudioExportDialog({
           )}
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }
 

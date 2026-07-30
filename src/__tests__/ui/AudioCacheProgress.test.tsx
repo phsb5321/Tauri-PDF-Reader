@@ -40,17 +40,16 @@ describe("AudioCacheProgress", () => {
 
   const mockSetCacheCoverage = vi.fn();
 
+  function mockCoverageState(cacheCoverage: CoverageResponse | null) {
+    mockUseAiTtsStore.mockImplementation(
+      (selector: (state: unknown) => unknown) =>
+        selector({ cacheCoverage, setCacheCoverage: mockSetCacheCoverage }),
+    );
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseAiTtsStore.mockImplementation(
-      (selector: (state: unknown) => unknown) => {
-        const state = {
-          cacheCoverage: null as CoverageResponse | null,
-          setCacheCoverage: mockSetCacheCoverage,
-        };
-        return selector(state);
-      },
-    );
+    mockCoverageState(null);
   });
 
   afterEach(() => {
@@ -68,23 +67,14 @@ describe("AudioCacheProgress", () => {
   });
 
   it("displays coverage percentage when data is available", async () => {
-    mockUseAiTtsStore.mockImplementation(
-      (selector: (state: unknown) => unknown) => {
-        const state = {
-          cacheCoverage: mockCoverage,
-          setCacheCoverage: mockSetCacheCoverage,
-        };
-        return selector(state);
-      },
-    );
+    mockCoverageState(mockCoverage);
 
     render(<AudioCacheProgress documentId="doc-123" />);
 
     await waitFor(() => {
-      expect(screen.getByRole("progressbar")).toHaveAttribute(
-        "aria-valuenow",
-        "50",
-      );
+      const progress = screen.getByRole("progressbar");
+      expect(progress).toHaveAttribute("value", "50");
+      expect(progress).toHaveAttribute("max", "100");
     });
   });
 
@@ -95,22 +85,16 @@ describe("AudioCacheProgress", () => {
       coveragePercent: 100,
     };
 
-    mockUseAiTtsStore.mockImplementation(
-      (selector: (state: unknown) => unknown) => {
-        const state = {
-          cacheCoverage: fullyCachedCoverage,
-          setCacheCoverage: mockSetCacheCoverage,
-        };
-        return selector(state);
-      },
-    );
+    mockCoverageState(fullyCachedCoverage);
 
     render(<AudioCacheProgress documentId="doc-123" />);
 
     await waitFor(() => {
-      const progressBar = screen.getByRole("progressbar");
-      expect(progressBar).toHaveAttribute("aria-valuenow", "100");
-      expect(progressBar).toHaveClass("cache-progress-bar--complete");
+      const progress = screen.getByRole("progressbar");
+      expect(progress).toHaveAttribute("value", "100");
+      expect(progress.parentElement).toHaveClass(
+        "cache-progress-bar--complete",
+      );
     });
   });
 
@@ -123,36 +107,17 @@ describe("AudioCacheProgress", () => {
       cachedSizeBytes: 0,
     };
 
-    mockUseAiTtsStore.mockImplementation(
-      (selector: (state: unknown) => unknown) => {
-        const state = {
-          cacheCoverage: emptyCache,
-          setCacheCoverage: mockSetCacheCoverage,
-        };
-        return selector(state);
-      },
-    );
+    mockCoverageState(emptyCache);
 
     render(<AudioCacheProgress documentId="doc-123" />);
 
     await waitFor(() => {
-      expect(screen.getByRole("progressbar")).toHaveAttribute(
-        "aria-valuenow",
-        "0",
-      );
+      expect(screen.getByRole("progressbar")).toHaveAttribute("value", "0");
     });
   });
 
   it("displays chunk count details when showDetails is true", async () => {
-    mockUseAiTtsStore.mockImplementation(
-      (selector: (state: unknown) => unknown) => {
-        const state = {
-          cacheCoverage: mockCoverage,
-          setCacheCoverage: mockSetCacheCoverage,
-        };
-        return selector(state);
-      },
-    );
+    mockCoverageState(mockCoverage);
 
     render(<AudioCacheProgress documentId="doc-123" showDetails />);
 
@@ -162,15 +127,7 @@ describe("AudioCacheProgress", () => {
   });
 
   it("hides details when showDetails is false", async () => {
-    mockUseAiTtsStore.mockImplementation(
-      (selector: (state: unknown) => unknown) => {
-        const state = {
-          cacheCoverage: mockCoverage,
-          setCacheCoverage: mockSetCacheCoverage,
-        };
-        return selector(state);
-      },
-    );
+    mockCoverageState(mockCoverage);
 
     render(<AudioCacheProgress documentId="doc-123" showDetails={false} />);
 
@@ -180,15 +137,7 @@ describe("AudioCacheProgress", () => {
   });
 
   it("applies compact variant styling", async () => {
-    mockUseAiTtsStore.mockImplementation(
-      (selector: (state: unknown) => unknown) => {
-        const state = {
-          cacheCoverage: mockCoverage,
-          setCacheCoverage: mockSetCacheCoverage,
-        };
-        return selector(state);
-      },
-    );
+    mockCoverageState(mockCoverage);
 
     render(<AudioCacheProgress documentId="doc-123" variant="compact" />);
 
@@ -205,23 +154,12 @@ describe("AudioCacheProgress", () => {
       coveragePercent: 30,
     };
 
-    mockUseAiTtsStore.mockImplementation(
-      (selector: (state: unknown) => unknown) => {
-        const state = {
-          cacheCoverage: doc1Coverage,
-          setCacheCoverage: mockSetCacheCoverage,
-        };
-        return selector(state);
-      },
-    );
+    mockCoverageState(doc1Coverage);
 
     const { rerender } = render(<AudioCacheProgress documentId="doc-1" />);
 
     await waitFor(() => {
-      expect(screen.getByRole("progressbar")).toHaveAttribute(
-        "aria-valuenow",
-        "30",
-      );
+      expect(screen.getByRole("progressbar")).toHaveAttribute("value", "30");
     });
 
     const doc2Coverage: CoverageResponse = {
@@ -230,36 +168,17 @@ describe("AudioCacheProgress", () => {
       coveragePercent: 70,
     };
 
-    mockUseAiTtsStore.mockImplementation(
-      (selector: (state: unknown) => unknown) => {
-        const state = {
-          cacheCoverage: doc2Coverage,
-          setCacheCoverage: mockSetCacheCoverage,
-        };
-        return selector(state);
-      },
-    );
+    mockCoverageState(doc2Coverage);
 
     rerender(<AudioCacheProgress documentId="doc-2" />);
 
     await waitFor(() => {
-      expect(screen.getByRole("progressbar")).toHaveAttribute(
-        "aria-valuenow",
-        "70",
-      );
+      expect(screen.getByRole("progressbar")).toHaveAttribute("value", "70");
     });
   });
 
   it("handles null coverage gracefully", async () => {
-    mockUseAiTtsStore.mockImplementation(
-      (selector: (state: unknown) => unknown) => {
-        const state = {
-          cacheCoverage: null,
-          setCacheCoverage: mockSetCacheCoverage,
-        };
-        return selector(state);
-      },
-    );
+    mockCoverageState(null);
 
     render(<AudioCacheProgress documentId="doc-123" />);
 
@@ -268,15 +187,7 @@ describe("AudioCacheProgress", () => {
   });
 
   it("provides accessible status updates", async () => {
-    mockUseAiTtsStore.mockImplementation(
-      (selector: (state: unknown) => unknown) => {
-        const state = {
-          cacheCoverage: mockCoverage,
-          setCacheCoverage: mockSetCacheCoverage,
-        };
-        return selector(state);
-      },
-    );
+    mockCoverageState(mockCoverage);
 
     render(<AudioCacheProgress documentId="doc-123" />);
 

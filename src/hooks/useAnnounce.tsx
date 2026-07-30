@@ -167,14 +167,14 @@ export function useAnnounce(
    */
   const AnnouncementRegion: React.FC = useCallback(() => {
     return (
-      <div
+      <output
         role="status"
         aria-live={current?.priority ?? "polite"}
         aria-atomic="true"
         className="sr-only"
       >
         {current?.message}
-      </div>
+      </output>
     );
   }, [current]);
 

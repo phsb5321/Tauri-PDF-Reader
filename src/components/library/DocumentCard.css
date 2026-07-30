@@ -4,7 +4,26 @@
   border: 1px solid var(--border-color, #e0e0e0);
   border-radius: 8px;
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s,
+    border-color 0.2s;
+}
+
+.document-card-open {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+.document-card-open:focus-visible {
+  outline: 2px solid var(--primary-color, #2196f3);
+  outline-offset: -2px;
 }
 
 .document-card:hover {
@@ -27,6 +46,12 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.document-card--grid .document-card-open {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
 }
 
 .document-card--grid .document-card-thumbnail {
@@ -118,6 +143,14 @@
   padding: var(--space-3) var(--space-4);
 }
 
+.document-card--list .document-card-open {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
 .document-card--list .document-card-icon {
   flex-shrink: 0;
   width: 40px;
@@ -193,7 +226,9 @@
   align-items: center;
   justify-content: center;
   opacity: 0;
-  transition: opacity 0.2s, background-color 0.2s;
+  transition:
+    opacity 0.2s,
+    background-color 0.2s;
   color: var(--text-secondary, #666);
 }
 

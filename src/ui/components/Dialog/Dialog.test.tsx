@@ -11,7 +11,7 @@ describe("Dialog", () => {
 
   it("renders when open", () => {
     render(<Dialog {...defaultProps}>Content</Dialog>);
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole("dialog").tagName).toBe("DIALOG");
     expect(screen.getByText("Test Dialog")).toBeInTheDocument();
     expect(screen.getByText("Content")).toBeInTheDocument();
   });
@@ -95,7 +95,9 @@ describe("Dialog", () => {
         Content
       </Dialog>,
     );
-    expect(screen.getByRole("dialog")).toHaveClass("dialog--lg");
+    expect(screen.getByRole("dialog").querySelector(".dialog")).toHaveClass(
+      "dialog--lg",
+    );
   });
 
   it("has proper aria attributes", () => {

@@ -2,6 +2,21 @@
  * SessionItem Component Styles (T070)
  */
 
+.session-item {
+  display: flex;
+  align-items: center;
+}
+
+.session-item__row {
+  flex: 1;
+  min-width: 0;
+}
+
+.session-item__delete {
+  flex-shrink: 0;
+  margin: 0 var(--space-2, 8px);
+}
+
 .session-item__icon {
   width: 20px;
   height: 20px;

@@ -53,10 +53,12 @@ export function SessionItem({
 
   const deleteButton = (
     <IconButton
+      type="button"
       label="Delete session"
       variant="ghost"
       size="sm"
       onClick={handleDelete}
+      className="session-item__delete"
     >
       <svg
         viewBox="0 0 24 24"
@@ -87,19 +89,21 @@ export function SessionItem({
   );
 
   return (
-    <ListRow
-      primary={session.name}
-      secondary={`${session.documentCount} document${session.documentCount !== 1 ? "s" : ""}`}
-      leading={documentIcon}
-      trailing={deleteButton}
-      metadata={
-        <span className="session-item__time">
-          {formatRelativeTime(session.lastAccessedAt)}
-        </span>
-      }
-      onClick={handleClick}
-      selected={selected}
-      className="session-item"
-    />
+    <div className="session-item">
+      <ListRow
+        primary={session.name}
+        secondary={`${session.documentCount} document${session.documentCount !== 1 ? "s" : ""}`}
+        leading={documentIcon}
+        metadata={
+          <span className="session-item__time">
+            {formatRelativeTime(session.lastAccessedAt)}
+          </span>
+        }
+        onClick={handleClick}
+        selected={selected}
+        className="session-item__row"
+      />
+      {deleteButton}
+    </div>
   );
 }

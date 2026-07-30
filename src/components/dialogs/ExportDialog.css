@@ -4,6 +4,14 @@
   left: 0;
   right: 0;
   bottom: 0;
+  width: auto;
+  max-width: none;
+  height: auto;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: inherit;
   background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
@@ -97,7 +105,9 @@
   border: 1px solid var(--border-color, #e0e0e0);
   border-radius: 8px;
   cursor: pointer;
-  transition: border-color 0.2s, background-color 0.2s;
+  transition:
+    border-color 0.2s,
+    background-color 0.2s;
 }
 
 .export-format-option:hover {
@@ -164,7 +174,9 @@
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s, opacity 0.2s;
+  transition:
+    background-color 0.2s,
+    opacity 0.2s;
 }
 
 .export-dialog-button:disabled {

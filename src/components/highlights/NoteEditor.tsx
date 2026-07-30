@@ -69,14 +69,16 @@ export function NoteEditor({ highlight, onSave, onClose }: NoteEditorProps) {
     previewText.length > 150 ? previewText.slice(0, 150) + "..." : previewText;
 
   return (
-    <div
+    <dialog
+      open
       className="note-editor-backdrop"
       onClick={handleBackdropClick}
       onKeyDown={(e) => {
         if (e.key === "Escape")
-          handleBackdropClick(e as unknown as React.MouseEvent<HTMLDivElement>);
+          handleBackdropClick(
+            e as unknown as React.MouseEvent<HTMLDialogElement>,
+          );
       }}
-      role="dialog"
       aria-modal="true"
       aria-labelledby="note-editor-title"
     >
@@ -139,7 +141,7 @@ export function NoteEditor({ highlight, onSave, onClose }: NoteEditorProps) {
           </button>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }
 

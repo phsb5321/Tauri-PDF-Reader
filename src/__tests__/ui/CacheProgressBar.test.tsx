@@ -18,24 +18,25 @@ describe("CacheProgressBar", () => {
     render(<CacheProgressBar coveragePercent={0} />);
 
     const progressBar = screen.getByRole("progressbar");
-    expect(progressBar).toHaveAttribute("aria-valuenow", "0");
-    expect(progressBar).toHaveAttribute("aria-valuemin", "0");
-    expect(progressBar).toHaveAttribute("aria-valuemax", "100");
+    expect(progressBar).toHaveAttribute("value", "0");
+    expect(progressBar).toHaveAttribute("max", "100");
   });
 
   it("renders with 50% coverage", () => {
     render(<CacheProgressBar coveragePercent={50} />);
 
     const progressBar = screen.getByRole("progressbar");
-    expect(progressBar).toHaveAttribute("aria-valuenow", "50");
+    expect(progressBar).toHaveAttribute("value", "50");
   });
 
   it("renders with 100% coverage (fully cached)", () => {
     render(<CacheProgressBar coveragePercent={100} />);
 
     const progressBar = screen.getByRole("progressbar");
-    expect(progressBar).toHaveAttribute("aria-valuenow", "100");
-    expect(progressBar).toHaveClass("cache-progress-bar--complete");
+    expect(progressBar).toHaveAttribute("value", "100");
+    expect(progressBar.parentElement).toHaveClass(
+      "cache-progress-bar--complete",
+    );
   });
 
   it("shows percentage label", () => {
@@ -54,7 +55,7 @@ describe("CacheProgressBar", () => {
     render(<CacheProgressBar coveragePercent={50} className="custom-class" />);
 
     const progressBar = screen.getByRole("progressbar");
-    expect(progressBar).toHaveClass("custom-class");
+    expect(progressBar.parentElement).toHaveClass("custom-class");
   });
 
   it("shows correct visual width via inline style", () => {
@@ -68,14 +69,18 @@ describe("CacheProgressBar", () => {
     render(<CacheProgressBar coveragePercent={30} variant="compact" />);
 
     const progressBar = screen.getByRole("progressbar");
-    expect(progressBar).toHaveClass("cache-progress-bar--compact");
+    expect(progressBar.parentElement).toHaveClass(
+      "cache-progress-bar--compact",
+    );
   });
 
   it("renders default variant", () => {
     render(<CacheProgressBar coveragePercent={30} variant="default" />);
 
     const progressBar = screen.getByRole("progressbar");
-    expect(progressBar).not.toHaveClass("cache-progress-bar--compact");
+    expect(progressBar.parentElement).not.toHaveClass(
+      "cache-progress-bar--compact",
+    );
   });
 
   it("handles decimal percentages by rounding", () => {
@@ -89,11 +94,11 @@ describe("CacheProgressBar", () => {
     const { rerender } = render(<CacheProgressBar coveragePercent={-10} />);
 
     let progressBar = screen.getByRole("progressbar");
-    expect(progressBar).toHaveAttribute("aria-valuenow", "0");
+    expect(progressBar).toHaveAttribute("value", "0");
 
     rerender(<CacheProgressBar coveragePercent={150} />);
     progressBar = screen.getByRole("progressbar");
-    expect(progressBar).toHaveAttribute("aria-valuenow", "100");
+    expect(progressBar).toHaveAttribute("value", "100");
   });
 
   it("provides accessible label", () => {
