@@ -89,6 +89,13 @@ jobs:
         # excluded (Rust has its own dead-code analysis via cargo clippy).
         run: pnpm knip
 
+      - name: Type coverage ratchet (≥ 99.9%)
+        # Pedro's Quality Enforcement Standard TS-monorepo lever #2: closes the
+        # `as any` escape hatch agents use to green `tsc`. Floor pinned at the
+        # measured baseline (25246/25269 = 99.90%); ratchets UP as `any` is
+        # removed, never loosens.
+        run: pnpm type-coverage
+
       - name: Coverage check
         run: pnpm test:coverage
 
