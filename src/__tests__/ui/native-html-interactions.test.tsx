@@ -1,4 +1,4 @@
-import { fireEvent, render } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { HighlightsPanel } from "../../components/highlights/HighlightsPanel";
 import { DocumentCard } from "../../components/library/DocumentCard";
@@ -65,6 +65,40 @@ describe("native HTML interactions", () => {
       expectNoNestedButtons(container);
     },
   );
+
+  it("keeps context-menu actions independent from the card action", () => {
+    const onDoubleClick = vi.fn();
+    const onDelete = vi.fn();
+    const { container } = render(
+      <DocumentCard
+        document={{
+          ...DOCUMENT,
+          title: null,
+          pageCount: 0,
+          lastOpenedAt: "2025-01-02T12:00:00.000Z",
+        }}
+        isSelected
+        viewMode="grid"
+        onClick={vi.fn()}
+        onDoubleClick={onDoubleClick}
+        onDelete={onDelete}
+      />,
+    );
+
+    const card = container.querySelector("article");
+    if (!card) throw new Error("Document card was not rendered");
+    fireEvent.contextMenu(card);
+    fireEvent.click(screen.getByRole("button", { name: "Open" }));
+    expect(onDoubleClick).toHaveBeenCalledOnce();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove from Library" }),
+    );
+    expect(onDelete).toHaveBeenCalledOnce();
+    expect(
+      screen.queryByRole("button", { name: "Cancel" }),
+    ).not.toBeInTheDocument();
+  });
 
   it("keeps highlight actions as sibling buttons", () => {
     const { container } = render(

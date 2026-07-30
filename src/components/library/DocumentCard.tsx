@@ -38,9 +38,9 @@ export function DocumentCard({
         month: "short",
         day: "numeric",
         year:
-          date.getFullYear() !== new Date().getFullYear()
-            ? "numeric"
-            : undefined,
+          date.getFullYear() === new Date().getFullYear()
+            ? undefined
+            : "numeric",
       });
     } catch {
       return "Unknown";
@@ -185,11 +185,7 @@ export function DocumentCard({
 
       {/* Context Menu */}
       {showContextMenu && (
-        <div
-          className="document-card-context-menu"
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-        >
+        <div className="document-card-context-menu">
           <button type="button" onClick={onDoubleClick}>
             Open
           </button>

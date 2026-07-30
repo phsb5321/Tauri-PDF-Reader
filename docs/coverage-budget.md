@@ -11,24 +11,38 @@ records the policy and the ratchet plan.
 - When you add tests that raise a metric, raise its floor to the new measured
   value in the same PR (ratchet up). Small steps are fine.
 
-## Current floor (019-coverage-ratchet, 2026-05-31, commit base 8c366d7)
+## Current floor (052-sonar-gate, 2026-07-30)
 
-Measured via `pnpm test:coverage` (v8 provider), after the 010–015 store-test
-branches merged to `main`:
+Measured via
+`pnpm exec vitest run --coverage --maxWorkers=1 --minWorkers=1`
+(v8 provider):
 
-| Metric     | Measured | Floor (CI gate) | Target |
-| ---------- | -------- | --------------- | ------ |
-| Lines      | 46.91%   | 46              | 80     |
-| Statements | 46.91%   | 46              | 80     |
-| Functions  | 59.58%   | 59              | 80     |
+| Metric     | Measured | Floor (CI gate) | Target   |
+| ---------- | -------- | --------------- | -------- |
+| Lines      | 57.52%   | 57              | 80       |
+| Statements | 57.52%   | 57              | 80       |
+| Functions  | 60.32%   | 60              | 80       |
+| Branches   | 89.97%   | 89              | 80 (met) |
+
+The 052 accessibility and interaction tests raised lines/statements by more
+than ten points and branches by one point. Floors sit at the integer below the
+measured value so deterministic runs retain a small margin.
+
+## History
+
+### 019-coverage-ratchet (2026-05-31, commit base 8c366d7)
+
+| Metric     | Measured | Floor (CI gate) | Target   |
+| ---------- | -------- | --------------- | -------- |
+| Lines      | 46.91%   | 46              | 80       |
+| Statements | 46.91%   | 46              | 80       |
+| Functions  | 59.58%   | 59              | 80       |
 | Branches   | 88.72%   | 88              | 80 (met) |
 
-Ratcheted up from the 009 floors below (42/53/80/42) — the merged store tests
-raised lines/statements ~42→47, functions ~54→60, branches ~88→89. Floors sit
-just under the measured value as a regression gate; the suite is deterministic
-(no flaky coverage), so the ~0.6–0.9% margin is safe.
+Ratcheted up from the 009 floors below (42/53/80/42) after the merged store
+tests raised lines/statements ~42→47, functions ~54→60, and branches ~88→89.
 
-## History — baseline (009-coverage-gate, 2026-05-30, commit base 7c5de09)
+### 009-coverage-gate (2026-05-30, commit base 7c5de09)
 
 Measured via `pnpm test:coverage` (v8 provider):
 

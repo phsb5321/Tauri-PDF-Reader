@@ -39,7 +39,6 @@ export function Dialog({
   useFocusTrap({
     containerRef: dialogRef,
     active: open,
-    onEscape: closeOnEscape ? onClose : undefined,
     preventScroll: true,
   });
 
@@ -60,6 +59,9 @@ export function Dialog({
       open
       className="dialog-backdrop"
       onClick={handleBackdropClick}
+      onKeyDown={(e) => {
+        if (closeOnEscape && e.key === "Escape") onClose();
+      }}
       aria-modal="true"
       aria-labelledby="dialog-title"
       aria-describedby={description ? "dialog-description" : undefined}

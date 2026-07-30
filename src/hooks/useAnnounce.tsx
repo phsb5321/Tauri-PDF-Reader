@@ -168,7 +168,6 @@ export function useAnnounce(
   const AnnouncementRegion: React.FC = useCallback(() => {
     return (
       <output
-        role="status"
         aria-live={current?.priority ?? "polite"}
         aria-atomic="true"
         className="sr-only"
