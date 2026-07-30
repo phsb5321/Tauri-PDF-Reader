@@ -1,0 +1,106 @@
+name: Release
+
+# Build + publish Lectrice Linux bundles (AppImage + deb) to a GitHub Release
+# on a v* tag. Runs on the self-hosted vm103 runner (GitHub-hosted runners are
+# billing-locked for this account). Mirrors ci.yml's runner + system-dep +
+# node/pnpm/Rust + cargo-cache setup; mirrors codeql.yml's deny-all permissions.
+#
+# Targets are restricted to appimage+deb via the tauri build CLI flag
+# (--bundles), NOT by editing tauri.conf.json (bundle.targets stays "all"), so
+# this change is CI-config-only — no app source, capability, or fs-scope edits.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+# Deny-all at workflow scope; the release job re-grants the minimum it needs.
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false # never cancel an in-flight release upload
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+
+jobs:
+  release:
+    name: Build & publish Linux bundles
+    runs-on: [self-hosted, Linux, X64, vm103]
+    timeout-minutes: 45
+    permissions:
+      contents: write # create the GitHub Release + upload AppImage/deb assets
+
+    env:
+      # AppImage bundling runs linuxdeploy (itself an AppImage) which needs the
+      # FUSE kernel module to self-mount; the self-hosted runner lacks it, so
+      # extract-and-run bypasses FUSE. NO_STRIP dodges the strip/.relr.dyn
+      # incompatibility on the modern toolchain.
+      APPIMAGE_EXTRACT_AND_RUN: "1"
+      NO_STRIP: "true"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf \
+            libspeechd-dev libasound2-dev libssl-dev pkg-config clang libclang-dev \
+            fakeroot dpkg file
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10 # package.json has no packageManager field — pin required
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ runner.os }}-cargo-release-${{ hashFiles('src-tauri/Cargo.lock') }}
+          # Release-scoped restore key ONLY. A broad `-cargo-` fallback would
+          # restore ci.yml's cache, whose target/ carries an ~11 GB debug tree
+          # (CI runs `cargo test`) — on the shared self-hosted runner that fills
+          # the disk and breaks AppImage bundling. Release builds --release only.
+          restore-keys: ${{ runner.os }}-cargo-release-
+
+      # tauri-action runs beforeBuildCommand ("pnpm build") but does NOT install
+      # node_modules itself — populate them first.
+      - name: Install frontend dependencies
+        run: pnpm install
+
+      - name: Build and publish release
+        # SHA-pinned (v1.0.0). This is the token-holding publish step — the
+        # supply-chain-critical action gets pinned; setup helpers float, matching
+        # ci.yml. To bump: verify the new tag is a non-prerelease release, then
+        # update the SHA + version comment together.
+        uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }} # the v* tag that triggered the run
+          releaseName: "Lectrice ${{ github.ref_name }}"
+          releaseBody: "See the assets below to download and install this version."
+          releaseDraft: false
+          # SemVer prerelease tags carry a hyphen (v1.0.0-rc.1); stable tags
+          # (v0.1.0) do not. Classify automatically so an -rc tag publishes as a
+          # prerelease instead of a full release.
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          # Restrict to Linux AppImage + deb (overrides bundle.targets:"all" in
+          # tauri.conf.json at build time, without editing the committed config).
+          args: --bundles appimage,deb
