@@ -165,7 +165,9 @@ export function AiPlaybackBar({
     currentWordIndex,
     wordTimings,
   } = useTtsWordHighlight({
-    onComplete: handlePlaybackComplete,
+    onComplete: () => {
+      void handlePlaybackComplete();
+    },
     onWordChange: useCallback((wordIndex: number, word: string) => {
       console.debug("[AiPlaybackBar] Word changed:", wordIndex, word);
     }, []),

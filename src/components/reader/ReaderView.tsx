@@ -58,10 +58,18 @@ export function ReaderView() {
   }, [playbackState]);
 
   useMenuActions({
-    onOpen: openPdf,
-    onPlayPause: handleMenuPlayPause,
-    onPrevPage: () => goToPageFromMenu(currentPage - 1),
-    onNextPage: () => goToPageFromMenu(currentPage + 1),
+    onOpen: () => {
+      void openPdf();
+    },
+    onPlayPause: () => {
+      void handleMenuPlayPause();
+    },
+    onPrevPage: () => {
+      void goToPageFromMenu(currentPage - 1);
+    },
+    onNextPage: () => {
+      void goToPageFromMenu(currentPage + 1);
+    },
   });
 
   // Auto-save reading progress

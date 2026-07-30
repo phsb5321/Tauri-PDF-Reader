@@ -104,6 +104,10 @@ export function CreateSessionDialog({
     <div
       className="create-session-dialog__overlay"
       onClick={handleOverlayClick}
+      onKeyDown={(e) => {
+        if (e.key === "Escape")
+          handleOverlayClick(e as unknown as React.MouseEvent<HTMLDivElement>);
+      }}
     >
       <div
         ref={dialogRef}

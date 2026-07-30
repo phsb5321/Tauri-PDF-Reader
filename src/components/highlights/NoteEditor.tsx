@@ -1,6 +1,6 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
-import type { Highlight } from '../../lib/schemas';
-import './NoteEditor.css';
+import { useState, useCallback, useRef, useEffect } from "react";
+import type { Highlight } from "../../lib/schemas";
+import "./NoteEditor.css";
 
 interface NoteEditorProps {
   highlight: Highlight;
@@ -12,7 +12,7 @@ interface NoteEditorProps {
  * Modal dialog for editing highlight notes
  */
 export function NoteEditor({ highlight, onSave, onClose }: NoteEditorProps) {
-  const [note, setNote] = useState(highlight.note || '');
+  const [note, setNote] = useState(highlight.note || "");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -28,13 +28,13 @@ export function NoteEditor({ highlight, onSave, onClose }: NoteEditorProps) {
   // Handle escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         onClose();
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
   // Handle click outside modal
@@ -44,7 +44,7 @@ export function NoteEditor({ highlight, onSave, onClose }: NoteEditorProps) {
         onClose();
       }
     },
-    [onClose]
+    [onClose],
   );
 
   const handleSave = useCallback(() => {
@@ -55,23 +55,27 @@ export function NoteEditor({ highlight, onSave, onClose }: NoteEditorProps) {
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       // Save on Ctrl/Cmd + Enter
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
         e.preventDefault();
         handleSave();
       }
     },
-    [handleSave]
+    [handleSave],
   );
 
   // Preview of highlighted text
-  const previewText = highlight.textContent || 'No text content';
+  const previewText = highlight.textContent || "No text content";
   const truncatedPreview =
-    previewText.length > 150 ? previewText.slice(0, 150) + '...' : previewText;
+    previewText.length > 150 ? previewText.slice(0, 150) + "..." : previewText;
 
   return (
     <div
       className="note-editor-backdrop"
       onClick={handleBackdropClick}
+      onKeyDown={(e) => {
+        if (e.key === "Escape")
+          handleBackdropClick(e as unknown as React.MouseEvent<HTMLDivElement>);
+      }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="note-editor-title"
@@ -79,7 +83,7 @@ export function NoteEditor({ highlight, onSave, onClose }: NoteEditorProps) {
       <div ref={modalRef} className="note-editor-modal">
         <div className="note-editor-header">
           <h2 id="note-editor-title" className="note-editor-title">
-            {highlight.note ? 'Edit Note' : 'Add Note'}
+            {highlight.note ? "Edit Note" : "Add Note"}
           </h2>
           <button
             className="note-editor-close"
@@ -95,7 +99,7 @@ export function NoteEditor({ highlight, onSave, onClose }: NoteEditorProps) {
           <div className="note-editor-preview">
             <span
               className="note-editor-preview-highlight"
-              style={{ backgroundColor: highlight.color + '40' }}
+              style={{ backgroundColor: highlight.color + "40" }}
             >
               {truncatedPreview}
             </span>
@@ -116,9 +120,7 @@ export function NoteEditor({ highlight, onSave, onClose }: NoteEditorProps) {
               placeholder="Add your note here..."
               rows={4}
             />
-            <span className="note-editor-hint">
-              Press Ctrl+Enter to save
-            </span>
+            <span className="note-editor-hint">Press Ctrl+Enter to save</span>
           </div>
         </div>
 

@@ -1,7 +1,7 @@
-import { useState, useCallback, useMemo } from 'react';
-import type { Document } from '../../lib/schemas';
-import type { ViewMode } from '../../stores/library-store';
-import './DocumentCard.css';
+import { useState, useCallback, useMemo } from "react";
+import type { Document } from "../../lib/schemas";
+import type { ViewMode } from "../../stores/library-store";
+import "./DocumentCard.css";
 
 interface DocumentCardProps {
   document: Document;
@@ -31,16 +31,19 @@ export function DocumentCard({
 
   // Format date for display
   const lastOpened = useMemo(() => {
-    if (!document.lastOpenedAt) return 'Never';
+    if (!document.lastOpenedAt) return "Never";
     try {
       const date = new Date(document.lastOpenedAt);
       return date.toLocaleDateString(undefined, {
-        month: 'short',
-        day: 'numeric',
-        year: date.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined,
+        month: "short",
+        day: "numeric",
+        year:
+          date.getFullYear() !== new Date().getFullYear()
+            ? "numeric"
+            : undefined,
       });
     } catch {
-      return 'Unknown';
+      return "Unknown";
     }
   }, [document.lastOpenedAt]);
 
@@ -59,7 +62,7 @@ export function DocumentCard({
       handleCloseContextMenu();
       onDelete();
     },
-    [onDelete, handleCloseContextMenu]
+    [onDelete, handleCloseContextMenu],
   );
 
   // Get file name from path
@@ -68,32 +71,34 @@ export function DocumentCard({
     return parts[parts.length - 1] || document.filePath;
   }, [document.filePath]);
 
-  if (viewMode === 'list') {
+  if (viewMode === "list") {
     return (
       <div
-        className={`document-card document-card--list ${isSelected ? 'selected' : ''} ${fileExists === false ? 'missing' : ''}`}
+        className={`document-card document-card--list ${isSelected ? "selected" : ""} ${fileExists === false ? "missing" : ""}`}
         onClick={onClick}
         onDoubleClick={onDoubleClick}
         onContextMenu={handleContextMenu}
         role="button"
         tabIndex={0}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') onDoubleClick();
-          if (e.key === ' ') onClick();
+          if (e.key === "Enter") onDoubleClick();
+          if (e.key === " ") onClick();
         }}
       >
         <div className="document-card-icon">
           <PdfIcon />
         </div>
         <div className="document-card-info">
-          <span className="document-card-title">{document.title || fileName}</span>
+          <span className="document-card-title">
+            {document.title || fileName}
+          </span>
           <span className="document-card-path" title={document.filePath}>
             {fileName}
           </span>
         </div>
         <div className="document-card-meta">
           <span className="document-card-pages">
-            {document.currentPage}/{document.pageCount || '?'} pages
+            {document.currentPage}/{document.pageCount || "?"} pages
           </span>
           <span className="document-card-date">{lastOpened}</span>
         </div>
@@ -117,15 +122,15 @@ export function DocumentCard({
 
   return (
     <div
-      className={`document-card document-card--grid ${isSelected ? 'selected' : ''} ${fileExists === false ? 'missing' : ''}`}
+      className={`document-card document-card--grid ${isSelected ? "selected" : ""} ${fileExists === false ? "missing" : ""}`}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onContextMenu={handleContextMenu}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') onDoubleClick();
-        if (e.key === ' ') onClick();
+        if (e.key === "Enter") onDoubleClick();
+        if (e.key === " ") onClick();
       }}
     >
       <div className="document-card-thumbnail">
@@ -139,7 +144,7 @@ export function DocumentCard({
           {document.title || fileName}
         </h3>
         <p className="document-card-meta">
-          <span>{document.pageCount || '?'} pages</span>
+          <span>{document.pageCount || "?"} pages</span>
           <span>{lastOpened}</span>
         </p>
         <div className="document-card-progress">
@@ -159,7 +164,11 @@ export function DocumentCard({
 
       {/* Context Menu */}
       {showContextMenu && (
-        <div className="document-card-context-menu" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="document-card-context-menu"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
           <button onClick={onDoubleClick}>Open</button>
           <button onClick={handleDelete}>Remove from Library</button>
           <button onClick={handleCloseContextMenu}>Cancel</button>

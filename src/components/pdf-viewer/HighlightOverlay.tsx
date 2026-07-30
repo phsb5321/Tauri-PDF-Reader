@@ -1,6 +1,6 @@
-import { useCallback } from 'react';
-import type { Highlight } from '../../lib/schemas';
-import './HighlightOverlay.css';
+import { useCallback } from "react";
+import type { Highlight } from "../../lib/schemas";
+import "./HighlightOverlay.css";
 
 interface HighlightOverlayProps {
   highlights: Highlight[];
@@ -29,7 +29,7 @@ export function HighlightOverlay({
       e.stopPropagation();
       onHighlightClick?.(highlight);
     },
-    [onHighlightClick]
+    [onHighlightClick],
   );
 
   const handleDoubleClick = useCallback(
@@ -37,7 +37,7 @@ export function HighlightOverlay({
       e.stopPropagation();
       onHighlightDoubleClick?.(highlight);
     },
-    [onHighlightDoubleClick]
+    [onHighlightDoubleClick],
   );
 
   if (highlights.length === 0) {
@@ -55,7 +55,7 @@ export function HighlightOverlay({
       {highlights.map((highlight) => (
         <div
           key={highlight.id}
-          className={`highlight-group ${selectedHighlightId === highlight.id ? 'selected' : ''}`}
+          className={`highlight-group ${selectedHighlightId === highlight.id ? "selected" : ""}`}
           data-highlight-id={highlight.id}
         >
           {highlight.rects.map((rect, index) => (
@@ -70,11 +70,17 @@ export function HighlightOverlay({
                 backgroundColor: hexToRgba(highlight.color, 0.35),
               }}
               onClick={(e) => handleClick(highlight, e)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  handleClick(highlight, e as unknown as React.MouseEvent);
+                }
+              }}
               onDoubleClick={(e) => handleDoubleClick(highlight, e)}
               title={highlight.textContent || undefined}
               role="button"
               tabIndex={0}
-              aria-label={`Highlight: ${highlight.textContent?.slice(0, 50) || 'No text'}`}
+              aria-label={`Highlight: ${highlight.textContent?.slice(0, 50) || "No text"}`}
             />
           ))}
           {/* Show note indicator if highlight has a note */}
@@ -128,7 +134,7 @@ function NoteIndicator({ highlight, scale, onClick }: NoteIndicatorProps) {
  */
 function hexToRgba(hex: string, alpha: number): string {
   // Remove # if present
-  const cleanHex = hex.startsWith('#') ? hex.slice(1) : hex;
+  const cleanHex = hex.startsWith("#") ? hex.slice(1) : hex;
 
   if (cleanHex.length !== 6) {
     return `rgba(255, 255, 0, ${alpha})`;
