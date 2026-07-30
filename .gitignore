@@ -47,3 +47,6 @@ src-tauri/gen/
 # Database files (development)
 *.db
 *.db-journal
+
+# pnpm 11 stray store (uses host pnpm 10 instead)
+.pnpm-store/
