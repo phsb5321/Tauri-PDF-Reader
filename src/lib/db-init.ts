@@ -149,6 +149,45 @@ const MIGRATIONS_TABLE = `CREATE TABLE IF NOT EXISTS _migrations (
   applied_at TEXT NOT NULL
 )`;
 
+/**
+ * The public read surface for out-of-process consumers.
+ *
+ * Tools outside this app (the Pearson knowledge-gap anchorer, for one) open
+ * pdf-reader.db read-only and turn highlights into citations. Pointing them at
+ * the base tables makes every column name an accidental API: a rename would
+ * break them silently, at a distance, with no version to check against. This
+ * view is the contract instead — its column names stay stable even when the
+ * underlying ones move, and when they move THIS definition is what has to be
+ * updated. `src-tauri/tests/frontend_schema_contract.rs` executes the DDL in
+ * this file against a real SQLite database and fails until it is. (The test
+ * lives on the Rust side because CI pins the frontend job to Node 20 and
+ * `node:sqlite` needs 22.5.)
+ *
+ * Deliberately NOT a migration. A migration runs once per database, so a later
+ * edit to this definition would ship to new profiles and never reach existing
+ * ones — the contract would hold on the machines nobody reads from and rot on
+ * the machines that matter. Dropped and recreated on every launch instead, so
+ * the view in any live database is always the one declared here.
+ */
+export const CONTRACT_VIEWS = [
+  `DROP VIEW IF EXISTS v_highlight_citations`,
+
+  `CREATE VIEW v_highlight_citations AS
+    SELECT
+      h.id            AS highlight_id,
+      d.id            AS document_id,
+      d.file_path     AS file_path,
+      d.title         AS title,
+      h.page_number   AS page_number,
+      h.text_content  AS text_content,
+      h.note          AS note,
+      h.color         AS color,
+      h.created_at    AS created_at,
+      d.last_opened_at AS document_last_opened_at
+    FROM highlights h
+    JOIN documents d ON d.id = h.document_id`,
+];
+
 // Re-applied on every launch so a key deleted from the table comes back.
 const DEFAULT_SETTINGS = [
   ["highlight.defaultColor", '"#FFEB3B"'],
@@ -241,6 +280,12 @@ export async function initDatabase(): Promise<void> {
         ? `[DB] Applied migration(s): ${applied.join(", ")}`
         : "[DB] Schema already up to date",
     );
+
+    // After the migrations, so the view is rebuilt on top of whatever shape
+    // this launch just migrated the base tables to.
+    for (const sql of CONTRACT_VIEWS) {
+      await db.execute(sql);
+    }
 
     for (const [key, value] of DEFAULT_SETTINGS) {
       try {

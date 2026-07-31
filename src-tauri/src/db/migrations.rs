@@ -1,3 +1,12 @@
+//! Schema fixture for the Rust test suite.
+//!
+//! NOT the production schema. `src/lib/db-init.ts` is — it is what
+//! tauri-plugin-sql executes at boot against the real `pdf-reader.db`. Keep the
+//! two in step: a table added here and nowhere else exists only in tests, and
+//! the command that queries it fails on a user's machine with "no such table".
+//! `tests/frontend_schema_contract.rs` asserts the production side has every
+//! table these fixtures create.
+
 /// SQL migrations for the PDF Reader database.
 ///
 /// These are test fixtures. The authoritative runner is `src/lib/db-init.ts`,
@@ -5,7 +14,6 @@
 /// this array exists so Rust repository tests can build the same schema in an
 /// in-memory SQLite. Keep the two in step — a table added there needs its DDL
 /// here or the Rust tests exercise a schema production does not have.
-#[allow(dead_code)]
 pub const MIGRATIONS: &[&str] = &[
     // Migration 1: Initial schema
     r##"
@@ -158,27 +166,3 @@ pub const MIGRATIONS: &[&str] = &[
     INSERT OR IGNORE INTO _migrations (version, applied_at) VALUES (3, datetime('now'));
     "##,
 ];
-
-/// SQLite PRAGMA configuration for optimal performance
-/// These should be run at connection time
-#[allow(dead_code)]
-pub const PRAGMA_CONFIG: &str = r#"
-PRAGMA foreign_keys = ON;
-PRAGMA journal_mode = WAL;
-PRAGMA synchronous = NORMAL;
-PRAGMA temp_store = MEMORY;
-PRAGMA cache_size = -64000;
-PRAGMA busy_timeout = 5000;
-"#;
-
-/// Get the SQL for creating initial schema
-#[allow(dead_code)]
-pub fn get_init_sql() -> &'static str {
-    MIGRATIONS[0]
-}
-
-/// Get PRAGMA configuration SQL
-#[allow(dead_code)]
-pub fn get_pragma_sql() -> &'static str {
-    PRAGMA_CONFIG
-}
