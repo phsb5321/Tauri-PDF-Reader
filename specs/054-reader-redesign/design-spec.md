@@ -119,9 +119,10 @@ python3 specs/054-reader-redesign/design-demos/render-screenshots.py
 
 It re-captures each screenshot and fails on: any page or console error; any
 request that is not `file:`/`data:` (the offline rule); a capture that is not
-1440×900; any visible interactive control below 44×44; or a required
-interaction — play/pause, revealing the session or inspector surface, next page
-— that mutates no observable state. Current result: all three directions pass.
+1440×900; any visible interactive control below 44×44; a required interaction
+— play/pause, revealing the session or inspector surface, next page — that
+mutates no observable state; or a play control that does not re-describe itself
+once playback starts. Current result: all three directions pass.
 Smallest rendered font size is reported, not gated (A and B use 10px eyebrow
 chrome, C bottoms out at 12px); the brief's 14px floor governs production body
 copy, so that trade-off is part of what the reviewer is choosing between.

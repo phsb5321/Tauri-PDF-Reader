@@ -88,6 +88,13 @@ INTERACTIONS = [
     ("reader control", re.compile(r"^next page$", re.I)),
 ]
 
+# The play control additionally has to re-describe itself, because "listening
+# state is legible" is the brief's whole point: a direction that starts playing
+# while its button still says Play has failed even if the page text changed.
+CONTROL_JS = """
+el => [el.getAttribute('aria-label'), el.getAttribute('aria-pressed'), el.textContent.trim()].join('|')
+"""
+
 
 def first_onscreen(page, name: re.Pattern):
     """First button with this accessible name inside the 1440x900 frame.
@@ -113,11 +120,19 @@ def check_interactions(page) -> list[str]:
         if control is None:
             problems.append(f"{label}: no on-screen button named {name.pattern}")
             continue
+        # A handle, not the locator: the play control renames itself to Pause,
+        # so re-resolving by name after the click would find nothing.
+        handle = control.element_handle()
         before = page.evaluate(STATE_JS)
+        control_before = handle.evaluate(CONTROL_JS)
         control.click()
         page.wait_for_timeout(250)
         if page.evaluate(STATE_JS) == before:
             problems.append(f"{label}: clicking {name.pattern} changed no observable state")
+        if label == "play/pause" and handle.evaluate(CONTROL_JS) == control_before:
+            problems.append(
+                f"play/pause: the control still describes itself as {control_before!r} after the click"
+            )
     return problems
 
 
