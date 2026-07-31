@@ -1,5 +1,6 @@
 import { useEffect, useCallback } from "react";
 import { useLibraryStore } from "../../stores/library-store";
+import { ContinueReading } from "./ContinueReading";
 import { DocumentCard } from "./DocumentCard";
 import { SearchBar } from "./SearchBar";
 import { EmptyState } from "../../ui/components/EmptyState/EmptyState";
@@ -121,6 +122,8 @@ export function LibraryView({ onDocumentSelect }: LibraryViewProps) {
           </div>
         </div>
       </div>
+
+      <ContinueReading documents={documents} onResume={handleDocumentOpen} />
 
       {documents.length === 0 ? (
         <EmptyState
