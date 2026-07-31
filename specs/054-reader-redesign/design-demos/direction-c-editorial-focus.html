@@ -1305,7 +1305,7 @@
           const zoom = zoomStates[zoomIndex];
           zoomMode.textContent = zoom.mode;
           zoomValue.textContent = zoom.value;
-          zoomButton.setAttribute("aria-label", `Zoom, ${zoom.mode}, ${zoom.value.replace("%", " percent")}`);
+          zoomButton.setAttribute("aria-label", `Zoom, ${zoom.mode}, ${zoom.value.replaceAll("%", " percent")}`);
           pageSheet.style.transform = `scale(${zoom.scale})`;
           titlePageState.textContent = `Page ${page} of 2 · ${zoom.mode} · ${zoom.value}`;
         }
@@ -1324,7 +1324,7 @@
         speedButton.addEventListener("click", () => {
           speedIndex = (speedIndex + 1) % speeds.length;
           speedButton.textContent = speeds[speedIndex];
-          speedButton.setAttribute("aria-label", `Playback speed ${speeds[speedIndex].replace("×", " times")}`);
+          speedButton.setAttribute("aria-label", `Playback speed ${speeds[speedIndex].replaceAll("×", " times")}`);
           showToast(`Playback speed ${speeds[speedIndex]}`);
         });
 
