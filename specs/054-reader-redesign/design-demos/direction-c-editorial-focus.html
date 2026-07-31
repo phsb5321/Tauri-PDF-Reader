@@ -1,0 +1,1408 @@
+<!--
+  Direction C · Editorial Focus
+
+  Assumptions
+  - This prototype represents Lectrice's active macOS reading state at 1440×900.
+  - The supplied fixture image is the only document imagery; page 2 reuses it only
+    to demonstrate navigation because no second fixture asset is specified.
+  - "Library" contains only the real current session so the prototype does not
+    invent files, folders, history, or usage data.
+  - System sans and monospace stacks are intentional offline fallbacks for the
+    shipped IBM Plex Sans and IBM Plex Mono families.
+
+  Reasoning
+  - Information Architects / iA Writer suggests a document-first composition:
+    the page owns the visual center, controls sit in its margins, and navigation
+    is disclosed only when requested.
+  - Blue is reserved for app/navigation actions. Mauve appears only where speech,
+    timing, or listening state is expressed.
+  - The lower transcript is attached to the page edge like editorial apparatus,
+    not presented as a detached media-player toolbar.
+  - Form comes from treating the spoken sentence as a typographic margin note attached to the page.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lectrice · Editorial Focus</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --base: #eff1f5;
+        --mantle: #e6e9ef;
+        --crust: #dce0e8;
+        --ink: #4c4f69;
+        --secondary: #6c6f85;
+        --blue: #1e66f5;
+        --mauve: #8839ef;
+        --page: #ffffff;
+        --rule: #c5c9d4;
+        --focus: #1e66f5;
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+        --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+        --ease: 180ms cubic-bezier(0.2, 0.7, 0.2, 1);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: var(--crust);
+        color: var(--ink);
+        font-family: var(--sans);
+        font-size: 16px;
+      }
+
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+
+      button {
+        color: inherit;
+      }
+
+      button:focus-visible,
+      input:focus-visible {
+        outline: 3px solid var(--focus);
+        outline-offset: 2px;
+      }
+
+      .voice-control:focus-visible {
+        outline-color: var(--mauve);
+      }
+
+      .app {
+        position: relative;
+        width: min(100vw, 1440px);
+        height: min(100vh, 900px);
+        margin: auto;
+        overflow: hidden;
+        background: var(--mantle);
+        border: 1px solid var(--rule);
+      }
+
+      .icon {
+        display: block;
+        width: 19px;
+        height: 19px;
+        fill: none;
+        stroke: currentColor;
+        stroke-linecap: square;
+        stroke-linejoin: miter;
+        stroke-width: 1.7;
+      }
+
+      .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      .titlebar {
+        position: relative;
+        z-index: 20;
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: center;
+        height: 58px;
+        padding: 0 12px;
+        background: var(--base);
+        border-bottom: 1px solid var(--rule);
+        user-select: none;
+      }
+
+      .titlebar-left,
+      .titlebar-right {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        min-width: 0;
+      }
+
+      .titlebar-right {
+        justify-content: flex-end;
+      }
+
+      .traffic-lights {
+        display: flex;
+        gap: 8px;
+        padding: 0 9px 0 3px;
+      }
+
+      .traffic-light {
+        width: 12px;
+        height: 12px;
+        border: 1px solid rgba(76, 79, 105, 0.22);
+        border-radius: 50%;
+      }
+
+      .traffic-light.close {
+        background: #d20f39;
+      }
+
+      .traffic-light.minimize {
+        background: #df8e1d;
+      }
+
+      .traffic-light.maximize {
+        background: #40a02b;
+      }
+
+      .brand-lockup {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        min-width: 0;
+        margin-left: 4px;
+      }
+
+      .brand-lockup img {
+        width: 24px;
+        height: 24px;
+      }
+
+      .brand-name {
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+
+      .document-context {
+        min-width: 320px;
+        text-align: center;
+      }
+
+      .document-title {
+        display: block;
+        overflow: hidden;
+        font-size: 14px;
+        font-weight: 600;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .document-state {
+        display: block;
+        margin-top: 2px;
+        color: var(--secondary);
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+
+      .chrome-button,
+      .icon-button,
+      .margin-button,
+      .voice-button,
+      .compact-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 44px;
+        min-height: 44px;
+        border: 1px solid transparent;
+        border-radius: 3px;
+        background: transparent;
+        cursor: pointer;
+        transition:
+          background var(--ease),
+          border-color var(--ease),
+          color var(--ease),
+          transform var(--ease);
+      }
+
+      .chrome-button:hover,
+      .icon-button:hover,
+      .margin-button:hover,
+      .compact-button:hover {
+        background: var(--crust);
+        border-color: var(--rule);
+      }
+
+      .chrome-button {
+        gap: 8px;
+        padding: 0 12px;
+        color: var(--blue);
+        font-size: 14px;
+        font-weight: 650;
+      }
+
+      .icon-button {
+        position: relative;
+        color: var(--secondary);
+      }
+
+      .icon-button[aria-pressed="true"] {
+        color: var(--blue);
+        background: var(--crust);
+      }
+
+      .tooltip::after {
+        position: absolute;
+        top: calc(100% + 7px);
+        left: 50%;
+        z-index: 50;
+        padding: 6px 8px;
+        color: var(--base);
+        font-size: 12px;
+        line-height: 1;
+        white-space: nowrap;
+        content: attr(data-tooltip);
+        visibility: hidden;
+        background: var(--ink);
+        border-radius: 2px;
+        opacity: 0;
+        transform: translate(-50%, -3px);
+        transition:
+          opacity var(--ease),
+          transform var(--ease),
+          visibility var(--ease);
+        pointer-events: none;
+      }
+
+      .tooltip:hover::after,
+      .tooltip:focus-visible::after {
+        visibility: visible;
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+
+      .reader-stage {
+        position: relative;
+        height: calc(100% - 58px);
+        overflow: hidden;
+        background: var(--mantle);
+      }
+
+      .stage-rule {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 50%;
+        width: 1px;
+        background: rgba(197, 201, 212, 0.42);
+        pointer-events: none;
+      }
+
+      .reader-layout {
+        position: relative;
+        z-index: 2;
+        display: grid;
+        grid-template-columns: 568px 58px;
+        gap: 18px;
+        width: 644px;
+        height: 100%;
+        margin: 0 auto;
+        padding-top: 22px;
+        transition: transform var(--ease);
+      }
+
+      .app.library-open .reader-layout {
+        transform: translateX(76px);
+      }
+
+      .editorial-column {
+        min-width: 0;
+      }
+
+      .document-heading {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        height: 44px;
+        padding: 0 0 9px;
+        border-bottom: 1px solid var(--ink);
+      }
+
+      .document-heading h1 {
+        max-width: 430px;
+        margin: 0;
+        overflow: hidden;
+        font-size: 18px;
+        font-weight: 650;
+        letter-spacing: -0.025em;
+        line-height: 1.1;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .eyebrow {
+        margin: 0;
+        color: var(--secondary);
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 500;
+        letter-spacing: 0.08em;
+        line-height: 1;
+        text-transform: uppercase;
+      }
+
+      .page-region {
+        position: relative;
+        height: 548px;
+        padding: 14px 0 0;
+      }
+
+      .page-sheet {
+        position: relative;
+        width: 430px;
+        height: 526px;
+        margin: 0 auto;
+        overflow: hidden;
+        background: var(--page);
+        border: 1px solid var(--rule);
+        box-shadow: 0 11px 30px rgba(76, 79, 105, 0.12);
+        transform-origin: center center;
+        transition:
+          transform var(--ease),
+          opacity var(--ease);
+      }
+
+      .page-sheet img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        background: var(--page);
+      }
+
+      .page-sheet.is-turning {
+        opacity: 0.72;
+        transform: translateX(5px);
+      }
+
+      .voice-annotation {
+        position: relative;
+        display: grid;
+        grid-template-columns: 92px 1fr;
+        min-height: 145px;
+        border-top: 2px solid var(--mauve);
+        background: var(--base);
+      }
+
+      .voice-annotation::before {
+        position: absolute;
+        top: -10px;
+        left: 61px;
+        width: 17px;
+        height: 17px;
+        content: "";
+        background: var(--base);
+        border-top: 2px solid var(--mauve);
+        border-left: 2px solid var(--mauve);
+        transform: rotate(45deg);
+      }
+
+      .voice-index {
+        position: relative;
+        padding: 20px 14px 14px 0;
+        border-right: 1px solid var(--rule);
+      }
+
+      .voice-index .eyebrow {
+        color: var(--mauve);
+      }
+
+      .voice-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 12px;
+        color: var(--secondary);
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .voice-pulse {
+        width: 8px;
+        height: 8px;
+        background: var(--mauve);
+        border: 1px solid var(--mauve);
+        border-radius: 50%;
+      }
+
+      .voice-annotation.is-playing .voice-pulse {
+        animation: voice-pulse 1.35s ease-out infinite;
+      }
+
+      @keyframes voice-pulse {
+        0% {
+          box-shadow: 0 0 0 0 rgba(136, 57, 239, 0.32);
+        }
+        70% {
+          box-shadow: 0 0 0 8px rgba(136, 57, 239, 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(136, 57, 239, 0);
+        }
+      }
+
+      .voice-body {
+        min-width: 0;
+        padding: 16px 0 13px 18px;
+      }
+
+      .spoken-line {
+        margin: 0 0 14px;
+        color: var(--ink);
+        font-size: 20px;
+        font-weight: 500;
+        letter-spacing: -0.025em;
+        line-height: 1.35;
+      }
+
+      .spoken-word {
+        border-bottom: 2px solid transparent;
+        transition:
+          color var(--ease),
+          border-color var(--ease);
+      }
+
+      .voice-annotation.is-playing .spoken-word.active {
+        color: var(--mauve);
+        border-bottom-color: var(--mauve);
+      }
+
+      .voice-controls {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+      }
+
+      .voice-button {
+        gap: 7px;
+        min-height: 46px;
+        padding: 0 13px;
+        color: var(--mauve);
+        border-color: var(--mauve);
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .voice-button:hover {
+        background: rgba(136, 57, 239, 0.08);
+      }
+
+      .voice-button .pause-glyph {
+        display: none;
+      }
+
+      .voice-annotation.is-playing .voice-button .play-glyph {
+        display: none;
+      }
+
+      .voice-annotation.is-playing .voice-button .pause-glyph {
+        display: block;
+      }
+
+      .compact-button {
+        position: relative;
+        min-width: 44px;
+        min-height: 44px;
+        padding: 0 9px;
+        color: var(--secondary);
+        font-family: var(--mono);
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .compact-button.stop-button {
+        color: var(--mauve);
+      }
+
+      .voice-selector {
+        justify-content: space-between;
+        min-width: 174px;
+        color: var(--ink);
+        font-family: var(--sans);
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .voice-selector .icon {
+        width: 15px;
+        height: 15px;
+        color: var(--mauve);
+      }
+
+      .voice-menu {
+        position: absolute;
+        right: 0;
+        bottom: 52px;
+        z-index: 40;
+        width: 218px;
+        padding: 8px;
+        background: var(--base);
+        border: 1px solid var(--mauve);
+        box-shadow: 0 12px 28px rgba(76, 79, 105, 0.16);
+      }
+
+      .voice-menu[hidden] {
+        display: none;
+      }
+
+      .voice-menu-title {
+        padding: 7px 9px 9px;
+        color: var(--secondary);
+        font-family: var(--mono);
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .voice-option {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        min-height: 44px;
+        padding: 0 9px;
+        color: var(--ink);
+        text-align: left;
+        background: var(--crust);
+        border: 0;
+        border-radius: 2px;
+        cursor: pointer;
+      }
+
+      .voice-option strong {
+        display: block;
+        font-size: 14px;
+      }
+
+      .voice-option small {
+        display: block;
+        margin-top: 2px;
+        color: var(--secondary);
+        font-size: 12px;
+      }
+
+      .voice-option .icon {
+        color: var(--mauve);
+      }
+
+      .voice-footnote {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 10px;
+        color: var(--secondary);
+        font-size: 12px;
+      }
+
+      .cache-ready {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+      }
+
+      .cache-ready::before {
+        width: 6px;
+        height: 6px;
+        content: "";
+        background: var(--mauve);
+      }
+
+      .auto-continue {
+        min-height: 44px;
+        padding: 0 7px;
+        color: var(--secondary);
+        background: transparent;
+        border: 0;
+        border-radius: 2px;
+        cursor: pointer;
+      }
+
+      .auto-continue[aria-pressed="true"] {
+        color: var(--mauve);
+      }
+
+      .auto-continue::before {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        margin-right: 7px;
+        vertical-align: -2px;
+        content: "";
+        border: 1px solid currentColor;
+      }
+
+      .auto-continue[aria-pressed="true"]::before {
+        background: var(--mauve);
+        box-shadow: inset 0 0 0 4px var(--base);
+      }
+
+      .margin-controls {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding-top: 58px;
+      }
+
+      .margin-label {
+        margin: 10px 0;
+        color: var(--secondary);
+        font-family: var(--mono);
+        font-size: 12px;
+        line-height: 1.4;
+        text-align: center;
+      }
+
+      .margin-label strong {
+        display: block;
+        color: var(--ink);
+        font-weight: 600;
+      }
+
+      .margin-button {
+        position: relative;
+        color: var(--secondary);
+      }
+
+      .margin-button:hover {
+        color: var(--blue);
+        background: var(--base);
+        border-color: var(--rule);
+      }
+
+      .margin-button:disabled {
+        color: #9ca0b0;
+        cursor: not-allowed;
+        opacity: 0.55;
+      }
+
+      .margin-divider {
+        width: 1px;
+        height: 34px;
+        margin: 9px 0;
+        background: var(--rule);
+      }
+
+      .zoom-button {
+        flex-direction: column;
+        gap: 1px;
+        width: 58px;
+        padding: 5px 2px;
+        color: var(--blue);
+        font-family: var(--mono);
+        font-size: 12px;
+        line-height: 1.15;
+      }
+
+      .zoom-button strong {
+        font-size: 13px;
+      }
+
+      .library-panel {
+        position: absolute;
+        top: 58px;
+        bottom: 0;
+        left: 0;
+        z-index: 12;
+        display: flex;
+        flex-direction: column;
+        width: 304px;
+        padding: 26px 20px 20px;
+        background: var(--base);
+        border-right: 1px solid var(--ink);
+        transform: translateX(-101%);
+        transition: transform var(--ease);
+      }
+
+      .library-panel.is-open {
+        transform: translateX(0);
+      }
+
+      .library-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-bottom: 17px;
+        border-bottom: 1px solid var(--ink);
+      }
+
+      .library-header h2 {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 650;
+        letter-spacing: -0.035em;
+      }
+
+      .open-document {
+        justify-content: flex-start;
+        width: 100%;
+        margin: 18px 0 28px;
+        color: var(--blue);
+        border-color: var(--blue);
+      }
+
+      .library-section-title {
+        margin: 0 0 9px;
+        color: var(--secondary);
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 500;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .session-item {
+        position: relative;
+        width: 100%;
+        min-height: 72px;
+        padding: 12px 12px 12px 18px;
+        color: var(--ink);
+        text-align: left;
+        background: var(--crust);
+        border: 0;
+        border-radius: 2px;
+        cursor: pointer;
+      }
+
+      .session-item::before {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: 3px;
+        content: "";
+        background: var(--blue);
+      }
+
+      .session-item strong {
+        display: block;
+        overflow: hidden;
+        font-size: 14px;
+        font-weight: 650;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .session-item span {
+        display: block;
+        margin-top: 7px;
+        color: var(--secondary);
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+
+      .library-empty {
+        margin: 14px 0 0;
+        color: var(--secondary);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .library-brand {
+        display: grid;
+        grid-template-columns: 28px 1fr;
+        gap: 10px;
+        align-items: center;
+        margin-top: auto;
+        padding-top: 17px;
+        border-top: 1px solid var(--rule);
+      }
+
+      .library-brand img {
+        width: 28px;
+        height: 28px;
+      }
+
+      .library-brand strong {
+        display: block;
+        font-size: 14px;
+      }
+
+      .library-brand span {
+        display: block;
+        margin-top: 2px;
+        color: var(--secondary);
+        font-size: 12px;
+      }
+
+      .settings-menu {
+        position: absolute;
+        top: 52px;
+        right: 10px;
+        z-index: 60;
+        width: 236px;
+        padding: 15px;
+        background: var(--base);
+        border: 1px solid var(--ink);
+        box-shadow: 0 12px 28px rgba(76, 79, 105, 0.16);
+      }
+
+      .settings-menu[hidden] {
+        display: none;
+      }
+
+      .settings-menu h2 {
+        margin: 0 0 12px;
+        font-size: 16px;
+      }
+
+      .settings-menu p {
+        margin: 0;
+        color: var(--secondary);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .toast {
+        position: absolute;
+        right: 22px;
+        bottom: 22px;
+        z-index: 80;
+        padding: 10px 13px;
+        color: var(--base);
+        font-size: 14px;
+        font-weight: 600;
+        background: var(--ink);
+        border-radius: 2px;
+        opacity: 0;
+        transform: translateY(8px);
+        transition:
+          opacity var(--ease),
+          transform var(--ease);
+        pointer-events: none;
+      }
+
+      .toast.is-visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      @media (max-width: 900px) {
+        .document-context {
+          display: none;
+        }
+
+        .titlebar {
+          grid-template-columns: 1fr 1fr;
+        }
+
+        .reader-layout {
+          transform: scale(0.88);
+          transform-origin: top center;
+        }
+
+        .app.library-open .reader-layout {
+          transform: translateX(60px) scale(0.88);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          animation-duration: 0.001ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.001ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <svg class="visually-hidden" aria-hidden="true">
+      <symbol id="icon-library" viewBox="0 0 24 24">
+        <path d="M4 4h6v16H4zM14 4h6v16h-6z" />
+      </symbol>
+      <symbol id="icon-folder-open" viewBox="0 0 24 24">
+        <path d="M3 7h7l2 2h9l-2 10H4L3 7Z" />
+      </symbol>
+      <symbol id="icon-export" viewBox="0 0 24 24">
+        <path d="M12 15V3m0 0L8 7m4-4 4 4M5 12v8h14v-8" />
+      </symbol>
+      <symbol id="icon-settings" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="3" />
+        <path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1M18.4 5.6l-2.1 2.1m-8.6 8.6-2.1 2.1" />
+      </symbol>
+      <symbol id="icon-close" viewBox="0 0 24 24">
+        <path d="m6 6 12 12M18 6 6 18" />
+      </symbol>
+      <symbol id="icon-chevron-up" viewBox="0 0 24 24">
+        <path d="m7 15 5-6 5 6" />
+      </symbol>
+      <symbol id="icon-chevron-down" viewBox="0 0 24 24">
+        <path d="m7 9 5 6 5-6" />
+      </symbol>
+      <symbol id="icon-play" viewBox="0 0 24 24">
+        <path d="m8 5 11 7-11 7V5Z" />
+      </symbol>
+      <symbol id="icon-pause" viewBox="0 0 24 24">
+        <path d="M8 5v14m8-14v14" />
+      </symbol>
+      <symbol id="icon-stop" viewBox="0 0 24 24">
+        <path d="M7 7h10v10H7z" />
+      </symbol>
+      <symbol id="icon-check" viewBox="0 0 24 24">
+        <path d="m5 12 4 4L19 6" />
+      </symbol>
+    </svg>
+
+    <div class="app" id="app">
+      <header class="titlebar">
+        <div class="titlebar-left">
+          <div class="traffic-lights" aria-hidden="true">
+            <span class="traffic-light close"></span>
+            <span class="traffic-light minimize"></span>
+            <span class="traffic-light maximize"></span>
+          </div>
+
+          <button
+            class="icon-button tooltip"
+            id="libraryToggle"
+            type="button"
+            aria-label="Show sessions and library"
+            aria-controls="libraryPanel"
+            aria-expanded="false"
+            aria-pressed="false"
+            data-tooltip="Show library"
+          >
+            <svg class="icon" aria-hidden="true"><use href="#icon-library"></use></svg>
+          </button>
+
+          <div class="brand-lockup" aria-label="Lectrice">
+            <img src="../../../public/lectrice-mark.svg" alt="" />
+            <span class="brand-name">Lectrice</span>
+          </div>
+        </div>
+
+        <div class="document-context" aria-live="polite">
+          <span class="document-title" data-document-title>Lectrice end to end fixture</span>
+          <span class="document-state" id="titlePageState">Page 1 of 2 · Fit width · 118%</span>
+        </div>
+
+        <div class="titlebar-right">
+          <input class="visually-hidden" id="fileInput" type="file" accept="application/pdf" />
+          <button class="chrome-button" id="openDocument" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#icon-folder-open"></use></svg>
+            Open document
+          </button>
+          <button
+            class="icon-button tooltip"
+            id="exportAudio"
+            type="button"
+            aria-label="Export audio"
+            data-tooltip="Export audio"
+          >
+            <svg class="icon" aria-hidden="true"><use href="#icon-export"></use></svg>
+          </button>
+          <button
+            class="icon-button tooltip"
+            id="settingsButton"
+            type="button"
+            aria-label="Open settings"
+            aria-expanded="false"
+            aria-controls="settingsMenu"
+            data-tooltip="Settings"
+          >
+            <svg class="icon" aria-hidden="true"><use href="#icon-settings"></use></svg>
+          </button>
+        </div>
+      </header>
+
+      <aside class="library-panel" id="libraryPanel" aria-hidden="true" aria-label="Sessions and library">
+        <div class="library-header">
+          <h2>Library</h2>
+          <button class="icon-button" id="libraryClose" type="button" aria-label="Close library">
+            <svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg>
+          </button>
+        </div>
+
+        <button class="chrome-button open-document" id="panelOpenDocument" type="button">
+          <svg class="icon" aria-hidden="true"><use href="#icon-folder-open"></use></svg>
+          Open document
+        </button>
+
+        <p class="library-section-title">Current session</p>
+        <button class="session-item" type="button" aria-current="page">
+          <strong data-document-title>Lectrice end to end fixture</strong>
+          <span id="libraryPageState">Page 1 of 2 · audio ready</span>
+        </button>
+        <p class="library-empty">No fabricated history is shown in this direction prototype.</p>
+
+        <div class="library-brand">
+          <img src="../../../public/lectrice-mark.svg" alt="" />
+          <div>
+            <strong>Every page, read aloud.</strong>
+            <span>Local-first reading and voice.</span>
+          </div>
+        </div>
+      </aside>
+
+      <div class="settings-menu" id="settingsMenu" role="dialog" aria-label="Reader settings" hidden>
+        <h2>Reader settings</h2>
+        <p>Reading controls stay in context. Voice, speed, and continuation are attached to the spoken line below the page.</p>
+      </div>
+
+      <main class="reader-stage" aria-label="PDF reader">
+        <div class="stage-rule" aria-hidden="true"></div>
+
+        <div class="reader-layout">
+          <section class="editorial-column" aria-labelledby="documentHeading">
+            <header class="document-heading">
+              <div>
+                <p class="eyebrow">Reading now</p>
+                <h1 id="documentHeading" data-document-title>Lectrice end to end fixture</h1>
+              </div>
+              <p class="eyebrow" id="pageHeadingState">01 / 02</p>
+            </header>
+
+            <div class="page-region">
+              <figure class="page-sheet" id="pageSheet" aria-label="PDF page 1">
+                <img
+                  src="assets/e2e-fixture-page-1.png"
+                  alt="Page 1 of Lectrice end to end fixture containing alpha beta gamma delta epsilon"
+                />
+              </figure>
+            </div>
+
+            <section class="voice-annotation" id="voiceAnnotation" aria-labelledby="voiceLabel">
+              <div class="voice-index">
+                <p class="eyebrow" id="voiceLabel">Voice / 01</p>
+                <div class="voice-status" aria-live="polite">
+                  <span class="voice-pulse" aria-hidden="true"></span>
+                  <span id="voiceStatus">Ready</span>
+                </div>
+              </div>
+
+              <div class="voice-body">
+                <p class="spoken-line" aria-label="Current spoken sentence">
+                  <span class="spoken-word active">alpha</span>
+                  <span class="spoken-word">beta</span>
+                  <span class="spoken-word">gamma</span>
+                  <span class="spoken-word">delta</span>
+                  <span class="spoken-word">epsilon</span>
+                </p>
+
+                <div class="voice-controls">
+                  <button class="voice-button voice-control" id="playToggle" type="button" aria-label="Play page audio">
+                    <svg class="icon play-glyph" aria-hidden="true"><use href="#icon-play"></use></svg>
+                    <svg class="icon pause-glyph" aria-hidden="true"><use href="#icon-pause"></use></svg>
+                    <span id="playLabel">Read aloud</span>
+                  </button>
+
+                  <button
+                    class="compact-button stop-button voice-control tooltip"
+                    id="stopButton"
+                    type="button"
+                    aria-label="Stop page audio"
+                    data-tooltip="Stop"
+                  >
+                    <svg class="icon" aria-hidden="true"><use href="#icon-stop"></use></svg>
+                  </button>
+
+                  <button
+                    class="compact-button voice-control"
+                    id="speedButton"
+                    type="button"
+                    aria-label="Playback speed 1.2 times"
+                  >
+                    1.2×
+                  </button>
+
+                  <button
+                    class="compact-button voice-selector voice-control"
+                    id="voiceButton"
+                    type="button"
+                    aria-label="Select voice, currently LJSpeech English"
+                    aria-expanded="false"
+                    aria-controls="voiceMenu"
+                  >
+                    <span>LJSpeech · English</span>
+                    <svg class="icon" aria-hidden="true"><use href="#icon-chevron-up"></use></svg>
+                  </button>
+
+                  <div class="voice-menu" id="voiceMenu" hidden>
+                    <div class="voice-menu-title">Voice</div>
+                    <button class="voice-option voice-control" id="voiceOption" type="button">
+                      <span>
+                        <strong>LJSpeech</strong>
+                        <small>English · selected</small>
+                      </span>
+                      <svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="voice-footnote">
+                  <span class="cache-ready">Page audio ready</span>
+                  <button
+                    class="auto-continue voice-control"
+                    id="autoContinue"
+                    type="button"
+                    aria-pressed="true"
+                    aria-label="Automatic page continuation enabled"
+                  >
+                    Continue to next page
+                  </button>
+                </div>
+              </div>
+            </section>
+          </section>
+
+          <aside class="margin-controls" aria-label="Page and zoom controls">
+            <button
+              class="margin-button tooltip"
+              id="previousPage"
+              type="button"
+              aria-label="Previous page"
+              data-tooltip="Previous page"
+              disabled
+            >
+              <svg class="icon" aria-hidden="true"><use href="#icon-chevron-up"></use></svg>
+            </button>
+
+            <p class="margin-label" aria-live="polite">
+              <strong id="currentPage">01</strong>
+              of 02
+            </p>
+
+            <button
+              class="margin-button tooltip"
+              id="nextPage"
+              type="button"
+              aria-label="Next page"
+              data-tooltip="Next page"
+            >
+              <svg class="icon" aria-hidden="true"><use href="#icon-chevron-down"></use></svg>
+            </button>
+
+            <span class="margin-divider" aria-hidden="true"></span>
+
+            <button
+              class="margin-button zoom-button"
+              id="zoomButton"
+              type="button"
+              aria-label="Zoom, Fit width, 118 percent"
+            >
+              <span id="zoomMode">Fit width</span>
+              <strong id="zoomValue">118%</strong>
+            </button>
+          </aside>
+        </div>
+      </main>
+
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </div>
+
+    <script>
+      (() => {
+        const app = document.getElementById("app");
+        const libraryPanel = document.getElementById("libraryPanel");
+        const libraryToggle = document.getElementById("libraryToggle");
+        const libraryClose = document.getElementById("libraryClose");
+        const voiceAnnotation = document.getElementById("voiceAnnotation");
+        const voiceStatus = document.getElementById("voiceStatus");
+        const playToggle = document.getElementById("playToggle");
+        const playLabel = document.getElementById("playLabel");
+        const stopButton = document.getElementById("stopButton");
+        const voiceButton = document.getElementById("voiceButton");
+        const voiceMenu = document.getElementById("voiceMenu");
+        const voiceOption = document.getElementById("voiceOption");
+        const speedButton = document.getElementById("speedButton");
+        const autoContinue = document.getElementById("autoContinue");
+        const previousPage = document.getElementById("previousPage");
+        const nextPage = document.getElementById("nextPage");
+        const currentPage = document.getElementById("currentPage");
+        const pageHeadingState = document.getElementById("pageHeadingState");
+        const titlePageState = document.getElementById("titlePageState");
+        const libraryPageState = document.getElementById("libraryPageState");
+        const pageSheet = document.getElementById("pageSheet");
+        const zoomButton = document.getElementById("zoomButton");
+        const zoomMode = document.getElementById("zoomMode");
+        const zoomValue = document.getElementById("zoomValue");
+        const settingsButton = document.getElementById("settingsButton");
+        const settingsMenu = document.getElementById("settingsMenu");
+        const openDocument = document.getElementById("openDocument");
+        const panelOpenDocument = document.getElementById("panelOpenDocument");
+        const fileInput = document.getElementById("fileInput");
+        const exportAudio = document.getElementById("exportAudio");
+        const toast = document.getElementById("toast");
+
+        let playing = false;
+        let page = 1;
+        let zoomIndex = 0;
+        let toastTimer;
+        const speeds = ["1.0×", "1.2×", "1.5×", "2.0×"];
+        let speedIndex = 1;
+        const zoomStates = [
+          { mode: "Fit width", value: "118%", scale: 1 },
+          { mode: "Fit page", value: "100%", scale: 0.94 },
+          { mode: "Actual size", value: "100%", scale: 1.04 },
+        ];
+
+        function setLibrary(open) {
+          app.classList.toggle("library-open", open);
+          libraryPanel.classList.toggle("is-open", open);
+          libraryPanel.setAttribute("aria-hidden", String(!open));
+          libraryToggle.setAttribute("aria-expanded", String(open));
+          libraryToggle.setAttribute("aria-pressed", String(open));
+          libraryToggle.setAttribute("data-tooltip", open ? "Hide library" : "Show library");
+          libraryToggle.setAttribute("aria-label", open ? "Hide sessions and library" : "Show sessions and library");
+          if (open) libraryClose.focus();
+        }
+
+        function setPlaying(nextPlaying, status = nextPlaying ? "Reading" : "Ready") {
+          playing = nextPlaying;
+          voiceAnnotation.classList.toggle("is-playing", playing);
+          voiceStatus.textContent = status;
+          playLabel.textContent = playing ? "Pause" : "Read aloud";
+          playToggle.setAttribute("aria-label", playing ? "Pause page audio" : "Play page audio");
+        }
+
+        function setVoiceMenu(open) {
+          voiceMenu.hidden = !open;
+          voiceButton.setAttribute("aria-expanded", String(open));
+          if (open) voiceOption.focus();
+        }
+
+        function setSettings(open) {
+          settingsMenu.hidden = !open;
+          settingsButton.setAttribute("aria-expanded", String(open));
+        }
+
+        function showToast(message) {
+          window.clearTimeout(toastTimer);
+          toast.textContent = message;
+          toast.classList.add("is-visible");
+          toastTimer = window.setTimeout(() => toast.classList.remove("is-visible"), 1800);
+        }
+
+        function updatePage(nextPageNumber) {
+          page = Math.max(1, Math.min(2, nextPageNumber));
+          pageSheet.classList.add("is-turning");
+          window.setTimeout(() => pageSheet.classList.remove("is-turning"), 180);
+          pageSheet.setAttribute("aria-label", `PDF page ${page}`);
+          currentPage.textContent = String(page).padStart(2, "0");
+          pageHeadingState.textContent = `${String(page).padStart(2, "0")} / 02`;
+          previousPage.disabled = page === 1;
+          nextPage.disabled = page === 2;
+          titlePageState.textContent = `Page ${page} of 2 · ${zoomStates[zoomIndex].mode} · ${zoomStates[zoomIndex].value}`;
+          libraryPageState.textContent = `Page ${page} of 2 · audio ready`;
+          setPlaying(false, "Ready");
+        }
+
+        function updateZoom() {
+          const zoom = zoomStates[zoomIndex];
+          zoomMode.textContent = zoom.mode;
+          zoomValue.textContent = zoom.value;
+          zoomButton.setAttribute("aria-label", `Zoom, ${zoom.mode}, ${zoom.value.replace("%", " percent")}`);
+          pageSheet.style.transform = `scale(${zoom.scale})`;
+          titlePageState.textContent = `Page ${page} of 2 · ${zoom.mode} · ${zoom.value}`;
+        }
+
+        libraryToggle.addEventListener("click", () => {
+          setLibrary(!libraryPanel.classList.contains("is-open"));
+        });
+        libraryClose.addEventListener("click", () => {
+          setLibrary(false);
+          libraryToggle.focus();
+        });
+
+        playToggle.addEventListener("click", () => setPlaying(!playing));
+        stopButton.addEventListener("click", () => setPlaying(false, "Stopped"));
+
+        speedButton.addEventListener("click", () => {
+          speedIndex = (speedIndex + 1) % speeds.length;
+          speedButton.textContent = speeds[speedIndex];
+          speedButton.setAttribute("aria-label", `Playback speed ${speeds[speedIndex].replace("×", " times")}`);
+          showToast(`Playback speed ${speeds[speedIndex]}`);
+        });
+
+        voiceButton.addEventListener("click", () => setVoiceMenu(voiceMenu.hidden));
+        voiceOption.addEventListener("click", () => {
+          setVoiceMenu(false);
+          voiceButton.focus();
+          showToast("LJSpeech · English selected");
+        });
+
+        autoContinue.addEventListener("click", () => {
+          const enabled = autoContinue.getAttribute("aria-pressed") !== "true";
+          autoContinue.setAttribute("aria-pressed", String(enabled));
+          autoContinue.setAttribute(
+            "aria-label",
+            `Automatic page continuation ${enabled ? "enabled" : "disabled"}`,
+          );
+          showToast(`Page continuation ${enabled ? "on" : "off"}`);
+        });
+
+        previousPage.addEventListener("click", () => updatePage(page - 1));
+        nextPage.addEventListener("click", () => updatePage(page + 1));
+
+        zoomButton.addEventListener("click", () => {
+          zoomIndex = (zoomIndex + 1) % zoomStates.length;
+          updateZoom();
+        });
+
+        settingsButton.addEventListener("click", () => {
+          const open = settingsMenu.hidden;
+          setSettings(open);
+          if (open) setVoiceMenu(false);
+        });
+
+        [openDocument, panelOpenDocument].forEach((button) => {
+          button.addEventListener("click", () => fileInput.click());
+        });
+
+        fileInput.addEventListener("change", () => {
+          const selected = fileInput.files && fileInput.files[0];
+          if (!selected) return;
+          document.querySelectorAll("[data-document-title]").forEach((node) => {
+            node.textContent = selected.name;
+          });
+          showToast(`${selected.name} selected`);
+          setLibrary(false);
+        });
+
+        exportAudio.addEventListener("click", () => showToast("Page audio ready to export"));
+
+        document.addEventListener("click", (event) => {
+          if (!voiceMenu.hidden && !voiceMenu.contains(event.target) && !voiceButton.contains(event.target)) {
+            setVoiceMenu(false);
+          }
+          if (!settingsMenu.hidden && !settingsMenu.contains(event.target) && !settingsButton.contains(event.target)) {
+            setSettings(false);
+          }
+        });
+
+        document.addEventListener("keydown", (event) => {
+          if (event.key === "Escape") {
+            setVoiceMenu(false);
+            setSettings(false);
+            if (libraryPanel.classList.contains("is-open")) {
+              setLibrary(false);
+              libraryToggle.focus();
+            }
+          }
+
+          if (
+            event.code === "Space" &&
+            event.target === document.body
+          ) {
+            event.preventDefault();
+            setPlaying(!playing);
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>
