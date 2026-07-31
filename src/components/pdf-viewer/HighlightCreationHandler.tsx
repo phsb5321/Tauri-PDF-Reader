@@ -44,8 +44,18 @@ interface HighlightCreationHandlerProps {
 }
 
 /**
- * The highlight-creation hook. Mounted per page by `PdfPage`, and by
- * `PdfViewer` for the single-page path.
+ * The highlight-creation hook.
+ *
+ * One live mount: `PdfViewer.tsx:90`, reached by `App` -> `ReaderView` ->
+ * `PdfViewer`. `PdfPage.tsx:64` also calls it, but `<PdfPage` has no render
+ * site anywhere in `src/` and never has (`git log -S`), so it is dead code —
+ * the same state `useKeyboardShortcuts` is in.
+ *
+ * That matters for the duplicate-commit latch below: it is per-instance. If
+ * `PdfPage` is ever wired up for continuous scroll while `PdfViewer` still
+ * mounts the hook itself, both instances would hold the same selection and one
+ * Ctrl+Shift+H would produce two highlights, which no per-instance latch can
+ * see. Whoever wires it up owns the selection in ONE place.
  */
 export function useHighlightCreation({
   documentId,

@@ -48,6 +48,22 @@ count() { sqlite3 "file:$1?mode=ro" "SELECT (SELECT count(*) FROM documents) || 
 # is not worth it for a one-shot tool run against two known locations.
 sql_quote() { printf '%s' "${1//\'/\'\'}"; }
 
+# Back up the destination using SQL, not the `.backup` dot-command.
+#
+# `sql_quote` is correct for SQL string literals and WRONG for dot-commands:
+# the shell's dot-command parser does not treat '' as an escape, it treats it as
+# a close-quote followed by an open-quote. So `.backup 'Pedro''s.db'` parses as
+# two arguments and is read as `.backup <db> <file>`:
+#
+#   $ sqlite3 src.db ".backup 'Pedro''s backup.db'"
+#   Error: unknown database Pedro          # …and leaves a stray `s backup.db`
+#
+# VACUUM INTO is a statement, so the literal really is a literal. It also
+# refuses to overwrite an existing file, which is the behaviour we want for a
+# backup — and cannot bite here, because BACKUP carries a second-resolution
+# timestamp.
+backup_to() { sqlite3 "$1" "VACUUM INTO '$(sql_quote "$2")'"; }
+
 import_into() {
   local src="$1" dest="$2"
 
@@ -104,22 +120,33 @@ INSERT INTO highlights (id, document_id, page_number, rects, color, text_content
   sqlite3 "$dest" "$schema
 INSERT INTO documents (id, file_path, created_at) VALUES ('new-a','/a.pdf','t');"
 
+  # The real run backs the destination up before importing, so the check has to
+  # cover that too — the apostrophe path is exactly what broke the `.backup`
+  # dot-command this replaced, and a check that only called `import_into` said
+  # nothing about it.
+  local backup="$SELF_CHECK_DIR/dest's backup.db"
+  backup_to "$dest" "$backup"
+
   import_into "$src" "$dest"
   import_into "$src" "$dest" # idempotence: second run must change nothing
 
-  local docs highlights remapped dangling
+  local docs highlights remapped dangling backed_up
   docs=$(sqlite3 "$dest" "SELECT count(*) FROM documents")
   highlights=$(sqlite3 "$dest" "SELECT count(*) FROM highlights")
   remapped=$(sqlite3 "$dest" "SELECT document_id FROM highlights WHERE id='h1'")
   dangling=$(sqlite3 "$dest" "SELECT count(*) FROM highlights h LEFT JOIN documents d ON d.id=h.document_id WHERE d.id IS NULL")
+  # Reads the backup at the exact path asked for, so a mis-parsed argument that
+  # wrote somewhere else cannot pass. 1 document: the pre-import state.
+  backed_up=$([ -f "$backup" ] && sqlite3 "file:$backup?mode=ro" "SELECT count(*) FROM documents" || echo "MISSING")
 
   local failed=0
   [ "$docs" = "2" ]        || { echo "FAIL: expected 2 documents, got $docs"; failed=1; }
   [ "$highlights" = "2" ]  || { echo "FAIL: expected 2 highlights, got $highlights"; failed=1; }
   [ "$remapped" = "new-a" ]|| { echo "FAIL: h1 should point at new-a, points at $remapped"; failed=1; }
   [ "$dangling" = "0" ]    || { echo "FAIL: $dangling highlight(s) reference a missing document"; failed=1; }
+  [ "$backed_up" = "1" ]   || { echo "FAIL: pre-import backup should hold 1 document, got $backed_up"; failed=1; }
 
-  [ "$failed" = "0" ] && echo "self-check OK: 2 documents, 2 highlights, h1 remapped to new-a, 0 dangling"
+  [ "$failed" = "0" ] && echo "self-check OK: 2 documents, 2 highlights, h1 remapped to new-a, 0 dangling, backup readable"
   return "$failed"
 }
 
@@ -146,7 +173,7 @@ if pgrep -x 'Lectrice|tauri-pdf-reade' >/dev/null 2>&1; then
 fi
 
 BACKUP="$DEST.pre-import-$(date +%Y%m%d-%H%M%S)"
-sqlite3 "$DEST" ".backup '$(sql_quote "$BACKUP")'"
+backup_to "$DEST" "$BACKUP"
 
 echo "source:      $SRC          ($(count "$SRC"))"
 echo "destination: $DEST ($(count "$DEST"))"
