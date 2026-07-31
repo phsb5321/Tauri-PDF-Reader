@@ -30,9 +30,23 @@ const DB_INIT_TS: &str = include_str!("../../src/lib/db-init.ts");
 /// sanity checks in `parses_the_production_ddl` fail loudly if that stops being
 /// true, rather than silently yielding an empty list.
 fn sql_literals(decl: &str, terminator: &str) -> Vec<String> {
-    let start = DB_INIT_TS.find(decl).unwrap_or_else(|| {
-        panic!("db-init.ts must declare `{decl}` — did the production DDL move?")
-    });
+    // `find` takes the first hit, so a second declaration of the same name would
+    // be silently ignored and a longer identifier could be anchored on instead —
+    // `MIGRATIONS` matches the start of `MIGRATIONS_V2`. Both would have this
+    // test validating a schema the app does not ship.
+    let hits = DB_INIT_TS.matches(decl).count();
+    assert_eq!(
+        hits, 1,
+        "db-init.ts must declare `{decl}` exactly once — found {hits}. Did the \
+         production DDL move, or does a longer identifier start with this name?"
+    );
+    let start = DB_INIT_TS.find(decl).unwrap();
+    let next = DB_INIT_TS[start + decl.len()..].chars().next();
+    assert!(
+        !matches!(next, Some(c) if c.is_alphanumeric() || c == '_'),
+        "`{decl}` matched the beginning of a longer identifier — widen the needle"
+    );
+
     let body = &DB_INIT_TS[start..];
     let end = body
         .find(terminator)
@@ -45,6 +59,17 @@ fn sql_literals(decl: &str, terminator: &str) -> Vec<String> {
         .collect::<Vec<_>>()
         .join("\n");
 
+    // Every literal opens and closes, so the count is even. Odd means either the
+    // terminator turned up inside a literal and cut the scan short, or something
+    // in the block carries a stray backtick — both invert the parity below and
+    // fill the result with the gaps between the statements.
+    let ticks = uncommented.matches('`').count();
+    assert!(
+        ticks.is_multiple_of(2),
+        "`{decl}` holds {ticks} backticks before `{terminator}` — either the \
+         terminator landed inside a SQL literal or a stray backtick got in"
+    );
+
     uncommented
         .split('`')
         .skip(1) // everything before the first backtick is the declaration
@@ -53,16 +78,21 @@ fn sql_literals(decl: &str, terminator: &str) -> Vec<String> {
         .collect()
 }
 
-/// Every statement `initDatabase` executes against a real database, in order.
+/// Every DDL statement `initSchema` executes, in the order it executes them.
 ///
-/// Three separate declarations, because they run under different rules and the
+/// Four declarations, because they run under different rules and the
 /// distinction is load-bearing: `MIGRATIONS` entries run once per database and
-/// are stamped in `_migrations`, whereas `CONTRACT_VIEWS` is re-applied on every
-/// launch so an edited view definition reaches databases that already exist.
-/// Executing all of them together is still the right fixture — it is the shape a
-/// profile has once `initDatabase` returns.
+/// are stamped in `_migrations`, whereas the contract views are torn down before
+/// the migrations and rebuilt after, on every launch, so an edited view
+/// definition reaches databases that already exist.
+///
+/// Not the whole of `initDatabase`: the `_migrations` stamps and the
+/// `DEFAULT_SETTINGS` inserts are parameterised queries rather than literals,
+/// and are covered by `src/lib/db-init.test.ts` against a recording fake. What
+/// this builds is the schema, which is what the assertions below are about.
 fn production_migrations() -> Vec<String> {
     let mut statements = sql_literals("const MIGRATIONS_TABLE", "`;");
+    statements.extend(sql_literals("export const CONTRACT_VIEW_DROPS", "\n];"));
     statements.extend(sql_literals("export const MIGRATIONS", "\n];"));
     statements.extend(sql_literals("export const CONTRACT_VIEWS", "\n];"));
     statements
@@ -100,17 +130,26 @@ async fn parses_the_production_ddl() {
         "expected the full migration list, extracted {} statement(s)",
         statements.len()
     );
-    assert!(
-        statements
-            .iter()
-            .any(|s| s.contains("CREATE TABLE IF NOT EXISTS documents")),
-        "the documents table is missing from what was extracted"
-    );
     // One block per declaration: missing `CONTRACT_VIEWS` would leave every
     // view assertion below testing a database the app does not build.
     assert!(
         statements.iter().any(|s| s.contains("CREATE VIEW")),
         "no view was extracted — CONTRACT_VIEWS did not make it into the fixture"
+    );
+    // And the teardown has to come before the DDL it protects, or a migration
+    // that drops a base column fails against the view still attached to it.
+    let drop_view = statements
+        .iter()
+        .position(|s| s.contains("DROP VIEW"))
+        .expect("no view teardown was extracted — CONTRACT_VIEW_DROPS is missing");
+    let first_table = statements
+        .iter()
+        .position(|s| s.contains("CREATE TABLE IF NOT EXISTS documents"))
+        .expect("the documents table is missing from what was extracted");
+    assert!(
+        drop_view < first_table,
+        "the contract view teardown must come before the migrations \
+         (found at {drop_view}, migrations start at {first_table})"
     );
     assert!(
         statements.iter().all(|s| !s.trim().is_empty()),

@@ -150,6 +150,21 @@ const MIGRATIONS_TABLE = `CREATE TABLE IF NOT EXISTS _migrations (
 )`;
 
 /**
+ * Torn down before the migrations run, rebuilt after — see `CONTRACT_VIEWS`.
+ *
+ * A view is not inert while migrations execute. SQLite refuses to drop a column
+ * a view still selects (`error in view v_highlight_citations after drop column:
+ * no such column: h.text_content`), and a migration that throws is never
+ * stamped, so the failure repeats on every launch and the app stops starting.
+ * `ALTER TABLE … RENAME COLUMN` is quieter and worse: it succeeds and edits the
+ * stored view SQL in place, leaving the definition in the database drifted from
+ * the one declared here. Dropping first removes both.
+ */
+export const CONTRACT_VIEW_DROPS = [
+  `DROP VIEW IF EXISTS v_highlight_citations`,
+];
+
+/**
  * The public read surface for out-of-process consumers.
  *
  * Tools outside this app (the Pearson knowledge-gap anchorer, for one) open
@@ -168,10 +183,11 @@ const MIGRATIONS_TABLE = `CREATE TABLE IF NOT EXISTS _migrations (
  * ones — the contract would hold on the machines nobody reads from and rot on
  * the machines that matter. Dropped and recreated on every launch instead, so
  * the view in any live database is always the one declared here.
+ *
+ * The drop is a separate export because it has to run *before* the migrations,
+ * not alongside the create — see `CONTRACT_VIEW_DROPS`.
  */
 export const CONTRACT_VIEWS = [
-  `DROP VIEW IF EXISTS v_highlight_citations`,
-
   `CREATE VIEW v_highlight_citations AS
     SELECT
       h.id            AS highlight_id,
@@ -253,6 +269,31 @@ export async function runMigrations(db: MigrationRunnerDb): Promise<number[]> {
   return applied;
 }
 
+/**
+ * Bring a database to the shape this build expects: contract views down,
+ * migrations, contract views back up.
+ *
+ * Separate from `initDatabase` because the order is the load-bearing part and
+ * `initDatabase` cannot be exercised without a live Tauri connection.
+ *
+ * @returns the versions applied by this call, ascending.
+ */
+export async function initSchema(db: MigrationRunnerDb): Promise<number[]> {
+  for (const sql of CONTRACT_VIEW_DROPS) {
+    await db.execute(sql);
+  }
+
+  const applied = await runMigrations(db);
+
+  // After the migrations, so the view is rebuilt on top of whatever shape this
+  // launch just migrated the base tables to.
+  for (const sql of CONTRACT_VIEWS) {
+    await db.execute(sql);
+  }
+
+  return applied;
+}
+
 let initialized = false;
 
 /**
@@ -274,18 +315,12 @@ export async function initDatabase(): Promise<void> {
     console.log("[DB] Initializing database...");
     const db = await Database.load("sqlite:pdf-reader.db");
 
-    const applied = await runMigrations(db);
+    const applied = await initSchema(db);
     console.log(
       applied.length > 0
         ? `[DB] Applied migration(s): ${applied.join(", ")}`
         : "[DB] Schema already up to date",
     );
-
-    // After the migrations, so the view is rebuilt on top of whatever shape
-    // this launch just migrated the base tables to.
-    for (const sql of CONTRACT_VIEWS) {
-      await db.execute(sql);
-    }
 
     for (const [key, value] of DEFAULT_SETTINGS) {
       try {
