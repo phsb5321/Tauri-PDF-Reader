@@ -149,6 +149,61 @@ const MIGRATIONS_TABLE = `CREATE TABLE IF NOT EXISTS _migrations (
   applied_at TEXT NOT NULL
 )`;
 
+/**
+ * Torn down before the migrations run, rebuilt after — see `CONTRACT_VIEWS`.
+ *
+ * A view is not inert while migrations execute. SQLite refuses to drop a column
+ * a view still selects (`error in view v_highlight_citations after drop column:
+ * no such column: h.text_content`), and a migration that throws is never
+ * stamped, so the failure repeats on every launch and the app stops starting.
+ * `ALTER TABLE … RENAME COLUMN` is quieter and worse: it succeeds and edits the
+ * stored view SQL in place, leaving the definition in the database drifted from
+ * the one declared here. Dropping first removes both.
+ */
+export const CONTRACT_VIEW_DROPS = [
+  `DROP VIEW IF EXISTS v_highlight_citations`,
+];
+
+/**
+ * The public read surface for out-of-process consumers.
+ *
+ * Tools outside this app (the Pearson knowledge-gap anchorer, for one) open
+ * pdf-reader.db read-only and turn highlights into citations. Pointing them at
+ * the base tables makes every column name an accidental API: a rename would
+ * break them silently, at a distance, with no version to check against. This
+ * view is the contract instead — its column names stay stable even when the
+ * underlying ones move, and when they move THIS definition is what has to be
+ * updated. `src-tauri/tests/frontend_schema_contract.rs` executes the DDL in
+ * this file against a real SQLite database and fails until it is. (The test
+ * lives on the Rust side because CI pins the frontend job to Node 20 and
+ * `node:sqlite` needs 22.5.)
+ *
+ * Deliberately NOT a migration. A migration runs once per database, so a later
+ * edit to this definition would ship to new profiles and never reach existing
+ * ones — the contract would hold on the machines nobody reads from and rot on
+ * the machines that matter. Dropped and recreated on every launch instead, so
+ * the view in any live database is always the one declared here.
+ *
+ * The drop is a separate export because it has to run *before* the migrations,
+ * not alongside the create — see `CONTRACT_VIEW_DROPS`.
+ */
+export const CONTRACT_VIEWS = [
+  `CREATE VIEW v_highlight_citations AS
+    SELECT
+      h.id            AS highlight_id,
+      d.id            AS document_id,
+      d.file_path     AS file_path,
+      d.title         AS title,
+      h.page_number   AS page_number,
+      h.text_content  AS text_content,
+      h.note          AS note,
+      h.color         AS color,
+      h.created_at    AS created_at,
+      d.last_opened_at AS document_last_opened_at
+    FROM highlights h
+    JOIN documents d ON d.id = h.document_id`,
+];
+
 // Re-applied on every launch so a key deleted from the table comes back.
 const DEFAULT_SETTINGS = [
   ["highlight.defaultColor", '"#FFEB3B"'],
@@ -214,6 +269,31 @@ export async function runMigrations(db: MigrationRunnerDb): Promise<number[]> {
   return applied;
 }
 
+/**
+ * Bring a database to the shape this build expects: contract views down,
+ * migrations, contract views back up.
+ *
+ * Separate from `initDatabase` because the order is the load-bearing part and
+ * `initDatabase` cannot be exercised without a live Tauri connection.
+ *
+ * @returns the versions applied by this call, ascending.
+ */
+export async function initSchema(db: MigrationRunnerDb): Promise<number[]> {
+  for (const sql of CONTRACT_VIEW_DROPS) {
+    await db.execute(sql);
+  }
+
+  const applied = await runMigrations(db);
+
+  // After the migrations, so the view is rebuilt on top of whatever shape this
+  // launch just migrated the base tables to.
+  for (const sql of CONTRACT_VIEWS) {
+    await db.execute(sql);
+  }
+
+  return applied;
+}
+
 let initialized = false;
 
 /**
@@ -235,7 +315,7 @@ export async function initDatabase(): Promise<void> {
     console.log("[DB] Initializing database...");
     const db = await Database.load("sqlite:pdf-reader.db");
 
-    const applied = await runMigrations(db);
+    const applied = await initSchema(db);
     console.log(
       applied.length > 0
         ? `[DB] Applied migration(s): ${applied.join(", ")}`

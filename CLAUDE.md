@@ -267,7 +267,14 @@ Import from `src/ui/components/`:
 
 ### Keyboard Shortcuts
 
-Defined in `src/hooks/useKeyboardShortcuts.ts`:
+Live:
+
+- `Ctrl+Shift+H` - Highlight the current selection in the default colour, skipping
+  the toolbar (`src/components/pdf-viewer/HighlightCreationHandler.tsx`, bound only
+  while a selection is pending)
+
+Declared in `src/hooks/useKeyboardShortcuts.ts` but **inert** — that hook has no
+call site, so none of these are bound at runtime:
 
 - `Ctrl+O` - Open file
 - `Ctrl+,` - Settings
@@ -275,6 +282,12 @@ Defined in `src/hooks/useKeyboardShortcuts.ts`:
 - `Ctrl+B` - Toggle sidebar
 - `Escape` - Close modal/panel
 - `Space` - Play/Pause TTS
+
+Components register their own handlers, so some of that behaviour exists under a
+different chord: `Escape` closes the highlight toolbar, the context menu and an
+active playback (`HighlightToolbar.tsx:118`, `HighlightContextMenu.tsx:38`,
+`AiPlaybackBar.tsx:278`), and play/pause is **`Ctrl+Space`**, not `Space`
+(`AiPlaybackBar.tsx:271`).
 
 ## Z-Index Token System
 

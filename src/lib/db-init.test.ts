@@ -14,7 +14,10 @@
  */
 import { describe, it, expect } from "vitest";
 import {
+  CONTRACT_VIEWS,
+  CONTRACT_VIEW_DROPS,
   MIGRATIONS,
+  initSchema,
   pendingMigrations,
   runMigrations,
   type Migration,
@@ -182,5 +185,50 @@ describe("runMigrations", () => {
     await expect(runMigrations(db)).resolves.toEqual([]);
     // Only the CREATE TABLE IF NOT EXISTS _migrations probe.
     expect(db.executed.length).toBe(after + 1);
+  });
+});
+
+describe("initSchema", () => {
+  const firstMigrationStatement = MIGRATIONS[0].statements[0];
+
+  it("drops the contract views before any migration runs", async () => {
+    // SQLite will not drop a column a view still selects, and a migration that
+    // throws is never stamped — so a future `ALTER TABLE … DROP COLUMN` landing
+    // while the old view is attached would fail on every launch, forever.
+    const db = new RecordingDb();
+    await initSchema(db);
+
+    for (const sql of CONTRACT_VIEW_DROPS) {
+      expect(db.indexOf(sql)).toBeGreaterThanOrEqual(0);
+      expect(db.indexOf(sql)).toBeLessThan(db.indexOf(firstMigrationStatement));
+    }
+  });
+
+  it("recreates them after, on the shape the migrations just produced", async () => {
+    const db = new RecordingDb();
+    await initSchema(db);
+
+    const lastMigrationStatement = MIGRATIONS.flatMap(
+      (m) => m.statements,
+    ).reduce((latest, sql) =>
+      db.indexOf(sql) > db.indexOf(latest) ? sql : latest,
+    );
+
+    for (const sql of CONTRACT_VIEWS) {
+      expect(db.indexOf(sql)).toBeGreaterThan(
+        db.indexOf(lastMigrationStatement),
+      );
+    }
+  });
+
+  it("rebuilds the views even when no migration is pending", async () => {
+    // The point of keeping them out of `MIGRATIONS`: an edited view definition
+    // has to reach databases that are already fully migrated.
+    const db = new RecordingDb(new Set(MIGRATIONS.map((m) => m.version)));
+
+    await expect(initSchema(db)).resolves.toEqual([]);
+    for (const sql of [...CONTRACT_VIEW_DROPS, ...CONTRACT_VIEWS]) {
+      expect(db.indexOf(sql)).toBeGreaterThanOrEqual(0);
+    }
   });
 });
