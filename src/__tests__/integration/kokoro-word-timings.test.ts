@@ -171,6 +171,29 @@ describe('kokoroToWordTimings — spans are monotonic and cover the text', () =>
       /does not occur in the source text/
     );
   });
+
+  it('refuses to skip source text that no chunk spoke', () => {
+    // Kokoro returning only the second segment would otherwise convert
+    // "cleanly" — indexOf would find it, and the missing words would just be
+    // absent from the timeline with nothing to notice them.
+    const dropped: KokoroCapture = { ...MULTI, chunks: [MULTI.chunks[1]] };
+    expect(() => kokoroToWordTimings(dropped)).toThrow(/kokoro skipped/);
+  });
+
+  it('refuses marks that fall outside their own chunk audio', () => {
+    // The offsetting scheme assumes marks and audio share a timebase. Halve a
+    // chunk's audio and its own last mark no longer fits inside it.
+    const shortened: KokoroCapture = {
+      ...MULTI,
+      chunks: [
+        { ...MULTI.chunks[0], audio_samples: 12000 }, // 0.5 s, but marks run to 1.55 s
+        ...MULTI.chunks.slice(1),
+      ],
+    };
+    expect(() => kokoroToWordTimings(shortened)).toThrow(
+      /outside that chunk's .*s of audio/
+    );
+  });
 });
 
 describe('what a timestamp-less runtime would cost', () => {

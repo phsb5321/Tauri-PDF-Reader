@@ -65,9 +65,15 @@ export interface KokoroConversion {
  * Convert a captured Kokoro synthesis into the timing marks the highlight
  * store consumes.
  *
- * Throws when a chunk's `graphemes` cannot be located in the source text:
- * that means the offsets would be silently wrong for every word after it, and
- * a highlight pointing at the wrong characters is worse than a failed request.
+ * Throws rather than emitting a plausible-but-wrong timeline when:
+ *  - a chunk's `graphemes` cannot be located in the source text (offsets would
+ *    be silently wrong for every word after it, and a highlight pointing at
+ *    the wrong characters is worse than a failed request);
+ *  - non-whitespace source text sits between two chunks (Kokoro dropped a
+ *    segment, so words are missing from the timeline entirely);
+ *  - a token's mark falls outside its own chunk's audio (marks and audio are
+ *    not on the same timebase, which is the assumption the whole offsetting
+ *    scheme rests on).
  */
 export function kokoroToWordTimings(capture: KokoroCapture): KokoroConversion {
   const wordTimings: WordTiming[] = [];
@@ -85,6 +91,15 @@ export function kokoroToWordTimings(capture: KokoroCapture): KokoroConversion {
       );
     }
 
+    const gap = capture.text.slice(searchFrom, chunkStart);
+    if (gap.trim() !== '') {
+      throw new Error(
+        `kokoro skipped ${JSON.stringify(gap)} before chunk ${chunk.index}; only the split separator may sit between chunks, so this capture is missing spoken text`
+      );
+    }
+
+    const chunkSeconds = chunk.audio_samples / capture.sample_rate;
+
     let local = 0;
     for (const token of chunk.tokens) {
       const charStart = chunkStart + local;
@@ -93,6 +108,17 @@ export function kokoroToWordTimings(capture: KokoroCapture): KokoroConversion {
       if (token.start_ts === null || token.end_ts === null) {
         skippedTokens += 1;
         continue;
+      }
+
+      // The whole conversion rests on marks and audio sharing a timebase: if a
+      // mark sits outside the chunk's own audio, the offsetting below is
+      // meaningless and every later word is wrong. Fail loudly rather than
+      // emit a plausible-looking timeline. No tolerance on purpose — a real
+      // overshoot is a signal to look at, not to clamp away.
+      if (token.start_ts < 0 || token.end_ts > chunkSeconds) {
+        throw new Error(
+          `kokoro token ${JSON.stringify(token.text)} in chunk ${chunk.index} is marked ${token.start_ts}–${token.end_ts}s, outside that chunk's ${chunkSeconds}s of audio`
+        );
       }
 
       wordTimings.push({

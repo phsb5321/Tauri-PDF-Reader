@@ -115,7 +115,10 @@ oracle.
 A runtime that returns audio per chunk but no per-token marks can only spread
 each chunk's duration across its words. `uniformApproximationError` models the
 *generous* version of that (length-weighted, not equal-width) and measures the
-worst distance from Kokoro's real marks:
+worst distance from Kokoro's real **start** marks. Start is the deciding
+quantity, not an arbitrary half of the mark: `findWordIndexAtTime` selects the
+highlighted word from `startTime` boundaries, so start error is what moves the
+highlight onto the wrong word. End error is not measured and is not claimed.
 
 | Fixture | Worst error | As a fraction of its chunk |
 |---|---|---|
