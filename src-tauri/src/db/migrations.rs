@@ -1,5 +1,10 @@
-/// SQL migrations for the PDF Reader database
-/// Note: Currently managed by tauri-plugin-sql, these are kept for reference/future use
+/// SQL migrations for the PDF Reader database.
+///
+/// These are test fixtures. The authoritative runner is `src/lib/db-init.ts`,
+/// which applies migrations incrementally by version against the real database;
+/// this array exists so Rust repository tests can build the same schema in an
+/// in-memory SQLite. Keep the two in step — a table added there needs its DDL
+/// here or the Rust tests exercise a schema production does not have.
 #[allow(dead_code)]
 pub const MIGRATIONS: &[&str] = &[
     // Migration 1: Initial schema
@@ -82,6 +87,9 @@ pub const MIGRATIONS: &[&str] = &[
         size_bytes INTEGER NOT NULL,
         created_at TEXT NOT NULL,
         last_accessed_at TEXT NOT NULL,
+        chunk_index INTEGER,
+        duration_ms INTEGER NOT NULL DEFAULT 0,
+        total_chunks INTEGER,
         FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
     );
 
@@ -119,11 +127,11 @@ pub const MIGRATIONS: &[&str] = &[
         FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
     );
 
-    -- Enhance existing tts_cache_metadata with chunk tracking
-    -- Note: Using ALTER TABLE for backward compatibility
-    ALTER TABLE tts_cache_metadata ADD COLUMN chunk_index INTEGER;
-    ALTER TABLE tts_cache_metadata ADD COLUMN duration_ms INTEGER NOT NULL DEFAULT 0;
-    ALTER TABLE tts_cache_metadata ADD COLUMN total_chunks INTEGER;
+    -- chunk_index / duration_ms / total_chunks were originally added here by
+    -- ALTER TABLE; they now ship in migration 2's CREATE TABLE. No database
+    -- ever reached version 2 (the previous runner could only stamp version 1),
+    -- so that table had no deployed shape to preserve, and dropping the ALTERs
+    -- makes this migration re-runnable.
 
     -- Indexes for reading sessions performance
     CREATE INDEX IF NOT EXISTS idx_reading_sessions_last_accessed
