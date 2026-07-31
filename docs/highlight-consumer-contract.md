@@ -43,6 +43,9 @@ Guarantees:
   every name above — plus the values, so a view joined the wrong way fails too.
   Rename a base column without updating the view and that test goes red before it
   ships.
+- The view is dropped and recreated every time the app starts, so a database that
+  has been opened once by a given build has that build's definition. It is not a
+  versioned migration: there is no profile out there running an older view.
 
 Not covered by any guarantee: the base tables (`documents`, `highlights`,
 `settings`, `tts_cache_metadata`, `reading_sessions`, `session_documents`,

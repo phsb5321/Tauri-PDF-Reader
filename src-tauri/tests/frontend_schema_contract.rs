@@ -30,9 +30,9 @@ const DB_INIT_TS: &str = include_str!("../../src/lib/db-init.ts");
 /// sanity checks in `parses_the_production_ddl` fail loudly if that stops being
 /// true, rather than silently yielding an empty list.
 fn sql_literals(decl: &str, terminator: &str) -> Vec<String> {
-    let start = DB_INIT_TS
-        .find(decl)
-        .unwrap_or_else(|| panic!("db-init.ts must declare `{decl}` — did the production DDL move?"));
+    let start = DB_INIT_TS.find(decl).unwrap_or_else(|| {
+        panic!("db-init.ts must declare `{decl}` — did the production DDL move?")
+    });
     let body = &DB_INIT_TS[start..];
     let end = body
         .find(terminator)
