@@ -279,7 +279,11 @@ pub fn run() {
 
     // Generate TypeScript bindings in development
     // Using header to disable strict type checking for auto-generated code
-    #[cfg(debug_assertions)]
+    //
+    // Desktop-only: on Android/iOS the source tree is read-only (the packaged
+    // app has no checkout to write into). The bindings.ts is regenerated on the
+    // dev's desktop and checked in; the mobile app just uses the prebuilt file.
+    #[cfg(all(debug_assertions, not(any(target_os = "android", target_os = "ios"))))]
     specta_builder
         .export(
             specta_typescript::Typescript::default().header("// @ts-nocheck\n/* eslint-disable */"),
@@ -300,8 +304,13 @@ pub fn run() {
         // without re-prompting. It introduces NO new or broader pattern, so the
         // effective scope is unchanged across restarts (no whole-disk exposure).
         .plugin(tauri_plugin_persisted_scope::init())
-        .plugin(tauri_plugin_shell::init())
         .manage(ExportState::new());
+
+    // shell plugin is cfg-gated out of mobile in Cargo.toml; only init on desktop.
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    {
+        builder = builder.plugin(tauri_plugin_shell::init());
+    }
 
     // Register TTS state if feature enabled
     #[cfg(feature = "native-tts")]
@@ -492,6 +501,7 @@ pub fn run() {
             // items emit a "menu-action" event the frontend handles via the same
             // code paths as the keyboard shortcuts; predefined items (Quit,
             // About) carry their own behavior.
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             {
                 use tauri::menu::{MenuBuilder, PredefinedMenuItem, SubmenuBuilder};
 

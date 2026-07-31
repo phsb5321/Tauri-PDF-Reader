@@ -1,0 +1,8 @@
+#!/usr/bin/env node
+// src-tauri/tauri — bootstrap to @tauri-apps/cli.
+// Required by the Tauri Android gradle plugin (buildSrc/BuildTask.kt) which runs
+// `node tauri android android-studio-script` from this directory. Lectrice was
+// originally scaffolded before this convention; added for spec 042 (Android target).
+// ESM `import` (not CommonJS `require`) because Lectrice's package.json declares
+// `"type": "module"` — an extensionless or `.js` file in this tree is ESM.
+import '../node_modules/@tauri-apps/cli/tauri.js';

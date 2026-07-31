@@ -15,7 +15,6 @@
     "dialog:allow-open",
     "sql:default",
     "sql:allow-execute",
-    "sql:allow-select",
-    "shell:allow-open"
+    "sql:allow-select"
   ]
 }
