@@ -67,11 +67,6 @@ export function useHighlightCreation({
 
   // Handle text selection from TextLayer
   const handleTextSelect = useCallback((selection: TextSelection) => {
-    console.debug("[useHighlightCreation] Text selected:", {
-      textLength: selection.text.length,
-      rectsCount: selection.rects.length,
-      pageNumber: selection.pageNumber,
-    });
     setPendingSelection(selection);
   }, []);
 
@@ -97,13 +92,6 @@ export function useHighlightCreation({
         createdAt: new Date().toISOString(),
         updatedAt: null,
       };
-
-      console.debug("[useHighlightCreation] Creating highlight:", {
-        id: highlight.id,
-        color,
-        pageNumber: highlight.pageNumber,
-        rectsCount: highlight.rects.length,
-      });
 
       // Add to store (immediate UI update)
       addHighlight(highlight);
