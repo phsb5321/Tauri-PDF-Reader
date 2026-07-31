@@ -1,0 +1,68 @@
+{
+  "cache_key": "cf1d72df207a39167eb43fe6deb38353c6cb7f5e19878eb4775bd1e5997385b2",
+  "chunks": [
+    {
+      "audio_samples": 45600,
+      "graphemes": "alpha beta gamma",
+      "index": 0,
+      "tokens": [
+        {
+          "end_ts": 0.675,
+          "phonemes": "ˈælfə",
+          "start_ts": 0.35,
+          "text": "alpha",
+          "whitespace": " "
+        },
+        {
+          "end_ts": 0.975,
+          "phonemes": "bˈATə",
+          "start_ts": 0.675,
+          "text": "beta",
+          "whitespace": " "
+        },
+        {
+          "end_ts": 1.55,
+          "phonemes": "ɡˈæmə",
+          "start_ts": 0.975,
+          "text": "gamma",
+          "whitespace": ""
+        }
+      ]
+    },
+    {
+      "audio_samples": 51000,
+      "graphemes": "delta epsilon zeta",
+      "index": 1,
+      "tokens": [
+        {
+          "end_ts": 0.65,
+          "phonemes": "dˈɛltə",
+          "start_ts": 0.3,
+          "text": "delta",
+          "whitespace": " "
+        },
+        {
+          "end_ts": 1.175,
+          "phonemes": "ˈɛpsɪlˌɑn",
+          "start_ts": 0.65,
+          "text": "epsilon",
+          "whitespace": " "
+        },
+        {
+          "end_ts": 1.85,
+          "phonemes": "zˈATə",
+          "start_ts": 1.175,
+          "text": "zeta",
+          "whitespace": ""
+        }
+      ]
+    }
+  ],
+  "kokoro_version": "0.9.4",
+  "lang_code": "a",
+  "model": "hexgrad/Kokoro-82M",
+  "provider": "kokoro",
+  "sample_rate": 24000,
+  "text": "alpha beta gamma\ndelta epsilon zeta",
+  "voice": "af_heart"
+}
