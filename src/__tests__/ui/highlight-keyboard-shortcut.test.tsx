@@ -89,6 +89,33 @@ describe('Ctrl+Shift+H highlights the pending selection', () => {
     expect(createHighlight).toHaveBeenCalledTimes(1);
   });
 
+  it('creates one highlight when the chord is held down, not one per repeat', () => {
+    // Harsher than a real keyboard: an auto-repeat burst arrives as separate
+    // tasks, so React flushes the `pendingSelection = null` update between
+    // them. Dispatching the whole burst inside ONE act() denies it that flush,
+    // which is the only way the handler could still be holding the stale
+    // selection when the second event lands.
+    const { result } = mount();
+    act(() => result.current.handleTextSelect(SELECTION));
+
+    act(() => {
+      for (let i = 0; i < 5; i++) {
+        document.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            key: 'H',
+            ctrlKey: true,
+            shiftKey: true,
+            repeat: i > 0,
+            bubbles: true,
+          })
+        );
+      }
+    });
+
+    expect(createHighlight).toHaveBeenCalledTimes(1);
+    expect(useDocumentStore.getState().highlights).toHaveLength(1);
+  });
+
   it('stays inert with no selection pending', () => {
     mount();
     press('H', { ctrlKey: true, shiftKey: true });

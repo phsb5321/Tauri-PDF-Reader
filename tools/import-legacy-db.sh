@@ -37,11 +37,22 @@ HL_COLS="id, document_id, page_number, rects, color, text_content, note, created
 
 count() { sqlite3 "file:$1?mode=ro" "SELECT (SELECT count(*) FROM documents) || ' documents, ' || (SELECT count(*) FROM highlights) || ' highlights'"; }
 
+# A SQL string literal escapes a single quote by doubling it. Paths containing
+# one are ordinary (~/Documents/Pedro's books/…), and interpolating such a path
+# raw would end the literal early and hand the rest of the path to SQLite as
+# statements — a syntax error if you are lucky, `'; DROP TABLE highlights; --`
+# if the path came from somewhere less trustworthy than your own shell.
+#
+# ponytail: quote-doubling only. A path containing `?` or `#` still confuses the
+# `file:` URI parser; the full fix is percent-encoding the path component, which
+# is not worth it for a one-shot tool run against two known locations.
+sql_quote() { printf '%s' "${1//\'/\'\'}"; }
+
 import_into() {
   local src="$1" dest="$2"
 
   sqlite3 "$dest" <<SQL
-ATTACH DATABASE 'file:${src}?mode=ro' AS legacy;
+ATTACH DATABASE 'file:$(sql_quote "$src")?mode=ro' AS legacy;
 BEGIN;
 
 INSERT OR IGNORE INTO documents (${DOC_COLS})
@@ -75,7 +86,9 @@ self_check() {
   # cleanup into a spurious failure.
   SELF_CHECK_DIR="$(mktemp -d)"
   trap 'rm -rf "$SELF_CHECK_DIR"' EXIT
-  src="$SELF_CHECK_DIR/src.db"
+  # The apostrophe is deliberate: it is what a raw interpolation into the
+  # ATTACH string literal breaks on, so the happy path also covers sql_quote.
+  src="$SELF_CHECK_DIR/Pedro's legacy.db"
   dest="$SELF_CHECK_DIR/dest.db"
 
   local schema="CREATE TABLE documents (id TEXT PRIMARY KEY, file_path TEXT NOT NULL UNIQUE, title TEXT, page_count INTEGER, current_page INTEGER NOT NULL DEFAULT 1, scroll_position REAL NOT NULL DEFAULT 0.0, last_tts_chunk_id TEXT, last_opened_at TEXT, file_hash TEXT, created_at TEXT NOT NULL);
@@ -133,7 +146,7 @@ if pgrep -x 'Lectrice|tauri-pdf-reade' >/dev/null 2>&1; then
 fi
 
 BACKUP="$DEST.pre-import-$(date +%Y%m%d-%H%M%S)"
-sqlite3 "$DEST" ".backup '$BACKUP'"
+sqlite3 "$DEST" ".backup '$(sql_quote "$BACKUP")'"
 
 echo "source:      $SRC          ($(count "$SRC"))"
 echo "destination: $DEST ($(count "$DEST"))"

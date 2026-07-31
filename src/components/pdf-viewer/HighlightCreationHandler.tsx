@@ -19,7 +19,7 @@
  * pending selection, which lives in this hook's state.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { HighlightToolbar, calculateToolbarPosition } from "./HighlightToolbar";
 import { useDocumentStore } from "../../stores/document-store";
 import { useHighlightPersistence } from "../../hooks/useHighlightPersistence";
@@ -59,6 +59,9 @@ export function useHighlightCreation({
   const { addHighlight } = useDocumentStore();
   const toastSuccess = useToastStore((s) => s.success);
   const defaultColor = useSettingsStore((s) => s.highlightDefaultColor);
+  // The selection already committed, so a burst cannot commit it twice. See
+  // the note in `handleHighlight`.
+  const committedSelectionRef = useRef<TextSelection | null>(null);
 
   const { createHighlight } = useHighlightPersistence({
     documentId,
@@ -79,6 +82,19 @@ export function useHighlightCreation({
         );
         return;
       }
+
+      // `setPendingSelection(null)` below does not take effect until React
+      // flushes, which it cannot do until the current task yields. So every
+      // event in a burst — an auto-repeat of Ctrl+Shift+H, or a double-fire of
+      // the toolbar button — still sees the selection set and creates its own
+      // highlight. Measured before this latch: holding the chord produced 5.
+      //
+      // The latch is a ref because it has to be readable and writable in the
+      // same synchronous turn, which state is not. Comparing the selection
+      // OBJECT means a genuinely new selection is never suppressed, so it
+      // needs no reset.
+      if (committedSelectionRef.current === pendingSelection) return;
+      committedSelectionRef.current = pendingSelection;
 
       // Create highlight object with UUID
       const highlight: Highlight = {

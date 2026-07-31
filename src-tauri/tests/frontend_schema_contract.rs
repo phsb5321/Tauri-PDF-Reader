@@ -116,6 +116,25 @@ async fn parses_the_production_ddl() {
         statements.iter().all(|s| !s.trim().is_empty()),
         "extracted an empty statement — the scan is picking up the gaps between literals"
     );
+
+    // The scan assumes the array holds nothing but template literals, so the
+    // odd-numbered chunks are statements and the even ones are the `,` and
+    // comments between them. Add a backtick anywhere else in that array — a
+    // backtick-quoted SQLite identifier, a block comment, a non-literal entry —
+    // and the parity inverts: `statements` fills up with the *gaps*. Those look
+    // like `,\n\n  ` and would still satisfy the two checks above, so assert
+    // the shape of what came out, not just how much of it there is.
+    for statement in &statements {
+        let head = statement.trim_start();
+        assert!(
+            ["CREATE", "INSERT", "DROP", "ALTER", "PRAGMA", "UPDATE", "DELETE"]
+                .iter()
+                .any(|kw| head.starts_with(kw)),
+            "extracted a chunk that is not a SQL statement, so the backtick scan has \
+             lost parity — check db-init.ts for a backtick outside a migration literal:\n{}",
+            &head[..head.len().min(120)]
+        );
+    }
 }
 
 #[tokio::test]
