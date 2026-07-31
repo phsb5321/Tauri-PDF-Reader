@@ -1,0 +1,54 @@
+{
+  "cache_key": "8fc1e6fdec8d24401f053f280030df2c76fde646c46b9c8626c0f0421536c5e3",
+  "chunks": [
+    {
+      "audio_samples": 62400,
+      "graphemes": "alpha beta gamma delta epsilon",
+      "index": 0,
+      "tokens": [
+        {
+          "end_ts": 0.575,
+          "phonemes": "ˈælfə",
+          "start_ts": 0.275,
+          "text": "alpha",
+          "whitespace": " "
+        },
+        {
+          "end_ts": 0.9,
+          "phonemes": "bˈATə",
+          "start_ts": 0.575,
+          "text": "beta",
+          "whitespace": " "
+        },
+        {
+          "end_ts": 1.2,
+          "phonemes": "ɡˈæmə",
+          "start_ts": 0.9,
+          "text": "gamma",
+          "whitespace": " "
+        },
+        {
+          "end_ts": 1.55,
+          "phonemes": "dˈɛltə",
+          "start_ts": 1.2,
+          "text": "delta",
+          "whitespace": " "
+        },
+        {
+          "end_ts": 2.375,
+          "phonemes": "ˈɛpsɪlˌɑn",
+          "start_ts": 1.55,
+          "text": "epsilon",
+          "whitespace": ""
+        }
+      ]
+    }
+  ],
+  "kokoro_version": "0.9.4",
+  "lang_code": "a",
+  "model": "hexgrad/Kokoro-82M",
+  "provider": "kokoro",
+  "sample_rate": 24000,
+  "text": "alpha beta gamma delta epsilon",
+  "voice": "af_heart"
+}
