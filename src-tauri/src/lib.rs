@@ -189,6 +189,7 @@ use commands::audio_cache::*;
 use commands::audio_export::{
     audio_export_cancel, audio_export_check_ready, audio_export_document, ExportState,
 };
+use commands::collections::*;
 use commands::highlights::*;
 use commands::library::*;
 use commands::settings::*;
@@ -275,6 +276,14 @@ pub fn run() {
         highlights_delete,
         highlights_delete_for_document,
         highlights_export,
+        // Shelf commands
+        collections_create,
+        collections_list,
+        collections_rename,
+        collections_delete,
+        collections_add_document,
+        collections_remove_document,
+        collections_list_memberships,
     ]);
 
     // Generate TypeScript bindings in development
@@ -343,6 +352,14 @@ pub fn run() {
             highlights_delete,
             highlights_delete_for_document,
             highlights_export,
+            // Shelf commands
+            collections_create,
+            collections_list,
+            collections_rename,
+            collections_delete,
+            collections_add_document,
+            collections_remove_document,
+            collections_list_memberships,
             // Settings commands (legacy)
             settings_get,
             settings_set,

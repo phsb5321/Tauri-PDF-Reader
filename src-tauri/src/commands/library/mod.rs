@@ -2,7 +2,9 @@
 //!
 //! Tauri commands for document library management.
 
-mod db;
+// `pub(crate)` so sibling command modules can reach `get_pool` rather than
+// each re-deriving the pool lookup from `DbInstances`.
+pub(crate) mod db;
 
 use crate::db::models::{Document, FileExistsResponse};
 use chrono::Utc;

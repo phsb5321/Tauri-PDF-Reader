@@ -10,6 +10,11 @@ interface DocumentCardProps {
   onClick: () => void;
   onDoubleClick: () => void;
   onDelete: () => void;
+  /** Shelves the book can be filed on. Omit to hide the filing controls. */
+  shelves?: readonly { id: string; name: string }[];
+  /** Shelf ids this book is already filed under. */
+  shelfIds?: ReadonlySet<string>;
+  onToggleShelf?: (shelfId: string, filed: boolean) => void;
 }
 
 export function DocumentCard({
@@ -19,6 +24,9 @@ export function DocumentCard({
   onClick,
   onDoubleClick,
   onDelete,
+  shelves,
+  shelfIds,
+  onToggleShelf,
 }: DocumentCardProps) {
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [fileExists] = useState<boolean | null>(null);
@@ -81,6 +89,46 @@ export function DocumentCard({
     return parts[parts.length - 1] || document.filePath;
   }, [document.filePath]);
 
+  // Same menu in both view modes: filing a book is the reason the menu exists
+  // now, and it was previously unreachable in list view — the handler set the
+  // flag but the list branch returned before anything rendered it.
+  const contextMenu = showContextMenu && (
+    <div className="document-card-context-menu">
+      <button type="button" onClick={onDoubleClick}>
+        Open
+      </button>
+      {shelves && shelves.length > 0 && (
+        <div
+          className="document-card-shelves"
+          role="group"
+          aria-label="Shelves"
+        >
+          {shelves.map((shelf) => {
+            const filed = shelfIds?.has(shelf.id) ?? false;
+            return (
+              <label key={shelf.id} className="document-card-shelf">
+                <input
+                  type="checkbox"
+                  checked={filed}
+                  // Menu stays open: filing a book on several shelves in one
+                  // pass is the common case.
+                  onChange={() => onToggleShelf?.(shelf.id, filed)}
+                />
+                <span>{shelf.name}</span>
+              </label>
+            );
+          })}
+        </div>
+      )}
+      <button type="button" onClick={handleDelete}>
+        Remove from Library
+      </button>
+      <button type="button" onClick={handleCloseContextMenu}>
+        Cancel
+      </button>
+    </div>
+  );
+
   if (viewMode === "list") {
     return (
       <article
@@ -130,6 +178,7 @@ export function DocumentCard({
         >
           <DeleteIcon />
         </button>
+        {contextMenu}
       </article>
     );
   }
@@ -183,20 +232,7 @@ export function DocumentCard({
         <DeleteIcon />
       </button>
 
-      {/* Context Menu */}
-      {showContextMenu && (
-        <div className="document-card-context-menu">
-          <button type="button" onClick={onDoubleClick}>
-            Open
-          </button>
-          <button type="button" onClick={handleDelete}>
-            Remove from Library
-          </button>
-          <button type="button" onClick={handleCloseContextMenu}>
-            Cancel
-          </button>
-        </div>
-      )}
+      {contextMenu}
     </article>
   );
 }

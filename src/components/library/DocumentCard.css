@@ -291,3 +291,35 @@
 .document-card-context-menu button:hover {
   background: var(--hover-bg, #f5f5f5);
 }
+
+/* Shelf checkboxes sit between Open and Remove, hairlined off so the
+   destructive entry never reads as part of the filing list. */
+.document-card-shelves {
+  display: flex;
+  flex-direction: column;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border-color, #e0e0e0);
+  border-bottom: 1px solid var(--border-color, #e0e0e0);
+}
+
+.document-card-shelf {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px var(--space-4);
+  font-size: 13px;
+  color: var(--text-primary, #1a1a1a);
+  cursor: pointer;
+}
+
+.document-card-shelf:hover {
+  background: var(--hover-bg, #f5f5f5);
+}
+
+.document-card-shelf span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

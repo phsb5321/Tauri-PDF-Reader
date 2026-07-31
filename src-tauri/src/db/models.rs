@@ -17,6 +17,31 @@ pub struct Document {
     pub created_at: String,
 }
 
+/// A shelf — a named collection of documents.
+///
+/// `document_count` is denormalized for list display; it is computed by the
+/// query, not stored.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct Collection {
+    pub id: String,
+    pub name: String,
+    pub document_count: i64,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// One document filed under one shelf.
+///
+/// The whole membership table is small enough to load at once, which lets the
+/// shelf filter and the per-document shelf picker work without further calls.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct CollectionMembership {
+    pub document_id: String,
+    pub collection_id: String,
+}
+
 /// Represents a rectangle for highlight positioning (page coordinates)
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]

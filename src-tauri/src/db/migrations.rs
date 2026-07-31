@@ -165,4 +165,28 @@ pub const MIGRATIONS: &[&str] = &[
 
     INSERT OR IGNORE INTO _migrations (version, applied_at) VALUES (3, datetime('now'));
     "##,
+    // Migration 4: Shelves — named collections of documents
+    r##"
+    CREATE TABLE IF NOT EXISTS collections (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_collections_name ON collections(name COLLATE NOCASE);
+
+    CREATE TABLE IF NOT EXISTS document_collections (
+        document_id TEXT NOT NULL,
+        collection_id TEXT NOT NULL,
+        added_at TEXT NOT NULL,
+        PRIMARY KEY (document_id, collection_id),
+        FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
+        FOREIGN KEY (collection_id) REFERENCES collections(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_document_collections_collection ON document_collections(collection_id);
+
+    INSERT OR IGNORE INTO _migrations (version, applied_at) VALUES (4, datetime('now'));
+    "##,
 ];
