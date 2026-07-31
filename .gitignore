@@ -29,6 +29,9 @@ Thumbs.db
 npm-debug.log*
 pnpm-debug.log*
 
+# Local delivery-harness evidence
+.artifacts/
+
 # Test coverage
 coverage/
 

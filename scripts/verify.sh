@@ -3,7 +3,7 @@
 # Verification script for Tauri PDF Reader
 # Runs all checks that would run in CI/pre-commit
 
-set -e
+set -Eeuo pipefail
 
 # Colors for output
 RED='\033[0;31m'
@@ -45,7 +45,7 @@ echo -e "${BLUE}── Frontend Checks ──${NC}"
 echo ""
 
 step "Installing dependencies..."
-pnpm install --frozen-lockfile || pnpm install
+pnpm install --frozen-lockfile
 success "Dependencies installed"
 
 step "TypeScript type checking..."
@@ -61,11 +61,11 @@ pnpm lint:boundaries || error "ESLint boundaries check failed"
 success "ESLint boundaries passed"
 
 step "Running frontend tests..."
-pnpm test:run || error "Frontend tests failed"
+pnpm exec vitest run --maxWorkers=1 --minWorkers=1 || error "Frontend tests failed"
 success "Frontend tests passed"
 
 step "Architecture tests..."
-pnpm test:arch || error "Architecture tests failed"
+pnpm exec vitest run src/__tests__/architecture/ --maxWorkers=1 --minWorkers=1 || error "Architecture tests failed"
 success "Architecture tests passed"
 
 # ============================================================================
@@ -82,7 +82,7 @@ success "Rust formatting passed"
 
 step "Clippy linting..."
 if command -v cargo-clippy &> /dev/null || cargo clippy --version &> /dev/null; then
-    cargo clippy -- -D warnings || error "Clippy failed"
+    cargo clippy --all-targets --features test-mocks -j 1 -- -D warnings || error "Clippy failed"
     success "Clippy passed"
 else
     echo -e "${YELLOW}⚠ Clippy not installed, skipping (install with: rustup component add clippy)${NC}"
@@ -90,11 +90,11 @@ else
 fi
 
 step "Running Rust tests..."
-cargo test --features test-mocks || error "Rust tests failed"
+cargo test --features test-mocks -j 1 || error "Rust tests failed"
 success "Rust tests passed"
 
 step "Running contract tests..."
-cargo test --features test-mocks --test '*' || error "Contract tests failed"
+cargo test --features test-mocks --test '*' -j 1 || error "Contract tests failed"
 success "Contract tests passed"
 
 cd ..
@@ -114,7 +114,7 @@ echo -e "Total time: ${DURATION}s"
 echo ""
 
 # Check if duration is under target
-if [ $DURATION -lt 120 ]; then
+if [ "$DURATION" -lt 120 ]; then
     echo -e "${GREEN}✓ Verification completed in under 2 minutes${NC}"
 else
     echo -e "${YELLOW}⚠ Verification took longer than 2 minutes${NC}"
