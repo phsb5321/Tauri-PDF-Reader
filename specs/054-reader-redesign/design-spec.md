@@ -117,15 +117,38 @@ The three directions are checked by a runnable script rather than by eye:
 python3 specs/054-reader-redesign/design-demos/render-screenshots.py
 ```
 
-It re-captures each screenshot and fails on: any page or console error; any
-request that is not `file:`/`data:` (the offline rule); a capture that is not
-1440×900; any visible interactive control below 44×44; a required interaction
-— play/pause, revealing the session or inspector surface, next page — that
-mutates no observable state; or a play control that does not re-describe itself
-once playback starts. Current result: all three directions pass.
-Smallest rendered font size is reported, not gated (A and B use 10px eyebrow
-chrome, C bottoms out at 12px); the brief's 14px floor governs production body
-copy, so that trade-off is part of what the reviewer is choosing between.
+It re-captures each screenshot and fails on:
+
+1. any page or console error;
+2. any request that is not `file:`/`data:`, any WebSocket, or any worker —
+   sockets and workers are separate Playwright events, so watching `request`
+   alone would let a direction phone home and still be called offline;
+3. a capture that is not 1440×900;
+4. any visible interactive control below 44×44;
+5. any text run below the brief's contrast floor (4.5:1, or 3:1 for large text
+   per WCAG 1.4.3). Only text whose background resolves to an opaque colour can
+   be judged from the DOM, so unresolvable runs are counted and reported — and
+   a direction where *nothing* resolves fails rather than passing vacuously;
+6. any element that still animates under an emulated
+   `prefers-reduced-motion: reduce` (the 0.01ms reset idiom is not motion);
+7. a required interaction — play/pause, revealing the session or inspector
+   surface, next page — that mutates no observable state; a play control that
+   does not re-describe itself once playback starts; or a session surface that
+   leaves under 60% of the fixture page visible or covers its centre. "The page
+   is the visual anchor" is a layout claim, so it is asserted, not eyeballed.
+
+Current result: all three directions pass; 42 / 36 / 31 text runs contrast-
+checked with none unresolvable. Each gate has a negative control: reverting the
+Latte accent darkening reproduces 11 contrast failures, stripping a direction's
+reduced-motion block reproduces 8 animation failures, and removing the fixture
+page image trips the page-anchor assertion.
+
+Latte's `blue #1e66f5`, `mauve #8839ef` and `subtext0 #6c6f85` all clear 3:1 but
+not 4.5:1 on `base`, so the directions use hue-matched darker variants
+(`#1152cf`, `#7526c9`, `#5c5f77`) for text. Smallest rendered font size is
+reported, not gated (A and B use 10px eyebrow chrome, C bottoms out at 12px);
+the brief's 14px floor governs production body copy, so that trade-off is part
+of what the reviewer is choosing between.
 
 ## Direction isolation
 

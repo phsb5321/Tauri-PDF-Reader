@@ -4,10 +4,12 @@
 > Status: waiting on one decision — which direction goes to production
 
 Everything mechanizable about the three directions is already asserted by
-`design-demos/render-screenshots.py` (offline assets, 1440×900, zero console
-errors, 44×44 hit targets, working play/pause + surface reveal + page change).
-All three pass. What remains is a taste call, so it is the one thing left for a
-human.
+`design-demos/render-screenshots.py` (offline assets — including no WebSocket
+and no worker, 1440×900, zero console errors, 44×44 hit targets, 4.5:1 text
+contrast, no motion under `prefers-reduced-motion`, working play/pause +
+surface reveal + page change, and the page staying visible and unoccluded when
+the session surface opens). All three pass. What remains is a taste call, so it
+is the one thing left for a human.
 
 ## 60-second checklist
 
@@ -24,11 +26,13 @@ sessions/library surface, advance the page. Then answer:
 
 1. **Which one makes "this app reads pages aloud" obvious in the first second?**
 2. **Which one would you rather stare at for two hours of reading?**
-3. **When you opened the session surface, did the page stay the thing you were
-   looking at?**
 
-The direction that wins two of three is the answer. Reply with `A`, `B`, or `C`
-(plus any single element you want carried over from a loser).
+Both questions are irreducibly about taste. The third question this checklist
+used to ask — whether the page stayed the thing you were looking at when the
+session surface opened — was a layout claim, not a taste one, so it is now
+asserted by the gate instead (≥60% of the page still visible, centre not
+occluded). Reply with `A`, `B`, or `C` (plus any single element you want
+carried over from a loser).
 
 ## What each direction is betting
 
@@ -50,5 +54,9 @@ Two items carry into that work regardless of which direction wins:
 
 - The 10px eyebrow labels in A and B must rise to meet the brief's 14px body
   floor, or be demoted to genuinely non-essential metadata.
-- The 44×44 hit-target rule is currently asserted on the prototypes only; the
-  production shell needs the same assertion in its own test layer.
+- The 44×44, contrast, reduced-motion and page-anchor rules are currently
+  asserted on the prototypes only; the production shell needs the same
+  assertions in its own test layer.
+- Catppuccin Latte's `blue`, `mauve` and `subtext0` fail 4.5:1 on `base` at
+  small sizes. The prototypes use hue-matched darker variants; production needs
+  the same decision made once, in the token layer, not per component.
