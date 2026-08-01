@@ -52,16 +52,15 @@ jobs:
         with:
           version: 10
 
-      - name: Get pnpm store directory
-        shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: ${{ runner.os }}-pnpm-store-
+      # No pnpm store cache. The runner is self-hosted (vm103) and the store
+      # lives at ~/.local/share/pnpm/store — outside the workspace, so it
+      # survives `actions/checkout`'s clean and is already warm on the next
+      # run. The GitHub cache round-trip added nothing and broke every frontend
+      # job: `Post Setup pnpm cache` stalled uploading the 677 MB store at
+      # "Sent 0 of 677350749 (0.0%)" until `timeout-minutes: 10` cancelled the
+      # job, so the job reported `failure` with every substantive step green.
+      # It could not recover on its own — the entry was never written, so the
+      # next run missed, tried to save, and stalled again.
 
       - name: Install dependencies
         run: pnpm install
