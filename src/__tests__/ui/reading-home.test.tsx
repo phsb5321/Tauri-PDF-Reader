@@ -147,4 +147,46 @@ describe("the reading home", () => {
     // Going back to the home does not close the book.
     expect(useDocumentStore.getState().currentDocument?.id).toBe("doc-1");
   });
+
+  it("keeps the current page across a toggle-library round trip", async () => {
+    // The previous test proves leaving the document behind does not lose it;
+    // this one closes the loop. Coming BACK must show the page the reader
+    // navigated to while away, not the page the row was resumed at, and must
+    // not re-fetch the file — a second Ctrl+L is a view swap (ReaderView's
+    // `showLibrary` flips off), never another `resumeDocument` call.
+    render(<ReaderView />);
+
+    fireEvent.click(await shelfEntry(/Moby-Dick/));
+    await waitFor(() =>
+      expect(screen.getByTestId("pdf-viewer")).toBeInTheDocument(),
+    );
+    expect(useDocumentStore.getState().currentPage).toBe(213);
+
+    // Turn a page for real, through the same window-level dispatcher a
+    // physical PageDown key goes through (useCommandKeys -> onNextPage ->
+    // usePageNavigation's goToNextPage -> the document store).
+    act(() => {
+      fireEvent.keyDown(window, { key: "PageDown" });
+    });
+    await waitFor(() =>
+      expect(useDocumentStore.getState().currentPage).toBe(214),
+    );
+
+    // Away to the library...
+    act(() => {
+      fireEvent.keyDown(window, { key: "l", ctrlKey: true });
+    });
+    expect(await shelfEntry(/Moby-Dick/)).toBeInTheDocument();
+
+    // ...and back.
+    act(() => {
+      fireEvent.keyDown(window, { key: "l", ctrlKey: true });
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("pdf-viewer")).toBeInTheDocument(),
+    );
+    expect(useDocumentStore.getState().currentPage).toBe(214);
+    expect(loadDocument).toHaveBeenCalledTimes(1);
+  });
 });
