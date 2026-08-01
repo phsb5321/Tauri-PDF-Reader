@@ -40,6 +40,25 @@ of the pull request:
 A spec-less pull request still carries the full description in its body and
 still passes `verify_gate`. Spec-less means no `specs/NNN-slug/`, not less rigour.
 
+### The disqualifier
+
+None of the labels above survive contact with a behaviour change. The test is
+mechanical, not a judgement call:
+
+> If the pull request adds or edits a test **to describe behaviour the
+> application did not have before**, it is not spec-less, whatever else it is
+> called.
+
+A refactor that is genuinely mechanical leaves the existing suite passing
+unchanged — that is what makes it mechanical. New tests over *existing*
+behaviour are the "test infrastructure" class and stay spec-less; a new test
+that would have failed before the change is the definition of a behaviour delta,
+and no label removes it. Reviewers check this by reading the test diff, not the
+label.
+
+This is deliberately the same evidence a reviewer already has to look at, so it
+costs nothing to apply and cannot be satisfied by assertion.
+
 ## What actually happened to #56–#65
 
 | PR   | Class                                          | Correct? |

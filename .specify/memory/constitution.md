@@ -7,8 +7,10 @@ Date: 2026-08-01
 Why MAJOR: two principles asserted properties the repository does not have, and
 a Constitution Check that passes against a false statement is not a check. Both
 are restated to what is measurably true today, and one of them is a
-NON-NEGOTIABLE — an incompatible redefinition under this document's own semver
-rule.
+NON-NEGOTIABLE. The Governance section below defines the rule being applied:
+"MAJOR: Principle removal or incompatible redefinition". Restating a
+NON-NEGOTIABLE principle so that what it forbids changes is that, so the bump is
+MAJOR even though no code moves.
 
 Renamed:
   - "Tauri PDF Reader Constitution" → "Lectrice Constitution". The name has been
@@ -87,9 +89,13 @@ The typed surface is incomplete and is governed as a **ratchet**, not as a claim
 - `src/lib/bindings.ts` is generated (`cargo run --example
   regenerate_bindings`), never hand-edited, and asserted byte-for-byte against
   what specta emits.
-- The exception list may only get **shorter**. Lengthening it requires a stated
-  reason in the PR description. It was 63 entries when the gate landed
-  (PR #64) and 53 after the session family migrated (PR #65).
+- The exception list may only get **shorter**, and this is enforced rather than
+  promised: `MAX_UNTYPED_COMMANDS` in the same file pins its length, and
+  `the_untyped_surface_never_grows` fails both when the list exceeds the pin and
+  when the pin keeps slack the list no longer needs. Raising the pin is a
+  visible edit that needs a stated reason in the pull request. It was 63 entries
+  when the gate landed (PR #64) and 53 after the session family migrated
+  (PR #65).
 - Every `#[tauri::command]` in `src-tauri/src/tauri_api/` MUST carry
   `#[specta::specta]`.
 
