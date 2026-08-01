@@ -421,6 +421,16 @@ pub async fn library_heal_document(
         .next()
         .ok_or_else(|| "NOT_FOUND: Document not found".to_string())?;
 
+    // ponytail: a resolving path is taken at its word — no hash. Ceiling: if
+    // the book moved away *and* a different PDF took its place at the old path,
+    // this opens the impostor under the old book's progress. That is what the
+    // library already did before healing existed, so it is not a regression,
+    // and closing it here is not free: healing runs on every open (see
+    // `LibraryView.handleDocumentOpen`), so verifying content would put a
+    // SHA-256 of the whole file on the hot path, and `documents.file_hash` is
+    // nullable — rows added before hashing have nothing to compare against.
+    // Upgrade path: store size+mtime alongside the hash and compare those
+    // first, hashing only when the cheap pair disagrees.
     if validate_pdf_path(&doc.file_path).is_ok() {
         return Ok(doc);
     }
