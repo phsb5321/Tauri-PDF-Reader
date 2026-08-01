@@ -2,6 +2,100 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #34 — 2026-08-01 (Two merges, sonar green for the first time in seven, and 963 lines that were never reachable)
+
+**Live state:** `origin/main` = `18ef0e9` after **#65 `8a469eb`** and **#66
+`18ef0e9`**, both confirmed `state=MERGED`. Three branches in flight:
+**#67** `067-command-surface` (keyboard onto the menu's command registry),
+**068** `068-dead-playback`, **069** `069-docs-housekeeping` (this entry).
+
+- **`sonar` is green on `main`.** `conclusion: success` at `18ef0e9`. #26's
+  diagnosis (`sonar.tests` nested inside `sonar.sources`, so every test file is
+  indexed twice and the scan aborts whole) was right, and #57's structural fix
+  holds. **The prediction recorded on #57 was wrong, in the good direction:**
+  it said the first scan that _completed_ would then fail the new-code quality
+  gate, judging six merges of unanalysed code at once against
+  `new_violations GT 0`. It didn't. Recording that here so the next person does
+  not budget triage time for a gate failure that never came.
+- **#65's red `Frontend Checks` was a coverage-denominator fault, not a flake,
+  and no floor was touched to clear it.** Regenerating `src/lib/bindings.ts`
+  put ~130 uncovered generated lines into the denominator: 62.33% → 61.93%
+  against a 62 floor. `36724f7` adds the file to `coverage.exclude`, which
+  `sonar-project.properties` had listed all along. `4861482` pins
+  `MAX_UNTYPED_COMMANDS = 53` — it lives in
+  `src-tauri/tests/bindings_contract.rs:289`, **not** in any `.ts`, so a
+  `--include='*.ts'` grep will tell you it does not exist. **Neither `pnpm lint`
+  nor `pnpm typecheck` can see this class:** run `pnpm test:coverage` before
+  pushing any slice that regenerates bindings.
+- **#66 closed the governance items.** `.specify/memory/constitution.md` is
+  `# Lectrice Constitution` v2.0.0; the orphan speckit artifacts that were loose
+  in `specs/` root moved into `specs/044-tauri-pdf-reader/` (their `spec.md:3`
+  had declared that branch while sitting at the root); `docs/spec-policy.md`
+  records #56–#65 and documents `054-reader-redesign` as a deliberate half-run.
+  `ls specs/ | grep -vE '^[0-9]{3}-[a-z0-9-]+$'` now returns nothing.
+- **A stale CI run was eating the one runner slot ahead of the live one.** Run
+  `30709423883` was still grinding on `5b08d1a`, #67's pre-rebase commit.
+  Cancelled after proving supersession **by ref** —
+  `git ls-remote origin 067-command-surface` returns `f9b47a0`, so `5b08d1a` is
+  unreachable. Ancestry is the wrong test after a rebase; the ref is the right
+  one. Before it died it had returned Frontend, Backend and Alignment all
+  `success` on #67's content, so only the rebased base is unverified.
+- **`main` shows a red CI at `8a469eb` that is infrastructure, not code.**
+  Backend and Contract Tests both died on
+  `Permission denied (os error 13)` reading cache-restored files under
+  `src-tauri/target/debug/deps/*.d` — dozens of them, none from our source. It
+  hit the two runs queued back-to-back at 16:46 and 16:49 and then cleared; the
+  17:01 run compiled fine and `18ef0e9`'s Contract Tests passed. `target/` is
+  gitignored, so `actions/checkout`'s `git clean -ffdx` wipes and re-restores it
+  every job, and a restore colliding with the previous job's cache-save fits the
+  shape. Same family as the cache wall #52 fixed for pnpm. Not re-run:
+  `18ef0e9`'s CI supersedes it. **If it recurs, that is the signal to give
+  `ci.yml` a `concurrency` group** — which is a `.github/workflows` change and
+  therefore Pedro's.
+- **#67 is the full speckit chain** (`spec.md`, `plan.md`, `tasks.md` in the
+  diff). Round 2 of the Groq gate found a MAJOR round 1 missed entirely:
+  `goToPageBy` read `currentPage` _before_ `await aiTtsStop()`, so a held
+  `PageDown` advanced one page for two presses while the comment above it
+  claimed that bug was fixed. **Read-before-await is a distinct staleness bug
+  from render-closure capture** — moving to `getState()` fixes the second and
+  not the first. Fix is `src/hooks/usePageNavigation.ts`, reading after the
+  stop; the regression test was accepted only after re-introducing the defect
+  and watching that one test fail (`expected 6 to be 7`, 1 failed / 8 passed).
+- **068 deletes 963 lines that `main.tsx` has never been able to reach.**
+  `PlaybackBar`, `VoiceSelector`, `SpeedSlider`, `ChunkNavigation` and their
+  CSS; the `playback-bar/index.ts` barrel, which had **no importer at all**
+  (`AiPlaybackBar` is imported by direct path from `ReaderView`); and
+  `useFollowAlong` + `useTtsEvents`, both zero-call-site and both dating to
+  `bea256b`, the initial commit. **The `Ai*` trio is alive** — an early pass
+  read them as orphaned because the grep for their importers excluded their own
+  directory. `knip`'s unused-file count goes 54 → 43, exactly these eleven, but
+  knip did not prove the deletion: its list also contains `LibraryView` and
+  `SettingsPanel`, which are plainly mounted (`ci.yml:88` says its path-alias
+  resolution can't trace them, which is why it is report-only).
+- **What 068 leaves standing on purpose:** `stores/tts-store.ts` now has no
+  production consumer, only its own 21 tests, and the eight `tts*` wrappers in
+  `lib/tauri-invoke.ts` are called from nowhere. Retiring them means deciding
+  whether the native Speech Dispatcher path returns as an offline fallback —
+  a product call, and a `src-tauri` change. **⏸ Pedro.**
+- **`_temp/lectrice-design/lectrice-reader-vision.html` is now tracked** at
+  `specs/054-reader-redesign/design-demos/superseded/direction-a-scholars-desk.html`.
+  It is not a duplicate of anything: it is titled "Direction A · Scholar's
+  Desk", dated one day before the A/B/C set, where the Direction A that reached
+  the choice set is "Signal Desk". It went in a `superseded/` subdirectory
+  rather than beside its successors because `render-screenshots.py:334` globs
+  `direction-*.html` in the parent and renders every match — and this draft
+  loads fonts from `fonts.googleapis.com`, so it would fail the offline check
+  the three candidates are built to pass. Delete `_temp/` once 069 merges.
+
+**Next, in order:** merge #67, #068, #069 (one at a time — the runner is one
+slot and `ci.yml` has no `concurrency` group, so a second push queues a second
+run rather than replacing the first). Then the two carried-forward typed-IPC
+items: resolve `title: string | null` (generated) vs `title?: string`
+(`src/domain/sessions/session.ts:29`) so `src/lib/api/sessions.ts` can point at
+`commands.*`, and decide what `src/lib/schemas.ts` is for — 16 zod schemas, every
+one consumed `import type`, exactly one runtime `.parse()` at
+`src/hooks/useRenderSettings.ts:65`.
+
 ## Iteration #33 — 2026-08-01 (First family off the exception list: 63 → 53, and the frontend wrapper stays where it is on purpose)
 
 **Live state:** `origin/main` = `565fe1a` after **#64** merged (`sonar: completed success` on the new main). Branch `065-session-typed`. Diff is `src-tauri/src/domain/sessions/session.rs`, `src-tauri/src/ports/session_repository.rs`, `src-tauri/src/tauri_api/sessions.rs`, `src-tauri/src/lib.rs`, `src-tauri/tests/bindings_contract.rs`, the regenerated `src/lib/bindings.ts`, and this entry.
