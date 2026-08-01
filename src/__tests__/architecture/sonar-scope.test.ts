@@ -23,7 +23,7 @@
  * ONLY, by design (SonarQube Community analyses a single branch, so a
  * pull_request run would overwrite the dashboard instead of gating the PR).
  * Nothing about the failure is visible from a PR, which is why it rode along
- * under four consecutive merges before anyone looked.
+ * under six consecutive merges before anyone looked.
  *
  * Two shapes it deliberately refuses to judge rather than wave through: glob
  * roots and identical roots. Both are legal for the scanner and neither is
