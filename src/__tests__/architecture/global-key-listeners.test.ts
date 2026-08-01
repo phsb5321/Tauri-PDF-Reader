@@ -74,7 +74,18 @@ const DEAD_UNMOUNTED: Record<string, string> = {
 
 const DECLARED = { ...OWNERS, ...DEAD_UNMOUNTED };
 
-/** `window.addEventListener("keydown"` or the `document.` equivalent. */
+/**
+ * `window.addEventListener("keydown"` or the `document.` equivalent.
+ *
+ * ponytail: textual, not an AST walk. Ceiling — the call written inside a
+ * comment or a string counts as a registration, and a listener reached through
+ * an alias (`const w = window; w.addEventListener(...)`) does not. Both are
+ * accepted deliberately: the first fails LOUD in the safe direction (a build
+ * that stops until someone looks at the file), and the second is not a form
+ * anything in this codebase uses. Upgrade path if either bites: parse with the
+ * TypeScript compiler API, already a dependency, and match CallExpressions.
+ * A parser is not worth adding before there is a case it would have caught.
+ */
 const GLOBAL_KEYDOWN =
   /\b(?:window|document)\.addEventListener\(\s*["']keydown["']/;
 

@@ -136,6 +136,17 @@ that a literal grep for `addEventListener("keydown"` could not see — both use
 single quotes. A test that reads the source is the only form of this check that
 does not depend on the auditor's grep being lucky.
 
+### Why page navigation is its own module
+
+`navigatePageBy` could have stayed a `useCallback` in `ReaderView`, and did for
+two rounds. It moved because the ordering inside it is the part that can be
+wrong — stop playback, _then_ read the page, _then_ write — and a closure in a
+700-line component body offers nowhere to assert that from. The first version
+read the page before the `await`, so during the stop window every repeat of a
+held key computed the same target; the comment above it claimed the opposite.
+Extraction is not tidying here. It is what made the bug expressible as a failing
+test, and the test was checked by re-introducing the bug and watching it fail.
+
 ### The keys that stay where they are
 
 `Escape` (three component-local handlers), `Ctrl+Shift+H` (highlight creation)

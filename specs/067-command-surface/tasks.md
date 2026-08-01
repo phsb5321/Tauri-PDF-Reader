@@ -106,7 +106,36 @@ for, and that one _was_ live.
       → _Proves_: FR-008 in general, and SC-004. It found `HighlightToolbar` and
       the unmounted `PlaybackBar` on its first run.
 
-## Phase 5: verification gate
+## Phase 5: the ordering bug round 2 found
+
+Round 2 of the adversarial pass was told what round 1 had covered and pointed at
+the surfaces round 1 never read. It landed one real MAJOR: `goToPageBy` read the
+page _before_ awaiting `aiTtsStop()`, so the comment claiming it had fixed the
+stale-read bug was false for exactly the window the guard opens.
+
+- [x] **T018** Move page navigation out of `ReaderView` into
+      `src/hooks/usePageNavigation.ts`, reading the page **after** the stop
+      completes. The extraction is not tidying: a function in a component body
+      has no seam to assert the ordering through, which is why the bug survived
+      T015.
+      → _Proves_: nothing alone. T019 is the assertion.
+
+- [x] **T019** Add `src/hooks/usePageNavigation.test.ts`, including "advances
+      once per call when repeats arrive during the stop": hold `aiTtsStop`
+      unresolved, start two navigations, release, assert the page moved by two.
+      → _Proves_: the ordering. **Falsified before acceptance** — re-introducing
+      the read-before-await made exactly this test fail with `expected 6 to be 7`
+      while the other eight passed, so it is specific to the defect rather than
+      a tautology.
+
+- [x] **T020** Record the textual-scan ceiling on `GLOBAL_KEYDOWN` in the
+      architecture test: a match inside a comment counts, an aliased `window`
+      does not. Both fail in the safe direction; the upgrade path (TypeScript
+      compiler API, already a dependency) is named rather than taken.
+      → _Proves_: nothing. It stops the next reader mistaking a known limit for
+      an oversight.
+
+## Phase 6: verification gate
 
 - [x] **T010** `pnpm exec vitest run src/hooks/useCommandKeys.test.ts
 src/hooks/useMenuActions.test.ts src/__tests__/architecture/` — green.
@@ -121,7 +150,7 @@ T001 → T002 → T003 → T004 → T005. T006/T007 need T003. T008 needs T005 (
 replacement must be mounted before the dead file goes). T009 needs T008.
 T013 needs T014 (the replacement binding must exist before the old one goes).
 T017 is independent and was written last, which is why it caught what the
-hand audit did not. Phase 5 needs everything.
+hand audit did not. T018 → T019. Phase 6 needs everything.
 
 ## Out of scope, stated so it is not mistaken for an oversight
 

@@ -14,7 +14,8 @@ import {
   type MenuActionHandlers,
 } from "../../hooks/useMenuActions";
 import { useCommandKeys } from "../../hooks/useCommandKeys";
-import { aiTtsPause, aiTtsResume, aiTtsStop } from "../../lib/tauri-invoke";
+import { usePageNavigation } from "../../hooks/usePageNavigation";
+import { aiTtsPause, aiTtsResume } from "../../lib/tauri-invoke";
 import "./ReaderView.css";
 
 export function ReaderView() {
@@ -28,31 +29,17 @@ export function ReaderView() {
   // the same handlers object, so a command cannot behave differently depending
   // on how it was invoked.
   //
-  // Page navigation goes through the store (which clamps to [1, totalPages]);
-  // useAutoSave below persists the new page. Stop TTS first, mirroring
-  // PageNavigation's on-navigation guard.
-  //
-  // Both the page and the playback state are read from the store at call time
-  // rather than captured from this render. A held PageDown fires keydown faster
-  // than React re-renders, so a captured `currentPage` would make every repeat
-  // in a burst compute the same target and the page would advance once for
-  // several presses. Reading `getState()` also leaves this callback with no
-  // changing dependency, so the handlers object below keeps stable references.
-  const goToPageBy = useCallback(async (delta: number) => {
-    const playbackState = useAiTtsStore.getState().playbackState;
-    const currentPage = useDocumentStore.getState().currentPage;
-    if (playbackState === "playing" || playbackState === "paused") {
-      try {
-        await aiTtsStop();
-      } catch (error) {
-        console.error("Failed to stop TTS on navigation:", error);
-      }
-    }
-    useDocumentStore.getState().setCurrentPage(currentPage + delta);
-  }, []);
+  // Page navigation lives in its own module because the order it does things in
+  // (stop playback, then read the page, then write) is load-bearing and needs a
+  // seam to assert through. See usePageNavigation.
+  const { goToPrevPage, goToNextPage } = usePageNavigation();
 
   // Toggle ongoing playback (playing <-> paused). Starting from idle needs the
   // page text, so that stays with the playback bar's play button.
+  //
+  // Playback state is read at call time rather than captured from this render,
+  // so the callback has no changing dependency and the handlers object below
+  // keeps stable references.
   const handleMenuPlayPause = useCallback(async () => {
     try {
       const playbackState = useAiTtsStore.getState().playbackState;
@@ -73,12 +60,8 @@ export function ReaderView() {
     onPlayPause: () => {
       void handleMenuPlayPause();
     },
-    onPrevPage: () => {
-      void goToPageBy(-1);
-    },
-    onNextPage: () => {
-      void goToPageBy(1);
-    },
+    onPrevPage: goToPrevPage,
+    onNextPage: goToNextPage,
   };
 
   useMenuActions(commandHandlers);

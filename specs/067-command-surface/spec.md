@@ -245,12 +245,15 @@ that no chord is declared twice.
   command added with no handler fails the suite rather than shipping inert.
 - **SC-003**: Every P1 acceptance scenario is asserted headlessly against the
   store or against a pure function, with no manual step and no visual check.
-- **SC-004**: Global `keydown` listeners in production code go from **6
-  undeclared** to **6 declared with a reason**, of which one is the command
-  registry, four are component-owned for state a window listener cannot see, and
-  one is recorded as dead. A seventh fails the suite.
-- **SC-005**: Production lines fall. The 229-line unmounted hook and 12 lines of
-  duplicate page handling in `PdfViewer` are removed against ~150 lines of new
-  hook, so shipped code drops by roughly 90 lines while gaining ~360 lines of
-  test — the ratio a feature whose whole point is "this is now asserted" should
-  have.
+- **SC-004**: Global `keydown` listeners in production code go from **8
+  undeclared** to **8 declared with a reason** — one the command registry, six
+  component-owned for state a window listener cannot see, one recorded as dead.
+  A ninth fails the suite. (Counted, not estimated: the same scan the test runs,
+  at `565fe1a` and at HEAD. An earlier draft of this criterion said six, which
+  was a hand count taken before the test found `HighlightToolbar` and
+  `PlaybackBar`.)
+- **SC-005**: Shipped code does not grow. Against `565fe1a`, production lines are
+  **+269 / −286**, a net **−17** — the 229-line unmounted hook and the duplicate
+  page handling in `PdfViewer` pay for the registry and the navigation module.
+  Test lines are **+548**. A feature whose point is "this is now asserted"
+  should spend its lines on assertions, not on the thing being asserted.
