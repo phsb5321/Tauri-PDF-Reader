@@ -22,6 +22,7 @@ SELECT * FROM v_highlight_citations;
 | `document_id`             | stable id of the document                           |
 | `file_path`               | absolute path to the PDF as Lectrice last saw it    |
 | `title`                   | document title, may be `NULL`                       |
+| `page_count`              | pages in the document, for rendering `p.42/600`     |
 | `page_number`             | 1-based page the highlight is on                    |
 | `text_content`            | the highlighted text, may be `NULL` for old rows    |
 | `note`                    | free-text note attached to the highlight, or `NULL` |

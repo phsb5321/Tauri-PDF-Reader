@@ -16,8 +16,11 @@
 //! rejects outright.
 
 use sqlx::{Column, Executor, Row, SqlitePool};
+use std::fs;
+use std::path::{Path, PathBuf};
 
 const DB_INIT_TS: &str = include_str!("../../src/lib/db-init.ts");
+const TAURI_CONF_JSON: &str = include_str!("../tauri.conf.json");
 
 /// Pull the backtick-quoted SQL out of one declaration in `db-init.ts`.
 ///
@@ -243,14 +246,111 @@ async fn is_re_runnable_because_a_crash_before_the_stamp_replays_it() {
     }
 }
 
+/// The database's location is as much a contract as its columns: an external
+/// reader opens an absolute path, so moving the file is indistinguishable from
+/// deleting it. tauri-plugin-sql resolves `sqlite:pdf-reader.db` against the app
+/// config directory, which on Linux is `$XDG_CONFIG_HOME/<identifier>/` — so
+/// the identifier plus every `sqlite:` URL in the codebase decide where the
+/// file lands. It has
+/// moved once already: renaming the bundle from `com.voxpage.pdf-reader` to
+/// `com.lectrice.reader` shipped no migration and simply abandoned the old
+/// database beside the new one (`tools/import-legacy-db.sh` recovered it by
+/// hand). This test is the tripwire that failed to exist that time.
+///
+/// If it fails, the change may well be right — but it is not silent, and
+/// consumers listed in `docs/highlight-consumer-contract.md` need telling.
+#[test]
+fn keeps_the_database_where_external_readers_look_for_it() {
+    // Parse rather than string-match: the identifier's *value* is the contract,
+    // and reformatting `tauri.conf.json` must not be able to redden this.
+    let conf: serde_json::Value =
+        serde_json::from_str(TAURI_CONF_JSON).expect("tauri.conf.json is not valid JSON");
+    assert_eq!(
+        conf["identifier"].as_str(),
+        Some("com.lectrice.reader"),
+        "the bundle identifier changed, so the database moved out of \
+         ~/.config/com.lectrice.reader/ and every external reader now opens \
+         a path that does not exist"
+    );
+
+    // The frontend opens the pool; the backend fetches it back out of
+    // tauri-plugin-sql's instance map, keyed by the very same URL string. Seven
+    // call sites under `src-tauri/src` repeat that literal, so pinning only
+    // `db-init.ts` would let the two halves drift: `.get()` returns `None` and
+    // every SQL-backed command fails at runtime.
+    //
+    // Scan every `sqlite:` literal on both sides rather than matching one exact
+    // call spelling. Extracting the URL into a `const` keeps the literal, so a
+    // refactor stays green; and requiring *all* of them to agree is stronger
+    // than asking whether the right one is present somewhere — a wrong name
+    // fails even when the right name still appears in a comment nearby. Walking
+    // the tree rather than naming the seven files covers an eighth call site
+    // the day someone writes it.
+    let mut sources = vec![(PathBuf::from("src/lib/db-init.ts"), DB_INIT_TS.to_string())];
+    for path in rust_sources(&PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src")) {
+        let source = fs::read_to_string(&path).unwrap();
+        sources.push((path, source));
+    }
+
+    let mut checked = 0usize;
+    for (path, source) in sources {
+        for (line_no, line) in source.lines().enumerate() {
+            for chunk in line.split("\"sqlite:").skip(1) {
+                let name = chunk.split('"').next().unwrap_or_default();
+                // `sqlite::memory:` names no file on disk — test fixtures build
+                // a throwaway database per test and cannot collide with the one
+                // an external reader opens.
+                if name == ":memory:" {
+                    continue;
+                }
+                assert_eq!(
+                    name,
+                    "pdf-reader.db",
+                    "{}:{} opens `sqlite:{name}`, but external readers open \
+                     `pdf-reader.db` by name — and the frontend and backend \
+                     must address the same file for tauri-plugin-sql's \
+                     instance map to resolve",
+                    path.display(),
+                    line_no + 1
+                );
+                checked += 1;
+            }
+        }
+    }
+    assert!(
+        checked > 1,
+        "found {checked} on-disk `sqlite:` literals across db-init.ts and \
+         src-tauri/src — the scan is broken, not the code, and this test is \
+         now guarding nothing"
+    );
+}
+
+/// Every `.rs` file under a directory, recursively.
+fn rust_sources(dir: &Path) -> Vec<PathBuf> {
+    let mut found = Vec::new();
+    let Ok(entries) = fs::read_dir(dir) else {
+        return found;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            found.extend(rust_sources(&path));
+        } else if path.extension().is_some_and(|e| e == "rs") {
+            found.push(path);
+        }
+    }
+    found
+}
+
 /// Exactly what an out-of-process consumer selects. Adding a column is a
 /// feature; removing or renaming one breaks somebody else's script silently, at
 /// runtime, on their machine. See `docs/highlight-consumer-contract.md`.
-const CITATION_COLUMNS: [&str; 10] = [
+const CITATION_COLUMNS: [&str; 11] = [
     "highlight_id",
     "document_id",
     "file_path",
     "title",
+    "page_count",
     "page_number",
     "text_content",
     "note",
@@ -297,6 +397,9 @@ async fn exposes_v_highlight_citations_to_external_readers() {
     assert_eq!(rows[0].get::<String, _>("highlight_id"), "hl-1");
     assert_eq!(rows[0].get::<String, _>("file_path"), "/books/ddia.pdf");
     assert_eq!(rows[0].get::<i64, _>("page_number"), 42);
+    // page_count comes off `documents`, page_number off `highlights`. A view
+    // that took both from the same side would still pass the column-name check.
+    assert_eq!(rows[0].get::<i64, _>("page_count"), 600);
     assert_eq!(
         rows[0].get::<String, _>("text_content"),
         "Reliability means the system continues to work correctly."
@@ -313,7 +416,7 @@ async fn keeps_the_base_columns_the_view_is_built_from() {
     let pool = shipped_schema().await;
 
     let documents = columns_of(&pool, "documents").await;
-    for column in ["id", "file_path", "title", "last_opened_at"] {
+    for column in ["id", "file_path", "title", "page_count", "last_opened_at"] {
         assert!(
             documents.contains(&column.to_string()),
             "documents.{column} went missing"

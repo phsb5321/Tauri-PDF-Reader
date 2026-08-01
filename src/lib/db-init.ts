@@ -194,6 +194,7 @@ export const CONTRACT_VIEWS = [
       d.id            AS document_id,
       d.file_path     AS file_path,
       d.title         AS title,
+      d.page_count    AS page_count,
       h.page_number   AS page_number,
       h.text_content  AS text_content,
       h.note          AS note,
