@@ -276,11 +276,19 @@ the same thing whichever way it is reached.
 Global (`COMMAND_CHORDS` in `src/hooks/useCommandKeys.ts`):
 
 - `Ctrl+O` - Open a document
-- `Page Down` / `→` - Next page
+- `Page Down` / `→` / `Space` - Next page
 - `Page Up` / `←` - Previous page
 
 Unmodified chords are suppressed while typing in an `input`, `textarea`,
-`select` or `contenteditable`; modified chords are not.
+`select` or `contenteditable`; modified chords are not. A chord also yields to
+any component handler that already called `preventDefault` — element-level
+`onKeyDown` runs before the event reaches `window`, so arrow keys inside a
+roving-tabindex list move through the list rather than turning the page.
+
+`Home` / `End` (first / last page) stay on `PdfViewer`'s own listener: there is
+no `MenuAction` id for them, because the native menu has no such item.
+`src/__tests__/architecture/global-key-listeners.test.ts` fails if any other
+file registers a global `keydown` handler without declaring why.
 
 Owned by a component, because each needs state a window-level listener cannot
 see:

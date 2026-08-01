@@ -107,6 +107,35 @@ The comments are updated to name the surviving module.
 inline at the `useMenuActions` call is hoisted into a `const` and passed to both
 hooks. Same object, same references, two dispatchers.
 
+Its page handler also stops reading `currentPage` and `playbackState` from the
+render closure and reads them from the store at call time. A held `PageDown`
+fires `keydown` faster than React re-renders, so a captured page number makes
+every repeat in a burst compute the same target and the page advances once for
+several presses. The store is the only value that is current when the handler
+actually runs. This also leaves the callback with an empty dependency list.
+
+`src/components/PdfViewer.tsx` — its `window` `keydown` listener loses the four
+page keys and `Space`, which move into `COMMAND_CHORDS`. `Home`/`End` stay:
+there is no `MenuAction` id for first/last page, the native menu has no such
+item, and inventing an id `src-tauri` never emits would put a dead entry in the
+registry. They collide with nothing.
+
+This is the substantive correction to the original draft of this plan, which
+recorded page navigation as inert. It was not — `PdfViewer` was binding it all
+along, one component away from the hook that was found dead. The consequence is
+that the feature is a consolidation, not only a binding: two window listeners
+answering `PageDown` is the same defect class as `Ctrl+Space` being answered
+twice, which this design already refused to introduce.
+
+### What stops the next one
+
+`src/__tests__/architecture/global-key-listeners.test.ts` scans production
+source for `window`/`document` `keydown` registrations and fails on any file
+without a declared reason. Written after the audit above missed two listeners
+that a literal grep for `addEventListener("keydown"` could not see — both use
+single quotes. A test that reads the source is the only form of this check that
+does not depend on the auditor's grep being lucky.
+
 ### The keys that stay where they are
 
 `Escape` (three component-local handlers), `Ctrl+Shift+H` (highlight creation)

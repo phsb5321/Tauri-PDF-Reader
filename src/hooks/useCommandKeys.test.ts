@@ -109,6 +109,33 @@ describe("resolveChord", () => {
     expect(resolveChord(keyEvent("q"))).toBeNull();
     expect(resolveChord(keyEvent("F5"))).toBeNull();
   });
+
+  it("yields to a component that already handled the key", () => {
+    // The enforcement half of FR-005. An element-level React `onKeyDown` runs
+    // before the event reaches `window`, so a list using arrows for its own
+    // navigation (useRovingTabindex) has already called preventDefault by the
+    // time this sees it. Without the guard the page would turn under the user
+    // while they were moving through a list.
+    const claimed = keyEvent("ArrowRight");
+    claimed.preventDefault();
+    expect(claimed.defaultPrevented).toBe(true);
+    expect(resolveChord(claimed)).toBeNull();
+
+    // ...and the same key is still a command when nobody claimed it.
+    expect(resolveChord(keyEvent("ArrowRight"))).toBe("next-page");
+  });
+
+  it("treats Space as next page, the binding PdfViewer used to own", () => {
+    // PdfViewer bound Space to next-page on its own window listener. It is a
+    // real, live binding, so it moves into the table rather than disappearing;
+    // what changes is that it now goes through the same handler the menu does.
+    expect(resolveChord(keyEvent(" "))).toBe("next-page");
+    // Still suppressed while typing, which PdfViewer's version got right only
+    // for input and textarea.
+    expect(
+      resolveChord(keyEvent(" ", { target: contentEditable() })),
+    ).toBeNull();
+  });
 });
 
 describe("COMMAND_CHORDS", () => {

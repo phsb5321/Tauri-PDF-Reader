@@ -70,10 +70,46 @@ not done until that assertion runs and passes.
       → _Proves_: SC-001 for the documentation half — the file that told a reader
       `Ctrl+O` exists now matches the code.
 
-## Phase 4: verification gate
+## Phase 4: one key, one owner — the defect the adversarial pass surfaced
+
+The review round on this branch reported that deleting `useKeyboardShortcuts`
+removed working shortcuts. It did not — that file had no call site. But checking
+the claim turned up a listener neither the spec nor the review had accounted
+for, and that one _was_ live.
+
+- [x] **T013** Remove the page-key cases (`ArrowLeft`/`ArrowRight`/`PageUp`/
+      `PageDown`/`Space`) from `PdfViewer.tsx`'s `window` `keydown` listener, and
+      drop `currentPage` from its dependency array. Keep `Home`/`End` with the
+      reason inline.
+      → _Proves_: FR-008 for the one overlap that existed. Two listeners no longer
+      answer `PageDown`.
+
+- [x] **T014** Add `{ action: "next-page", key: " " }` to `COMMAND_CHORDS`,
+      preserving the live `Space` → next-page binding `PdfViewer` owned, now with
+      the stop-playback guard and the full typing-suppression rule.
+      → _Proves_: no behaviour is lost to T013. Asserted in the resolver tests.
+
+- [x] **T015** Read `currentPage` and `playbackState` from the store inside
+      `goToPageBy`/`handleMenuPlayPause` instead of capturing them per render.
+      → _Proves_: a held navigation key advances once per press rather than once
+      per re-render.
+
+- [x] **T016** Make `resolveChord` return `null` for an already-prevented event,
+      and assert it: an element-level `onKeyDown` (`useRovingTabindex`) runs
+      first, so the flag is the signal that a narrower binding already answered.
+      → _Proves_: FR-005's second clause, which was previously only a comment.
+
+- [x] **T017** Add `src/__tests__/architecture/global-key-listeners.test.ts`:
+      scan production source for global `keydown` registrations, fail on any file
+      with no declared reason, fail on a stale declaration, and fail if the scan
+      matches nothing.
+      → _Proves_: FR-008 in general, and SC-004. It found `HighlightToolbar` and
+      the unmounted `PlaybackBar` on its first run.
+
+## Phase 5: verification gate
 
 - [x] **T010** `pnpm exec vitest run src/hooks/useCommandKeys.test.ts
-src/hooks/useMenuActions.test.ts` — both green.
+src/hooks/useMenuActions.test.ts src/__tests__/architecture/` — green.
 - [x] **T011** `pnpm typecheck` and `pnpm lint` (boundaries included) — clean.
       Strict mode's `noUnusedLocals` is what catches a half-finished deletion.
 - [x] **T012** `./tools/alignment-gate.sh --changes --base origin/main` —
@@ -82,12 +118,26 @@ src/hooks/useMenuActions.test.ts` — both green.
 ## Dependencies
 
 T001 → T002 → T003 → T004 → T005. T006/T007 need T003. T008 needs T005 (the
-replacement must be mounted before the dead file goes). T009 needs T008. Phase 4
-needs everything.
+replacement must be mounted before the dead file goes). T009 needs T008.
+T013 needs T014 (the replacement binding must exist before the old one goes).
+T017 is independent and was written last, which is why it caught what the
+hand audit did not. Phase 5 needs everything.
 
 ## Out of scope, stated so it is not mistaken for an oversight
 
 - The four menu items with no destination (settings, library, highlights, find)
   stay inert. Fixing them means building the panels.
 - `Escape` and `Ctrl+Shift+H` stay with their components.
+- `Home`/`End` stay in `PdfViewer`: no `MenuAction` id exists for first/last
+  page, and adding one the backend never emits would be a dead registry entry.
+- **The dead `PlaybackBar` subtree.** `components/playback-bar/PlaybackBar.tsx`
+  is the pre-ElevenLabs playback bar. It binds `Ctrl+Space` and `Escape` exactly
+  as `AiPlaybackBar` does and is reachable only through
+  `components/playback-bar/index.ts`, which nothing imports — the same defect as
+  the deleted `useKeyboardShortcuts`. It is not deleted here because the dead
+  subtree is eight files (`PlaybackBar`, `VoiceSelector`, `SpeedSlider`,
+  `ChunkNavigation` and their CSS) plus four barrel lines, and that is a
+  different change with a different reason to revert. It is declared as dead in
+  the listener test rather than allowlisted as an owner, so the debt is visible
+  in code and the entry cannot outlive the file.
 - No `src-tauri` change, no IPC change, no workflow change.

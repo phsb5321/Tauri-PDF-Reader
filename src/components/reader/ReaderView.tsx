@@ -18,14 +18,8 @@ import { aiTtsPause, aiTtsResume, aiTtsStop } from "../../lib/tauri-invoke";
 import "./ReaderView.css";
 
 export function ReaderView() {
-  const {
-    pdfDocument,
-    currentPage,
-    currentDocument,
-    scrollPosition,
-    setCurrentPage,
-  } = useDocumentStore();
-  const playbackState = useAiTtsStore((state) => state.playbackState);
+  const { pdfDocument, currentPage, currentDocument, scrollPosition } =
+    useDocumentStore();
   const { openPdf } = useOpenPdf();
 
   // One set of reader commands, reached two ways: the native menu (File / View
@@ -37,24 +31,31 @@ export function ReaderView() {
   // Page navigation goes through the store (which clamps to [1, totalPages]);
   // useAutoSave below persists the new page. Stop TTS first, mirroring
   // PageNavigation's on-navigation guard.
-  const goToPageFromMenu = useCallback(
-    async (page: number) => {
-      if (playbackState === "playing" || playbackState === "paused") {
-        try {
-          await aiTtsStop();
-        } catch (error) {
-          console.error("Failed to stop TTS on menu navigation:", error);
-        }
+  //
+  // Both the page and the playback state are read from the store at call time
+  // rather than captured from this render. A held PageDown fires keydown faster
+  // than React re-renders, so a captured `currentPage` would make every repeat
+  // in a burst compute the same target and the page would advance once for
+  // several presses. Reading `getState()` also leaves this callback with no
+  // changing dependency, so the handlers object below keeps stable references.
+  const goToPageBy = useCallback(async (delta: number) => {
+    const playbackState = useAiTtsStore.getState().playbackState;
+    const currentPage = useDocumentStore.getState().currentPage;
+    if (playbackState === "playing" || playbackState === "paused") {
+      try {
+        await aiTtsStop();
+      } catch (error) {
+        console.error("Failed to stop TTS on navigation:", error);
       }
-      setCurrentPage(page);
-    },
-    [playbackState, setCurrentPage],
-  );
+    }
+    useDocumentStore.getState().setCurrentPage(currentPage + delta);
+  }, []);
 
   // Toggle ongoing playback (playing <-> paused). Starting from idle needs the
   // page text, so that stays with the playback bar's play button.
   const handleMenuPlayPause = useCallback(async () => {
     try {
+      const playbackState = useAiTtsStore.getState().playbackState;
       if (playbackState === "playing") {
         await aiTtsPause();
       } else if (playbackState === "paused") {
@@ -63,7 +64,7 @@ export function ReaderView() {
     } catch (error) {
       console.error("Failed to toggle TTS from menu:", error);
     }
-  }, [playbackState]);
+  }, []);
 
   const commandHandlers: MenuActionHandlers = {
     onOpen: () => {
@@ -73,10 +74,10 @@ export function ReaderView() {
       void handleMenuPlayPause();
     },
     onPrevPage: () => {
-      void goToPageFromMenu(currentPage - 1);
+      void goToPageBy(-1);
     },
     onNextPage: () => {
-      void goToPageFromMenu(currentPage + 1);
+      void goToPageBy(1);
     },
   };
 

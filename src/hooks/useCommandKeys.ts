@@ -8,6 +8,13 @@
  * `useMenuActions` with the *same* handlers object and the two surfaces cannot
  * drift, because they are calling the same function references.
  *
+ * Page navigation moved here out of `PdfViewer`, which bound `PageUp` /
+ * `PageDown` / the arrows / `Space` on its own `window` listener. That listener
+ * wrote the page directly and so skipped the stop-playback-first guard the menu
+ * path applies, and it treated only `input` and `textarea` as typing targets.
+ * Two window listeners on one key is the defect this module exists to remove,
+ * so the keys are bound in exactly one place now.
+ *
  * Two kinds of key deliberately stay out of this table:
  *
  * - Keys a focused component owns for a narrower job — `Escape` (dismiss the
@@ -59,6 +66,7 @@ export const COMMAND_CHORDS: readonly Chord[] = [
   { action: "prev-page", key: "ArrowLeft", ctrl: false, label: "←" },
   { action: "next-page", key: "PageDown", ctrl: false, label: "Page Down" },
   { action: "next-page", key: "ArrowRight", ctrl: false, label: "→" },
+  { action: "next-page", key: " ", ctrl: false, label: "Space" },
 ] as const;
 
 /** True when the event came from somewhere the user is typing. */
@@ -87,6 +95,14 @@ function isTypingTarget(target: EventTarget | null): boolean {
  * @returns the command id, or `null` when nothing matches.
  */
 export function resolveChord(event: KeyboardEvent): MenuAction | null {
+  // A focused component got there first and claimed the key. This is the
+  // enforcement half of "a global chord must not override a narrower binding":
+  // element-level React `onKeyDown` handlers (useRovingTabindex's arrow-key
+  // list navigation, for one) run during the bubble phase before the event
+  // reaches `window`, so by the time this sees an arrow key inside a list the
+  // flag is already set. Yielding is the correct answer, not a courtesy.
+  if (event.defaultPrevented) return null;
+
   // Shift and Alt are not part of any chord here. Requiring them to be absent
   // keeps Ctrl+Shift+H (owned by the highlight handler) from matching a future
   // plain Ctrl+H, rather than relying on that binding never being added.

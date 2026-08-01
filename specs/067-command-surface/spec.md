@@ -12,25 +12,36 @@ items (File / View / Playback, exported over AT-SPI to the Linux global menu
 bar) and once as keyboard shortcuts, listed in `KEYBOARD_SHORTCUTS` and in the
 project's own documentation.
 
-Only the menu half runs. Measured on `main` at `565fe1a`:
+The two halves do not agree. Measured on `main` at `565fe1a`:
 
-| Command              | Menu item | Keyboard                                                                                                                  |
-| -------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Open a document      | works     | **inert** — `Ctrl+O` does nothing                                                                                         |
-| Play / pause reading | works     | works, but through a _different_ binding (`Ctrl+Space`, registered by the playback bar) than the one advertised (`Space`) |
-| Previous / next page | works     | **inert** — `PageUp`/`PageDown`/arrows do nothing                                                                         |
-| Settings             | inert     | **inert**                                                                                                                 |
-| Toggle library       | inert     | **inert**                                                                                                                 |
-| Toggle highlights    | inert     | **inert**                                                                                                                 |
-| Find                 | inert     | **inert**                                                                                                                 |
+| Command              | Menu item | Keyboard                                                                                                             |
+| -------------------- | --------- | -------------------------------------------------------------------------------------------------------------------- |
+| Open a document      | works     | **inert** — `Ctrl+O` does nothing                                                                                    |
+| Play / pause reading | works     | works, but through a _different_ binding (`Ctrl+Space`, `AiPlaybackBar`) than the one advertised (`Space`)           |
+| Previous / next page | works     | works, but through a _second listener_ (`PdfViewer`) that writes the page directly and skips the stop-playback guard |
+| Settings             | inert     | **inert**                                                                                                            |
+| Toggle library       | inert     | **inert**                                                                                                            |
+| Toggle highlights    | inert     | **inert**                                                                                                            |
+| Find                 | inert     | **inert**                                                                                                            |
 
-The keyboard half is inert for one reason: `src/hooks/useKeyboardShortcuts.ts`
-is 229 lines with **no call site**. It registers nothing because nothing mounts
-it. The four inert _menu_ items are a different problem — they have no
-destination yet — and stay out of scope here.
+The keyboard is not one broken surface. It is **four independent `keydown`
+listeners**, added at different times, none aware of the others:
 
-A person who reads the shortcut list and presses the key gets silence, with no
-error and no clue that the key was never bound. That is the whole bug.
+| Listener                       | Binds                                                                          | State                                                              |
+| ------------------------------ | ------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| `useKeyboardShortcuts.ts`      | `Ctrl+O`, `Ctrl+,`, `Ctrl+H`, `Ctrl+B`, `Ctrl+F`, `Escape`, `Space`, page keys | 229 lines, **no call site** — advertised, never mounted, never ran |
+| `PdfViewer.tsx`                | `PageUp`/`PageDown`/arrows/`Space`, `Home`/`End`                               | live, but bypasses the menu's stop-playback-first guard            |
+| `AiPlaybackBar.tsx`            | `Ctrl+Space`, `Escape`                                                         | live, correct — needs playback state a window listener cannot see  |
+| `HighlightCreationHandler.tsx` | `Ctrl+Shift+H`                                                                 | live, correct — needs the pending selection                        |
+
+So `Ctrl+O` is genuinely dead, page navigation works but through the wrong path,
+and play/pause works under a chord the documentation does not name. The reason
+all three could be true at once is that nothing anywhere asserts which listener
+owns a key — a fifth could be added tomorrow and no test would notice.
+
+A person who reads the shortcut list and presses `Ctrl+O` gets silence, with no
+error and no clue that the key was never bound. That is the visible bug; the
+scattering is why it survived.
 
 ## Clarifications
 
@@ -41,10 +52,12 @@ than by preference. Each names the evidence.
 
 - **Q: `Space` or `Ctrl+Space` for play/pause?** → `Ctrl+Space`. The advertised
   list says `Space`, but `AiPlaybackBar.tsx:271` already binds `Ctrl+Space` and
-  that binding works today. Plain `Space` is also the browser's page-scroll key
-  inside a scrolling document view, so taking it globally would cost a
-  navigation gesture to gain a duplicate. The documentation moves to match the
-  code (FR-006).
+  that binding works today. Plain `Space` is not free either: `PdfViewer`
+  already binds it to next-page, so "give `Space` to play/pause" would take a
+  working navigation key to duplicate a working playback key. The documentation
+  moves to match the code (FR-006), and `Space` keeps its live meaning — it
+  joins the chord table as next-page so that it goes through the same guard the
+  other page keys now do.
 
   A consequence worth stating: play/pause therefore does **not** enter the
   global chord table. `AiPlaybackBar`'s handler can _start_ playback from idle,
@@ -70,6 +83,14 @@ than by preference. Each names the evidence.
   Withdrawn. No handler for it exists anywhere in the tree; there is nothing to
   bind. Advertising a zoom control the app does not have is the same defect as
   advertising a shortcut that is not wired.
+- **Q: what stops a fifth listener being added next month?** → A test, not a
+  convention. `src/__tests__/architecture/global-key-listeners.test.ts` scans
+  the source for `window`/`document` `keydown` registrations and fails on any
+  file that is not in a declared list, with the reason it is not in the command
+  registry written beside it. Every previous instance of this bug was added by
+  someone who had no way to know the other listeners existed; the failure
+  message is that way to know. It found two the initial audit missed
+  (`HighlightToolbar`, and the unmounted legacy `PlaybackBar`).
 
 ## User Scenarios & Testing _(mandatory)_
 
@@ -191,7 +212,12 @@ that no chord is declared twice.
   same stop-playback-first guard as menu navigation.
 - **FR-005**: Global chords MUST NOT fire while the user is typing into a text
   field, and MUST NOT override a key a focused component has already bound for a
-  narrower purpose.
+  narrower purpose. Enforced, not merely intended: a component handler that has
+  called `preventDefault` runs before the event reaches `window`, and the global
+  resolver treats an already-prevented event as not matching.
+- **FR-008**: Exactly one listener MUST own a given key. A second global
+  `keydown` registration is a test failure naming the file, whether or not the
+  keys it binds happen to overlap today.
 - **FR-006**: The play/pause chord MUST be a single documented chord. Where the
   documented chord and the live chord disagree today, the live one wins and the
   documentation is corrected — changing a working key would break a habit for no
@@ -211,15 +237,20 @@ that no chord is declared twice.
 
 ### Measurable Outcomes
 
-- **SC-001**: Advertised-but-inert shortcuts go from **12 of 12** to **0**,
-  asserted by a test comparing the advertised set to the bound set in both
-  directions. Commands whose destination does not exist are withdrawn from the
-  advertised list rather than bound to a no-op.
+- **SC-001**: Advertised-but-inert shortcuts go to **0**. Every entry in the
+  advertised list is an entry in the bound list, because they are the same
+  array. Commands whose destination does not exist are withdrawn rather than
+  bound to a no-op.
 - **SC-002**: Adding a reader command requires editing **one** registry entry. A
   command added with no handler fails the suite rather than shipping inert.
 - **SC-003**: Every P1 acceptance scenario is asserted headlessly against the
-  store, with no manual step and no visual check.
-- **SC-004**: Production lines fall. The 229-line unmounted hook is removed and
-  the replacement is ~130 lines, a net reduction of roughly 100 lines of
-  shipped code, against ~230 lines of new test — the ratio a feature whose
-  whole point is "this is now asserted" should have.
+  store or against a pure function, with no manual step and no visual check.
+- **SC-004**: Global `keydown` listeners in production code go from **6
+  undeclared** to **6 declared with a reason**, of which one is the command
+  registry, four are component-owned for state a window listener cannot see, and
+  one is recorded as dead. A seventh fails the suite.
+- **SC-005**: Production lines fall. The 229-line unmounted hook and 12 lines of
+  duplicate page handling in `PdfViewer` are removed against ~150 lines of new
+  hook, so shipped code drops by roughly 90 lines while gaining ~360 lines of
+  test — the ratio a feature whose whole point is "this is now asserted" should
+  have.
