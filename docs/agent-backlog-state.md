@@ -22,9 +22,44 @@ and `git pull --ff-only origin main`. The squash body is regenerable as
 1. **PR #70** `070-verify-hardening` — the `scripts/verify.sh` slice below, one
    commit, rebased onto `3cda8fe`, green locally. It is the only PR in flight;
    the single vm103 slot is free.
-2. **Nothing else queued.** The remaining Lectrice work is the SC-004
+2. **⏸ Pedro — CI never lints 7 of its 10 cargo targets.** Turned up by the
+   Codex gate on #70. `ci.yml:145` is a bare `cargo clippy -- -D warnings`, so
+   the `regenerate_bindings` **example** and all **six integration-test targets**
+   (`audio_cache_contract`, `audio_export_contract`, `bindings_contract`,
+   `frontend_schema_contract`, `session_contract`, `settings_contract`) have
+   never been linted. `cargo clippy --all-targets --features test-mocks -j 1 --
+-D warnings` exits 0 today in 47.2s, so closing the gap is currently free.
+   **Escalated, not deferred:** the fix edits `.github/workflows/ci.yml`, which
+   is escalate-class per CLAUDE.md. #70 deliberately does **not** widen the
+   script alone — see the Codex round below.
+3. **Nothing else queued.** The remaining Lectrice work is the SC-004
    intelligibility ear-check (Pedro-gated) and the Tier 3 remainder — see the
    closing section of this file.
+
+### Codex round on #70 — one MAJOR, upheld and fixed
+
+`gpt-5.6-terra`, read-only, graded against six named attack surfaces. Verdict:
+**A/B/C/D clear**, one MAJOR, one MINOR. Both were re-verified against the real
+files before acting rather than taken on the reviewer's word.
+
+- **MAJOR, upheld.** The slice's `cargo clippy --all-targets --features
+test-mocks` made the script **stricter than CI**, which `verify.sh:4` promises
+  it mirrors ("checks that would run in CI/pre-commit"). Failure mode: a lint in
+  an example or contract-test target turns `pnpm verify` red while every CI check
+  stays green. Fixed by narrowing to `cargo clippy -j 1 -- -D warnings` — `-j 1`
+  is a resource flag and does not move the lint scope. The genuine gap it exposed
+  is item 2 above.
+- **MINOR, upheld.** The commit claimed `"$DURATION"` needed quoting because
+  `set -u` "would otherwise trip on" it. It would not: `DURATION` is assigned at
+  `verify.sh:119` and first read at `:129`, and nounset cares about assignment,
+  not quoting. The quote is correct hygiene; the rationale was wrong, and the
+  commit message no longer claims it.
+- **C was the one worth its own proof** — collapsing `test:run` + `test:arch`
+  into `vitest run` would silently drop the architecture suite if `test:arch`
+  used a different config. It does not: it is `vitest run
+src/__tests__/architecture/`, a positional filter over the same
+  `vitest.config.ts`. Confirmed empirically with `vitest list --filesOnly`, which
+  collects all four architecture files under an unfiltered run.
 
 **Held-open note on `#69`** (recorded because the reasoning generalises): it sat
 BEHIND `f64801d` right up to the merge and was **not** `update-branch`ed. `main`

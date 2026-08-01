@@ -94,7 +94,14 @@ success "Rust formatting passed"
 
 step "Clippy linting..."
 if command -v cargo-clippy &> /dev/null || cargo clippy --version &> /dev/null; then
-    cargo clippy --all-targets --features test-mocks -j 1 -- -D warnings || error "Clippy failed"
+    # Lint scope is deliberately identical to ci.yml's "Clippy" step (bare, no
+    # --all-targets, no features). `-j 1` is a resource flag only; it does not
+    # change what is linted. Widening this here would make the script red where
+    # CI is green, which defeats the header's "checks that would run in CI".
+    # CI itself never lints the example or the six integration-test targets --
+    # that gap is real, but closing it edits .github/workflows, so it is filed
+    # in docs/agent-backlog-state.md rather than fixed here.
+    cargo clippy -j 1 -- -D warnings || error "Clippy failed"
     success "Clippy passed"
 else
     echo -e "${YELLOW}⚠ Clippy not installed, skipping (install with: rustup component add clippy)${NC}"
