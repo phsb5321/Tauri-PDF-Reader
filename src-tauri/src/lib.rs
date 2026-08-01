@@ -335,9 +335,21 @@ pub fn write_bindings<L: tauri_specta::LanguageExt>(
 /// list rather than its own copy — a test that maintained a second list would
 /// pass while the real surface drifted, which is the failure it exists to catch.
 ///
-/// Commands taking or returning `serde_json::Value` are absent on purpose:
-/// specta cannot type them. That is why this list is shorter than
-/// `tauri::generate_handler!` below, and the difference is not drift.
+/// This list is much shorter than `tauri::generate_handler!` below, and most of
+/// that difference is *not* deliberate. Sessions, the audio cache, both TTS
+/// engines and settings are all registered without types; the frontend reaches
+/// them through hand-written wrappers in `src/lib/api/` that name commands and
+/// arguments as string literals, which nothing compares to the signatures here.
+///
+/// Only a minority are genuinely un-typeable — specta needs a `specta::Type` for
+/// every argument and return, and `serde_json::Value` has no TypeScript shape,
+/// which is what strands the `settings_*` family. The rest return ordinary
+/// structs and were simply never migrated.
+///
+/// `tests/bindings_contract.rs` holds the full list in
+/// `COMMANDS_OUTSIDE_THE_TYPED_SURFACE` and fails when a newly registered
+/// command joins it without being written down, so the gap stops growing by
+/// accident while it is worked off a family at a time.
 pub fn specta_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new().commands(collect_commands![
         // Library commands
