@@ -16,6 +16,8 @@
 //! rejects outright.
 
 use sqlx::{Column, Executor, Row, SqlitePool};
+use std::fs;
+use std::path::{Path, PathBuf};
 
 const DB_INIT_TS: &str = include_str!("../../src/lib/db-init.ts");
 const TAURI_CONF_JSON: &str = include_str!("../tauri.conf.json");
@@ -269,6 +271,61 @@ fn keeps_the_database_where_external_readers_look_for_it() {
         "the database filename changed; external readers open pdf-reader.db \
          by name"
     );
+
+    // The frontend opens the pool; the backend fetches it back out of
+    // tauri-plugin-sql's instance map, keyed by the very same URL string. Seven
+    // call sites across `src-tauri/src` repeat that literal, so pinning only
+    // `db-init.ts` would let the two halves drift: `.get()` returns `None` and
+    // every SQL-backed command fails at runtime. Walk the tree rather than
+    // naming the files, so an eighth call site is covered the day it is written.
+    let mut checked = 0usize;
+    for path in rust_sources(&PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src")) {
+        let source = fs::read_to_string(&path).unwrap();
+        for (line_no, line) in source.lines().enumerate() {
+            let Some(rest) = line.split_once("\"sqlite:") else {
+                continue;
+            };
+            let name = rest.1.split('"').next().unwrap_or_default();
+            // `sqlite::memory:` names no file on disk — test fixtures build a
+            // throwaway database per test and cannot collide with the one an
+            // external reader opens.
+            if name == ":memory:" {
+                continue;
+            }
+            assert_eq!(
+                name,
+                "pdf-reader.db",
+                "{}:{} opens `sqlite:{name}` while the frontend opens \
+                 `sqlite:pdf-reader.db` — the two halves address different \
+                 databases",
+                path.display(),
+                line_no + 1
+            );
+            checked += 1;
+        }
+    }
+    assert!(
+        checked > 0,
+        "found no on-disk `sqlite:` literal in src-tauri/src — the walk is \
+         broken, not the code, and this test is now guarding nothing"
+    );
+}
+
+/// Every `.rs` file under a directory, recursively.
+fn rust_sources(dir: &Path) -> Vec<PathBuf> {
+    let mut found = Vec::new();
+    let Ok(entries) = fs::read_dir(dir) else {
+        return found;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            found.extend(rust_sources(&path));
+        } else if path.extension().is_some_and(|e| e == "rs") {
+            found.push(path);
+        }
+    }
+    found
 }
 
 /// Exactly what an out-of-process consumer selects. Adding a column is a
@@ -345,7 +402,7 @@ async fn keeps_the_base_columns_the_view_is_built_from() {
     let pool = shipped_schema().await;
 
     let documents = columns_of(&pool, "documents").await;
-    for column in ["id", "file_path", "title", "last_opened_at"] {
+    for column in ["id", "file_path", "title", "page_count", "last_opened_at"] {
         assert!(
             documents.contains(&column.to_string()),
             "documents.{column} went missing"
