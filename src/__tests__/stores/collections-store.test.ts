@@ -72,6 +72,29 @@ describe("useCollectionsStore", () => {
     expect(state.isLoading).toBe(false);
   });
 
+  it("keeps the Tauri message when a call rejects with a bare string", async () => {
+    // Tauri IPC rejects with a plain string, not an Error.
+    mocked.collectionsList.mockRejectedValue("DATABASE_ERROR: disk I/O error");
+
+    await useCollectionsStore.getState().loadShelves();
+
+    expect(useCollectionsStore.getState().error).toBe(
+      "DATABASE_ERROR: disk I/O error",
+    );
+  });
+
+  it("falls back to a readable message rather than showing the word undefined", async () => {
+    // `String(undefined)` is "undefined" — truthy, so a `|| fallback` never
+    // fires and the user reads a word where a reason should be.
+    mocked.collectionsList.mockRejectedValue(undefined);
+
+    await useCollectionsStore.getState().loadShelves();
+
+    const shown = useCollectionsStore.getState().error;
+    expect(shown).not.toBe("undefined");
+    expect(shown).toBeTruthy();
+  });
+
   it("reloads after creating a shelf so its count is the backend's", async () => {
     mocked.collectionsCreate.mockResolvedValue(philosophy);
 

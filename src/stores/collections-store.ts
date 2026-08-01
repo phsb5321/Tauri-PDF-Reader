@@ -37,8 +37,15 @@ const initialState = {
   error: null as string | null,
 };
 
-const message = (error: unknown, fallback: string) =>
-  error instanceof Error ? error.message : String(error) || fallback;
+// Tauri IPC rejects with a plain string, so that case is worth surfacing. Any
+// other value is not: `String(undefined)` is the *truthy* "undefined", which
+// would shoulder the fallback aside and show the user a word instead of a
+// reason.
+const message = (error: unknown, fallback: string) => {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string" && error !== "") return error;
+  return fallback;
+};
 
 export const useCollectionsStore = create<CollectionsState>((set, get) => ({
   ...initialState,

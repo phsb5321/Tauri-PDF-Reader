@@ -153,6 +153,22 @@ pub async fn add_document(
         return Err("NOT_FOUND: Shelf does not exist".to_string());
     }
 
+    // Same reason `delete` clears memberships by hand: the foreign key is
+    // declared on the table but `PRAGMA foreign_keys` is per connection and the
+    // pool hands out whichever one is free. Without this, filing a document
+    // that does not exist succeeds, and the orphan row inflates the shelf's
+    // `document_count` forever — nothing ever deletes it, because the document
+    // it points at was never there to be deleted.
+    let document: Option<(String,)> = sqlx::query_as("SELECT id FROM documents WHERE id = ?")
+        .bind(document_id)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| format!("DATABASE_ERROR: {}", e))?;
+
+    if document.is_none() {
+        return Err("NOT_FOUND: Document does not exist".to_string());
+    }
+
     sqlx::query(
         "INSERT OR IGNORE INTO document_collections (document_id, collection_id, added_at)
          VALUES (?, ?, ?)",
@@ -328,6 +344,29 @@ mod tests {
         assert!(
             result.as_ref().is_err_and(|e| e.starts_with("NOT_FOUND")),
             "expected NOT_FOUND, got {result:?}"
+        );
+    }
+
+    /// The foreign key on `document_collections` is declared but unenforced
+    /// whenever the pool hands out a connection with `PRAGMA foreign_keys` off,
+    /// so the insert has to check for itself. The count is the reason it
+    /// matters: an orphan membership has no document to be deleted along with,
+    /// so it inflates the shelf forever.
+    #[tokio::test]
+    async fn filing_a_document_that_does_not_exist_fails_and_does_not_inflate_the_count() {
+        let pool = setup().await;
+        create(&pool, "c1", "Philosophy").await.unwrap();
+
+        let result = add_document(&pool, "c1", "doc-99").await;
+
+        assert!(
+            result.as_ref().is_err_and(|e| e.starts_with("NOT_FOUND")),
+            "expected NOT_FOUND, got {result:?}"
+        );
+        let shelves = list(&pool).await.unwrap();
+        assert_eq!(
+            shelves[0].document_count, 0,
+            "a document that does not exist was counted onto the shelf"
         );
     }
 
