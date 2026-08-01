@@ -44,6 +44,55 @@ sudo systemctl restart actions.runner.phsb5321-Tauri-PDF-Reader.tauri-pdf-reader
 
 Reversible — the runner re-registers on startup + picks up the queue.
 
+## Red "Frontend Checks" is usually the cache upload, not a test
+
+Check the timestamps before you read a single line of the diff. The job carries
+`timeout-minutes: 10`, the vitest suite finishes in about 90 seconds, and the
+rest of the wall clock belongs to the post-job `actions/cache` step uploading
+the pnpm store. That upload does not merely run slow — it **stalls**:
+
+```
+21:28:50  Sent 543146203 of 677363931 (80.2%), 1.0 MBs/sec
+   …      (byte counter identical for eight minutes)
+21:36:40  Sent 543146203 of 677363931 (80.2%), 1.1 MBs/sec
+21:37:01  ##[error]The operation was canceled.
+```
+
+`The operation was canceled` reads like someone hit the button. Nobody did; the
+job hit its own 10-minute wall while blocked on a stalled upload. It killed
+PR #51 and PR #53 on 31/07/2026, and both were diagnosed as code failures first.
+
+It presented as **intermittent** — the same branch passed Frontend Checks in
+2m12s an hour earlier — which is why it read as unrelated PRs going randomly red
+rather than as one clean break. **Re-run the job. Do not touch the code.** Note
+that it could not reliably clear itself: a save that never finishes writes no
+cache entry, so the next run misses, tries to save, and stalls in the same place.
+
+Runner-side tuning does not fix it. `pnpm store prune` on vm103 reclaimed only
+about a quarter (1.5 GB → 1.05 GiB, `Removed 1704 packages`); what is left is
+genuinely referenced by the dependency tree, so the tarball stays in the
+hundreds of megabytes and the stall stays possible.
+
+**Fixed on `main` by PR #52 (`3bcbf3d`, 31/07/2026): the pnpm cache step is
+gone.** The runner is *persistent* and its store lives at
+`~/.local/share/pnpm/store`, outside the workspace — so it survives
+`actions/checkout`'s clean and is already warm on the next run. The GitHub cache
+round-trip was uploading a directory that never needed restoring. Frontend
+Checks takes **1m17s** with the step removed.
+
+**Do not assume the class is closed.** #52 removed the *pnpm* cache; the two
+Rust jobs still cache — `ci.yml:125` (Backend) and `:186` (Contract Tests) — and
+what they cache is `~/.cargo/registry`, `~/.cargo/git` **and `src-tauri/target`**,
+a multi-gigabyte directory, so their upload is considerably larger than the pnpm
+store's ever was. Their walls are `timeout-minutes: 15` and `10`. A red Backend
+Checks that dies at almost exactly 15 minutes with every substantive step green
+in the log is this same failure wearing a different job name: re-run it, do not
+read the diff. The "a persistent runner already has it on disk" argument applies
+to the cargo caches at least as strongly — but `src-tauri/target` *is* inside
+the workspace, so unlike the pnpm store it does not survive `actions/checkout`,
+and removing that cache is a real trade against cold Rust rebuilds rather than
+the free deletion #52 was. Measure before copying the fix across.
+
 ## Why the queue stacks (and why that's fine)
 
 Each push to `main` (merge) triggers multiple workflows:
@@ -64,3 +113,5 @@ vm103 processes them **serially** (1 slot). A merge that triggers 2 CI runs + 1 
 1. **The `busy:true / 0 in-progress` API state ≠ wedge.** Verify via local `Runner.Worker` + journal before any restart call.
 2. **The 5-min falsifier test catches transient job-transition windows.** Apply before escalating.
 3. **Single-concurrency serial draining is normal** — the queue length is proportional to recent merges, not a wedge indicator.
+4. **`##[error]The operation was canceled.` in Frontend Checks means the job timed out, not that a human cancelled it.** Read the last timestamp before the error and compare it to when the tests finished; an eight-minute gap of identical `Sent …` lines is the cache upload, not your diff.
+5. **Cancel superseded runs by hand.** `ci.yml` has no `concurrency` group, so pushing to a branch queues a *second* run rather than replacing the first, and on a one-slot runner the stale one is charged real minutes ahead of the live one. `gh run cancel <id>` on the run whose `headSha` no longer matches the PR head.
