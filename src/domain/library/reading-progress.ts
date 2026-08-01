@@ -70,7 +70,7 @@ export function continueReading<T extends ProgressSnapshot>(
       const byRecency = (b.doc.lastOpenedAt ?? "").localeCompare(
         a.doc.lastOpenedAt ?? "",
       );
-      return byRecency !== 0 ? byRecency : a.index - b.index;
+      return byRecency === 0 ? a.index - b.index : byRecency;
     })
     .slice(0, limit)
     .map(({ doc }) => doc);

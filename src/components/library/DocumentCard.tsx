@@ -98,11 +98,11 @@ export function DocumentCard({
         Open
       </button>
       {shelves && shelves.length > 0 && (
-        <div
-          className="document-card-shelves"
-          role="group"
-          aria-label="Shelves"
-        >
+        <fieldset className="document-card-shelves">
+          {/* Named by a hidden legend rather than aria-label: a fieldset is
+              the native grouping element for a set of checkboxes, and the
+              menu has no room for a visible heading. */}
+          <legend className="sr-only">Shelves</legend>
           {shelves.map((shelf) => {
             const filed = shelfIds?.has(shelf.id) ?? false;
             return (
@@ -118,7 +118,7 @@ export function DocumentCard({
               </label>
             );
           })}
-        </div>
+        </fieldset>
       )}
       <button type="button" onClick={handleDelete}>
         Remove from Library

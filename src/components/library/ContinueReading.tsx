@@ -14,7 +14,10 @@ interface ContinueReadingProps {
  * The books in flight, most recently opened first. Renders nothing when
  * nothing is in flight, so a fresh library is not padded with an empty shelf.
  */
-export function ContinueReading({ documents, onResume }: ContinueReadingProps) {
+export function ContinueReading({
+  documents,
+  onResume,
+}: Readonly<ContinueReadingProps>) {
   const inFlight = continueReading(documents);
 
   if (inFlight.length === 0) return null;
@@ -44,14 +47,18 @@ export function ContinueReading({ documents, onResume }: ContinueReadingProps) {
                     ? `Page ${document.currentPage} of ${document.pageCount}`
                     : `Page ${document.currentPage}`}
                 </span>
-                <span
-                  className="continue-reading-bar"
-                  role="progressbar"
-                  aria-valuenow={percent}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
+                {/* Native <progress> carries the semantics; the bar next to
+                    it is decoration. Styling a real <progress> means
+                    per-engine ::-webkit-progress-value rules, so this follows
+                    CacheProgressBar: sr-only element for assistive tech, a
+                    plain span for the pixels. */}
+                <progress
+                  className="sr-only"
+                  value={percent}
+                  max={100}
                   aria-label={`${label} progress`}
-                >
+                />
+                <span className="continue-reading-bar" aria-hidden="true">
                   <span
                     className="continue-reading-bar-fill"
                     style={{ width: `${percent}%` }}

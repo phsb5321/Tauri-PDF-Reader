@@ -299,7 +299,12 @@
   flex-direction: column;
   max-height: 180px;
   overflow-y: auto;
+  /* fieldset defaults undone: it ships a groove border, inline margin and a
+     min-inline-size of min-content that would stop the menu from shrinking. */
+  margin: 0;
+  min-inline-size: 0;
   padding: var(--space-2) 0;
+  border: none;
   border-top: 1px solid var(--border-color, #e0e0e0);
   border-bottom: 1px solid var(--border-color, #e0e0e0);
 }

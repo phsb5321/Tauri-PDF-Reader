@@ -110,10 +110,10 @@ describe("ContinueReading", () => {
     );
 
     expect(screen.getByText("Page 42 of 100")).toBeInTheDocument();
-    expect(screen.getByRole("progressbar")).toHaveAttribute(
-      "aria-valuenow",
-      "42",
-    );
+    // Native <progress> carries value/max rather than the aria-value* trio.
+    const bar = screen.getByRole("progressbar");
+    expect(bar).toHaveAttribute("value", "42");
+    expect(bar).toHaveAttribute("max", "100");
   });
 
   it("omits the total when the page count is unknown", () => {

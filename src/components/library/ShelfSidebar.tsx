@@ -23,7 +23,7 @@ export function ShelfSidebar({
   onCreate,
   onRename,
   onDelete,
-}: ShelfSidebarProps) {
+}: Readonly<ShelfSidebarProps>) {
   const [draftName, setDraftName] = useState("");
 
   const handleCreate = (event: React.FormEvent) => {
