@@ -14,12 +14,17 @@ const NATIVE_SEMANTIC_SURFACES = [
   ["../../hooks/useAnnounce.tsx", /<output\b/],
   ["../../ui/components/Dialog/Dialog.tsx", /<dialog\b/],
   ["../../components/highlights/NoteEditor.tsx", /<dialog\b/],
+  ["../../components/library/ContinueReading.tsx", /<progress\b/],
   ["../../components/library/DocumentCard.tsx", /<button\b/],
+  ["../../components/library/DocumentCard.tsx", /<fieldset\b/],
   ["../../components/pdf-viewer/HighlightOverlay.tsx", /<button\b/],
 ] as const;
 
+// `group` joins the list because <fieldset> is its native element: the shelf
+// checkboxes carried role="group" on a plain <div> until SonarQube S6819
+// flagged it.
 const REDUNDANT_NATIVE_ROLE =
-  /\brole\s*=\s*(["'])(?:button|dialog|list|progressbar|presentation)\1/;
+  /\brole\s*=\s*(["'])(?:button|dialog|group|list|progressbar|presentation)\1/;
 
 const DIALOG_EVENT_SURFACES = [
   "../../components/session-menu/CreateSessionDialog.tsx",
