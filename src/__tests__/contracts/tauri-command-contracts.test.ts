@@ -17,7 +17,8 @@
  */
 
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const invoke = vi.hoisted(() => vi.fn());
@@ -171,6 +172,47 @@ const CONTRACTS: ReadonlyArray<
   ],
 ];
 
+// Held in a const rather than written inline as `new URL("../…",
+// import.meta.url)`: Vite rewrites that literal form into an asset reference,
+// so it resolves to http://localhost:3000/… and readFileSync rejects the
+// scheme. `import.meta.url` itself is a perfectly good file: URL under jsdom.
+const LIB_RS = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../../src-tauri/src/lib.rs",
+);
+
+/** Every command name registered in `generate_handler!`. */
+function registeredCommands(): ReadonlySet<string> {
+  // Comments go first, for two reasons: a command named inside one must not
+  // vouch for itself, and a `]` inside one would throw off the depth scan.
+  const code = readFileSync(LIB_RS, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/[^\n]*/g, "");
+
+  const open = code.indexOf("generate_handler![");
+  expect(open).toBeGreaterThan(-1);
+
+  // Depth scan, not `/generate_handler!\[([\s\S]*?)\]/`. The macro body holds
+  // `#[cfg(feature = "native-tts")]` attributes and the non-greedy form stops
+  // at the first of them — measured, it captured 45 of the 91 registered
+  // commands and silently ignored everything after that line.
+  const body = open + "generate_handler![".length;
+  let depth = 1;
+  let i = body;
+  for (; i < code.length && depth > 0; i++) {
+    if (code[i] === "[") depth++;
+    else if (code[i] === "]") depth--;
+  }
+  expect(depth).toBe(0);
+
+  return new Set(
+    code
+      .slice(body, i - 1)
+      .split(/[\s,]+/)
+      .filter((token) => /^[a-z][a-z0-9_]*$/.test(token)),
+  );
+}
+
 describe("Tauri command contracts", () => {
   beforeEach(() => {
     invoke.mockReset();
@@ -199,24 +241,13 @@ describe("Tauri command contracts", () => {
   });
 
   it("every invoked command is registered in generate_handler!", () => {
-    // Resolved from cwd (the vitest root), not `import.meta.url`: under
-    // jsdom a relative URL that climbs out of the vite root comes back as
-    // http://localhost:3000/... and readFileSync rejects the scheme. Sibling
-    // suites get away with import.meta.url because their paths stay in src/.
-    const lib = readFileSync(
-      resolve(process.cwd(), "src-tauri/src/lib.rs"),
-      "utf8",
-    );
-    const handler = /generate_handler!\[([\s\S]*?)\]/.exec(lib);
-    expect(handler).not.toBeNull();
+    const registered = registeredCommands();
 
-    // Strip comments so a command named inside one cannot vouch for itself.
-    const registered = new Set(
-      (handler?.[1] ?? "")
-        .replace(/\/\/[^\n]*/g, "")
-        .split(/[\s,]+/)
-        .filter((token) => /^[a-z][a-z0-9_]*$/.test(token)),
-    );
+    // A command declared after the first `#[cfg(...)]` block. Asserting it
+    // here is what keeps the extractor honest: a truncating parser still finds
+    // all nineteen contracts below, because they happen to sit in the prefix
+    // before that attribute. This one does not.
+    expect(registered.has("audio_export_cancel")).toBe(true);
 
     const missing = CONTRACTS.map(([, , command]) => command).filter(
       (command) => !registered.has(command),
