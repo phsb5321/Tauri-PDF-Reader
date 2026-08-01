@@ -9,7 +9,11 @@ import { pdfService } from "../../services/pdf-service";
 import { useAutoSave } from "../../hooks/useAutoSave";
 import { useTtsPrebuffer } from "../../hooks/useTtsPrebuffer";
 import { useOpenPdf } from "../../hooks/useOpenPdf";
-import { useMenuActions } from "../../hooks/useMenuActions";
+import {
+  useMenuActions,
+  type MenuActionHandlers,
+} from "../../hooks/useMenuActions";
+import { useCommandKeys } from "../../hooks/useCommandKeys";
 import { aiTtsPause, aiTtsResume, aiTtsStop } from "../../lib/tauri-invoke";
 import "./ReaderView.css";
 
@@ -24,11 +28,15 @@ export function ReaderView() {
   const playbackState = useAiTtsStore((state) => state.playbackState);
   const { openPdf } = useOpenPdf();
 
-  // The native menu (File / View / Playback / Help — exported over AT-SPI on
-  // Linux to a global menu bar) emits "menu-action" events. Wire the items that
-  // are backed by stores/services. Page navigation goes through the store
-  // (which clamps to [1, totalPages]); useAutoSave below persists the new page.
-  // Stop TTS first, mirroring PageNavigation's on-navigation guard.
+  // One set of reader commands, reached two ways: the native menu (File / View
+  // / Playback / Help — exported over AT-SPI on Linux to a global menu bar,
+  // emitting "menu-action" events) and the keyboard. Both dispatchers below get
+  // the same handlers object, so a command cannot behave differently depending
+  // on how it was invoked.
+  //
+  // Page navigation goes through the store (which clamps to [1, totalPages]);
+  // useAutoSave below persists the new page. Stop TTS first, mirroring
+  // PageNavigation's on-navigation guard.
   const goToPageFromMenu = useCallback(
     async (page: number) => {
       if (playbackState === "playing" || playbackState === "paused") {
@@ -57,7 +65,7 @@ export function ReaderView() {
     }
   }, [playbackState]);
 
-  useMenuActions({
+  const commandHandlers: MenuActionHandlers = {
     onOpen: () => {
       void openPdf();
     },
@@ -70,7 +78,10 @@ export function ReaderView() {
     onNextPage: () => {
       void goToPageFromMenu(currentPage + 1);
     },
-  });
+  };
+
+  useMenuActions(commandHandlers);
+  useCommandKeys(commandHandlers);
 
   // Auto-save reading progress
   useAutoSave({

@@ -14,9 +14,9 @@
  * the whole flow reachable from the keyboard when the selection was made with
  * Shift+arrows.
  *
- * Note the shortcut is registered HERE rather than in `useKeyboardShortcuts`:
- * that hook has no call site anywhere in the app, and it has no access to the
- * pending selection, which lives in this hook's state.
+ * Note the shortcut is registered HERE rather than in the global chord table
+ * (`useCommandKeys`): it needs the pending selection, which lives in this
+ * hook's state and which a window-level listener cannot see.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -48,8 +48,7 @@ interface HighlightCreationHandlerProps {
  *
  * One live mount: `PdfViewer.tsx:90`, reached by `App` -> `ReaderView` ->
  * `PdfViewer`. `PdfPage.tsx:64` also calls it, but `<PdfPage` has no render
- * site anywhere in `src/` and never has (`git log -S`), so it is dead code —
- * the same state `useKeyboardShortcuts` is in.
+ * site anywhere in `src/` and never has (`git log -S`), so it is dead code.
  *
  * That matters for the duplicate-commit latch below: it is per-instance. If
  * `PdfPage` is ever wired up for continuous scroll while `PdfViewer` still
