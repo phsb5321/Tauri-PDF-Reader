@@ -1,7 +1,22 @@
-import { useCallback } from "react";
+/**
+ * ReaderView — the application shell.
+ *
+ * Owns the two surfaces a reader moves between: the reading home (the library,
+ * with its Continue-reading shelf) and the document itself. They share one
+ * chrome and, more importantly, one command surface — `useMenuActions` and
+ * `useCommandKeys` are mounted here exactly once, so a command reached from the
+ * native menu, from the keyboard, or from either surface runs the same handler.
+ * Hosting the home in a sibling shell would mean a second subscription to the
+ * same events, which is the defect `useCommandKeys` was written to remove.
+ *
+ * @module components/reader/ReaderView
+ */
+
+import { useCallback, useState } from "react";
 import { AppLayout } from "../layout/AppLayout";
 import { Toolbar } from "../Toolbar";
 import { PdfViewer } from "../PdfViewer";
+import { LibraryView } from "../library/LibraryView";
 import { AiPlaybackBar } from "../playback-bar/AiPlaybackBar";
 import { useDocumentStore } from "../../stores/document-store";
 import { useAiTtsStore } from "../../stores/ai-tts-store";
@@ -16,12 +31,33 @@ import {
 import { useCommandKeys } from "../../hooks/useCommandKeys";
 import { usePageNavigation } from "../../hooks/usePageNavigation";
 import { aiTtsPause, aiTtsResume } from "../../lib/tauri-invoke";
+import type { Document } from "../../lib/schemas";
 import "./ReaderView.css";
 
 export function ReaderView() {
   const { pdfDocument, currentPage, currentDocument, scrollPosition } =
     useDocumentStore();
-  const { openPdf } = useOpenPdf();
+  const { openPdf, resumeDocument } = useOpenPdf();
+
+  // The reading home is the landing surface, so this starts true: a reader with
+  // nothing loaded has nothing to show, and the library is where a returning
+  // reader picks up. It is a view swap rather than a close — the loaded
+  // `pdfDocument` stays alive behind the home, which is what lets View ->
+  // Library go back and forth without re-reading the file or losing the page.
+  const [showLibrary, setShowLibrary] = useState(true);
+
+  // Leave the home only once something is actually showing. A cancelled dialog
+  // or a file that failed to load must not strand the reader on a blank page.
+  const handleResume = useCallback(
+    async (document: Document) => {
+      if (await resumeDocument(document)) setShowLibrary(false);
+    },
+    [resumeDocument],
+  );
+
+  const handleOpen = useCallback(async () => {
+    if (await openPdf()) setShowLibrary(false);
+  }, [openPdf]);
 
   // One set of reader commands, reached two ways: the native menu (File / View
   // / Playback / Help — exported over AT-SPI on Linux to a global menu bar,
@@ -55,8 +91,9 @@ export function ReaderView() {
 
   const commandHandlers: MenuActionHandlers = {
     onOpen: () => {
-      void openPdf();
+      void handleOpen();
     },
+    onToggleLibrary: () => setShowLibrary((showing) => !showing),
     onPlayPause: () => {
       void handleMenuPlayPause();
     },
@@ -110,12 +147,26 @@ export function ReaderView() {
     }
   }, [pdfDocument, currentPage]);
 
+  // Nothing loaded means nothing to read, so the home wins regardless of the
+  // toggle. The playback bar is deliberately NOT tied to this: audio started in
+  // the reader keeps playing while the home is up, and hiding its controls
+  // would leave a reader with no way to stop it.
+  const libraryShowing = showLibrary || !pdfDocument;
+
   return (
     <AppLayout
       header={<Toolbar />}
       footer={pdfDocument && <AiPlaybackBar getText={getCurrentPageText} />}
     >
-      <PdfViewer />
+      {libraryShowing ? (
+        <LibraryView
+          onDocumentSelect={(document) => {
+            void handleResume(document);
+          }}
+        />
+      ) : (
+        <PdfViewer />
+      )}
     </AppLayout>
   );
 }

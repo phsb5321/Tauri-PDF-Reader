@@ -276,6 +276,7 @@ the same thing whichever way it is reached.
 Global (`COMMAND_CHORDS` in `src/hooks/useCommandKeys.ts`):
 
 - `Ctrl+O` - Open a document
+- `Ctrl+L` - Toggle the reading home (View → Library)
 - `Page Down` / `→` / `Space` - Next page
 - `Page Up` / `←` - Previous page
 
@@ -303,8 +304,22 @@ see:
   playback (`HighlightToolbar.tsx:118`, `HighlightContextMenu.tsx:38`,
   `AiPlaybackBar.tsx:278`) — whichever is open
 
-Settings, library, highlights and find have menu items but no panel to open, so
-they have no chord. An inert shortcut is indistinguishable from a broken one.
+Settings, highlights and find have menu items but no panel to open, so they have
+no chord. An inert shortcut is indistinguishable from a broken one.
+
+### The two surfaces
+
+`ReaderView` is the app shell, not just the reader: it renders the reading home
+(`LibraryView`, with its Continue-reading shelf) when no document is open, and
+the document when one is. Both live under one `AppLayout` and — the reason they
+are not separate shells — one command surface, since `useMenuActions` and
+`useCommandKeys` are mounted there exactly once.
+
+Opening a book from the home goes through `useOpenPdf`'s `resumeDocument`,
+which loads the file and lands on the row's stored `currentPage`. `openPdf`
+(dialog / `Ctrl+O`) shares the same landing step, so both arrive in the same
+state. `toggle-library` is a view swap, not a close: the loaded PDF stays alive
+behind the home, so going back and forth costs nothing and loses no place.
 
 ## Z-Index Token System
 

@@ -6,9 +6,9 @@
  * in the tree (e.g. `ReaderView`) so there is exactly one subscription for the
  * app's lifetime.
  *
- * Actions with no handler are inert (a no-op). Today `toggle-library`,
- * `toggle-highlights`, and `find` have no UI to drive, so their menu items do
- * nothing until those panels exist.
+ * Actions with no handler are inert (a no-op). Today `toggle-highlights` and
+ * `find` have no UI to drive, so their menu items do nothing until those panels
+ * exist.
  *
  * @module hooks/useMenuActions
  */

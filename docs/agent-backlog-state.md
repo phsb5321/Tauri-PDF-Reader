@@ -2,6 +2,68 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #36 — 2026-08-01 (The reading home was finished, tested, merged — and unreachable)
+
+**Live state:** `origin/main` = `67101f3` after **#70 `070-verify-hardening`**,
+confirmed `state=MERGED` with all seven checks green — Backend Checks took
+9m30s and Contract Tests 5m40s behind it, the one vm103 slot draining serially
+as ever. Its worktree and branch are removed. **071-reading-home** is this
+entry, rebased onto that merge.
+
+- **The home page already existed. Nothing mounted it.** `LibraryView`, its
+  Continue-reading shelf with per-book progress, the shelves sidebar, and
+  `healDocument` path-relinking on resume were all merged, all unit-tested, all
+  dead: `App.tsx` returns `<ReaderView />` and `ReaderView` rendered
+  `<PdfViewer />` unconditionally. `grep -rn "LibraryView" src/ | grep -v
+src/components/library/` returned **nothing**. This is the same failure class
+  as the 963-line pre-AI playback path deleted in #69 the same day, and it is
+  why the new test asserts through the shell: no unit test on `LibraryView`
+  could have caught it, because every one of them mounted the component the app
+  never did.
+- **What shipped.** `ReaderView` is now the shell over two surfaces — the
+  reading home and the document — sharing one command surface (`useMenuActions`
+  - `useCommandKeys` stay mounted exactly once, which is the defect #67 was
+    written to remove, so a second shell was not an option). `useOpenPdf` grew
+    `resumeDocument`; `toggle-library` went from inert to live on the menu and on
+    a new `Ctrl+L`; the menu item's label went from "Toggle Sidebar" (it toggles
+    no sidebar) to "Library".
+- **`src/services/library-service.ts` is deleted** — the last raw-`invoke`
+  service in the tree, with `useOpenPdf` as its only consumer. It passed
+  **snake_case** argument keys (`file_path`); tauri-specta's own generated
+  bindings pass **camelCase** (`TAURI_INVOKE("library_add_document",
+{ filePath, title, pageCount })`, `src/lib/bindings.ts:15`), which is what
+  `src/lib/api/library.ts` sends and what Tauri converts to the Rust
+  parameters. Reading the generated file settles which is correct; a test now
+  pins it, because a wrong key reaches the backend as a **missing argument at
+  runtime** and mocked IPC will happily accept either spelling.
+- **Verified by mutation, not by eye.** 11 new tests across
+  `src/hooks/useOpenPdf.test.ts` and `src/__tests__/ui/reading-home.test.tsx`;
+  the document store is the oracle throughout. RED-proved in two rounds:
+  reverting the shell to an unconditional `<PdfViewer />` and dropping the
+  `setCurrentPage` clamp → **5 failed | 3 passed**; then re-spelling the library
+  args snake_case, dropping the known-document lookup, and dropping the
+  cancelled-dialog guard → **3 failed | 4 passed**, each on its own claim.
+  Full suite green, `pnpm typecheck && pnpm lint && pnpm lint:boundaries`
+  EXIT=0.
+- **A clamp bug fixed at the root while passing.** `setDocument` writes the
+  stored page **without clamping** (`setCurrentPage` is the one that clamps, and
+  `setPdfDocument` is what teaches the store the real page count). Both entry
+  points now go through one `showInReader` that re-sets the page afterwards, so
+  a book whose file was replaced by a shorter one resumes on a page that
+  exists instead of on a blank. That bug predates the home and was reachable
+  from the file dialog alone.
+- **Known ceiling: the resume unit is the page, not the scroll offset.**
+  `setScrollPosition` has **no caller anywhere in `src/`** — the column is
+  persisted and read back, and always 0. `PdfViewer` renders one page at a time
+  (`data-page-number={currentPage}`), so page-level resume is the whole of
+  "where I left off" today. Restoring within-page position means writing
+  `scrollPosition` on scroll first; it is a separate slice, not a line.
+- **Coverage headroom worth a dedicated slice:** measured 68.26 lines / 91.33
+  branches / 70.46 functions against floors of 62 / 90 / 67. The floors were
+  last ratcheted in #62. Not touched here — this repo ratchets in its own
+  `test(...)` PRs (#7, #62) and mixing it into a feature PR buys a rebase
+  conflict for nothing.
+
 ## Iteration #35 — 2026-08-01 (#69 merged · the verify.sh slice opened as #70)
 
 **Live state:** `origin/main` = **`3cda8fe`**. Merged today, in order:
