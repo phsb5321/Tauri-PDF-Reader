@@ -278,6 +278,16 @@ const LIB_RS: &str = include_str!("../src/lib.rs");
 /// command into `collect_commands!` and regenerating. It grows only when a new
 /// command is registered without types, and the test below makes that a
 /// deliberate edit here rather than something nobody notices.
+///
+/// `MAX_UNTYPED_COMMANDS` is the second half of that ratchet. The test below
+/// catches a command added to `generate_handler!` alone; it does not catch one
+/// added to *both* the handler and this list, which passes while the surface
+/// gets worse. Pinning the length means growing the list is an edit to a number
+/// as well as an edit to the array — the same visibility the coverage floors in
+/// `vitest.config.ts` get, for the same reason. Lower it when a family
+/// migrates; raising it needs a stated reason in the pull request.
+const MAX_UNTYPED_COMMANDS: usize = 53;
+
 const COMMANDS_OUTSIDE_THE_TYPED_SURFACE: &[&str] = &[
     "ai_tts_cache_clear",
     "ai_tts_cache_info",
@@ -482,5 +492,33 @@ fn every_registered_command_is_typed_or_a_recorded_exception() {
         "listed in COMMANDS_OUTSIDE_THE_TYPED_SURFACE but no longer untyped — \
          either typed now or gone: {now_typed:?}\n\
          Delete these entries; a stale exception list hides the next real gap."
+    );
+}
+
+/// The exception list may only get shorter.
+///
+/// Without this, the two assertions above are satisfied by adding a new untyped
+/// command to `generate_handler!` *and* to the exception list in the same
+/// commit: the lists agree, every entry is genuinely untyped, and the typed
+/// surface quietly shrinks as a share of the whole. That is the one way the
+/// ratchet runs backwards without any test objecting.
+#[test]
+fn the_untyped_surface_never_grows() {
+    let actual = COMMANDS_OUTSIDE_THE_TYPED_SURFACE.len();
+    assert!(
+        actual <= MAX_UNTYPED_COMMANDS,
+        "COMMANDS_OUTSIDE_THE_TYPED_SURFACE has {actual} entries, over the pinned \
+         maximum of {MAX_UNTYPED_COMMANDS}.\n\
+         A new command belongs in collect_commands! with a specta::Type on its \
+         argument and return types. If it genuinely cannot be typed, raise \
+         MAX_UNTYPED_COMMANDS in the same commit and say why in the pull request \
+         — the point is that growing this surface is never silent."
+    );
+    assert_eq!(
+        actual, MAX_UNTYPED_COMMANDS,
+        "COMMANDS_OUTSIDE_THE_TYPED_SURFACE is down to {actual} entries but \
+         MAX_UNTYPED_COMMANDS still says {MAX_UNTYPED_COMMANDS}.\n\
+         Lower the pin to {actual}: a ratchet that keeps the old slack lets the \
+         next command back in for free."
     );
 }
