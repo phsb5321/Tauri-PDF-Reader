@@ -69,7 +69,14 @@ describe("collections api → invoke wire contract", () => {
     expect(mockInvoke).toHaveBeenCalledWith("collections_list_memberships");
   });
 
-  it("passes the backend's value back to the caller unchanged", async () => {
+  // These two pin the semantic difference between these hand-written wrappers
+  // and their generated counterparts in `lib/bindings.ts`, which return a
+  // `Result` envelope (`{ status, data | error }`) and swallow the rejection.
+  // These return the raw value and let the rejection through, so every caller
+  // is written with try/catch. Migrating them to the generated shape would
+  // leave those callers reading `{status:"error"}` as a success and would not
+  // be a type error on the `unknown` boundary — hence a test, not a comment.
+  it("returns the backend's value raw, not wrapped in a Result envelope", async () => {
     const shelf = {
       id: "shelf-1",
       name: "Unfiled reading",
@@ -80,5 +87,13 @@ describe("collections api → invoke wire contract", () => {
     mockInvoke.mockResolvedValue(shelf);
 
     await expect(api.collectionsCreate("Unfiled reading")).resolves.toBe(shelf);
+  });
+
+  it("lets an IPC rejection propagate instead of absorbing it", async () => {
+    mockInvoke.mockRejectedValue(new Error("collection name already taken"));
+
+    await expect(api.collectionsCreate("Unfiled reading")).rejects.toThrow(
+      "collection name already taken",
+    );
   });
 });

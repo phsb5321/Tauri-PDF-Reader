@@ -29,7 +29,14 @@ describe("library api → invoke wire contract", () => {
     });
   });
 
-  it("libraryAddDocument sends the optional fields as undefined when omitted", async () => {
+  it("libraryAddDocument leaves the optional fields undefined rather than null", async () => {
+    // Deliberately NOT titled "sends undefined on the wire" — it does not.
+    // `invoke` serialises with JSON.stringify, which drops undefined-valued
+    // keys entirely: {filePath:"/a.pdf",title:undefined} -> {"filePath":"/a.pdf"}.
+    // The backend therefore sees a *missing* key, which serde maps to `None`
+    // for an Option<T> field. What this asserts is the step before that — the
+    // wrapper must not substitute `null` or `""`, which would serialise and
+    // mean something different on the Rust side.
     await api.libraryAddDocument("/books/a.pdf");
     expect(mockInvoke).toHaveBeenCalledWith("library_add_document", {
       filePath: "/books/a.pdf",
