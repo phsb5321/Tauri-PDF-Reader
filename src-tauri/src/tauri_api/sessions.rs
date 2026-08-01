@@ -58,6 +58,7 @@ async fn create_service(
 
 /// Create a new reading session
 #[tauri::command]
+#[specta::specta]
 pub async fn session_create(
     db: State<'_, DbInstances>,
     name: String,
@@ -71,6 +72,7 @@ pub async fn session_create(
 
 /// Get a session by ID with all documents
 #[tauri::command]
+#[specta::specta]
 pub async fn session_get(
     db: State<'_, DbInstances>,
     session_id: String,
@@ -81,6 +83,7 @@ pub async fn session_get(
 
 /// List all sessions (summary only)
 #[tauri::command]
+#[specta::specta]
 pub async fn session_list(db: State<'_, DbInstances>) -> Result<Vec<SessionSummary>, String> {
     let service = create_service(&db).await?;
     service.list().await.map_err(map_error)
@@ -92,6 +95,7 @@ pub async fn session_list(db: State<'_, DbInstances>) -> Result<Vec<SessionSumma
 
 /// Update a session's name and/or documents
 #[tauri::command]
+#[specta::specta]
 pub async fn session_update(
     db: State<'_, DbInstances>,
     session_id: String,
@@ -106,6 +110,7 @@ pub async fn session_update(
 
 /// Delete a session
 #[tauri::command]
+#[specta::specta]
 pub async fn session_delete(db: State<'_, DbInstances>, session_id: String) -> Result<(), String> {
     let service = create_service(&db).await?;
     service.delete(&session_id).await.map_err(map_error)
@@ -113,6 +118,7 @@ pub async fn session_delete(db: State<'_, DbInstances>, session_id: String) -> R
 
 /// Restore a session (touch last_accessed and check for missing documents)
 #[tauri::command]
+#[specta::specta]
 pub async fn session_restore(
     db: State<'_, DbInstances>,
     session_id: String,
@@ -127,6 +133,7 @@ pub async fn session_restore(
 
 /// Add a document to a session
 #[tauri::command]
+#[specta::specta]
 pub async fn session_add_document(
     db: State<'_, DbInstances>,
     session_id: String,
@@ -142,6 +149,7 @@ pub async fn session_add_document(
 
 /// Remove a document from a session
 #[tauri::command]
+#[specta::specta]
 pub async fn session_remove_document(
     db: State<'_, DbInstances>,
     session_id: String,
@@ -156,6 +164,7 @@ pub async fn session_remove_document(
 
 /// Update a document's reading position within a session
 #[tauri::command]
+#[specta::specta]
 pub async fn session_update_document(
     db: State<'_, DbInstances>,
     session_id: String,
@@ -177,6 +186,7 @@ pub async fn session_update_document(
 
 /// Touch a session to update its last_accessed_at timestamp
 #[tauri::command]
+#[specta::specta]
 pub async fn session_touch(db: State<'_, DbInstances>, session_id: String) -> Result<(), String> {
     let service = create_service(&db).await?;
     service.touch(&session_id).await.map_err(map_error)

@@ -383,6 +383,17 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
         collections_add_document,
         collections_remove_document,
         collections_list_memberships,
+        // Session commands
+        session_create,
+        session_get,
+        session_list,
+        session_update,
+        session_delete,
+        session_restore,
+        session_add_document,
+        session_remove_document,
+        session_update_document,
+        session_touch,
     ])
 }
 
