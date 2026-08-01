@@ -3,8 +3,9 @@
  *
  * The open-a-PDF flow as a reusable hook: pick a file, load it, register or
  * refresh it in the library, and push it into the document store. Shared so the
- * toolbar button and the native File -> Open menu item trigger identical
- * behavior. Mirrors the flow in `Toolbar` / `useKeyboardShortcuts`.
+ * toolbar button, the native File -> Open menu item and Ctrl+O trigger
+ * identical behavior. `ReaderView` passes this to both dispatchers, so the
+ * three entry points are one flow rather than three copies of it.
  *
  * @module hooks/useOpenPdf
  */

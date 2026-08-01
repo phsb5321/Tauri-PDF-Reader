@@ -64,7 +64,7 @@ Full rules + exact commands: `.claude/skills/lectrice-forward-loop/SKILL.md`
 - **Deadlock gate (MANDATORY):** any `src-tauri/src/ai_tts/player.rs` or `!Send`/`!Sync`
   change ships with a timeout-guarded test proving no lock is held across
   `sink.sleep_until_end()`.
-- **Codex review:** also blocks (PR#595 parity) if a slice deferred a *verifiable*
+- **Codex review:** also blocks (PR#595 parity) if a slice deferred a _verifiable_
   property to a human instead of mechanizing it.
 
 ## Merge Ownership (NON-NEGOTIABLE)
@@ -267,27 +267,44 @@ Import from `src/ui/components/`:
 
 ### Keyboard Shortcuts
 
-Live:
+Every chord below is bound at runtime. There is no separate keyboard command
+list: `src/hooks/useCommandKeys.ts` resolves a chord to a `MenuAction` id and
+hands it to `dispatchMenuAction`, the same lookup the native menu goes through.
+`ReaderView` passes one handlers object to both dispatchers, so a command does
+the same thing whichever way it is reached.
 
-- `Ctrl+Shift+H` - Highlight the current selection in the default colour, skipping
-  the toolbar (`src/components/pdf-viewer/HighlightCreationHandler.tsx`, bound only
-  while a selection is pending)
+Global (`COMMAND_CHORDS` in `src/hooks/useCommandKeys.ts`):
 
-Declared in `src/hooks/useKeyboardShortcuts.ts` but **inert** — that hook has no
-call site, so none of these are bound at runtime:
+- `Ctrl+O` - Open a document
+- `Page Down` / `→` / `Space` - Next page
+- `Page Up` / `←` - Previous page
 
-- `Ctrl+O` - Open file
-- `Ctrl+,` - Settings
-- `Ctrl+H` - Toggle highlights
-- `Ctrl+B` - Toggle sidebar
-- `Escape` - Close modal/panel
-- `Space` - Play/Pause TTS
+Unmodified chords are suppressed while typing in an `input`, `textarea`,
+`select` or `contenteditable`; modified chords are not. A chord also yields to
+any component handler that already called `preventDefault` — element-level
+`onKeyDown` runs before the event reaches `window`, so arrow keys inside a
+roving-tabindex list move through the list rather than turning the page.
 
-Components register their own handlers, so some of that behaviour exists under a
-different chord: `Escape` closes the highlight toolbar, the context menu and an
-active playback (`HighlightToolbar.tsx:118`, `HighlightContextMenu.tsx:38`,
-`AiPlaybackBar.tsx:278`), and play/pause is **`Ctrl+Space`**, not `Space`
-(`AiPlaybackBar.tsx:271`).
+`Home` / `End` (first / last page) stay on `PdfViewer`'s own listener: there is
+no `MenuAction` id for them, because the native menu has no such item.
+`src/__tests__/architecture/global-key-listeners.test.ts` fails if any other
+file registers a global `keydown` handler without declaring why.
+
+Owned by a component, because each needs state a window-level listener cannot
+see:
+
+- `Ctrl+Shift+H` - Highlight the current selection in the default colour,
+  skipping the toolbar (`HighlightCreationHandler.tsx`, bound only while a
+  selection is pending)
+- `Ctrl+Space` - Play/pause TTS (`AiPlaybackBar.tsx:271`). It can also _start_
+  playback from idle, which the menu's play/pause cannot, so it is not
+  duplicated in the global table
+- `Escape` - Closes the highlight toolbar, the context menu, or an active
+  playback (`HighlightToolbar.tsx:118`, `HighlightContextMenu.tsx:38`,
+  `AiPlaybackBar.tsx:278`) — whichever is open
+
+Settings, library, highlights and find have menu items but no panel to open, so
+they have no chord. An inert shortcut is indistinguishable from a broken one.
 
 ## Z-Index Token System
 

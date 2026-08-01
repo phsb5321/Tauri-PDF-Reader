@@ -537,7 +537,15 @@ export function PdfViewer() {
     checkTextLayer();
   }, [pdfDocument, textLayerChecked, setHasTextLayer]);
 
-  // Keyboard navigation
+  // Jump to the first or last page.
+  //
+  // Page-by-page navigation used to live here too — PageUp/PageDown, the arrows
+  // and Space — on this same listener. It moved to `useCommandKeys`, which
+  // reaches the same commands the native menu does and therefore applies the
+  // stop-playback-first guard this listener never had. Home/End stay because
+  // there is no `MenuAction` id for them: the native menu has no first/last-page
+  // item, and inventing an id `src-tauri` never emits would put a dead entry in
+  // the registry. They overlap with nothing, so no key has two owners.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!pdfDocument) return;
@@ -550,17 +558,6 @@ export function PdfViewer() {
       }
 
       switch (e.key) {
-        case "ArrowLeft":
-        case "PageUp":
-          e.preventDefault();
-          setCurrentPage(Math.max(1, currentPage - 1));
-          break;
-        case "ArrowRight":
-        case "PageDown":
-        case " ":
-          e.preventDefault();
-          setCurrentPage(Math.min(pdfDocument.numPages, currentPage + 1));
-          break;
         case "Home":
           e.preventDefault();
           setCurrentPage(1);
@@ -574,7 +571,7 @@ export function PdfViewer() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [pdfDocument, currentPage, setCurrentPage]);
+  }, [pdfDocument, setCurrentPage]);
 
   // Empty state
   if (!pdfDocument && !isLoading && !error) {

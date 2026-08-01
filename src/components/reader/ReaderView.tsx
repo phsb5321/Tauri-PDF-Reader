@@ -9,44 +9,40 @@ import { pdfService } from "../../services/pdf-service";
 import { useAutoSave } from "../../hooks/useAutoSave";
 import { useTtsPrebuffer } from "../../hooks/useTtsPrebuffer";
 import { useOpenPdf } from "../../hooks/useOpenPdf";
-import { useMenuActions } from "../../hooks/useMenuActions";
-import { aiTtsPause, aiTtsResume, aiTtsStop } from "../../lib/tauri-invoke";
+import {
+  useMenuActions,
+  type MenuActionHandlers,
+} from "../../hooks/useMenuActions";
+import { useCommandKeys } from "../../hooks/useCommandKeys";
+import { usePageNavigation } from "../../hooks/usePageNavigation";
+import { aiTtsPause, aiTtsResume } from "../../lib/tauri-invoke";
 import "./ReaderView.css";
 
 export function ReaderView() {
-  const {
-    pdfDocument,
-    currentPage,
-    currentDocument,
-    scrollPosition,
-    setCurrentPage,
-  } = useDocumentStore();
-  const playbackState = useAiTtsStore((state) => state.playbackState);
+  const { pdfDocument, currentPage, currentDocument, scrollPosition } =
+    useDocumentStore();
   const { openPdf } = useOpenPdf();
 
-  // The native menu (File / View / Playback / Help — exported over AT-SPI on
-  // Linux to a global menu bar) emits "menu-action" events. Wire the items that
-  // are backed by stores/services. Page navigation goes through the store
-  // (which clamps to [1, totalPages]); useAutoSave below persists the new page.
-  // Stop TTS first, mirroring PageNavigation's on-navigation guard.
-  const goToPageFromMenu = useCallback(
-    async (page: number) => {
-      if (playbackState === "playing" || playbackState === "paused") {
-        try {
-          await aiTtsStop();
-        } catch (error) {
-          console.error("Failed to stop TTS on menu navigation:", error);
-        }
-      }
-      setCurrentPage(page);
-    },
-    [playbackState, setCurrentPage],
-  );
+  // One set of reader commands, reached two ways: the native menu (File / View
+  // / Playback / Help — exported over AT-SPI on Linux to a global menu bar,
+  // emitting "menu-action" events) and the keyboard. Both dispatchers below get
+  // the same handlers object, so a command cannot behave differently depending
+  // on how it was invoked.
+  //
+  // Page navigation lives in its own module because the order it does things in
+  // (stop playback, then read the page, then write) is load-bearing and needs a
+  // seam to assert through. See usePageNavigation.
+  const { goToPrevPage, goToNextPage } = usePageNavigation();
 
   // Toggle ongoing playback (playing <-> paused). Starting from idle needs the
   // page text, so that stays with the playback bar's play button.
+  //
+  // Playback state is read at call time rather than captured from this render,
+  // so the callback has no changing dependency and the handlers object below
+  // keeps stable references.
   const handleMenuPlayPause = useCallback(async () => {
     try {
+      const playbackState = useAiTtsStore.getState().playbackState;
       if (playbackState === "playing") {
         await aiTtsPause();
       } else if (playbackState === "paused") {
@@ -55,22 +51,21 @@ export function ReaderView() {
     } catch (error) {
       console.error("Failed to toggle TTS from menu:", error);
     }
-  }, [playbackState]);
+  }, []);
 
-  useMenuActions({
+  const commandHandlers: MenuActionHandlers = {
     onOpen: () => {
       void openPdf();
     },
     onPlayPause: () => {
       void handleMenuPlayPause();
     },
-    onPrevPage: () => {
-      void goToPageFromMenu(currentPage - 1);
-    },
-    onNextPage: () => {
-      void goToPageFromMenu(currentPage + 1);
-    },
-  });
+    onPrevPage: goToPrevPage,
+    onNextPage: goToNextPage,
+  };
+
+  useMenuActions(commandHandlers);
+  useCommandKeys(commandHandlers);
 
   // Auto-save reading progress
   useAutoSave({
