@@ -2,35 +2,36 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
-## Iteration #35 — 2026-08-01 (Context-guard handoff · #68 merged · #69 in flight · a verify.sh slice under proof)
+## Iteration #35 — 2026-08-01 (#69 merged · the verify.sh slice opened as #70)
 
-**Live state:** `origin/main` = **`f64801d`**. Merged today, in order:
+**Live state:** `origin/main` = **`3cda8fe`**. Merged today, in order:
 **#65 `8a469eb`** → **#66 `18ef0e9`** → **#67 `ad8c650`** (the speckit chain, which
-closed the last open item of the standing goal contract) → **#68 `f64801d`**.
+closed the last open item of the standing goal contract) → **#68 `f64801d`** →
+**#69 `3cda8fe`**.
 
-**EXACT NEXT ACTION on resume:** poll `gh pr checks 69`; when its four vm103 jobs
+**EXACT NEXT ACTION on resume:** poll `gh pr checks 70`; when its four vm103 jobs
 are green, merge with
-`gh pr merge 69 --squash --delete-branch -t "refactor: delete the pre-AI playback path, unreachable since the first commit (#69)" --body-file <body>`,
-confirm `gh pr view 69 --json state` prints `MERGED`, then
-`git worktree remove ../tauri-pdf-reader-068-dead-playback && git branch -D 068-dead-playback`
+`gh pr merge 70 --squash --delete-branch -t "ci: make verify.sh runnable in a fresh worktree, and match CI's resource flags (#70)" --body-file <body>`,
+confirm `gh pr view 70 --json state` prints `MERGED`, then
+`git worktree remove ../tauri-pdf-reader-070-verify-hardening && git branch -D 070-verify-hardening`
 and `git pull --ff-only origin main`. The squash body is regenerable as
-`tail -n +3` of the branch-tip commit message (`git log -1 --format=%B origin/068-dead-playback`).
-Then, and only then, push `070-verify-hardening` and open its PR.
+`tail -n +3` of the branch-tip commit message (`git log -1 --format=%B origin/070-verify-hardening`).
 
 ### Open work, in priority order
 
-1. **PR #69** `068-dead-playback` — the 977-line deletion of the pre-AI playback
-   path. `mergeable=MERGEABLE mergeState=UNSTABLE`; Frontend Checks, CodeQL,
-   Analyze and GitGuardian pass, Backend / Alignment / Contract still running at
-   handoff. **It is BEHIND `f64801d`** — do NOT `gh pr update-branch` for that
-   alone. `main` has no branch protection here, the two diffs do not overlap
-   (#68 was docs-only, #69 is `src/`-only), and an update-branch costs a full
-   four-job cycle on the single vm103 slot.
-2. **`070-verify-hardening`** — worktree at
-   `../tauri-pdf-reader-070-verify-hardening`, branch off `f64801d`, one commit,
-   green locally. **Open the PR after #69 merges**, not before: the two would
-   otherwise queue four jobs each against the single vm103 slot, and #69 is the
-   one already most of the way through.
+1. **PR #70** `070-verify-hardening` — the `scripts/verify.sh` slice below, one
+   commit, rebased onto `3cda8fe`, green locally. It is the only PR in flight;
+   the single vm103 slot is free.
+2. **Nothing else queued.** The remaining Lectrice work is the SC-004
+   intelligibility ear-check (Pedro-gated) and the Tier 3 remainder — see the
+   closing section of this file.
+
+**Held-open note on `#69`** (recorded because the reasoning generalises): it sat
+BEHIND `f64801d` right up to the merge and was **not** `update-branch`ed. `main`
+has no branch protection here, the two diffs did not overlap (#68 docs-only, #69
+`src/`-only), and an update-branch costs a full four-job cycle on the single
+vm103 slot. All seven checks passed against the stale base and the squash applied
+cleanly.
 
 ### The verify.sh slice, and the defect it turned up
 
@@ -155,8 +156,8 @@ and [#69](https://github.com/phsb5321/Tauri-PDF-Reader/pull/69#issuecomment-5152
 
 ### Carried forward, unchanged
 
-`sonar` run `30713126392` was queued at `ad8c650` and shares the one runner —
-check it after #69 lands. Typed-IPC debt: `title: string | null` in generated
+`sonar` run `30713126392`, queued at `ad8c650` behind the one runner, has since
+**completed `success`** — two green sonar runs in a row now. Typed-IPC debt: `title: string | null` in generated
 `src/lib/bindings.ts:476` vs `title?: string` in `src/domain/sessions/session.ts`,
 which is what blocks pointing `src/lib/api/sessions.ts` at `commands.*` (it still
 uses raw `invoke`). `src/lib/schemas.ts` has 16 zod schemas, all consumed
