@@ -62,20 +62,36 @@ the pnpm store. That upload does not merely run slow — it **stalls**:
 job hit its own 10-minute wall while blocked on a stalled upload. It killed
 PR #51 and PR #53 on 31/07/2026, and both were diagnosed as code failures first.
 
-It is **intermittent** — the same branch passed Frontend Checks in 2m12s an hour
-earlier — which is why it presents as unrelated PRs going randomly red rather
-than as one clean break. **Re-run the job. Do not touch the code.**
+It presented as **intermittent** — the same branch passed Frontend Checks in
+2m12s an hour earlier — which is why it read as unrelated PRs going randomly red
+rather than as one clean break. **Re-run the job. Do not touch the code.** Note
+that it could not reliably clear itself: a save that never finishes writes no
+cache entry, so the next run misses, tries to save, and stalls in the same place.
 
 Runner-side tuning does not fix it. `pnpm store prune` on vm103 reclaimed only
 about a quarter (1.5 GB → 1.05 GiB, `Removed 1704 packages`); what is left is
 genuinely referenced by the dependency tree, so the tarball stays in the
 hundreds of megabytes and the stall stays possible.
 
-The actual fix is to stop caching the store at all: this runner is
-**persistent**, so the store is already on its disk between jobs and the cache
-round-trip uploads a directory that never needs restoring. With the step
-removed, Frontend Checks takes **1m17s**. That change lives in `.github/workflows/`,
-which is Pedro-gated — PR #52.
+**Fixed on `main` by PR #52 (`3bcbf3d`, 01/08/2026): the pnpm cache step is
+gone.** The runner is *persistent* and its store lives at
+`~/.local/share/pnpm/store`, outside the workspace — so it survives
+`actions/checkout`'s clean and is already warm on the next run. The GitHub cache
+round-trip was uploading a directory that never needed restoring. Frontend
+Checks takes **1m17s** with the step removed.
+
+**Do not assume the class is closed.** #52 removed the *pnpm* cache; the two
+Rust jobs still cache — `ci.yml:125` (Backend) and `:186` (Contract Tests) — and
+what they cache is `~/.cargo/registry`, `~/.cargo/git` **and `src-tauri/target`**,
+a multi-gigabyte directory, so their upload is considerably larger than the pnpm
+store's ever was. Their walls are `timeout-minutes: 15` and `10`. A red Backend
+Checks that dies at almost exactly 15 minutes with every substantive step green
+in the log is this same failure wearing a different job name: re-run it, do not
+read the diff. The "a persistent runner already has it on disk" argument applies
+to the cargo caches at least as strongly — but `src-tauri/target` *is* inside
+the workspace, so unlike the pnpm store it does not survive `actions/checkout`,
+and removing that cache is a real trade against cold Rust rebuilds rather than
+the free deletion #52 was. Measure before copying the fix across.
 
 ## Why the queue stacks (and why that's fine)
 
