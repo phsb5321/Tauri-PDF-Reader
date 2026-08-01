@@ -56,12 +56,13 @@ export interface Chord {
  * indistinguishable from a broken one, so the honest form of "not built yet" is
  * silence rather than a key that swallows itself.
  *
- * That is why `settings`, `toggle-library`, `toggle-highlights` and `find` are
- * absent — they have no panel to open. Their menu items remain, already
- * documented as inert in `useMenuActions`.
+ * That is why `settings`, `toggle-highlights` and `find` are absent — they have
+ * no panel to open. Their menu items remain, already documented as inert in
+ * `useMenuActions`.
  */
 export const COMMAND_CHORDS: readonly Chord[] = [
   { action: "open", key: "o", ctrl: true, label: "Ctrl+O" },
+  { action: "toggle-library", key: "l", ctrl: true, label: "Ctrl+L" },
   { action: "prev-page", key: "PageUp", ctrl: false, label: "Page Up" },
   { action: "prev-page", key: "ArrowLeft", ctrl: false, label: "←" },
   { action: "next-page", key: "PageDown", ctrl: false, label: "Page Down" },

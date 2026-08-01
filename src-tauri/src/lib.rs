@@ -656,7 +656,7 @@ pub fn run() {
                     .item(&PredefinedMenuItem::quit(app, Some("Quit Lectrice"))?)
                     .build()?;
                 let view = SubmenuBuilder::new(app, "View")
-                    .text("toggle-library", "Toggle Sidebar")
+                    .text("toggle-library", "Library")
                     .text("toggle-highlights", "Toggle Highlights")
                     .separator()
                     .text("find", "Find…")
