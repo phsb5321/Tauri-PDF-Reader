@@ -266,6 +266,7 @@ pub fn run() {
         library_check_file_exists,
         library_update_title,
         library_relocate_document,
+        library_heal_document,
         // Highlights commands
         highlights_create,
         highlights_batch_create,
@@ -342,6 +343,7 @@ pub fn run() {
             library_check_file_exists,
             library_update_title,
             library_relocate_document,
+            library_heal_document,
             // Highlights commands
             highlights_create,
             highlights_batch_create,

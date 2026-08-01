@@ -1,15 +1,16 @@
-import { create } from 'zustand';
-import type { Document } from '../lib/schemas';
+import { create } from "zustand";
+import type { Document } from "../lib/schemas";
 import {
   libraryListDocuments,
   libraryRemoveDocument,
   libraryUpdateTitle,
   libraryCheckFileExists,
   libraryRelocateDocument,
-} from '../lib/tauri-invoke';
+  libraryHealDocument,
+} from "../lib/tauri-invoke";
 
-export type SortOrder = 'recent' | 'created' | 'title';
-export type ViewMode = 'grid' | 'list';
+export type SortOrder = "recent" | "created" | "title";
+export type ViewMode = "grid" | "list";
 
 interface LibraryState {
   // Documents
@@ -30,6 +31,7 @@ interface LibraryState {
   removeDocument: (id: string) => Promise<void>;
   updateDocumentTitle: (id: string, title: string) => Promise<void>;
   relocateDocument: (id: string, newPath: string) => Promise<void>;
+  healDocument: (id: string) => Promise<Document | null>;
   checkFileExists: (id: string) => Promise<boolean>;
   setSearchQuery: (query: string) => void;
   setSortOrder: (order: SortOrder) => void;
@@ -43,9 +45,9 @@ const initialState = {
   documents: [] as Document[],
   isLoading: false,
   error: null as string | null,
-  searchQuery: '',
-  sortOrder: 'recent' as SortOrder,
-  viewMode: 'grid' as ViewMode,
+  searchQuery: "",
+  sortOrder: "recent" as SortOrder,
+  viewMode: "grid" as ViewMode,
   selectedDocumentId: null as string | null,
 };
 
@@ -56,13 +58,14 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const { sortOrder } = get();
-      const orderBy = sortOrder === 'recent' ? 'last_opened' : sortOrder;
+      const orderBy = sortOrder === "recent" ? "last_opened" : sortOrder;
       const documents = await libraryListDocuments(orderBy);
       set({ documents, isLoading: false });
     } catch (error) {
-      console.error('Failed to load documents:', error);
+      console.error("Failed to load documents:", error);
       set({
-        error: error instanceof Error ? error.message : 'Failed to load library',
+        error:
+          error instanceof Error ? error.message : "Failed to load library",
         isLoading: false,
       });
     }
@@ -77,7 +80,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
           state.selectedDocumentId === id ? null : state.selectedDocumentId,
       }));
     } catch (error) {
-      console.error('Failed to remove document:', error);
+      console.error("Failed to remove document:", error);
       throw error;
     }
   },
@@ -87,11 +90,11 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
       const updated = await libraryUpdateTitle(id, title);
       set((state) => ({
         documents: state.documents.map((d) =>
-          d.id === id ? { ...d, ...updated } : d
+          d.id === id ? { ...d, ...updated } : d,
         ),
       }));
     } catch (error) {
-      console.error('Failed to update document title:', error);
+      console.error("Failed to update document title:", error);
       throw error;
     }
   },
@@ -101,12 +104,35 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
       const updated = await libraryRelocateDocument(id, newPath);
       set((state) => ({
         documents: state.documents.map((d) =>
-          d.id === id ? { ...d, ...updated } : d
+          d.id === id ? { ...d, ...updated } : d,
         ),
       }));
     } catch (error) {
-      console.error('Failed to relocate document:', error);
+      console.error("Failed to relocate document:", error);
       throw error;
+    }
+  },
+
+  /**
+   * Relink a document by content hash and merge the result.
+   *
+   * Returns null instead of throwing when the file cannot be found: healing is
+   * a best effort attempted on the way to opening a document, and a failure
+   * here should leave the caller free to carry on and report the real problem
+   * — that the file is gone — rather than replace it with a healing error.
+   */
+  healDocument: async (id) => {
+    try {
+      const healed = await libraryHealDocument(id);
+      set((state) => ({
+        documents: state.documents.map((d) =>
+          d.id === id ? { ...d, ...healed } : d,
+        ),
+      }));
+      return healed;
+    } catch (error) {
+      console.error("Failed to heal document:", error);
+      return null;
     }
   },
 
@@ -142,21 +168,21 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
       filtered = documents.filter(
         (d) =>
           d.title?.toLowerCase().includes(query) ||
-          d.filePath.toLowerCase().includes(query)
+          d.filePath.toLowerCase().includes(query),
       );
     }
 
     // Sort
     return [...filtered].sort((a, b) => {
       switch (sortOrder) {
-        case 'title':
-          return (a.title || '').localeCompare(b.title || '');
-        case 'created':
-          return (b.createdAt || '').localeCompare(a.createdAt || '');
-        case 'recent':
+        case "title":
+          return (a.title || "").localeCompare(b.title || "");
+        case "created":
+          return (b.createdAt || "").localeCompare(a.createdAt || "");
+        case "recent":
         default:
-          return (b.lastOpenedAt || b.createdAt || '').localeCompare(
-            a.lastOpenedAt || a.createdAt || ''
+          return (b.lastOpenedAt || b.createdAt || "").localeCompare(
+            a.lastOpenedAt || a.createdAt || "",
           );
       }
     });
@@ -166,5 +192,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
 }));
 
 // Selectors
-export const selectDocumentCount = (state: LibraryState) => state.documents.length;
-export const selectHasDocuments = (state: LibraryState) => state.documents.length > 0;
+export const selectDocumentCount = (state: LibraryState) =>
+  state.documents.length;
+export const selectHasDocuments = (state: LibraryState) =>
+  state.documents.length > 0;

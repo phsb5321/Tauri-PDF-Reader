@@ -18,6 +18,7 @@ vi.mock("../../lib/tauri-invoke", () => ({
   libraryUpdateTitle: vi.fn(),
   libraryCheckFileExists: vi.fn(),
   libraryRelocateDocument: vi.fn(),
+  libraryHealDocument: vi.fn(),
 }));
 
 import {
@@ -31,6 +32,7 @@ import {
   libraryRemoveDocument,
   libraryUpdateTitle,
   libraryRelocateDocument,
+  libraryHealDocument,
   libraryCheckFileExists,
 } from "../../lib/tauri-invoke";
 
@@ -287,6 +289,38 @@ describe("library-store", () => {
       );
       await useLibraryStore.getState().relocateDocument("a", "/new.pdf");
       expect(useLibraryStore.getState().documents[0].filePath).toBe("/new.pdf");
+    });
+
+    it("healDocument merges the relinked path", async () => {
+      useLibraryStore.setState({
+        documents: [doc({ id: "a", filePath: "/gone.pdf" })],
+      });
+      vi.mocked(libraryHealDocument).mockResolvedValue(
+        doc({ id: "a", filePath: "/found/elsewhere.pdf" }),
+      );
+
+      const healed = await useLibraryStore.getState().healDocument("a");
+
+      expect(healed?.filePath).toBe("/found/elsewhere.pdf");
+      expect(useLibraryStore.getState().documents[0].filePath).toBe(
+        "/found/elsewhere.pdf",
+      );
+    });
+
+    it("healDocument returns null and leaves state alone when nothing matches", async () => {
+      useLibraryStore.setState({
+        documents: [doc({ id: "a", filePath: "/gone.pdf" })],
+      });
+      vi.mocked(libraryHealDocument).mockRejectedValue(
+        "FILE_NOT_FOUND: No file near the library matches this document",
+      );
+
+      const healed = await useLibraryStore.getState().healDocument("a");
+
+      expect(healed).toBeNull();
+      expect(useLibraryStore.getState().documents[0].filePath).toBe(
+        "/gone.pdf",
+      );
     });
 
     it("checkFileExists returns the repository result", async () => {

@@ -31,6 +31,7 @@ export function LibraryView({ onDocumentSelect }: LibraryViewProps) {
     setViewMode,
     getFilteredDocuments,
     removeDocument,
+    healDocument,
     selectedDocumentId,
     setSelectedDocument,
   } = useLibraryStore();
@@ -86,11 +87,21 @@ export function LibraryView({ onDocumentSelect }: LibraryViewProps) {
     [setSelectedDocument],
   );
 
+  /**
+   * Open a document, relinking it first if its file moved.
+   *
+   * Healing runs on every open rather than only after a failure: the backend
+   * returns immediately once the stored path still resolves, so the ordinary
+   * case costs a stat, and a book that was renamed or refiled opens instead of
+   * erroring. When nothing matches, the stored document is opened unchanged so
+   * the missing file is reported where it already was.
+   */
   const handleDocumentOpen = useCallback(
-    (document: Document) => {
-      onDocumentSelect(document);
+    async (document: Document) => {
+      const healed = await healDocument(document.id);
+      onDocumentSelect(healed ?? document);
     },
-    [onDocumentSelect],
+    [healDocument, onDocumentSelect],
   );
 
   const handleDocumentDelete = useCallback(
@@ -205,7 +216,7 @@ export function LibraryView({ onDocumentSelect }: LibraryViewProps) {
                 isSelected={selectedDocumentId === document.id}
                 viewMode={viewMode}
                 onClick={() => handleDocumentClick(document)}
-                onDoubleClick={() => handleDocumentOpen(document)}
+                onDoubleClick={() => void handleDocumentOpen(document)}
                 onDelete={() => handleDocumentDelete(document.id)}
                 shelves={shelves}
                 shelfIds={shelvesForDocument(memberships, document.id)}

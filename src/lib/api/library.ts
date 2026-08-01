@@ -4,40 +4,42 @@
  * Tauri commands for document library management.
  */
 
-import { invoke } from '@tauri-apps/api/core';
-import type { Document, FileExistsResponse } from '../schemas';
+import { invoke } from "@tauri-apps/api/core";
+import type { Document, FileExistsResponse } from "../schemas";
 
 export async function libraryAddDocument(
   filePath: string,
   title?: string,
-  pageCount?: number
+  pageCount?: number,
 ): Promise<Document> {
-  return invoke('library_add_document', { filePath, title, pageCount });
+  return invoke("library_add_document", { filePath, title, pageCount });
 }
 
 export async function libraryGetDocument(id: string): Promise<Document | null> {
-  return invoke('library_get_document', { id });
+  return invoke("library_get_document", { id });
 }
 
-export async function libraryGetDocumentByPath(filePath: string): Promise<Document | null> {
-  return invoke('library_get_document_by_path', { filePath });
+export async function libraryGetDocumentByPath(
+  filePath: string,
+): Promise<Document | null> {
+  return invoke("library_get_document_by_path", { filePath });
 }
 
 export async function libraryListDocuments(
-  orderBy: 'last_opened' | 'created' | 'title' = 'last_opened',
+  orderBy: "last_opened" | "created" | "title" = "last_opened",
   limit?: number,
-  offset?: number
+  offset?: number,
 ): Promise<Document[]> {
-  return invoke('library_list_documents', { orderBy, limit, offset });
+  return invoke("library_list_documents", { orderBy, limit, offset });
 }
 
 export async function libraryUpdateProgress(
   id: string,
   currentPage: number,
   scrollPosition?: number,
-  lastTtsChunkId?: string
+  lastTtsChunkId?: string,
 ): Promise<Document> {
-  return invoke('library_update_progress', {
+  return invoke("library_update_progress", {
     id,
     currentPage,
     scrollPosition,
@@ -47,30 +49,46 @@ export async function libraryUpdateProgress(
 
 export async function libraryUpdateDocument(
   id: string,
-  updates: { title?: string; pageCount?: number; fileHash?: string }
+  updates: { title?: string; pageCount?: number; fileHash?: string },
 ): Promise<void> {
-  return invoke('library_update_document', { id, ...updates });
+  return invoke("library_update_document", { id, ...updates });
 }
 
-export async function libraryUpdateTitle(id: string, title: string): Promise<Document> {
-  return invoke('library_update_title', { id, title });
+export async function libraryUpdateTitle(
+  id: string,
+  title: string,
+): Promise<Document> {
+  return invoke("library_update_title", { id, title });
 }
 
 export async function libraryRelocateDocument(
   id: string,
-  newFilePath: string
+  newFilePath: string,
 ): Promise<Document> {
-  return invoke('library_relocate_document', { id, newFilePath });
+  return invoke("library_relocate_document", { id, newFilePath });
+}
+
+/**
+ * Relink a document whose file moved, by content hash.
+ *
+ * Cheap when nothing moved — the backend returns the document untouched as
+ * soon as its path still resolves — so this can be called before opening
+ * rather than only after a failure. Rejects when no nearby file matches.
+ */
+export async function libraryHealDocument(id: string): Promise<Document> {
+  return invoke("library_heal_document", { id });
 }
 
 export async function libraryRemoveDocument(id: string): Promise<void> {
-  return invoke('library_remove_document', { id });
+  return invoke("library_remove_document", { id });
 }
 
 export async function libraryOpenDocument(id: string): Promise<Document> {
-  return invoke('library_open_document', { id });
+  return invoke("library_open_document", { id });
 }
 
-export async function libraryCheckFileExists(id: string): Promise<FileExistsResponse> {
-  return invoke('library_check_file_exists', { id });
+export async function libraryCheckFileExists(
+  id: string,
+): Promise<FileExistsResponse> {
+  return invoke("library_check_file_exists", { id });
 }
