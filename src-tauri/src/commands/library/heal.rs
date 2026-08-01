@@ -35,6 +35,13 @@ pub(crate) const MAX_CANDIDATES: usize = 256;
 /// file exactly where it was, which is both the most common move and the
 /// cheapest to confirm. Then the folders of documents that still resolve,
 /// because a book filed away lands where its siblings already live.
+///
+/// Last comes the folder *above* the missing file, which is what catches a
+/// move into a shelf that did not exist before. Without it the search only
+/// reaches folders some document already occupies, so filing a book into a
+/// brand-new folder — the workflow shelves exist to encourage — would lose it.
+/// It is deliberately last: it is the widest root and the least likely to pay
+/// off, so the candidate budget is spent on the precise roots first.
 pub(crate) fn search_roots(missing_path: &str, live_paths: &[String]) -> Vec<PathBuf> {
     let mut roots = Vec::new();
     let mut seen = HashSet::new();
@@ -47,10 +54,17 @@ pub(crate) fn search_roots(missing_path: &str, live_paths: &[String]) -> Vec<Pat
         }
     };
 
-    push(Path::new(missing_path).parent());
+    let missing_dir = Path::new(missing_path).parent();
+    push(missing_dir);
     for path in live_paths {
         push(Path::new(path).parent());
     }
+    // Only the missing file's own grandparent, not every live document's. A
+    // book that moved went somewhere near where it was, and widening every
+    // root one level would drag in unrelated trees — `~/Downloads` above a
+    // document that happens to sit in `~/Downloads/Documents` — for a scan
+    // that cannot pay for itself.
+    push(missing_dir.and_then(Path::parent));
 
     roots
 }
@@ -69,7 +83,15 @@ pub(crate) fn rank_candidates(candidates: Vec<PathBuf>, wanted_name: &OsStr) -> 
     same_name.into_iter().chain(rest).collect()
 }
 
-/// PDFs under `roots`, shallowest first, excluding paths already claimed.
+/// PDFs under `roots`, excluding paths already claimed.
+///
+/// Roots are exhausted **in order**, and breadth-first within each. Order is
+/// the whole point: `search_roots` returns them most-likely first, and the
+/// shared `MAX_CANDIDATES` budget must be spent on the precise folders before
+/// the wide fallback root. Walking every root as one frontier would let a
+/// crowded folder at the end of the list fill the budget with files from a
+/// place the book almost certainly is not, at depth 0, before the folder it
+/// most likely *is* in has been descended into at all.
 ///
 /// `claimed` holds the paths of documents that still resolve: those files are
 /// accounted for, and hashing them would only burn the candidate budget to
@@ -79,10 +101,28 @@ pub(crate) fn rank_candidates(candidates: Vec<PathBuf>, wanted_name: &OsStr) -> 
 /// a permission-denied folder is a reason to look elsewhere, not to give up.
 pub(crate) fn collect_pdfs(roots: &[PathBuf], claimed: &HashSet<PathBuf>) -> Vec<PathBuf> {
     let mut found = Vec::new();
+    // Shared across roots so an earlier root's subtree is never re-walked by a
+    // later one that happens to sit above it.
     let mut visited: HashSet<PathBuf> = HashSet::new();
-    // Breadth-first so shallow matches — the library's own folders — are
-    // ranked ahead of whatever sits in a nested archive.
-    let mut frontier: Vec<(PathBuf, usize)> = roots.iter().cloned().map(|r| (r, 0)).collect();
+
+    for root in roots {
+        if found.len() >= MAX_CANDIDATES {
+            break;
+        }
+        collect_under(root, claimed, &mut visited, &mut found);
+    }
+
+    found
+}
+
+/// Breadth-first walk of a single root, appending into the shared budget.
+fn collect_under(
+    root: &Path,
+    claimed: &HashSet<PathBuf>,
+    visited: &mut HashSet<PathBuf>,
+    found: &mut Vec<PathBuf>,
+) {
+    let mut frontier: Vec<(PathBuf, usize)> = vec![(root.to_path_buf(), 0)];
 
     while !frontier.is_empty() && found.len() < MAX_CANDIDATES {
         let mut next = Vec::new();
@@ -136,8 +176,6 @@ pub(crate) fn collect_pdfs(roots: &[PathBuf], claimed: &HashSet<PathBuf>) -> Vec
 
         frontier = next;
     }
-
-    found
 }
 
 /// The path whose contents hash to `id`, if one is nearby.
@@ -206,7 +244,83 @@ mod tests {
             ],
         );
 
-        assert_eq!(roots, vec![PathBuf::from("/books")]);
+        assert_eq!(
+            roots
+                .iter()
+                .filter(|r| *r == &PathBuf::from("/books"))
+                .count(),
+            1,
+            "four documents in /books must not queue /books four times"
+        );
+    }
+
+    #[test]
+    fn search_roots_reach_a_shelf_that_did_not_exist_before() {
+        // Nothing lives in /books/philosophy yet, so it is reachable only via
+        // the folder above the missing file.
+        let roots = search_roots(
+            "/books/data/ddia.pdf",
+            &["/books/inbox/other.pdf".to_string()],
+        );
+
+        assert!(
+            roots.contains(&PathBuf::from("/books")),
+            "a book filed into a brand-new shelf is unreachable without the folder above it"
+        );
+    }
+
+    #[test]
+    fn the_widest_root_is_searched_last() {
+        let roots = search_roots(
+            "/books/data/ddia.pdf",
+            &["/books/inbox/other.pdf".to_string()],
+        );
+
+        assert_eq!(
+            roots.last(),
+            Some(&PathBuf::from("/books")),
+            "the fallback root must not spend the candidate budget ahead of the precise ones"
+        );
+    }
+
+    #[test]
+    fn only_the_missing_file_own_folder_is_widened() {
+        let roots = search_roots(
+            "/books/data/ddia.pdf",
+            &["/home/pedro/Downloads/Documents/tax.pdf".to_string()],
+        );
+
+        assert!(
+            !roots.contains(&PathBuf::from("/home/pedro/Downloads")),
+            "widening every live document's folder drags in unrelated trees"
+        );
+    }
+
+    #[test]
+    fn roots_are_exhausted_in_order_so_a_crowded_root_cannot_starve_a_precise_one() {
+        let base = tmp("root_order");
+        let precise = base.join("precise");
+        let nested = precise.join("nested");
+        let crowded = base.join("crowded");
+        fs::create_dir_all(&nested).unwrap();
+        fs::create_dir_all(&crowded).unwrap();
+
+        // The wanted file sits one level down inside the precise root; the
+        // crowded root holds enough files to exhaust the budget on its own.
+        let wanted = nested.join("wanted.pdf");
+        fs::write(&wanted, b"%PDF-1.7").unwrap();
+        for i in 0..(MAX_CANDIDATES + 10) {
+            fs::write(crowded.join(format!("noise{i}.pdf")), b"%PDF-1.7").unwrap();
+        }
+
+        let found = collect_pdfs(&[precise.clone(), crowded.clone()], &HashSet::new());
+
+        let _ = fs::remove_dir_all(&base);
+
+        assert!(
+            found.contains(&wanted),
+            "a file below the first root must be collected before a later root fills the budget"
+        );
     }
 
     #[test]
@@ -332,11 +446,15 @@ mod tests {
     fn a_renamed_and_refiled_book_is_found_by_content() {
         use super::super::db::compute_file_hash;
 
-        let root = tmp("end_to_end");
-        let shelf = root.join("Philosophy");
+        // Nested one level inside the fixture so the folder *above* the book is
+        // still fixture-owned: `search_roots` widens to it, and the walk must
+        // stay inside what this test created.
+        let base = tmp("end_to_end");
+        let library = base.join("Library");
+        let shelf = library.join("Philosophy");
         fs::create_dir_all(&shelf).unwrap();
 
-        let was_at = root.join("ethics.pdf");
+        let was_at = library.join("ethics.pdf");
         fs::write(&was_at, b"%PDF-1.7 Spinoza").unwrap();
         let id = compute_file_hash(was_at.to_str().unwrap()).unwrap();
 
@@ -344,19 +462,55 @@ mod tests {
         // old name so the content check is what decides.
         let now_at = shelf.join("Spinoza - Ethics (1677).pdf");
         fs::rename(&was_at, &now_at).unwrap();
-        fs::write(root.join("ethics.pdf"), b"%PDF-1.7 a different book").unwrap();
+        fs::write(library.join("ethics.pdf"), b"%PDF-1.7 a different book").unwrap();
 
         let roots = search_roots(was_at.to_str().unwrap(), &[]);
         let candidates = collect_pdfs(&roots, &HashSet::new());
         let ranked = rank_candidates(candidates, OsStr::new("ethics.pdf"));
         let found = find_by_hash(&ranked, &id, compute_file_hash);
 
-        let _ = fs::remove_dir_all(&root);
+        let _ = fs::remove_dir_all(&base);
 
         assert_eq!(
             found,
             Some(now_at),
             "the moved file must be recovered by its hash, not its name"
+        );
+    }
+
+    /// The case the narrow search missed, checked against real files: shelves
+    /// invite filing a book into a folder that did not exist before, and that
+    /// folder holds no other document to search from.
+    #[test]
+    fn a_book_filed_into_a_brand_new_shelf_is_found() {
+        use super::super::db::compute_file_hash;
+
+        let base = tmp("new_shelf");
+        let data = base.join("Data Engineering");
+        let philosophy = base.join("Philosophy");
+        fs::create_dir_all(&data).unwrap();
+        fs::create_dir_all(&philosophy).unwrap();
+
+        let was_at = data.join("ethics.pdf");
+        fs::write(&was_at, b"%PDF-1.7 Spinoza").unwrap();
+        let id = compute_file_hash(was_at.to_str().unwrap()).unwrap();
+
+        // Filed sideways into a shelf no document occupies. Nothing in the
+        // library points at it; only the folder above `Data Engineering` does.
+        let now_at = philosophy.join("ethics.pdf");
+        fs::rename(&was_at, &now_at).unwrap();
+
+        let roots = search_roots(was_at.to_str().unwrap(), &[]);
+        let candidates = collect_pdfs(&roots, &HashSet::new());
+        let ranked = rank_candidates(candidates, OsStr::new("ethics.pdf"));
+        let found = find_by_hash(&ranked, &id, compute_file_hash);
+
+        let _ = fs::remove_dir_all(&base);
+
+        assert_eq!(
+            found,
+            Some(now_at),
+            "a shelf with no other document in it must still be searched"
         );
     }
 
