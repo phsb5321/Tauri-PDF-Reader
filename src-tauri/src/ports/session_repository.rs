@@ -8,6 +8,7 @@ use async_trait::async_trait;
 #[cfg(any(test, feature = "test-mocks"))]
 use mockall::automock;
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
 /// Input for creating a new session
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,7 +35,7 @@ pub struct UpdateSessionDocumentInput {
 }
 
 /// Summary of a session for list operations
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionSummary {
     pub id: String,
@@ -95,7 +96,7 @@ pub trait SessionRepository: Send + Sync {
 }
 
 /// Response for session restore operation
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionRestoreResponse {
     pub success: bool,

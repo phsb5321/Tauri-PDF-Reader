@@ -327,6 +327,116 @@ async collectionsListMemberships() : Promise<Result<CollectionMembership[], stri
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+/**
+ * Create a new reading session
+ */
+async sessionCreate(name: string, documentIds: string[]) : Promise<Result<ReadingSession, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("session_create", { name, documentIds }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Get a session by ID with all documents
+ */
+async sessionGet(sessionId: string) : Promise<Result<ReadingSession | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("session_get", { sessionId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * List all sessions (summary only)
+ */
+async sessionList() : Promise<Result<SessionSummary[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("session_list") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Update a session's name and/or documents
+ */
+async sessionUpdate(sessionId: string, name: string | null, documentIds: string[] | null) : Promise<Result<ReadingSession, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("session_update", { sessionId, name, documentIds }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Delete a session
+ */
+async sessionDelete(sessionId: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("session_delete", { sessionId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Restore a session (touch last_accessed and check for missing documents)
+ */
+async sessionRestore(sessionId: string) : Promise<Result<SessionRestoreResponse, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("session_restore", { sessionId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Add a document to a session
+ */
+async sessionAddDocument(sessionId: string, documentId: string, position: number | null) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("session_add_document", { sessionId, documentId, position }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Remove a document from a session
+ */
+async sessionRemoveDocument(sessionId: string, documentId: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("session_remove_document", { sessionId, documentId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Update a document's reading position within a session
+ */
+async sessionUpdateDocument(sessionId: string, documentId: string, currentPage: number | null, scrollPosition: number | null) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("session_update_document", { sessionId, documentId, currentPage, scrollPosition }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Touch a session to update its last_accessed_at timestamp
+ */
+async sessionTouch(sessionId: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("session_touch", { sessionId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -375,9 +485,29 @@ export type Highlight = { id: string; documentId: string; pageNumber: number; re
  */
 export type ListHighlightsResponse = { highlights: Highlight[] }
 /**
+ * A reading session containing multiple documents with saved positions
+ */
+export type ReadingSession = { id: string; name: string; documents: SessionDocument[]; createdAt: string; updatedAt: string; lastAccessedAt: string }
+/**
  * Represents a rectangle for highlight positioning (page coordinates)
  */
 export type Rect = { x: number; y: number; width: number; height: number }
+/**
+ * A document within a reading session with saved position
+ */
+export type SessionDocument = { documentId: string; position: number; currentPage: number; scrollPosition: number; createdAt: string; 
+/**
+ * Denormalized for display
+ */
+title: string | null; pageCount: number | null }
+/**
+ * Response for session restore operation
+ */
+export type SessionRestoreResponse = { success: boolean; session: ReadingSession; missingDocuments: string[] }
+/**
+ * Summary of a session for list operations
+ */
+export type SessionSummary = { id: string; name: string; documentCount: number; lastAccessedAt: string; createdAt: string }
 
 /** tauri-specta globals **/
 

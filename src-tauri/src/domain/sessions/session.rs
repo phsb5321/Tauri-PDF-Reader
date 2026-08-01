@@ -3,6 +3,7 @@
 //! Defines the core domain entities for managing reading sessions.
 
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
 /// Validation constants for sessions
 pub const SESSION_NAME_MIN_LENGTH: usize = 1;
@@ -10,7 +11,7 @@ pub const SESSION_NAME_MAX_LENGTH: usize = 100;
 pub const MAX_DOCUMENTS_PER_SESSION: usize = 50;
 
 /// A reading session containing multiple documents with saved positions
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ReadingSession {
     pub id: String,
@@ -114,7 +115,7 @@ impl ReadingSession {
 }
 
 /// A document within a reading session with saved position
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionDocument {
     pub document_id: String,
