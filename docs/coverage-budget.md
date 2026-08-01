@@ -11,11 +11,41 @@ records the policy and the ratchet plan.
 - When you add tests that raise a metric, raise its floor to the new measured
   value in the same PR (ratchet up). Small steps are fine.
 
-## Current floor (052-sonar-gate, 2026-07-30)
+## Current floor (062-db-bootstrap, 2026-08-01)
 
 Measured via
 `pnpm exec vitest run --coverage --maxWorkers=1 --minWorkers=1`
-(v8 provider):
+(v8 provider), 848 tests:
+
+| Metric     | Measured | Floor (CI gate) | Target   |
+| ---------- | -------- | --------------- | -------- |
+| Lines      | 62.33%   | 62              | 80       |
+| Statements | 62.33%   | 62              | 80       |
+| Functions  | 67.55%   | 67              | 80       |
+| Branches   | 90.90%   | 90              | 80 (met) |
+
+Two things are in this step, and only one of them is 062's. The measured part
+that this slice earned is `src/lib/db-init.ts`: 73.72% → **99.27%** statements
+and 100% functions, from five tests over `initDatabase`, the bootstrap wrapper
+`main.tsx` calls before React mounts. The rest of the movement since 052 was
+already sitting on `main` — #59, #60 and #61 added tests without ratcheting, so
+the floor had drifted roughly five points below the real number and stopped
+being a regression gate in that band. Re-measure before assuming a jump this
+size is yours.
+
+The one uncovered line left in `db-init.ts` (353) is the "schema already up to
+date" arm of a `console.log` ternary. The behaviour underneath it — a fully
+migrated database applying nothing — is asserted in `initSchema`'s own tests; a
+test written to colour that line would assert a log string and nothing else.
+
+Floors sit at the integer below the measured value so deterministic runs retain
+a small margin. The measurement is worker-count independent: the same commit
+reports 62.33 with default workers and with `--maxWorkers=1`, so the flag in the
+recipe above is for reproducibility, not correctness.
+
+## History
+
+### 052-sonar-gate (2026-07-30)
 
 | Metric     | Measured | Floor (CI gate) | Target   |
 | ---------- | -------- | --------------- | -------- |
@@ -25,10 +55,7 @@ Measured via
 | Branches   | 89.97%   | 89              | 80 (met) |
 
 The 052 accessibility and interaction tests raised lines/statements by more
-than ten points and branches by one point. Floors sit at the integer below the
-measured value so deterministic runs retain a small margin.
-
-## History
+than ten points and branches by one point.
 
 ### 019-coverage-ratchet (2026-05-31, commit base 8c366d7)
 

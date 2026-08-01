@@ -6,13 +6,19 @@
  * migration 1 and `reading_sessions` — which the toolbar's session menu queries
  * — was never created outside Rust unit tests.
  *
- * Scope split: these cover version gating, ordering and idempotency. Whether
- * the SQL itself is valid is covered on the Rust side, where the mirrored DDL
- * in `src-tauri/src/db/migrations.rs` runs against a real in-memory SQLite
+ * Scope split: these cover version gating, ordering and idempotency, plus the
+ * bootstrap wrapper's failure and sequencing semantics. Whether the SQL itself
+ * is valid is covered on the Rust side, where the mirrored DDL in
+ * `src-tauri/src/db/migrations.rs` runs against a real in-memory SQLite
  * (`session_repo.rs`, `audio_cache_repo.rs`). Node's own `node:sqlite` would be
- * the better oracle here but only exists from Node 22.5; CI is on 20.
+ * the better oracle here but only exists from Node 22.5; CI is on 20. Where the
+ * database file lands, and the columns external readers are promised, are
+ * likewise Rust-side (`src-tauri/tests/frontend_schema_contract.rs`).
  */
-import { describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
+
+const dbLoad = vi.hoisted(() => vi.fn());
+vi.mock("@tauri-apps/plugin-sql", () => ({ default: { load: dbLoad } }));
 import {
   CONTRACT_VIEWS,
   CONTRACT_VIEW_DROPS,
@@ -32,10 +38,17 @@ import {
 class RecordingDb implements MigrationRunnerDb {
   readonly executed: string[] = [];
 
-  constructor(private readonly applied: Set<number> = new Set()) {}
+  constructor(
+    private readonly applied: Set<number> = new Set(),
+    /** Statements this database refuses, so a caller's error path can run. */
+    private readonly refuses: (sql: string) => boolean = () => false,
+  ) {}
 
   async execute(sql: string, values: unknown[] = []): Promise<unknown> {
     this.executed.push(sql);
+    if (this.refuses(sql)) {
+      throw new Error(`database refused: ${sql.slice(0, 40)}`);
+    }
     if (sql.includes("INSERT OR IGNORE INTO _migrations")) {
       this.applied.add(values[0] as number);
     }
@@ -234,5 +247,155 @@ describe("initSchema", () => {
     for (const sql of [...CONTRACT_VIEW_DROPS, ...CONTRACT_VIEWS]) {
       expect(db.indexOf(sql)).toBeGreaterThanOrEqual(0);
     }
+  });
+});
+
+/**
+ * The bootstrap wrapper — the only caller of `initSchema` in the app, invoked
+ * once from `main.tsx` before React mounts.
+ *
+ * Tested through a fresh module instance per case, because the run-once latch
+ * is module state: a static import would carry one test's `initialized` into
+ * the next.
+ */
+describe("initDatabase", () => {
+  /**
+   * How many default settings the wrapper *attempted*, not how many landed —
+   * `RecordingDb` records a statement before deciding to refuse it. Attempts
+   * are the right count here: the property under test is that the loop runs to
+   * the end, and a refused key is still a key the loop reached.
+   */
+  const settingsAttempted = (db: RecordingDb) =>
+    db.executed.filter((sql) => /INSERT OR IGNORE INTO settings\b/.test(sql))
+      .length;
+
+  async function freshModule() {
+    vi.resetModules();
+    return import("./db-init");
+  }
+
+  const TAURI = "__TAURI_INTERNALS__";
+  let hadTauri: { value?: unknown } = {};
+
+  function tauriPresent(present: boolean) {
+    const w = window as unknown as Record<string, unknown>;
+    if (present) w[TAURI] = {};
+    else delete w[TAURI];
+  }
+
+  beforeEach(() => {
+    // Restored rather than deleted in `afterEach`: `pdf-service.ts` reads this
+    // same global to decide whether it is running under Tauri, so a test that
+    // deletes a flag it did not set would be reaching outside its own subject.
+    const w = window as unknown as Record<string, unknown>;
+    hadTauri = TAURI in w ? { value: w[TAURI] } : {};
+
+    dbLoad.mockReset();
+    tauriPresent(true);
+    // The wrapper narrates itself to the console; keep the suite's output about
+    // the suite.
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    const w = window as unknown as Record<string, unknown>;
+    if ("value" in hadTauri) w[TAURI] = hadTauri.value;
+    else delete w[TAURI];
+  });
+
+  it("opens no database when there is no Tauri to open one against", async () => {
+    // `main.tsx` calls this unconditionally, so it also runs under `vite dev`
+    // in a plain browser and under vitest. Reaching for the sql plugin there
+    // throws on a missing IPC handler and takes the mount down with it.
+    tauriPresent(false);
+    const { initDatabase } = await freshModule();
+
+    await expect(initDatabase()).resolves.toBeUndefined();
+    expect(dbLoad).not.toHaveBeenCalled();
+  });
+
+  it("runs the schema once however often it is called", async () => {
+    dbLoad.mockResolvedValue(new RecordingDb());
+    const { initDatabase } = await freshModule();
+
+    await initDatabase();
+    await initDatabase();
+
+    expect(dbLoad).toHaveBeenCalledTimes(1);
+  });
+
+  it("seeds the default settings only after the migration that creates the table", async () => {
+    // Ordering is load-bearing *and* silent if broken: `settings` is created by
+    // migration 1, and each seed is individually caught below, so seeding first
+    // would raise `no such table: settings` eight times into console.warn and
+    // otherwise look like a clean start. Every default would simply be missing
+    // — no highlight colours, no TTS rate — with nothing in the app to say so.
+    const db = new RecordingDb();
+    dbLoad.mockResolvedValue(db);
+    const { initDatabase } = await freshModule();
+
+    await initDatabase();
+
+    const created = db.executed.findIndex((sql) =>
+      /CREATE TABLE IF NOT EXISTS settings\b/.test(sql),
+    );
+    const firstSeed = db.executed.findIndex((sql) =>
+      /INSERT OR IGNORE INTO settings\b/.test(sql),
+    );
+
+    expect(created).toBeGreaterThanOrEqual(0);
+    expect(firstSeed).toBeGreaterThan(created);
+  });
+
+  it("keeps seeding the rest when one default setting is refused", async () => {
+    // The per-setting catch exists so a single bad key costs that key, not the
+    // seven behind it in the loop — and not the whole launch.
+    const clean = new RecordingDb();
+    dbLoad.mockResolvedValue(clean);
+    await (await freshModule()).initDatabase();
+    const total = settingsAttempted(clean);
+    expect(total).toBeGreaterThan(1); // else the claim below is vacuous
+
+    let seen = 0;
+    const flaky = new RecordingDb(
+      new Set(),
+      (sql) => /INSERT OR IGNORE INTO settings\b/.test(sql) && seen++ === 0,
+    );
+    dbLoad.mockResolvedValue(flaky);
+    const { initDatabase } = await freshModule();
+
+    await expect(initDatabase()).resolves.toBeUndefined();
+    // Equal, not `total` or `total - 1`: a loop that aborted on the refusal
+    // would stop at one attempt, which is neither, so the looser form would
+    // only blur what counts as passing.
+    expect(settingsAttempted(flaky)).toBe(total);
+  });
+
+  it("stays un-initialized when the schema fails, so the next call retries", async () => {
+    // The opposite — latching on failure — leaves the app running against a
+    // half-migrated database while believing it is ready, and every later call
+    // returns early instead of repairing it. The throw is what `main.tsx` needs
+    // to see, but the retry is what makes a transient failure survivable.
+    // Matched on the table name rather than the exact DDL: the point is that
+    // the schema step fails, not which statement does it, and a reworded
+    // `CREATE TABLE IF NOT EXISTS _migrations` would otherwise stop matching
+    // and let the first call succeed — failing this test for a reason that has
+    // nothing to do with the property it is named for.
+    const refusesMigrations = new RecordingDb(new Set(), (sql) =>
+      /\b_migrations\b/.test(sql),
+    );
+    dbLoad.mockResolvedValueOnce(refusesMigrations);
+    const healthy = new RecordingDb();
+    dbLoad.mockResolvedValueOnce(healthy);
+    const { initDatabase } = await freshModule();
+
+    await expect(initDatabase()).rejects.toThrow("database refused");
+
+    await expect(initDatabase()).resolves.toBeUndefined();
+    expect(dbLoad).toHaveBeenCalledTimes(2);
+    expect(settingsAttempted(healthy)).toBeGreaterThan(0);
   });
 });

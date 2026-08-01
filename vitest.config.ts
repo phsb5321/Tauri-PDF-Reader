@@ -40,22 +40,22 @@ export default defineConfig({
         "src/e2e-native-bootstrap.ts",
         "src/vite-env.d.ts",
       ],
-      // Coverage ratchet — last raised by 052-sonar-gate (2026-07-30).
+      // Coverage ratchet — last raised by 062-db-bootstrap (2026-08-01).
       // Floors are pinned just under the MEASURED baseline at this commit, not
       // an aspirational 80%. They act as a REGRESSION gate — coverage may not
       // drop below the floor — and MUST be ratcheted UP as tests are added,
       // never silently down. Target: 80 across the board.
       // Policy + ratchet history: docs/coverage-budget.md.
       //
-      // 052 (2026-07-30): measured 57.52 / 89.97 / 60.32 / 57.52 for
-      // statements / branches / functions / lines. Added interaction coverage
-      // for the Sonar new-code accessibility fixes and raised every floor that
-      // increased. See docs/coverage-budget.md for earlier baselines.
+      // 062 (2026-08-01): measured 62.33 / 90.90 / 67.55 / 62.33 for
+      // statements / branches / functions / lines. Covers this slice's
+      // `initDatabase` bootstrap tests plus the gains #59–#61 landed without
+      // ratcheting. See docs/coverage-budget.md for earlier baselines.
       thresholds: {
-        lines: 57,
-        functions: 60,
-        branches: 89,
-        statements: 57,
+        lines: 62,
+        functions: 67,
+        branches: 90,
+        statements: 62,
       },
     },
   },
