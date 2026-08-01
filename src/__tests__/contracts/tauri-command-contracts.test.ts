@@ -233,12 +233,51 @@ describe("Tauri command contracts", () => {
     },
   );
 
-  it("passes the backend result straight through", async () => {
-    const document = { id: "d1", filePath: "/books/one.pdf" };
-    invoke.mockResolvedValue(document);
+  // These two pin the semantic difference between these hand-written wrappers
+  // and their generated counterparts in `lib/bindings.ts`, which return a
+  // `Result` envelope (`{ status, data | error }`) and absorb the rejection.
+  // These return the raw value and let it through, so every caller is written
+  // with try/catch. Swapping one shape for the other would leave those callers
+  // reading `{status:"error"}` as a success, and it would not be a type error
+  // on the `unknown` IPC boundary — hence a test rather than a comment.
+  //
+  // Run over the whole table rather than one sample. The property is a global
+  // claim about all nineteen wrappers, and the drift worth catching is a
+  // *hybrid* — someone copies the generated shape into one of them. A single
+  // sample cannot see that, and the contract table above cannot either: it
+  // asserts command names and argument keys, never the returned value.
+  //
+  // `toEqual`, not `toBe`. Identity is not part of the contract — in
+  // production every payload is freshly deserialised, so a wrapper that
+  // shallow-copied would still be correct, and `toBe` would fail it. Deep
+  // equality still fails the envelope, which is the thing being guarded.
+  it.each(CONTRACTS)(
+    "%s returns the backend result raw, not wrapped in a Result envelope",
+    async (_label, call) => {
+      const payload = { id: "d1", filePath: "/books/one.pdf" };
+      invoke.mockResolvedValue(payload);
 
-    await expect(libraryHealDocument("d1")).resolves.toBe(document);
-  });
+      await expect(call()).resolves.toEqual(payload);
+    },
+  );
+
+  // Not redundant with the one above, which is the obvious objection to a
+  // near-tautological assertion. The two catch different halves, and either
+  // alone has a blind spot: an envelope built only on the success path
+  // (`const data = await invoke(...); return { status: "ok", data }`) has no
+  // catch, so the rejection still propagates and this test stays green — the
+  // one above is what fails. Conversely a wrapper that swallows the rejection
+  // while returning raw on success passes the one above and fails this one.
+  it.each(CONTRACTS)(
+    "%s lets an IPC rejection propagate instead of absorbing it",
+    async (_label, call) => {
+      invoke.mockRejectedValue(new Error("no candidate matched the file hash"));
+
+      await expect(call()).rejects.toThrow(
+        "no candidate matched the file hash",
+      );
+    },
+  );
 
   it("every invoked command is registered in generate_handler!", () => {
     const registered = registeredCommands();
