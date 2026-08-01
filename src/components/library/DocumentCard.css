@@ -299,6 +299,13 @@
   flex-direction: column;
   max-height: 180px;
   overflow-y: auto;
+  /* A fieldset, not a div: it groups the shelf checkboxes natively instead of
+     via role="group". Its UA defaults have to be undone — the 2px groove
+     border, the 2px inline margin, and `min-inline-size: min-content`, which
+     would otherwise widen this column to its longest shelf name. */
+  margin-inline: 0;
+  min-inline-size: 0;
+  border: 0;
   padding: var(--space-2) 0;
   border-top: 1px solid var(--border-color, #e0e0e0);
   border-bottom: 1px solid var(--border-color, #e0e0e0);

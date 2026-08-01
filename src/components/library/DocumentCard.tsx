@@ -98,11 +98,8 @@ export function DocumentCard({
         Open
       </button>
       {shelves && shelves.length > 0 && (
-        <div
-          className="document-card-shelves"
-          role="group"
-          aria-label="Shelves"
-        >
+        <fieldset className="document-card-shelves">
+          <legend className="sr-only">Shelves</legend>
           {shelves.map((shelf) => {
             const filed = shelfIds?.has(shelf.id) ?? false;
             return (
@@ -118,7 +115,7 @@ export function DocumentCard({
               </label>
             );
           })}
-        </div>
+        </fieldset>
       )}
       <button type="button" onClick={handleDelete}>
         Remove from Library

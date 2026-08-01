@@ -110,10 +110,13 @@ describe("ContinueReading", () => {
     );
 
     expect(screen.getByText("Page 42 of 100")).toBeInTheDocument();
-    expect(screen.getByRole("progressbar")).toHaveAttribute(
-      "aria-valuenow",
-      "42",
-    );
+    // Still queried by role, because <progress> IS a progressbar — but the
+    // value now rides the element's own attributes instead of aria-valuenow,
+    // which is the whole point of preferring the native tag (S6819).
+    const bar = screen.getByRole("progressbar");
+    expect(bar.tagName).toBe("PROGRESS");
+    expect(bar).toHaveAttribute("value", "42");
+    expect(bar).toHaveAttribute("max", "100");
   });
 
   it("omits the total when the page count is unknown", () => {
