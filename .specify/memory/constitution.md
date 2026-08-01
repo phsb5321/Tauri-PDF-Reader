@@ -1,24 +1,57 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 0.0.0 → 1.0.0 (initial constitution)
-Modified principles: N/A (new document)
+Version change: 1.0.0 → 2.0.0
+Date: 2026-08-01
+
+Why MAJOR: two principles asserted properties the repository does not have, and
+a Constitution Check that passes against a false statement is not a check. Both
+are restated to what is measurably true today, and one of them is a
+NON-NEGOTIABLE — an incompatible redefinition under this document's own semver
+rule.
+
+Renamed:
+  - "Tauri PDF Reader Constitution" → "Lectrice Constitution". The name has been
+    settled since 30/05/2026; every /speckit.plan Constitution Check since then
+    has run against a document that predates the project having a name.
+
+Modified principles:
+  - II. Type-Safe Tauri IPC (NON-NEGOTIABLE) → "Typed Tauri IPC, Ratcheted".
+    The old text said all IPC MUST use generated bindings, then listed
+    `src/lib/api/` wrappers as a compliant option — those wrappers call raw
+    `invoke()` and are exempted from the ESLint ban at eslint.config.js:181-183,
+    so the principle contradicted itself. Measured on 2026-08-01: 53 of 91
+    registered commands are outside the typed surface
+    (COMMANDS_OUTSIDE_THE_TYPED_SURFACE, src-tauri/tests/bindings_contract.rs).
+    The principle now governs the ratchet that shrinks that number rather than
+    describing a state the repo has never been in.
+  - III. Test-First Development → coverage clause corrected. The old text said
+    "80% lines, functions, branches, statements ... enforced in CI". The
+    enforced floors are 62 / 67 / 90 / 62 (vitest.config.ts); 80 is the target
+    recorded in docs/coverage-budget.md. A gate nobody can pass is a gate
+    nobody reads.
+
 Added sections:
-  - Core Principles (5 principles)
-  - Architecture Constraints
-  - Development Workflow
-  - Governance
+  - VI. Verification Discipline (new principle)
+
 Removed sections: N/A
+
 Templates requiring updates:
-  ✅ plan-template.md - "Constitution Check" section exists, aligns with principles
-  ✅ spec-template.md - User stories/requirements format aligns with Test-First principle
-  ✅ tasks-template.md - Test tasks and phase structure align with principles
-  ✅ agent-file-template.md - Code style section aligns with naming/style principles
-  ✅ checklist-template.md - Generic, no constitution-specific updates needed
+  ✅ plan-template.md - "Constitution Check" section still aligns; the two
+     corrected principles are now checkable rather than aspirational
+  ✅ spec-template.md - unchanged, no principle-specific text
+  ✅ tasks-template.md - unchanged
+  ✅ agent-file-template.md - unchanged
+  ✅ checklist-template.md - generic
+
 Follow-up TODOs: None
 -->
 
-# Tauri PDF Reader Constitution
+# Lectrice Constitution
+
+Lectrice is a Tauri 2.x desktop PDF reader with text highlighting and native
+text-to-speech. The name is French for a person employed to read aloud to
+someone.
 
 ## Core Principles
 
@@ -34,28 +67,58 @@ All code MUST follow the hexagonal architecture pattern with strict layer bounda
 
 **Rationale**: Enforced via ESLint boundaries plugin. Violations fail CI. This ensures testability, maintainability, and clear separation of concerns.
 
-### II. Type-Safe Tauri IPC (NON-NEGOTIABLE)
+### II. Typed Tauri IPC, Ratcheted (NON-NEGOTIABLE)
 
-Direct `invoke()` calls from `@tauri-apps/api/core` are FORBIDDEN in application code.
+Direct `invoke()` calls from `@tauri-apps/api/core` are FORBIDDEN in application
+code. Components, hooks, stores and services MUST reach the backend through
+`src/adapters/tauri/` or the generated bindings
+(`import { commands } from '@/lib/bindings'`). ESLint `no-restricted-imports`
+enforces this, and `src/lib/api/**` is the one exempted glob
+(`eslint.config.js:181-183`) because that is where the remaining hand-written
+wrappers live.
 
-All Tauri IPC MUST use one of:
+The typed surface is incomplete and is governed as a **ratchet**, not as a claim:
 
-- Type-safe adapters in `src/adapters/tauri/`
-- Generated bindings: `import { commands } from '@/lib/bindings'`
-- API wrappers in `src/lib/api/`
+- Every command registered in `generate_handler!` MUST either be collected by
+  `collect_commands!` or be listed, with a reason, in
+  `COMMANDS_OUTSIDE_THE_TYPED_SURFACE`
+  (`src-tauri/tests/bindings_contract.rs`). Adding a command to one macro alone
+  fails the test that names it.
+- `src/lib/bindings.ts` is generated (`cargo run --example
+  regenerate_bindings`), never hand-edited, and asserted byte-for-byte against
+  what specta emits.
+- The exception list may only get **shorter**. Lengthening it requires a stated
+  reason in the PR description. It was 63 entries when the gate landed
+  (PR #64) and 53 after the session family migrated (PR #65).
+- Every `#[tauri::command]` in `src-tauri/src/tauri_api/` MUST carry
+  `#[specta::specta]`.
 
-**Rationale**: Type safety prevents runtime errors from IPC contract mismatches. The `tauri-specta` bindings provide compile-time guarantees. ESLint `no-restricted-imports` enforces this rule.
+**Rationale**: the previous wording said all IPC was typed while most of it was
+not, so the Constitution Check passed on a false statement and the real gap grew
+unobserved. A number that must shrink is enforceable; an absolute that was never
+true is not.
 
 ### III. Test-First Development
 
-Testing discipline with 80% coverage threshold:
+Testing discipline, with coverage held by a ratchet rather than a flat target:
 
 - Frontend tests MUST be written for all domain logic, adapters, and critical UI flows
 - Backend tests MUST use `--features test-mocks` for isolated testing
-- Coverage thresholds (80% lines, functions, branches, statements) are enforced in CI
+- Coverage floors are enforced in CI and are a **regression gate**, not an
+  aspiration. The floors in `vitest.config.ts` are pinned just under the
+  measured value and may only move **UP**; 80% across the board is the target,
+  recorded with its ratchet history in `docs/coverage-budget.md`.
+- Lowering a floor, deleting a test, or re-baselining a ratchet to reach green
+  is FORBIDDEN. Excluding a path from the denominator is allowed only for code
+  this repository does not write — generated or test-infrastructure files — and
+  MUST be recorded in `docs/coverage-budget.md` with the measured before and
+  after.
 - Architecture boundary tests in `src/__tests__/architecture/` MUST pass
 
-**Rationale**: High test coverage ensures refactoring safety and documents expected behavior. The 80% threshold balances coverage with development velocity.
+**Rationale**: the old text claimed an enforced 80% on all four metrics. The
+enforced numbers were 62 / 67 / 90 / 62, so the stated gate had been failing
+description for months while the real one did the work. A floor that describes
+itself accurately can be ratcheted; one that does not gets ignored.
 
 ### IV. Design System Consistency
 
@@ -81,6 +144,27 @@ Zustand stores MUST follow established patterns:
 - Stores MUST be named `use<Name>Store` (e.g., `useAiTtsStore`)
 
 **Rationale**: State machines make complex flows predictable and debuggable. Debug logging aids troubleshooting. Ref pattern prevents common React closure bugs.
+
+### VI. Verification Discipline
+
+Every claim about behaviour MUST be proved by a runnable assertion, not by
+inspection. Pixels and speakers are never the oracle — the state machine is.
+
+- Climb the ladder until the user-visible claim is asserted by code:
+  architecture/boundary test → state machine on a controlled clock → a
+  deadlock-bounded Rust test that fails on hang → mockIPC headless E2E →
+  `tauri-driver` real E2E (opt-in, env-gated).
+- Any change to `src-tauri/src/ai_tts/player.rs`, or to a `!Send`/`!Sync`
+  boundary, ships with a timeout-guarded test proving no lock is held across
+  `sink.sleep_until_end()`.
+- A slice ends with either a runnable assertion or a specific documented
+  blocker. "Needs your eyes", "looks synced" and "should work" are not endings.
+  The single legal human defer is subjective aesthetics, as a checklist of
+  60 seconds or less.
+
+**Rationale**: the failure this prevents is a slice that ships, claims victory,
+and leaves the symptom unchanged. Written down here because it gates
+`/speckit.implement` completion, not just review.
 
 ## Architecture Constraints
 
@@ -170,4 +254,4 @@ This constitution supersedes all other development practices in this repository.
 - Complexity beyond these constraints MUST be justified in PR description
 - Use `AGENTS.md` for runtime development guidance and quick reference
 
-**Version**: 1.0.0 | **Ratified**: 2026-02-01 | **Last Amended**: 2026-02-01
+**Version**: 2.0.0 | **Ratified**: 2026-02-01 | **Last Amended**: 2026-08-01
