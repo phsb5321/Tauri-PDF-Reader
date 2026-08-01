@@ -55,22 +55,17 @@ const OWNERS: Record<string, string> = {
  * them — and they are listed separately so the allowlist above cannot be read as
  * blessing them.
  *
- * `PlaybackBar` is the pre-ElevenLabs playback bar. It binds Ctrl+Space and
- * Escape exactly as `AiPlaybackBar` does, and is reachable only through
- * `components/playback-bar/index.ts`, which nothing imports. It is the same
- * defect as the deleted `useKeyboardShortcuts`: a parallel implementation that
- * kept working in the abstract because nothing ran it.
+ * Empty, and worth keeping empty. Its one entry was `PlaybackBar`, the
+ * pre-ElevenLabs playback bar, which bound Ctrl+Space and Escape exactly as
+ * `AiPlaybackBar` does while being reachable only through a barrel nothing
+ * imported. Spec 067 held it out of scope and predicted that "when it goes, the
+ * stale-entry test below is what makes this list go with it" — which is what
+ * happened: deleting the subtree made that test fail until this entry came out.
  *
- * It is not deleted here because the dead subtree is eight files
- * (`PlaybackBar`, `VoiceSelector`, `SpeedSlider`, `ChunkNavigation` and their
- * CSS, plus four barrel lines) and removing them is a different change with a
- * different reason to revert. Spec 067 records it as out of scope. When it goes,
- * the stale-entry test below is what makes this list go with it.
+ * The map stays declared so the next unmounted binder has somewhere to go that
+ * is visibly not `OWNERS`. Adding one is an admission, not a fix.
  */
-const DEAD_UNMOUNTED: Record<string, string> = {
-  "components/playback-bar/PlaybackBar.tsx":
-    "legacy pre-AI playback bar, no importer of the barrel that exports it; slated for deletion",
-};
+const DEAD_UNMOUNTED: Record<string, string> = {};
 
 const DECLARED = { ...OWNERS, ...DEAD_UNMOUNTED };
 
