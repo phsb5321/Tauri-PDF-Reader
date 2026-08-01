@@ -1,0 +1,7 @@
+# `src-tauri/tests/bindings_contract.rs` compares the checked-in bindings byte
+# for byte against what specta generates, and specta always emits LF. A checkout
+# that converted either side to CRLF — `core.autocrlf=true` on Windows — would
+# fail that test on every line rather than on drift, which reads as a broken gate
+# rather than a platform difference. Pin the two files the comparison touches.
+src/lib/bindings.ts text eol=lf
+src-tauri/bindings-header.txt text eol=lf

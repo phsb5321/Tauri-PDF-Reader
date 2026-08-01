@@ -129,6 +129,30 @@ async libraryRelocateDocument(id: string, newFilePath: string) : Promise<Result<
 }
 },
 /**
+ * Relink a document whose file moved, without asking where it went.
+ * 
+ * The id already is the file's SHA-256, so a book that was renamed or filed
+ * into a subfolder can be recovered by hashing what is nearby instead of being
+ * shown as missing — reading position, highlights and shelves come back with
+ * it. See `heal` for how "nearby" is bounded.
+ * 
+ * A document whose path still resolves is returned untouched, so the caller
+ * can invoke this whenever a file fails to open without checking first.
+ * 
+ * The winning candidate is hashed twice — once to identify it, once inside
+ * `library_relocate_document`. That is one extra read of one file, and it
+ * keeps the content check that guards the UPDATE in a single place rather
+ * than duplicated here.
+ */
+async libraryHealDocument(id: string) : Promise<Result<Document, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_heal_document", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Create a new highlight
  */
 async highlightsCreate(documentId: string, pageNumber: number, rects: Rect[], color: string, textContent: string | null) : Promise<Result<Highlight, string>> {
@@ -226,6 +250,83 @@ async highlightsExport(documentId: string, format: string) : Promise<Result<Expo
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+/**
+ * Create a shelf.
+ */
+async collectionsCreate(name: string) : Promise<Result<Collection, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("collections_create", { name }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Every shelf, ordered by name, each with its document count.
+ */
+async collectionsList() : Promise<Result<Collection[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("collections_list") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Rename a shelf.
+ */
+async collectionsRename(id: string, name: string) : Promise<Result<Collection, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("collections_rename", { id, name }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Delete a shelf. The documents filed on it stay in the library.
+ */
+async collectionsDelete(id: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("collections_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * File a document on a shelf.
+ */
+async collectionsAddDocument(collectionId: string, documentId: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("collections_add_document", { collectionId, documentId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Take a document off a shelf.
+ */
+async collectionsRemoveDocument(collectionId: string, documentId: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("collections_remove_document", { collectionId, documentId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Every (document, shelf) pair, loaded in one call.
+ */
+async collectionsListMemberships() : Promise<Result<CollectionMembership[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("collections_list_memberships") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -240,6 +341,20 @@ async highlightsExport(documentId: string, format: string) : Promise<Result<Expo
 /** user-defined types **/
 
 export type BatchCreateResponse = { highlights: Highlight[]; created: number }
+/**
+ * A shelf — a named collection of documents.
+ * 
+ * `document_count` is denormalized for list display; it is computed by the
+ * query, not stored.
+ */
+export type Collection = { id: string; name: string; documentCount: number; createdAt: string; updatedAt: string }
+/**
+ * One document filed under one shelf.
+ * 
+ * The whole membership table is small enough to load at once, which lets the
+ * shelf filter and the per-document shelf picker work without further calls.
+ */
+export type CollectionMembership = { documentId: string; collectionId: string }
 /**
  * Input for creating a new highlight
  */

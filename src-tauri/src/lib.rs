@@ -228,32 +228,118 @@ fn menu_action_for(id: &str) -> Option<&'static str> {
     }
 }
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "tauri_pdf_reader=debug".into()),
-        )
-        .with(tracing_subscriber::fmt::layer())
-        .init();
+/// Where the generated bindings live, relative to `src-tauri/`.
+pub const BINDINGS_PATH: &str = "../src/lib/bindings.ts";
 
-    // Check for crash from previous startup and enable safe mode if needed (FR-015)
-    let crashed_last_time = hw_accel::check_and_handle_crash();
-    if crashed_last_time {
-        tracing::warn!("Application crashed on last startup - entering safe mode");
+/// The first two lines of the generated file.
+///
+/// Payload, not a directive to this repo's linters — it is emitted *into*
+/// `bindings.ts`, and it lives in a data file for the same reason SQL does. The
+/// alignment gate reads added lines of Rust looking for suppression pragmas
+/// somebody reached for to make a check go green; the same two lines written
+/// inline here are indistinguishable from that by grep while meaning something
+/// else entirely, so keeping them out of the Rust keeps the gate meaningful.
+///
+/// Both halves are load-bearing on the generated output. specta emits the
+/// `TAURI_CHANNEL` import and `__makeEvents__` unconditionally, neither is used,
+/// and `noUnusedLocals` makes that two `TS6133` errors; eslint has its own
+/// opinions about generated code. `include_str!` registers a rebuild dependency,
+/// so editing this file regenerates rather than going stale.
+const BINDINGS_HEADER: &str = include_str!("../bindings-header.txt");
+
+/// The exporter that writes `src/lib/bindings.ts`.
+///
+/// Shared with `tests/bindings_contract.rs` so the test drives the *same*
+/// configuration startup does. Kept as one function rather than two matching
+/// copies because the copies are what failed here: the test would have compared
+/// against a file the app produces differently, and passed.
+///
+/// `bigint` has to be set explicitly. Specta defaults to
+/// `BigIntExportBehavior::Fail`, which aborts the entire export the moment any
+/// `i64` reaches the command surface — as `Collection::document_count` did, and
+/// the export is `expect`ed on the debug startup path, so `tauri dev` panicked
+/// before it opened a window.
+///
+/// `Number` is what actually crosses the boundary: Tauri serialises IPC with
+/// serde_json, so an `i64` is written as a JSON number and `JSON.parse` hands
+/// the frontend a JS `number`. `BigInt` would annotate a type the frontend
+/// never receives. ponytail: values above 2^53 are already truncated by that
+/// wire format and this annotation neither causes nor fixes that — if one ever
+/// needs full range, the upgrade path is `serde(with = "...")` to a string on
+/// that field plus `BigIntExportBehavior::String`.
+pub fn bindings_exporter() -> specta_typescript::Typescript {
+    specta_typescript::Typescript::default()
+        // `trim_end` because specta puts its own newline after the header, and
+        // the data file ends with one so it is not a no-final-newline oddity in
+        // an editor. Without the trim the generated file gains a blank line and
+        // the byte-for-byte test fails on it.
+        .header(BINDINGS_HEADER.trim_end())
+        .bigint(specta_typescript::BigIntExportBehavior::Number)
+}
+
+/// Render the bindings into a staging file, then rename it into place.
+///
+/// Deliberately not `Builder::export`. That calls `File::create`, which
+/// truncates, *before* `export_str` can return an error:
+///
+/// ```text
+/// let mut file = File::create(&path)?;               // truncates
+/// write!(file, "{}", self.export_str(&language)?)?;  // this can fail
+/// ```
+///
+/// so a failed render leaves a zero-byte file. Not hypothetical — that is how
+/// `src/lib/bindings.ts` was emptied while the `BigIntForbidden` failure was
+/// being diagnosed. The file is version-controlled, so the loss is recoverable,
+/// but the developer sees a startup panic *and* a wiped artifact and has to work
+/// out they are one event.
+///
+/// Rendering first is not sufficient on its own: `fs::write` truncates too, so a
+/// write that fails partway — a full disk or a quota, which is the only such
+/// failure that gets past `open` — would empty the file just the same. Staging
+/// and renaming closes that, because `rename` within a directory replaces the
+/// destination atomically or not at all. The destination therefore only ever
+/// holds a complete render.
+///
+/// The bytes are unchanged from what `export` would write: `export`'s only
+/// other step is `language.format(path)`, and `Typescript` carries no formatter
+/// unless one is set.
+pub fn write_bindings<L: tauri_specta::LanguageExt>(
+    builder: &Builder<tauri::Wry>,
+    language: L,
+    path: impl AsRef<std::path::Path>,
+) -> Result<(), L::Error> {
+    let path = path.as_ref();
+    let rendered = builder.export_str(language)?;
+
+    // Same directory as the destination, so the rename below stays within one
+    // filesystem — across a mount boundary it would fall back to a copy and
+    // lose the atomicity this exists for.
+    let mut staging = path.as_os_str().to_owned();
+    staging.push(".staging");
+    let staging = std::path::PathBuf::from(staging);
+
+    if let Err(e) = std::fs::write(&staging, rendered) {
+        // Otherwise a failed write leaves `bindings.ts.staging` sitting in
+        // `src/lib/`, where it is neither ignored nor tracked and shows up as
+        // untracked noise in whatever commit comes next.
+        let _ = std::fs::remove_file(&staging);
+        return Err(e.into());
     }
+    std::fs::rename(&staging, path)?;
+    Ok(())
+}
 
-    // Apply Linux-specific environment variables before WebView creation
-    hw_accel::apply_linux_env();
-
-    // Set crash flag before WebView creation (cleared on successful startup)
-    hw_accel::set_crash_flag();
-
-    // Configure tauri-specta for type-safe commands
-    // Note: Commands using serde_json::Value are excluded as they're not compatible with specta type generation
-    // The v2 settings and logging commands will be added once their types are fully migrated
-    let specta_builder = Builder::<tauri::Wry>::new().commands(collect_commands![
+/// The tauri-specta command surface.
+///
+/// Extracted from `run()` so `tests/bindings_contract.rs` can build the *same*
+/// list rather than its own copy — a test that maintained a second list would
+/// pass while the real surface drifted, which is the failure it exists to catch.
+///
+/// Commands taking or returning `serde_json::Value` are absent on purpose:
+/// specta cannot type them. That is why this list is shorter than
+/// `tauri::generate_handler!` below, and the difference is not drift.
+pub fn specta_builder() -> Builder<tauri::Wry> {
+    Builder::<tauri::Wry>::new().commands(collect_commands![
         // Library commands
         library_add_document,
         library_get_document,
@@ -285,16 +371,42 @@ pub fn run() {
         collections_add_document,
         collections_remove_document,
         collections_list_memberships,
-    ]);
+    ])
+}
 
-    // Generate TypeScript bindings in development
-    // Using header to disable strict type checking for auto-generated code
-    #[cfg(debug_assertions)]
-    specta_builder
-        .export(
-            specta_typescript::Typescript::default().header("// @ts-nocheck\n/* eslint-disable */"),
-            "../src/lib/bindings.ts",
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "tauri_pdf_reader=debug".into()),
         )
+        .with(tracing_subscriber::fmt::layer())
+        .init();
+
+    // Check for crash from previous startup and enable safe mode if needed (FR-015)
+    let crashed_last_time = hw_accel::check_and_handle_crash();
+    if crashed_last_time {
+        tracing::warn!("Application crashed on last startup - entering safe mode");
+    }
+
+    // Apply Linux-specific environment variables before WebView creation
+    hw_accel::apply_linux_env();
+
+    // Set crash flag before WebView creation (cleared on successful startup)
+    hw_accel::set_crash_flag();
+
+    // Configure tauri-specta for type-safe commands. The command list lives in
+    // `specta_builder()` so the drift test can build the same one.
+    let specta_builder = specta_builder();
+
+    // Regenerate the bindings on a debug run, as a convenience for `tauri dev`.
+    // This is NOT what keeps them current — it only fires when someone launches
+    // a debug build and then remembers to commit the result, which is how the
+    // checked-in file went six months and 8 commands out of date. The gate is
+    // `tests/bindings_contract.rs`, which runs in CI.
+    #[cfg(debug_assertions)]
+    write_bindings(&specta_builder, bindings_exporter(), BINDINGS_PATH)
         .expect("Failed to export TypeScript bindings");
 
     #[allow(unused_mut)]
