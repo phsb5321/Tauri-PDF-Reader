@@ -37,8 +37,8 @@ only)
 lifetime, matching the one `menu-action` subscription that already exists
 **Constraints**: no new Tauri command, no IPC change, no `.github/workflows`
 change, no `src-tauri` change at all
-**Scale/Scope**: 8 command ids, 3 of which get a chord; 2 files added, 1 file
-deleted, 1 call site edited
+**Scale/Scope**: 8 command ids, 3 of which get a chord; 4 files added (two
+modules, two test files), 1 file deleted, 2 call sites edited
 
 ## Constitution Check
 
@@ -50,7 +50,7 @@ document before merge. Each principle below is checked against the amended text.
 | ---------------------------------------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | I. Hexagonal boundaries                              | PASS             | UI layer only. Hooks call existing services (`useOpenPdf`) and existing IPC wrappers (`aiTtsPause`/`aiTtsResume`/`aiTtsStop` via `lib/tauri-invoke`). No new adapter, no domain change, no port. `pnpm lint:boundaries` covers it. |
 | II. Typed Tauri IPC, ratcheted                       | PASS (untouched) | No command added or removed. `COMMANDS_OUTSIDE_THE_TYPED_SURFACE` stays at 53 and `MAX_UNTYPED_COMMANDS` stays at 53 — this feature adds no IPC.                                                                                   |
-| III. Coverage floors (62/67/90/62, may only move up) | PASS             | Both new modules are pure functions plus a thin hook, tested directly. Net lines fall (SC-004), and the removed 229-line file was 0% covered, so the measured figure moves up rather than down. No floor is changed.               |
+| III. Coverage floors (62/67/90/62, may only move up) | PASS             | Both new modules are pure functions plus a thin hook, tested directly. Net production lines fall (SC-005), and the removed 229-line file was 0% covered, so the measured figure moves up rather than down. No floor is changed.    |
 | IV. Resource-conscious verification                  | PASS             | Targeted `vitest run` on the touched files; no full suite, no watch mode, no `cargo` run (nothing in `src-tauri` changes).                                                                                                         |
 | V. Design tokens / no ad-hoc styling                 | N/A              | No CSS, no component markup.                                                                                                                                                                                                       |
 | VI. Verification Discipline                          | PASS             | Every claim in the spec is asserted headlessly against the store or against a pure function. Pixels are not the oracle. No manual step is deferred.                                                                                |
@@ -107,12 +107,13 @@ The comments are updated to name the surviving module.
 inline at the `useMenuActions` call is hoisted into a `const` and passed to both
 hooks. Same object, same references, two dispatchers.
 
-Its page handler also stops reading `currentPage` and `playbackState` from the
-render closure and reads them from the store at call time. A held `PageDown`
-fires `keydown` faster than React re-renders, so a captured page number makes
-every repeat in a burst compute the same target and the page advances once for
-several presses. The store is the only value that is current when the handler
-actually runs. This also leaves the callback with an empty dependency list.
+Its page handler leaves entirely, to `usePageNavigation` (below), and its
+play/pause handler stops reading `playbackState` from the render closure and
+reads it from the store at call time. A held `PageDown` fires `keydown` faster
+than React re-renders, so a captured value is stale by the second press; the
+store is the only thing current when the handler actually runs. Both callbacks
+end up with empty dependency lists, so the handlers object keeps stable
+references across renders.
 
 `src/components/PdfViewer.tsx` — its `window` `keydown` listener loses the four
 page keys and `Space`, which move into `COMMAND_CHORDS`. `Home`/`End` stay:
