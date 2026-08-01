@@ -31,37 +31,31 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 /**
- * Walk up from the working directory to the repo root, i.e. the directory
- * holding `sonar-project.properties`. `import.meta.url` is not usable here:
- * under the jsdom environment it is not a `file:` URL, so `fileURLToPath`
- * throws and `new URL('.', import.meta.url).pathname` yields a URL path rather
- * than a filesystem one. Walking up also survives being run from a
- * subdirectory, which a bare cwd-relative read does not.
+ * Anchored to this file rather than to `process.cwd()`, so it does not care
+ * where vitest was started from.
+ *
+ * Deliberately NOT the `readFileSync(new URL(path, import.meta.url))` spelling
+ * used in `src/__tests__/ui/native-html-semantics.test.ts`. That idiom is fine
+ * there and broken here, for a reason worth writing down: **Vite rewrites
+ * `new URL(<string literal>, import.meta.url)`** as an asset reference. With a
+ * literal path it returns `http://localhost:3000/sonar-project.properties` and
+ * `readFileSync` rejects it — `The URL must be of scheme file`. The same path
+ * held in a `const` is not transformed and resolves to a real `file:` URL. The
+ * neighbouring test survives only because its paths come out of an array, so
+ * "copy how that file does it" quietly turns red the moment the path is
+ * inlined. `fileURLToPath` has no such special case.
  */
-function readPropertiesFile(): string {
-  let directory = resolve(process.cwd());
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 
-  for (;;) {
-    const candidate = join(directory, "sonar-project.properties");
-    if (existsSync(candidate)) {
-      return readFileSync(candidate, "utf8");
-    }
-
-    const parent = dirname(directory);
-    if (parent === directory) {
-      throw new Error(
-        `no sonar-project.properties in or above ${process.cwd()}`,
-      );
-    }
-    directory = parent;
-  }
-}
-
-const PROPERTIES = readPropertiesFile();
+const PROPERTIES = readFileSync(
+  join(REPO_ROOT, "sonar-project.properties"),
+  "utf8",
+);
 
 /**
  * Read `key=a,b,c` as a trimmed list, taking the LAST assignment. A duplicate
