@@ -250,7 +250,8 @@ async fn is_re_runnable_because_a_crash_before_the_stamp_replays_it() {
 /// reader opens an absolute path, so moving the file is indistinguishable from
 /// deleting it. tauri-plugin-sql resolves `sqlite:pdf-reader.db` against the app
 /// config directory, which on Linux is `$XDG_CONFIG_HOME/<identifier>/` — so
-/// these two strings, and nothing else, decide where the file lands. It has
+/// the identifier plus every `sqlite:` URL in the codebase decide where the
+/// file lands. It has
 /// moved once already: renaming the bundle from `com.voxpage.pdf-reader` to
 /// `com.lectrice.reader` shipped no migration and simply abandoned the old
 /// database beside the new one (`tools/import-legacy-db.sh` recovered it by
@@ -260,54 +261,67 @@ async fn is_re_runnable_because_a_crash_before_the_stamp_replays_it() {
 /// consumers listed in `docs/highlight-consumer-contract.md` need telling.
 #[test]
 fn keeps_the_database_where_external_readers_look_for_it() {
-    assert!(
-        TAURI_CONF_JSON.contains("\"identifier\": \"com.lectrice.reader\""),
+    // Parse rather than string-match: the identifier's *value* is the contract,
+    // and reformatting `tauri.conf.json` must not be able to redden this.
+    let conf: serde_json::Value =
+        serde_json::from_str(TAURI_CONF_JSON).expect("tauri.conf.json is not valid JSON");
+    assert_eq!(
+        conf["identifier"].as_str(),
+        Some("com.lectrice.reader"),
         "the bundle identifier changed, so the database moved out of \
          ~/.config/com.lectrice.reader/ and every external reader now opens \
          a path that does not exist"
     );
-    assert!(
-        DB_INIT_TS.contains("Database.load(\"sqlite:pdf-reader.db\")"),
-        "the database filename changed; external readers open pdf-reader.db \
-         by name"
-    );
 
     // The frontend opens the pool; the backend fetches it back out of
     // tauri-plugin-sql's instance map, keyed by the very same URL string. Seven
-    // call sites across `src-tauri/src` repeat that literal, so pinning only
+    // call sites under `src-tauri/src` repeat that literal, so pinning only
     // `db-init.ts` would let the two halves drift: `.get()` returns `None` and
-    // every SQL-backed command fails at runtime. Walk the tree rather than
-    // naming the files, so an eighth call site is covered the day it is written.
-    let mut checked = 0usize;
+    // every SQL-backed command fails at runtime.
+    //
+    // Scan every `sqlite:` literal on both sides rather than matching one exact
+    // call spelling. Extracting the URL into a `const` keeps the literal, so a
+    // refactor stays green; and requiring *all* of them to agree is stronger
+    // than asking whether the right one is present somewhere — a wrong name
+    // fails even when the right name still appears in a comment nearby. Walking
+    // the tree rather than naming the seven files covers an eighth call site
+    // the day someone writes it.
+    let mut sources = vec![(PathBuf::from("src/lib/db-init.ts"), DB_INIT_TS.to_string())];
     for path in rust_sources(&PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src")) {
         let source = fs::read_to_string(&path).unwrap();
+        sources.push((path, source));
+    }
+
+    let mut checked = 0usize;
+    for (path, source) in sources {
         for (line_no, line) in source.lines().enumerate() {
-            let Some(rest) = line.split_once("\"sqlite:") else {
-                continue;
-            };
-            let name = rest.1.split('"').next().unwrap_or_default();
-            // `sqlite::memory:` names no file on disk — test fixtures build a
-            // throwaway database per test and cannot collide with the one an
-            // external reader opens.
-            if name == ":memory:" {
-                continue;
+            for chunk in line.split("\"sqlite:").skip(1) {
+                let name = chunk.split('"').next().unwrap_or_default();
+                // `sqlite::memory:` names no file on disk — test fixtures build
+                // a throwaway database per test and cannot collide with the one
+                // an external reader opens.
+                if name == ":memory:" {
+                    continue;
+                }
+                assert_eq!(
+                    name,
+                    "pdf-reader.db",
+                    "{}:{} opens `sqlite:{name}`, but external readers open \
+                     `pdf-reader.db` by name — and the frontend and backend \
+                     must address the same file for tauri-plugin-sql's \
+                     instance map to resolve",
+                    path.display(),
+                    line_no + 1
+                );
+                checked += 1;
             }
-            assert_eq!(
-                name,
-                "pdf-reader.db",
-                "{}:{} opens `sqlite:{name}` while the frontend opens \
-                 `sqlite:pdf-reader.db` — the two halves address different \
-                 databases",
-                path.display(),
-                line_no + 1
-            );
-            checked += 1;
         }
     }
     assert!(
-        checked > 0,
-        "found no on-disk `sqlite:` literal in src-tauri/src — the walk is \
-         broken, not the code, and this test is now guarding nothing"
+        checked > 1,
+        "found {checked} on-disk `sqlite:` literals across db-init.ts and \
+         src-tauri/src — the scan is broken, not the code, and this test is \
+         now guarding nothing"
     );
 }
 
