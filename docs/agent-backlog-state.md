@@ -2,6 +2,208 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #35 — 2026-08-01 (#69 merged · the verify.sh slice opened as #70)
+
+**Live state:** `origin/main` = **`3cda8fe`**. Merged today, in order:
+**#65 `8a469eb`** → **#66 `18ef0e9`** → **#67 `ad8c650`** (the speckit chain, which
+closed the last open item of the standing goal contract) → **#68 `f64801d`** →
+**#69 `3cda8fe`**.
+
+**EXACT NEXT ACTION on resume:** poll `gh pr checks 70`; when its four vm103 jobs
+are green, merge with
+`gh pr merge 70 --squash --delete-branch -t "ci: make verify.sh runnable in a fresh worktree, and match CI's resource flags (#70)" --body-file <body>`,
+confirm `gh pr view 70 --json state` prints `MERGED`, then
+`git worktree remove ../tauri-pdf-reader-070-verify-hardening && git branch -D 070-verify-hardening`
+and `git pull --ff-only origin main`. The squash body is regenerable as
+`tail -n +3` of the branch-tip commit message (`git log -1 --format=%B origin/070-verify-hardening`).
+
+### Open work, in priority order
+
+1. **PR #70** `070-verify-hardening` — the `scripts/verify.sh` slice below, one
+   commit, rebased onto `3cda8fe`, green locally. It is the only PR in flight;
+   the single vm103 slot is free.
+2. **⏸ Pedro — CI never lints 7 of its 10 cargo targets.** Turned up by the
+   Codex gate on #70. `ci.yml:145` is a bare `cargo clippy -- -D warnings`, so
+   the `regenerate_bindings` **example** and all **six integration-test targets**
+   (`audio_cache_contract`, `audio_export_contract`, `bindings_contract`,
+   `frontend_schema_contract`, `session_contract`, `settings_contract`) have
+   never been linted. `cargo clippy --all-targets --features test-mocks -j 1 --
+-D warnings` exits 0 today in 47.2s, so closing the gap is currently free.
+   **Escalated, not deferred:** the fix edits `.github/workflows/ci.yml`, which
+   is escalate-class per CLAUDE.md. #70 deliberately does **not** widen the
+   script alone — see the Codex round below.
+3. **Nothing else queued.** The remaining Lectrice work is the SC-004
+   intelligibility ear-check (Pedro-gated) and the Tier 3 remainder — see the
+   closing section of this file.
+
+### Codex round on #70 — one MAJOR, upheld and fixed
+
+`gpt-5.6-terra`, read-only, graded against six named attack surfaces. Verdict:
+**A/B/C/D clear**, one MAJOR, one MINOR. Both were re-verified against the real
+files before acting rather than taken on the reviewer's word.
+
+- **MAJOR, upheld.** The slice's `cargo clippy --all-targets --features
+test-mocks` made the script **stricter than CI**, which `verify.sh:4` promises
+  it mirrors ("checks that would run in CI/pre-commit"). Failure mode: a lint in
+  an example or contract-test target turns `pnpm verify` red while every CI check
+  stays green. Fixed by narrowing to `cargo clippy -j 1 -- -D warnings` — `-j 1`
+  is a resource flag and does not move the lint scope. The genuine gap it exposed
+  is item 2 above.
+- **MINOR, upheld.** The commit claimed `"$DURATION"` needed quoting because
+  `set -u` "would otherwise trip on" it. It would not: `DURATION` is assigned at
+  `verify.sh:119` and first read at `:129`, and nounset cares about assignment,
+  not quoting. The quote is correct hygiene; the rationale was wrong, and the
+  commit message no longer claims it.
+- **C was the one worth its own proof** — collapsing `test:run` + `test:arch`
+  into `vitest run` would silently drop the architecture suite if `test:arch`
+  used a different config. It does not: it is `vitest run
+src/__tests__/architecture/`, a positional filter over the same
+  `vitest.config.ts`. Confirmed empirically with `vitest list --filesOnly`, which
+  collects all four architecture files under an unfiltered run.
+
+**Held-open note on `#69`** (recorded because the reasoning generalises): it sat
+BEHIND `f64801d` right up to the merge and was **not** `update-branch`ed. `main`
+has no branch protection here, the two diffs did not overlap (#68 docs-only, #69
+`src/`-only), and an update-branch costs a full four-job cycle on the single
+vm103 slot. All seven checks passed against the stale base and the squash applied
+cleanly.
+
+### The verify.sh slice, and the defect it turned up
+
+`scripts/verify.sh` hardening, lifted as the one separable piece of the parked
+`053-delivery-harness`: `set -Eeuo pipefail` over `set -e`; dropping the
+`|| pnpm install` fallback that silently defeats `--frozen-lockfile`;
+`pnpm exec vitest run --maxWorkers=1 --minWorkers=1` over `pnpm test:run`;
+`cargo … -j 1` throughout; `cargo clippy --all-targets --features test-mocks`;
+and quoting `"$DURATION"`. Worth landing because CLAUDE.md's own **Resource
+Flags** section already mandates the single-worker flags it adds — the script
+simply never got them.
+
+Running the hardened script's clippy line is what exposed a **pre-existing**
+defect that has nothing to do with the hardening. In a worktree that has never
+run `pnpm build`, every cargo step dies before linting anything:
+
+```
+error: proc macro panicked
+   --> src/lib.rs:734:14
+734 |         .run(tauri::generate_context!())
+    = help: message: The `frontendDist` configuration is set to `"../dist"` but this path doesn't exist
+```
+
+`generate_context!()` reads `tauri.conf.json`'s `frontendDist` at
+macro-expansion time. **This predates the slice** — `git show HEAD:scripts/verify.sh`
+has the same bare `cargo clippy --` and `cargo test`, and both expand the same
+macro, so `verify.sh` has never been runnable in a fresh worktree. CI does not
+hit it because `ci.yml`'s Backend Checks job has a step the script lacks:
+
+```yaml
+- name: Stub frontend dist (tauri generate_context! reads frontendDist)
+  run: |
+    mkdir -p dist
+    echo '<!doctype html><meta charset="utf-8"><title>Lectrice</title>' > dist/index.html
+```
+
+So the slice now carries that same stub, guarded by `[ ! -f dist/index.html ]`
+so a real build is never clobbered. Note CI _stubs_ rather than builds: nothing
+in the Rust check path reads the dist contents, only its existence.
+
+Proven:
+
+| Risk                                 | Check                                                                | Result                                        |
+| ------------------------------------ | -------------------------------------------------------------------- | --------------------------------------------- |
+| syntax                               | `bash -n scripts/verify.sh`                                          | OK                                            |
+| `set -u` on an unset var             | every `$VAR` expansion cross-checked against an in-script assignment | none unassigned                               |
+| `--frozen-lockfile` with no fallback | ran it                                                               | **exit 0** — the fallback was masking nothing |
+| dist gap                             | ran clippy in a fresh worktree                                       | **EXIT=101**, quoted above; fixed by the stub |
+| `--all-targets -D warnings`          | re-run with dist stubbed                                             | **exit 0**, clean in 47.2s                    |
+
+`--all-targets` lints test and bench targets the bare `cargo clippy --` never
+touched, and `-D warnings` promotes each to an error — so that clean run is the
+real content of the slice, not a formality. The hardening is therefore **proven,
+not merely staged**, and the branch is ready to open as a PR.
+
+### Parked-branch assessment (done this iteration, no CI spent)
+
+Both are single `wip(` commits by Pedro from 31/07, neither touches
+`.github/workflows`, so neither is workflow-gated:
+
+- **`042-android-target`** (`f431f82`, 32 behind) — `git merge-tree` against
+  `f64801d` conflicts on `flake.nix` and `flake.lock` **add/add**, plus
+  `src-tauri/src/lib.rs` content. The add/add is the finding: **main grew its own
+  flake in #36**, so 042's flake half is _superseded_, not merely stale. Only the
+  capabilities split, the `lib.rs` shim and `src-tauri/tauri` survive a rebase.
+  **⏸ Pedro** — this is a design call about what to keep, not a merge.
+- **`053-delivery-harness`** (`12c341e`, 20 behind) — rebases **clean**, but
+  `tasks.md` shows **0 of 11 tasks checked** and the commit covers only T001–T003.
+  T004–T011 are Rust fixtures, native-bootstrap wiring and tauri-driver E2E work.
+  **⏸ Pedro** on the whole; the `verify.sh` slice above is the separable part.
+
+### Adversarial gate — Groq `openai/gpt-oss-120b`, and how it actually behaves
+
+Four rounds across two PRs now. On **#69** (068): round 1 gave 7 MAJORs, **6
+fabricated**, and its one survivor caught a real error _in my own commit message_
+(I had written that `tts-store` has no production consumer; `PdfPage.tsx:9`
+imports it) — via a `TtsProvider` that does not exist. On **#68** (069): round 1
+killed 6 of 7, the survivor was again right-target/wrong-reason (it argued the
+webfont justification was flimsy; the actual defect one sentence over was
+"the gate asserts that", implying CI for a script **no workflow and no
+`package.json` script invokes**). Round 2, supplied with round 1's kill table,
+produced **zero survivors** — it quoted `render-screenshots.py:334` as
+`candidates = (HERE.parent).glob(...)` when the real line is
+`slugs = argv or [p.stem for p in sorted(HERE.glob("direction-*.html"))]`, and
+invented both a `Path(arg).with_suffix()` branch and an
+`if "superseded" in html.parts: continue` exclusion.
+
+So: **the kill-table technique stops repetition but not invention.** Round 2's
+yield is new _classes_ to walk, not new _facts_, and a round 3 is not worth its
+latency. Verdicts are posted as PR comments (zero CI) on
+[#68](https://github.com/phsb5321/Tauri-PDF-Reader/pull/68#issuecomment-5152941169)
+and [#69](https://github.com/phsb5321/Tauri-PDF-Reader/pull/69#issuecomment-5152948559).
+
+### Two process rules earned the hard way this iteration
+
+- **Do not re-push a green branch for review polish.** One cycle here is four jobs
+  on one vm103 slot, serialized behind every other PR and sonar. Re-push when a
+  review finds something _false_; post a `gh pr comment` when it finds something
+  merely improvable. I pushed 069 twice and was about to push a third time before
+  realising the provenance fix belonged in the **squash body**, which is settable
+  at merge time with `--body-file` and costs nothing.
+- **Check the run number before cancelling.** I cancelled `30713358763` believing
+  it was #68's stale run; it was **#69's live run**. Re-queued with
+  `gh run rerun`, then cancelled the actual stale `30712213772`. Prove supersession
+  by ref first — old run's `headSha` vs `gh pr view <n> --json headRefOid`.
+
+### Closed this iteration
+
+- **Goal contract: all five items verified at `ad8c650`** — #65 green+merged;
+  worktrees down to main plus outstanding-PR worktrees; `ls specs/` all conform to
+  `NNN-slug`; `.specify/memory/constitution.md:52` = `# Lectrice Constitution`;
+  and the speckit chain merged as #67 with artifacts in the diff and a Groq
+  verdict pasted.
+- **`_temp/` removed** from the main worktree, which is now clean. Safe because
+  the rescued draft is tracked on `main`, sha256
+  `8aaa53d7908881628f52022ab2cab87d6a27483df4c0f3896550ecf42c1e5bd9`, 28400 bytes,
+  identical. Recovery if ever needed:
+  `git show f64801d:specs/054-reader-redesign/design-demos/superseded/direction-a-scholars-desk.html`.
+  Its original name, `_temp/lectrice-design/lectrice-reader-vision.html`, is
+  searchable via `git log --grep=lectrice-reader-vision`, which resolves to
+  `f64801d` — that string lives in the squash body and nowhere else.
+
+### Carried forward, unchanged
+
+`sonar` run `30713126392`, queued at `ad8c650` behind the one runner, has since
+**completed `success`** — two green sonar runs in a row now. Typed-IPC debt: `title: string | null` in generated
+`src/lib/bindings.ts:476` vs `title?: string` in `src/domain/sessions/session.ts`,
+which is what blocks pointing `src/lib/api/sessions.ts` at `commands.*` (it still
+uses raw `invoke`). `src/lib/schemas.ts` has 16 zod schemas, all consumed
+`import type`, with exactly one runtime `.parse()` at
+`src/hooks/useRenderSettings.ts:65`. **⏸ Pedro** also still owns: the reader
+direction A/B/C pick (`specs/054-reader-redesign/direction-choice.md`); whether the
+native Speech Dispatcher path returns as an offline fallback (this gates retiring
+`stores/tts-store.ts` and the eight `tts*` wrappers in `src/lib/tauri-invoke.ts`,
+both of which #69 deliberately leaves standing); topping up DeepInfra; and the
+vm103 apt serialization + tauri-driver E2E lane, which touch `.github/workflows`.
+
 ## Iteration #34 — 2026-08-01 (Two merges, sonar green for the first time in seven, and 963 lines that were never reachable)
 
 **Live state:** `origin/main` = `18ef0e9` after **#65 `8a469eb`** and **#66
