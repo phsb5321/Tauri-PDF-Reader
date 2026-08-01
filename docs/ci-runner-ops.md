@@ -73,7 +73,7 @@ about a quarter (1.5 GB → 1.05 GiB, `Removed 1704 packages`); what is left is
 genuinely referenced by the dependency tree, so the tarball stays in the
 hundreds of megabytes and the stall stays possible.
 
-**Fixed on `main` by PR #52 (`3bcbf3d`, 01/08/2026): the pnpm cache step is
+**Fixed on `main` by PR #52 (`3bcbf3d`, 31/07/2026): the pnpm cache step is
 gone.** The runner is *persistent* and its store lives at
 `~/.local/share/pnpm/store`, outside the workspace — so it survives
 `actions/checkout`'s clean and is already warm on the next run. The GitHub cache
