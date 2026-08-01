@@ -227,3 +227,270 @@ fn a_failed_write_leaves_the_destination_untouched() {
 
     fs::remove_dir_all(&staging).ok();
 }
+
+/// The crate's own source, baked in so editing either command list rebuilds this
+/// test.
+///
+/// `tauri::generate_handler!` expands to a dispatch closure and exposes no list
+/// at runtime, so the set of commands the app actually registers is not
+/// reachable from a test the way `specta_builder()` is. Reading it out of the
+/// source that declares it is the only way to compare the two — worth the
+/// source-parsing because the alternative is not comparing them at all.
+///
+/// The source shows every feature's commands at once rather than one build's:
+/// `native-tts` is not in `default`, so the eleven `tts_*` entries are registered
+/// only where that feature is asked for. Both lists are read out of the same text,
+/// so they stay consistent with each other, and a union is the conservative side
+/// for an exception list to err on. The reverse — a *typed* command hidden behind
+/// a feature, exported to bindings.ts but unregistered in a default build — cannot
+/// be written: `collect_commands!` matches bare idents, so an attribute inside it
+/// is `error: no rules expected '#'`, not a silent narrowing.
+const LIB_RS: &str = include_str!("../src/lib.rs");
+
+/// Registered with tauri but deliberately outside the typed surface.
+///
+/// A command in this list works — it is live in the app — but has no generated
+/// binding, so the frontend reaches it through a hand-written wrapper in
+/// `src/lib/api/` that names the command and its arguments as string literals.
+/// Nothing checks those wrappers against Rust. Rename an argument and it
+/// compiles on both sides and fails at runtime. That is the same class of defect
+/// the byte-for-byte test above exists to catch, still open for these.
+///
+/// Two different reasons sit in here, and the difference matters:
+///
+/// - A minority genuinely cannot be typed. Specta needs a `specta::Type` for
+///   every argument and return, and `serde_json::Value` has no TypeScript
+///   shape — `SettingResponse { key, value: serde_json::Value }` carries one, so
+///   the whole `settings_*` family is stuck until those payloads get real types.
+/// - Most are just unmigrated. `session_*`, `audio_cache_*`, `ai_tts_*` and the
+///   rest return ordinary structs (`ReadingSession`, `CacheStatsResponse`) that
+///   would type fine; they were added after January without anyone extending
+///   `collect_commands!`, and the return types lack a `specta::Type` derive only
+///   because nothing ever asked for one.
+///
+/// They are not split into two lists here because the boundary cannot be decided
+/// by grep: `serde_json::Value` is reached transitively through struct fields,
+/// and this crate has several distinct types sharing a name across
+/// `commands/` and `tauri_api/`, so a mechanical classification mislabels
+/// entries. Resolve it per family when migrating that family.
+///
+/// This list is a ratchet, not an allowlist to add to. Shrink it by moving a
+/// command into `collect_commands!` and regenerating. It grows only when a new
+/// command is registered without types, and the test below makes that a
+/// deliberate edit here rather than something nobody notices.
+const COMMANDS_OUTSIDE_THE_TYPED_SURFACE: &[&str] = &[
+    "ai_tts_cache_clear",
+    "ai_tts_cache_info",
+    "ai_tts_cache_invalidate_voice",
+    "ai_tts_get_config",
+    "ai_tts_get_state",
+    "ai_tts_init",
+    "ai_tts_list_voices",
+    "ai_tts_pause",
+    "ai_tts_prebuffer",
+    "ai_tts_resume",
+    "ai_tts_set_speed",
+    "ai_tts_set_voice",
+    "ai_tts_speak",
+    "ai_tts_speak_with_timestamps",
+    "ai_tts_stop",
+    "audio_cache_clear_document",
+    "audio_cache_evict",
+    "audio_cache_get_coverage",
+    "audio_cache_get_limit",
+    "audio_cache_get_stats",
+    "audio_cache_notify_coverage",
+    "audio_cache_set_limit",
+    "audio_export_cancel",
+    "audio_export_check_ready",
+    "audio_export_document",
+    "clear_debug_logs",
+    "clear_safe_mode",
+    "export_debug_logs",
+    "get_debug_logs",
+    "get_hw_accel_status",
+    "get_render_settings",
+    "session_add_document",
+    "session_create",
+    "session_delete",
+    "session_get",
+    "session_list",
+    "session_remove_document",
+    "session_restore",
+    "session_touch",
+    "session_update",
+    "session_update_document",
+    "settings_delete",
+    "settings_delete_v2",
+    "settings_get",
+    "settings_get_all",
+    "settings_get_all_v2",
+    "settings_get_v2",
+    "settings_set",
+    "settings_set_batch",
+    "settings_set_batch_v2",
+    "settings_set_v2",
+    "tts_check_capabilities",
+    "tts_get_state",
+    "tts_init",
+    "tts_list_voices",
+    "tts_pause",
+    "tts_resume",
+    "tts_set_rate",
+    "tts_set_voice",
+    "tts_speak",
+    "tts_speak_long",
+    "tts_stop",
+    "update_render_settings",
+];
+
+/// The bracket-balanced text between `<macro_name>![` and its matching `]`.
+fn macro_body<'a>(source: &'a str, macro_name: &str) -> &'a str {
+    let opening = format!("{macro_name}![");
+    let start = source
+        .find(&opening)
+        .unwrap_or_else(|| panic!("{macro_name}! is not invoked in src/lib.rs"))
+        + opening.len();
+
+    let mut depth = 1usize;
+    for (offset, c) in source[start..].char_indices() {
+        match c {
+            '[' => depth += 1,
+            ']' => {
+                depth -= 1;
+                if depth == 0 {
+                    return &source[start..start + offset];
+                }
+            }
+            _ => {}
+        }
+    }
+    panic!("{macro_name}! has no closing bracket in src/lib.rs")
+}
+
+/// The bare command identifiers inside `<macro_name>![ … ]`, sorted.
+///
+/// Both lists are one identifier per line, with `//` comments and
+/// `#[cfg(feature = …)]` attributes on lines of their own, so the parse is: take
+/// the body, drop each line's comment tail, keep the last `::` segment.
+///
+/// Every other line has to resolve to a command — an unreadable one panics rather
+/// than being passed over. A parser that quietly drops what it cannot read would
+/// be worse here than no parser at all: write `#[cfg(feature = "native-tts")]
+/// tts_init,` on a single line, or wrap a name in `/* … */`, and it would fall out
+/// of *both* lists at once, leaving them in perfect agreement about a command
+/// neither had seen. Refusing the line turns that into a failure naming it.
+fn commands_in_macro(source: &str, macro_name: &str) -> Vec<String> {
+    let mut found: Vec<String> = macro_body(source, macro_name)
+        .lines()
+        .filter_map(|line| {
+            let code = line.split("//").next().unwrap_or_default().trim();
+            let is_an_attribute_of_its_own = code.starts_with("#[") && code.ends_with(']');
+            if code.is_empty() || is_an_attribute_of_its_own {
+                return None;
+            }
+
+            let name = code
+                .trim_end_matches(',')
+                .rsplit("::")
+                .next()
+                .unwrap_or_default()
+                .trim();
+            let looks_like_a_command = !name.is_empty()
+                && name
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_');
+            assert!(
+                looks_like_a_command,
+                "{macro_name}! has a line this test cannot read as a command, an \
+                 attribute or a comment: {line:?}\n\
+                 Keep one command per line and attributes on their own line, or teach \
+                 commands_in_macro the new shape. A line it cannot read is a command \
+                 it stops watching."
+            );
+            Some(name.to_string())
+        })
+        .collect();
+    found.sort();
+    found.dedup();
+    found
+}
+
+/// Everything specta types must actually be registered, or the bindings promise
+/// the frontend a command the app will refuse to dispatch.
+///
+/// This direction fails loudly at runtime rather than quietly — `invoke` on an
+/// unregistered command rejects — but it fails in the app, on the user's
+/// machine, and only on the code path that calls it. Here it fails in CI.
+#[test]
+fn every_typed_command_is_registered_with_tauri() {
+    let typed = commands_in_macro(LIB_RS, "collect_commands");
+    let registered = commands_in_macro(LIB_RS, "generate_handler");
+
+    assert!(
+        !typed.is_empty() && !registered.is_empty(),
+        "parsed {} typed and {} registered commands out of src/lib.rs — one of \
+         the lists stopped matching what this test knows how to read, so its \
+         result would be vacuous",
+        typed.len(),
+        registered.len()
+    );
+
+    let unregistered: Vec<&String> = typed.iter().filter(|c| !registered.contains(c)).collect();
+    assert!(
+        unregistered.is_empty(),
+        "collect_commands! types commands that generate_handler! does not \
+         register, so bindings.ts exports functions that cannot be invoked: \
+         {unregistered:?}"
+    );
+}
+
+/// A newly registered command is typed, or its absence is written down here.
+///
+/// The gap this pins is real and large: most of the app's IPC — sessions, the
+/// audio cache, both TTS engines, settings — is registered without types and
+/// reached through hand-written wrappers that nothing compares to Rust. The
+/// byte-for-byte test above gates the surface specta *collects*; it says nothing
+/// about a command that was never collected, which is how a surface this size
+/// stayed invisible.
+///
+/// Closing it is a per-family migration (each return type needs a
+/// `specta::Type`), not one change. Until then this at least makes the gap
+/// countable and stops it growing by accident: add a command to
+/// `generate_handler!` alone and this test names it.
+#[test]
+fn every_registered_command_is_typed_or_a_recorded_exception() {
+    let typed = commands_in_macro(LIB_RS, "collect_commands");
+    let registered = commands_in_macro(LIB_RS, "generate_handler");
+
+    let untyped: Vec<String> = registered
+        .iter()
+        .filter(|c| !typed.contains(c))
+        .cloned()
+        .collect();
+
+    let newly_untyped: Vec<&String> = untyped
+        .iter()
+        .filter(|c| !COMMANDS_OUTSIDE_THE_TYPED_SURFACE.contains(&c.as_str()))
+        .collect();
+    let now_typed: Vec<&&str> = COMMANDS_OUTSIDE_THE_TYPED_SURFACE
+        .iter()
+        .filter(|c| !untyped.iter().any(|u| u == *c))
+        .collect();
+
+    assert!(
+        newly_untyped.is_empty(),
+        "registered with tauri but not typed by specta, and not recorded as an \
+         exception: {newly_untyped:?}\n\
+         Add each to collect_commands! (its argument and return types need a \
+         specta::Type derive) and run: cargo run --example regenerate_bindings\n\
+         If it genuinely cannot be typed, add it to \
+         COMMANDS_OUTSIDE_THE_TYPED_SURFACE with the reason."
+    );
+    assert!(
+        now_typed.is_empty(),
+        "listed in COMMANDS_OUTSIDE_THE_TYPED_SURFACE but no longer untyped — \
+         either typed now or gone: {now_typed:?}\n\
+         Delete these entries; a stale exception list hides the next real gap."
+    );
+}
