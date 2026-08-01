@@ -40,7 +40,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use tauri_pdf_reader_lib::{bindings_exporter, specta_builder, write_bindings, BINDINGS_PATH};
+use tauri_pdf_reader_lib::{bindings_exporter, specta_builder, write_bindings};
 
 /// The checked-in artifact, baked in at compile time so cargo rebuilds this
 /// test when it changes.
@@ -106,7 +106,7 @@ fn bindings_expose_every_command_the_rust_surface_collects() {
         "src/lib/bindings.ts is out of sync with the Rust command surface.\n\
          missing from bindings.ts (callable in Rust, unreachable from TS): {missing:?}\n\
          stale in bindings.ts (no longer collected in Rust): {extra:?}\n\
-         Regenerate with: cargo test --test bindings_contract -- --ignored regenerate"
+         Regenerate with: cargo run --example regenerate_bindings"
     );
 }
 
@@ -123,7 +123,7 @@ fn checked_in_bindings_are_byte_for_byte_what_specta_generates() {
     assert_eq!(
         generated, CHECKED_IN,
         "src/lib/bindings.ts differs from freshly generated output.\n\
-         Regenerate with: cargo test --test bindings_contract -- --ignored regenerate"
+         Regenerate with: cargo run --example regenerate_bindings"
     );
 }
 
@@ -226,17 +226,4 @@ fn a_failed_write_leaves_the_destination_untouched() {
     );
 
     fs::remove_dir_all(&staging).ok();
-}
-
-/// Rewrite the checked-in bindings. Ignored by default — this is the fix for a
-/// failure above, not a check.
-///
-/// `cargo test --test bindings_contract -- --ignored regenerate`
-#[test]
-#[ignore = "writes to the source tree; run explicitly to fix a drift failure"]
-fn regenerate_checked_in_bindings() {
-    let dest = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(BINDINGS_PATH);
-    write_bindings(&specta_builder(), bindings_exporter(), &dest)
-        .expect("specta failed to export bindings");
-    println!("wrote {}", dest.display());
 }

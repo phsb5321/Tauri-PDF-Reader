@@ -231,6 +231,22 @@ fn menu_action_for(id: &str) -> Option<&'static str> {
 /// Where the generated bindings live, relative to `src-tauri/`.
 pub const BINDINGS_PATH: &str = "../src/lib/bindings.ts";
 
+/// The first two lines of the generated file.
+///
+/// Payload, not a directive to this repo's linters — it is emitted *into*
+/// `bindings.ts`, and it lives in a data file for the same reason SQL does. The
+/// alignment gate reads added lines of Rust looking for suppression pragmas
+/// somebody reached for to make a check go green; the same two lines written
+/// inline here are indistinguishable from that by grep while meaning something
+/// else entirely, so keeping them out of the Rust keeps the gate meaningful.
+///
+/// Both halves are load-bearing on the generated output. specta emits the
+/// `TAURI_CHANNEL` import and `__makeEvents__` unconditionally, neither is used,
+/// and `noUnusedLocals` makes that two `TS6133` errors; eslint has its own
+/// opinions about generated code. `include_str!` registers a rebuild dependency,
+/// so editing this file regenerates rather than going stale.
+const BINDINGS_HEADER: &str = include_str!("../bindings-header.txt");
+
 /// The exporter that writes `src/lib/bindings.ts`.
 ///
 /// Shared with `tests/bindings_contract.rs` so the test drives the *same*
@@ -253,7 +269,11 @@ pub const BINDINGS_PATH: &str = "../src/lib/bindings.ts";
 /// that field plus `BigIntExportBehavior::String`.
 pub fn bindings_exporter() -> specta_typescript::Typescript {
     specta_typescript::Typescript::default()
-        .header("// @ts-nocheck\n/* eslint-disable */")
+        // `trim_end` because specta puts its own newline after the header, and
+        // the data file ends with one so it is not a no-final-newline oddity in
+        // an editor. Without the trim the generated file gains a blank line and
+        // the byte-for-byte test fails on it.
+        .header(BINDINGS_HEADER.trim_end())
         .bigint(specta_typescript::BigIntExportBehavior::Number)
 }
 
