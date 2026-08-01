@@ -1,0 +1,771 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lectrice — Reader Vision (Direction A · Scholar's Desk)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Lectrice — Reader Vision (Direction A: Scholar's Desk)
+   Brand tokens pulled verbatim from docs/brand/brand-spec.md (Catppuccin Mocha).
+   Principles honored: blue is the app, mauve is the voice · one accent ·
+   developer-grade restraint · honest surfaces · no gradients/glass/emoji.
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+:root {
+  /* Catppuccin Mocha — surfaces + text (from brand-spec.md) */
+  --crust:    #11111b;
+  --mantle:   #181825;
+  --base:     #1e1e2e;
+  --surface0: #313244;
+  --surface1: #45475a;
+  --text:     #cdd6f4;
+  --subtext0: #a6adc8;
+  --subtext1: #bac2de;
+
+  /* Single-accent discipline — blue is the app, mauve is the voice */
+  --accent:   #89b4fa;   /* the app */
+  --speak:    #cba6f7;   /* the voice — active TTS */
+  --speak-dim: rgba(203, 166, 247, 0.16);  /* spoken-sentence background */
+  --speak-glow: rgba(203, 166, 247, 0.45); /* foreground-word glow */
+
+  /* Warm-paper variant (the SOTA non-negotiable the brand doesn't ship yet) */
+  --paper-bg:     #f4ecd8;
+  --paper-surface:#ebe2cc;
+  --paper-text:   #3d2f1f;
+  --paper-subtext:#7a6a52;
+  --paper-accent: #1e66f5;  /* blue stays; mauve warms slightly on paper */
+  --paper-speak:  #8839ef;
+
+  /* Typography (brand-spec) */
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-body:    'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono:    'IBM Plex Mono', ui-monospace, monospace;
+
+  /* Geometry — radii lean tight, no shadows (honest surfaces) */
+  --r-tile:  0px;
+  --r-chrome: 4px;
+  --r-card:  8px;
+
+  /* Motion — ease-out only, per brand-spec */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  font-family: var(--font-body);
+  background: var(--crust);
+  color: var(--text);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Paper variant toggle (SOTA non-negotiable: Light/Sepia/warm-Night triad) */
+body.paper {
+  background: var(--paper-bg);
+  color: var(--paper-text);
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   App shell — three-column layout (per existing UI_BASELINE.md) but with
+   CHROME-ON-DEMAND: sidebar + right panel fade out during reading, surface
+   on hover toward the screen edges. Toolbar collapses to a slim rail.
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.app {
+  display: grid;
+  grid-template-columns: 0 1fr 0;
+  grid-template-rows: 1fr auto;
+  height: 100vh;
+  transition: grid-template-columns 320ms var(--ease);
+}
+.app.chrome {
+  grid-template-columns: 280px 1fr 320px;  /* sidebar + reader + panel */
+}
+
+/* Left sidebar (TOC / library) — hidden during reading */
+.sidebar {
+  background: var(--mantle);
+  border-right: 1px solid var(--surface0);
+  padding: 24px 20px;
+  overflow-y: auto;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms var(--ease);
+}
+.app.chrome .sidebar { opacity: 1; pointer-events: auto; }
+
+.sidebar h3 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--subtext0);
+  margin-bottom: 16px;
+}
+.sidebar ol { list-style: none; }
+.sidebar li {
+  font-size: 13px;
+  color: var(--subtext1);
+  padding: 6px 0 6px 12px;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+  transition: border-color 120ms var(--ease), color 120ms var(--ease);
+}
+.sidebar li:hover { color: var(--text); }
+.sidebar li.active {
+  color: var(--accent);
+  border-left-color: var(--accent);
+}
+.sidebar li.sub { padding-left: 24px; font-size: 12px; }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Reader — the page is the content. Permanent chrome competes with reading,
+   so it recedes. Hover the top edge → toolbar drops down. Hover the right
+   edge → highlights panel slides in. The spoken sentence + word stay
+   front-and-center the whole time.
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.reader {
+  position: relative;
+  overflow-y: auto;
+  background: var(--base);
+}
+body.paper .reader { background: var(--paper-bg); }
+
+/* Hover-trigger zones (top edge → toolbar; right edge → panel) */
+.hover-zone {
+  position: absolute;
+  z-index: 10;
+}
+.hover-zone.top {
+  top: 0; left: 0; right: 0; height: 8px;
+}
+.hover-zone.right {
+  top: 0; right: 0; bottom: 0; width: 8px;
+}
+
+/* Toolbar — collapses to nothing during reading, drops on hover */
+.toolbar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 48px;
+  background: var(--mantle);
+  border-bottom: 1px solid var(--surface0);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 16px;
+  transform: translateY(-100%);
+  opacity: 0;
+  transition: transform 220ms var(--ease), opacity 160ms var(--ease);
+  z-index: 20;
+}
+.hover-zone.top:hover ~ .toolbar,
+.app.chrome .toolbar {
+  transform: translateY(0);
+  opacity: 1;
+}
+body.paper .toolbar { background: var(--paper-surface); border-bottom-color: var(--paper-subtext); }
+
+.toolbar .left   { flex: 1; display: flex; align-items: center; gap: 12px; }
+.toolbar .center { flex: 2; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.toolbar .right  { flex: 1; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+
+.tb-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--subtext1);
+  font-family: var(--font-body);
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: var(--r-chrome);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 120ms var(--ease), color 120ms var(--ease), border-color 120ms var(--ease);
+}
+.tb-btn:hover { background: var(--surface0); color: var(--text); }
+body.paper .tb-btn:hover { background: var(--paper-surface); }
+.tb-btn.icon { padding: 6px 8px; }
+.tb-btn mark {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--subtext0);
+  background: transparent;
+  padding: 1px 5px;
+  border: 1px solid var(--surface0);
+  border-radius: var(--r-chrome);
+}
+
+.doc-title {
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 280px;
+}
+body.paper .doc-title { color: var(--paper-text); }
+.page-indicator {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--subtext0);
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   The page — honest surface, generous margins, real reading typography.
+  pdf.js renders the actual page in production; here we mock the canvas with
+   typographically-faithful reading content so the karaoke highlight is real.
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.page-wrap {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 96px 48px 160px;
+}
+.page-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--subtext0);
+  margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+}
+body.paper .page-meta { color: var(--paper-subtext); }
+.page-meta .accent { color: var(--accent); }
+body.paper .page-meta .accent { color: var(--paper-accent); }
+
+h1.chapter {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 32px;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+body.paper h1.chapter { color: var(--paper-text); }
+.chapter-sub {
+  font-size: 14px;
+  color: var(--subtext0);
+  margin-bottom: 40px;
+  font-style: italic;
+}
+body.paper .chapter-sub { color: var(--paper-subtext); }
+
+.prose {
+  font-size: 17px;
+  line-height: 1.7;
+  color: var(--text);
+  max-width: 65ch;
+}
+body.paper .prose { color: var(--paper-text); }
+.prose p { margin-bottom: 1.2em; }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Dual-track karaoke highlight — the SOTA non-negotiable.
+   Foreground word: mauve glow + slight weight bump.
+   Dim sentence background: --speak-dim (16% mauve) so the whole spoken
+   sentence reads as "where the voice is," while the foreground word is
+   "where the voice IS right now." Matches Speechify/NaturalReader dual-track.
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.sentence {
+  background: var(--speak-dim);
+  border-radius: 2px;
+  padding: 1px 0;
+  transition: background 240ms var(--ease);
+}
+body.paper .sentence { background: rgba(136, 57, 239, 0.12); }
+
+.word {
+  position: relative;
+  transition: color 120ms var(--ease), text-shadow 240ms var(--ease);
+  border-radius: 2px;
+  padding: 1px 1px;
+  margin: 0 -1px;
+}
+.word.now {
+  color: var(--speak);
+  font-weight: 500;
+  background: var(--speak-glow);
+  text-shadow: 0 0 12px var(--speak-glow);
+}
+body.paper .word.now {
+  color: var(--paper-speak);
+  background: rgba(136, 57, 239, 0.22);
+  text-shadow: 0 0 10px rgba(136, 57, 239, 0.35);
+}
+
+/* User highlight (distinct from karaoke — yellow, like a real marker) */
+.user-hl {
+  background: rgba(245, 213, 143, 0.22);
+  border-bottom: 1px solid rgba(245, 213, 143, 0.55);
+  padding: 1px 0;
+  border-radius: 1px;
+}
+.user-hl.blue {
+  background: rgba(137, 180, 250, 0.18);
+  border-bottom-color: rgba(137, 180, 250, 0.5);
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Playback bar — the voice is the feature. Minimal, floating, always-visible
+   during playback. Voice selector turns mauve while speaking (brand signal).
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.playback {
+  grid-column: 1 / -1;
+  background: var(--mantle);
+  border-top: 1px solid var(--surface0);
+  display: grid;
+  grid-template-columns: 240px 1fr auto;
+  align-items: center;
+  gap: 24px;
+  padding: 12px 24px;
+  min-height: 64px;
+}
+body.paper .playback { background: var(--paper-surface); border-top-color: var(--paper-subtext); }
+
+.voice-block {
+  display: flex; align-items: center; gap: 10px;
+}
+.voice-mark {
+  /* the three-chevron Lectrice logo (Mark A · Voice Channels) — monoline */
+  width: 18px; height: 18px;
+  display: inline-block;
+}
+.voice-mark svg { width: 100%; height: 100%; }
+.voice-name {
+  font-size: 13px;
+  color: var(--subtext1);
+  font-weight: 500;
+  transition: color 200ms var(--ease);
+}
+.voice-name.speaking { color: var(--speak); }
+body.paper .voice-name.speaking { color: var(--paper-speak); }
+.voice-name .live {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--speak);
+  margin-left: 6px;
+  opacity: 0.8;
+}
+
+.transport {
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+}
+.transport button {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--subtext1);
+  font-size: 14px;
+  font-family: var(--font-mono);
+  padding: 8px 10px;
+  border-radius: var(--r-chrome);
+  cursor: pointer;
+  transition: background 120ms var(--ease), color 120ms var(--ease);
+  min-width: 36px;
+}
+.transport button:hover { background: var(--surface0); color: var(--text); }
+body.paper .transport button:hover { background: var(--paper-bg); }
+.transport button.play {
+  background: var(--accent);
+  color: var(--crust);
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  margin: 0 6px;
+}
+.transport button.play:hover { background: var(--accent); filter: brightness(1.08); }
+body.paper .transport button.play { background: var(--paper-accent); color: white; }
+
+.progress-block {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  align-items: center;
+}
+.progress {
+  height: 4px;
+  background: var(--surface0);
+  border-radius: 2px;
+  overflow: hidden;
+  width: 320px;
+  cursor: pointer;
+}
+.progress-bar {
+  height: 100%;
+  background: var(--accent);
+  width: 34%;
+  transition: width 120ms linear;
+}
+.progress-bar.speaking { background: var(--speak); }
+.time {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--subtext0);
+  white-space: nowrap;
+}
+
+.speed {
+  display: flex; align-items: center; gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--subtext1);
+}
+.speed button {
+  background: transparent;
+  border: 1px solid var(--surface0);
+  color: var(--subtext1);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: var(--r-chrome);
+  cursor: pointer;
+}
+.speed button:hover { border-color: var(--accent); color: var(--text); }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Command palette — SOTA non-negotiable #4 (Linear/Raycast/Sioyek lineage).
+   Cmd/Ctrl+K or click the helper chip to open.
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.palette-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(17, 17, 27, 0.6);
+  backdrop-filter: blur(4px);
+  display: none;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 14vh;
+  z-index: 100;
+}
+.palette-backdrop.open { display: flex; }
+.palette {
+  width: min(640px, 92vw);
+  background: var(--mantle);
+  border: 1px solid var(--surface0);
+  border-radius: var(--r-card);
+  box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+  overflow: hidden;
+}
+body.paper .palette { background: var(--paper-surface); border-color: var(--paper-subtext); }
+.palette-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--surface0);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  padding: 18px 22px;
+  outline: none;
+}
+body.paper .palette-input { color: var(--paper-text); border-bottom-color: var(--paper-subtext); }
+.palette-input::placeholder { color: var(--subtext0); }
+.palette-list { padding: 8px; max-height: 380px; overflow-y: auto; }
+.palette-section {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--subtext0);
+  padding: 10px 14px 4px;
+}
+.palette-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: var(--r-chrome);
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--subtext1);
+}
+.palette-item.active, .palette-item:hover {
+  background: var(--surface0);
+  color: var(--text);
+}
+body.paper .palette-item.active { background: var(--paper-bg); }
+.palette-item .kbd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--subtext0);
+}
+.palette-item .label { display: flex; align-items: center; gap: 10px; }
+.palette-item .label::before {
+  content: '→';
+  color: var(--accent);
+  font-family: var(--font-mono);
+}
+.palette-foot {
+  border-top: 1px solid var(--surface0);
+  padding: 10px 16px;
+  display: flex; justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--subtext0);
+}
+
+/* Helper chips — bottom-right corner, surfaces the chrome toggle + palette */
+.helpers {
+  position: fixed;
+  bottom: 80px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 30;
+}
+.helper-chip {
+  background: var(--surface0);
+  color: var(--subtext1);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 6px 10px;
+  border-radius: var(--r-chrome);
+  border: 1px solid var(--surface1);
+  cursor: pointer;
+  transition: background 120ms var(--ease), color 120ms var(--ease);
+}
+.helper-chip:hover { background: var(--surface1); color: var(--text); }
+body.paper .helper-chip { background: var(--paper-surface); border-color: var(--paper-subtext); color: var(--paper-subtext); }
+
+/* Annotation: small footer note explaining what the prototype demonstrates */
+.prototype-note {
+  position: fixed;
+  top: 12px; left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface0);
+  color: var(--subtext1);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 6px 14px;
+  border-radius: var(--r-chrome);
+  border: 1px solid var(--surface1);
+  z-index: 50;
+  pointer-events: none;
+}
+body.paper .prototype-note { background: var(--paper-surface); color: var(--paper-subtext); border-color: var(--paper-subtext); }
+
+/* Reduced-motion: kill the word-glow animation, keep the color shift */
+@media (prefers-reduced-motion: reduce) {
+  .word.now { text-shadow: none; transition: color 0ms; }
+  .toolbar, .sidebar, .palette-backdrop { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="prototype-note">
+  DIRECTION A · SCHOLAR'S DESK &nbsp;·&nbsp; hover top-edge = toolbar &nbsp;·&nbsp; ⌘K = palette &nbsp;·&nbsp; "P" = paper variant
+</div>
+
+<div class="app" id="app">
+
+  <!-- LEFT SIDEBAR (TOC) — hidden during reading, surfaces in chrome mode -->
+  <aside class="sidebar">
+    <h3>Contents</h3>
+    <ol>
+      <li>I. Down the Rabbit-Hole</li>
+      <li class="active">II. The Pool of Tears</li>
+      <li class="sub">— "Curiouser and curiouser!"</li>
+      <li class="sub">— The Mouse's Tale</li>
+      <li>III. A Caucus-Race and a Long Tale</li>
+      <li>IV. The Rabbit Sends in a Little Bill</li>
+      <li>V. Advice from a Caterpillar</li>
+      <li>VI. Pig and Pepper</li>
+    </ol>
+    <h3 style="margin-top:32px">Library</h3>
+    <ol>
+      <li>Alice's Adventures in Wonderland <span class="page-indicator">— p. 23 / 192</span></li>
+      <li style="color:var(--subtext0)">The Adventures of Sherlock Holmes</li>
+      <li style="color:var(--subtext0)">A Study in Scarlet</li>
+      <li style="color:var(--subtext0)">Meditations — Marcus Aurelius</li>
+    </ol>
+  </aside>
+
+  <!-- READER — the page is the content -->
+  <main class="reader">
+    <div class="hover-zone top"></div>
+    <div class="hover-zone right"></div>
+
+    <!-- TOOLBAR — drops on hover-top or chrome-mode -->
+    <div class="toolbar">
+      <div class="left">
+        <button class="tb-btn">Open…<mark>⌘O</mark></button>
+        <span class="doc-title">Alice's Adventures in Wonderland</span>
+      </div>
+      <div class="center">
+        <button class="tb-btn icon">◄</button>
+        <span class="page-indicator">23 / 192</span>
+        <button class="tb-btn icon">►</button>
+      </div>
+      <div class="right">
+        <button class="tb-btn icon">−</button>
+        <span class="page-indicator">100%</span>
+        <button class="tb-btn icon">+</button>
+        <button class="tb-btn">⌘K<mark>palette</mark></button>
+      </div>
+    </div>
+
+    <article class="page-wrap">
+      <div class="page-meta">
+        <span>Chapter II · <span class="accent">now reading</span></span>
+        <span>23 of 192</span>
+      </div>
+
+      <h1 class="chapter">The Pool of Tears</h1>
+      <p class="chapter-sub">"Curiouser and curiouser!" cried Alice…</p>
+
+      <div class="prose">
+        <p>
+          <span class="sentence">"How <span class="word">queer</span> it is," said Alice; "I never was so small as this before, never! And I declare it's too bad, that it is!"</span>
+        </p>
+
+        <p>
+          <span class="sentence">As she said these words her foot slipped, and in another moment, splash! she was up to her chin in salt water.</span>
+          Her first idea was that she had somehow fallen into the sea, "and in that case I can go back by railway," she said to herself. <span class="user-hl blue">Alice had been to the seaside once in her life</span>, and had come to the general conclusion, that wherever you go to on the English coast you find a number of bathing machines in the sea, some children digging in the sand with wooden spades, then a row of lodging houses, and behind them a railway station.
+        </p>
+
+        <p>
+          <span class="sentence">However, she soon made out that she was in the pool of tears which she had wept when she was <span class="word now">nine</span> inches tall.</span>
+        </p>
+
+        <p>
+          <span class="sentence">"I wish I hadn't cried so much!" said Alice, as she swam about, trying to find her way out. "I shall be punished for it now, I suppose, by being drowned in my own tears!"</span>
+        </p>
+
+        <p>
+          <span class="user-hl">That <em>was</em> a narrow escape!</span> said Alice, a good deal frightened at the sudden change, but very glad to find herself still in existence; "and now for the garden!" and she ran with all speed back to the little door: but, alas! the little door was shut again, and the little golden key was lying on the glass table as before, "and things are worse than ever," thought the poor child, "for I never was so small as this before, never!"
+        </p>
+
+        <p>
+          <span class="sentence">As she said these words her foot slipped, and in another moment, splash! she was up to her chin in <span class="word">salt</span> water.</span>
+        </p>
+      </div>
+    </article>
+  </main>
+
+  <!-- RIGHT PANEL (Highlights) — hidden during reading, surfaces in chrome mode -->
+  <!-- omitted for brevity in this single-file prototype; the .app.chrome grid reserves its space -->
+
+  <!-- PLAYBACK BAR — always visible during playback -->
+  <div class="playback">
+    <div class="voice-block">
+      <span class="voice-mark" aria-label="Lectrice mark">
+        <!-- Mark A · Voice Channels (three nested chevrons, monoline 45°/90°) -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--speak)">
+          <polyline points="3 7 9 12 3 17"/>
+          <polyline points="9 7 15 12 9 17"/>
+          <polyline points="15 7 21 12 15 17"/>
+        </svg>
+      </span>
+      <span class="voice-name speaking">Rachel <span class="live">● speaking</span></span>
+    </div>
+
+    <div class="progress-block">
+      <div class="transport">
+        <button title="Previous sentence">|◄</button>
+        <button title="Back 10s">◄</button>
+        <button class="play" title="Pause">❚❚</button>
+        <button title="Forward 10s">►</button>
+        <button title="Next sentence">►|</button>
+      </div>
+      <div class="progress" title="Scrub">
+        <div class="progress-bar speaking"></div>
+      </div>
+    </div>
+
+    <div class="speed">
+      <span style="color:var(--subtext0)">speed</span>
+      <button>1.75×</button>
+    </div>
+  </div>
+</div>
+
+<!-- Helper chips — bottom-right -->
+<div class="helpers">
+  <div class="helper-chip" id="palette-trigger">⌘K &nbsp;palette</div>
+  <div class="helper-chip" id="chrome-toggle">▢ &nbsp;toggle chrome</div>
+  <div class="helper-chip" id="paper-toggle">◐ &nbsp;paper variant</div>
+</div>
+
+<!-- COMMAND PALETTE -->
+<div class="palette-backdrop" id="palette">
+  <div class="palette">
+    <input class="palette-input" placeholder="Jump to page, highlight, or action…" autofocus>
+    <div class="palette-list">
+      <div class="palette-section">Reading</div>
+      <div class="palette-item active"><span class="label">Toggle read-aloud</span><span class="kbd">Space</span></div>
+      <div class="palette-item"><span class="label">Go to page…</span><span class="kbd">⌘G</span></div>
+      <div class="palette-item"><span class="label">Next sentence</span><span class="kbd">►|</span></div>
+      <div class="palette-section">Voice</div>
+      <div class="palette-item"><span class="label">Switch voice (Rachel → Brian)</span><span class="kbd">⌘⇧V</span></div>
+      <div class="palette-item"><span class="label">Speed: 1.75× → 2.0×</span><span class="kbd">⌘]</span></div>
+      <div class="palette-section">Library</div>
+      <div class="palette-item"><span class="label">Open "Sherlock Holmes"</span><span class="kbd">↵</span></div>
+      <div class="palette-item"><span class="label">Show all highlights</div>
+    </div>
+    <div class="palette-foot">
+      <span>↑↓ navigate &nbsp; ↵ select &nbsp; esc close</span>
+      <span>Lectrice · 12 results</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// Minimal interactivity — let Pedro feel the design moves.
+const app = document.getElementById('app');
+const palette = document.getElementById('palette');
+
+// Toggle chrome mode (sidebar + panel + persistent toolbar)
+document.getElementById('chrome-toggle').addEventListener('click', () => app.classList.toggle('chrome'));
+
+// Toggle paper variant
+document.getElementById('paper-toggle').addEventListener('click', () => document.body.classList.toggle('paper'));
+
+// Command palette
+const openPalette = () => palette.classList.add('open');
+const closePalette = () => palette.classList.remove('open');
+document.getElementById('palette-trigger').addEventListener('click', openPalette);
+palette.addEventListener('click', e => { if (e.target === palette) closePalette(); });
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  // Cmd/Ctrl+K → palette
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); openPalette(); }
+  // Esc → close palette
+  if (e.key === 'Escape') closePalette();
+  // "p" → paper variant
+  if (e.key === 'p' && !e.target.matches('input,textarea')) {
+    document.body.classList.toggle('paper');
+  }
+  // "c" → chrome toggle
+  if (e.key === 'c' && !e.target.matches('input,textarea')) {
+    app.classList.toggle('chrome');
+  }
+});
+
+// Animate the karaoke word forward every ~1.2s (demo only — production uses
+// the real ElevenLabs alignment + the karaoke-sync state machine, not a timer).
+const words = document.querySelectorAll('.word');
+let i = 0;
+setInterval(() => {
+  words.forEach(w => w.classList.remove('now'));
+  if (words[i]) words[i].classList.add('now');
+  i = (i + 1) % words.length;
+}, 1200);
+
+// Respect reduced-motion: don't auto-advance if user prefers reduced motion
+if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  // no auto-advance; leave the static "now" marker in place
+}
+</script>
+
+</body>
+</html>
