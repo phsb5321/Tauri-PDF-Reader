@@ -233,11 +233,31 @@ describe("Tauri command contracts", () => {
     },
   );
 
-  it("passes the backend result straight through", async () => {
+  // These two pin the semantic difference between these hand-written wrappers
+  // and their generated counterparts in `lib/bindings.ts`, which return a
+  // `Result` envelope (`{ status, data | error }`) and absorb the rejection.
+  // These return the raw value and let it through, so every caller is written
+  // with try/catch. Swapping one shape for the other would leave those callers
+  // reading `{status:"error"}` as a success, and it would not be a type error
+  // on the `unknown` IPC boundary — hence a test rather than a comment.
+  //
+  // The first assertion on its own is close to tautological: a one-line
+  // wrapper returning what `invoke` resolved to is the definition of a
+  // wrapper. It earns its place only paired with the second, which is what
+  // actually fails if the envelope shape is adopted.
+  it("returns the backend result raw, not wrapped in a Result envelope", async () => {
     const document = { id: "d1", filePath: "/books/one.pdf" };
     invoke.mockResolvedValue(document);
 
     await expect(libraryHealDocument("d1")).resolves.toBe(document);
+  });
+
+  it("lets an IPC rejection propagate instead of absorbing it", async () => {
+    invoke.mockRejectedValue(new Error("no candidate matched the file hash"));
+
+    await expect(libraryHealDocument("d1")).rejects.toThrow(
+      "no candidate matched the file hash",
+    );
   });
 
   it("every invoked command is registered in generate_handler!", () => {
