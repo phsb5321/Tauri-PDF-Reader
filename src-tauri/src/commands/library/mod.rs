@@ -5,11 +5,16 @@
 // `pub(crate)` so sibling command modules can reach `get_pool` rather than
 // each re-deriving the pool lookup from `DbInstances`.
 pub(crate) mod db;
+mod heal;
 
 use crate::db::models::{Document, FileExistsResponse};
 use chrono::Utc;
 use db::{compute_file_hash, get_pool, validate_pdf_path};
-use std::path::Path;
+use heal::{collect_pdfs, find_by_hash, rank_candidates, search_roots};
+use sqlx::Row;
+use std::collections::HashSet;
+use std::ffi::OsStr;
+use std::path::{Path, PathBuf};
 use tauri::State;
 use tauri_plugin_sql::DbInstances;
 
@@ -378,4 +383,88 @@ pub async fn library_relocate_document(
     library_get_document(db, id)
         .await?
         .ok_or_else(|| "NOT_FOUND: Document not found after update".to_string())
+}
+
+/// Relink a document whose file moved, without asking where it went.
+///
+/// The id already is the file's SHA-256, so a book that was renamed or filed
+/// into a subfolder can be recovered by hashing what is nearby instead of being
+/// shown as missing — reading position, highlights and shelves come back with
+/// it. See `heal` for how "nearby" is bounded.
+///
+/// A document whose path still resolves is returned untouched, so the caller
+/// can invoke this whenever a file fails to open without checking first.
+///
+/// The winning candidate is hashed twice — once to identify it, once inside
+/// `library_relocate_document`. That is one extra read of one file, and it
+/// keeps the content check that guards the UPDATE in a single place rather
+/// than duplicated here.
+#[tauri::command]
+#[specta::specta]
+pub async fn library_heal_document(
+    db: State<'_, DbInstances>,
+    id: String,
+) -> Result<Document, String> {
+    let pool = get_pool(&db).await?;
+
+    let docs: Vec<Document> = sqlx::query_as(
+        "SELECT id, file_path, title, page_count, current_page, scroll_position, last_tts_chunk_id, last_opened_at, file_hash, created_at
+         FROM documents WHERE id = ?",
+    )
+    .bind(&id)
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| format!("DATABASE_ERROR: {}", e))?;
+
+    let doc = docs
+        .into_iter()
+        .next()
+        .ok_or_else(|| "NOT_FOUND: Document not found".to_string())?;
+
+    if validate_pdf_path(&doc.file_path).is_ok() {
+        return Ok(doc);
+    }
+
+    let rows = sqlx::query("SELECT id, file_path FROM documents")
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| format!("DATABASE_ERROR: {}", e))?;
+
+    // Documents that still resolve serve twice over: their folders are where
+    // the missing book most likely went, and their files are already spoken
+    // for, so hashing them would waste the candidate budget.
+    let mut live_paths = Vec::new();
+    let mut claimed: HashSet<PathBuf> = HashSet::new();
+
+    for row in rows {
+        let row_id: String = row.get("id");
+        let file_path: String = row.get("file_path");
+
+        if row_id == id || validate_pdf_path(&file_path).is_err() {
+            continue;
+        }
+
+        claimed.insert(PathBuf::from(&file_path));
+        live_paths.push(file_path);
+    }
+
+    let roots = search_roots(&doc.file_path, &live_paths);
+    let candidates = collect_pdfs(&roots, &claimed);
+    let wanted_name = Path::new(&doc.file_path)
+        .file_name()
+        .unwrap_or_else(|| OsStr::new(""));
+
+    let found = find_by_hash(
+        &rank_candidates(candidates, wanted_name),
+        &id,
+        compute_file_hash,
+    )
+    .ok_or_else(|| "FILE_NOT_FOUND: No file near the library matches this document".to_string())?;
+
+    let new_file_path = found
+        .to_str()
+        .ok_or_else(|| "FILE_READ_ERROR: Path is not valid UTF-8".to_string())?
+        .to_string();
+
+    library_relocate_document(db, id, new_file_path).await
 }

@@ -14,6 +14,7 @@ export {
   libraryUpdateDocument,
   libraryUpdateTitle,
   libraryRelocateDocument,
+  libraryHealDocument,
   libraryRemoveDocument,
   libraryOpenDocument,
   libraryCheckFileExists,
