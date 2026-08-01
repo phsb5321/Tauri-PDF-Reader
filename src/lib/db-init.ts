@@ -141,6 +141,36 @@ export const MIGRATIONS: Migration[] = [
         VALUES ('eviction_policy', 'lru', datetime('now'))`,
     ],
   },
+
+  {
+    version: 4,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS collections (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )`,
+
+      // Shelf names are how the reader picks a shelf, so two that differ only
+      // in case are the same shelf.
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_collections_name ON collections(name COLLATE NOCASE)`,
+
+      // A document belongs to any number of shelves and a shelf holds any
+      // number of documents. No per-membership reading position lives here:
+      // progress belongs to the document, not to the shelf it is filed under.
+      `CREATE TABLE IF NOT EXISTS document_collections (
+        document_id TEXT NOT NULL,
+        collection_id TEXT NOT NULL,
+        added_at TEXT NOT NULL,
+        PRIMARY KEY (document_id, collection_id),
+        FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
+        FOREIGN KEY (collection_id) REFERENCES collections(id) ON DELETE CASCADE
+      )`,
+
+      `CREATE INDEX IF NOT EXISTS idx_document_collections_collection ON document_collections(collection_id)`,
+    ],
+  },
 ];
 
 /** Records which migrations have run. Created before any migration executes. */

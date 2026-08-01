@@ -69,7 +69,7 @@ describe("MIGRATIONS", () => {
     // A migration runs once per database, but a crash between the DDL and the
     // version stamp replays it. Every statement has to survive that.
     const guarded =
-      /^(CREATE TABLE IF NOT EXISTS|CREATE INDEX IF NOT EXISTS|INSERT OR IGNORE)/;
+      /^(CREATE TABLE IF NOT EXISTS|CREATE (UNIQUE )?INDEX IF NOT EXISTS|INSERT OR IGNORE)/;
     for (const migration of MIGRATIONS) {
       for (const sql of migration.statements) {
         expect(sql.trimStart()).toMatch(guarded);
@@ -170,7 +170,11 @@ describe("runMigrations", () => {
     // version 1 recorded, nothing after it.
     const db = new RecordingDb(new Set([1]));
 
-    await expect(runMigrations(db)).resolves.toEqual([2, 3]);
+    // Everything declared after 1, whatever that is today — the claim is that
+    // the stranded database catches all the way up, not that it stops at 3.
+    await expect(runMigrations(db)).resolves.toEqual(
+      versions(MIGRATIONS).filter((v) => v > 1),
+    );
     // Migration 1 is not replayed.
     for (const sql of MIGRATIONS[0].statements) {
       expect(db.indexOf(sql)).toBe(-1);

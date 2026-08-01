@@ -91,6 +91,23 @@
   height: 16px;
 }
 
+/* Shelves on the left, books on the right. min-height:0 so the grid — not the
+   page — is what scrolls when the library outgrows the window. */
+.library-body {
+  display: flex;
+  gap: var(--space-4);
+  flex: 1;
+  min-height: 0;
+}
+
+/* Everything right of the sidebar takes the remaining width — the grid and the
+   empty state alike. min-width:0 keeps a long title from widening the row. */
+.library-body > .library-grid,
+.library-body > .empty-state {
+  flex: 1;
+  min-width: 0;
+}
+
 .library-grid {
   display: grid;
   gap: var(--space-4);

@@ -19,6 +19,17 @@ export {
   libraryCheckFileExists,
 } from "./library";
 
+// Shelves API
+export {
+  collectionsCreate,
+  collectionsList,
+  collectionsRename,
+  collectionsDelete,
+  collectionsAddDocument,
+  collectionsRemoveDocument,
+  collectionsListMemberships,
+} from "./collections";
+
 // Highlights API
 export {
   highlightsCreate,

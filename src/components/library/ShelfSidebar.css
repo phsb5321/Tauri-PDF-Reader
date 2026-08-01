@@ -1,0 +1,142 @@
+.shelf-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 200px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  padding-right: var(--space-3);
+  border-right: 1px solid var(--border-color, #ddd);
+}
+
+.shelf-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.shelf-row {
+  position: relative;
+}
+
+.shelf-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 6px var(--space-2);
+  border: none;
+  border-radius: 6px;
+  background: none;
+  font-size: 14px;
+  text-align: left;
+  color: var(--text-primary, #1a1a1a);
+  cursor: pointer;
+}
+
+.shelf-item:hover {
+  background: var(--bg-secondary, #f5f5f5);
+}
+
+.shelf-item.selected {
+  background: var(--bg-secondary, #f5f5f5);
+  font-weight: 600;
+}
+
+.shelf-item:focus-visible {
+  outline: 2px solid var(--accent-color, #4a90d9);
+  outline-offset: 1px;
+}
+
+.shelf-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shelf-count {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary, #666);
+}
+
+/* Rename/delete stay out of the way until the row is hovered or a control
+   inside it has focus, so the sidebar reads as a list of shelves rather than
+   a list of buttons. focus-within keeps them reachable by keyboard. */
+.shelf-actions {
+  position: absolute;
+  top: 50%;
+  right: var(--space-2);
+  transform: translateY(-50%);
+  display: none;
+  gap: var(--space-2);
+  background: var(--bg-secondary, #f5f5f5);
+}
+
+.shelf-row:hover .shelf-actions,
+.shelf-row:focus-within .shelf-actions {
+  display: flex;
+}
+
+.shelf-action {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+  cursor: pointer;
+}
+
+.shelf-action:hover {
+  color: var(--text-primary, #1a1a1a);
+  text-decoration: underline;
+}
+
+.shelf-action:focus-visible {
+  outline: 2px solid var(--accent-color, #4a90d9);
+  outline-offset: 1px;
+}
+
+.shelf-new {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-2);
+  align-items: center;
+  margin-top: auto;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-color, #ddd);
+}
+
+.shelf-new-label {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+}
+
+.shelf-new-input {
+  min-width: 0;
+  padding: 5px var(--space-2);
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 6px;
+  font-size: 13px;
+  background: var(--bg-secondary, #fff);
+}
+
+.shelf-new-submit {
+  padding: 5px var(--space-3);
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 6px;
+  background: var(--bg-secondary, #fff);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.shelf-new-submit:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

@@ -1,9 +1,16 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useMemo } from "react";
 import { useLibraryStore } from "../../stores/library-store";
 import { ContinueReading } from "./ContinueReading";
+import { useCollectionsStore } from "../../stores/collections-store";
 import { DocumentCard } from "./DocumentCard";
+import { ShelfSidebar } from "./ShelfSidebar";
 import { SearchBar } from "./SearchBar";
 import { EmptyState } from "../../ui/components/EmptyState/EmptyState";
+import {
+  documentsOnShelf,
+  shelvesForDocument,
+  unfiledDocuments,
+} from "../../domain/library/shelves";
 import type { Document } from "../../lib/schemas";
 import "./LibraryView.css";
 
@@ -13,6 +20,7 @@ interface LibraryViewProps {
 
 export function LibraryView({ onDocumentSelect }: LibraryViewProps) {
   const {
+    documents: allDocuments,
     isLoading,
     error,
     viewMode,
@@ -27,12 +35,49 @@ export function LibraryView({ onDocumentSelect }: LibraryViewProps) {
     setSelectedDocument,
   } = useLibraryStore();
 
-  const documents = getFilteredDocuments();
+  const {
+    shelves,
+    memberships,
+    selectedShelfId,
+    loadShelves,
+    createShelf,
+    renameShelf,
+    deleteShelf,
+    fileDocument,
+    unfileDocument,
+    selectShelf,
+  } = useCollectionsStore();
+
+  const searched = getFilteredDocuments();
+  const documents = useMemo(
+    () => documentsOnShelf(searched, memberships, selectedShelfId),
+    [searched, memberships, selectedShelfId],
+  );
+
+  // Counts come off the whole library, not the search results: a sidebar that
+  // shrank with the search box could not say how much is left to file, and the
+  // shelf counts the backend returns are whole-library too.
+  const unfiledCount = useMemo(
+    () => unfiledDocuments(allDocuments, memberships).length,
+    [allDocuments, memberships],
+  );
 
   // Load documents on mount
   useEffect(() => {
     loadDocuments();
-  }, [loadDocuments]);
+    loadShelves();
+  }, [loadDocuments, loadShelves]);
+
+  const handleToggleShelf = useCallback(
+    (documentId: string, shelfId: string, filed: boolean) => {
+      if (filed) {
+        void unfileDocument(shelfId, documentId);
+      } else {
+        void fileDocument(shelfId, documentId);
+      }
+    },
+    [fileDocument, unfileDocument],
+  );
 
   const handleDocumentClick = useCallback(
     (document: Document) => {
@@ -125,27 +170,53 @@ export function LibraryView({ onDocumentSelect }: LibraryViewProps) {
 
       <ContinueReading documents={documents} onResume={handleDocumentOpen} />
 
-      {documents.length === 0 ? (
-        <EmptyState
-          title="No recent documents"
-          description="Open a PDF to add it to your library"
-          icon={<DocumentIcon />}
+      <div className="library-body">
+        <ShelfSidebar
+          shelves={shelves}
+          selectedShelfId={selectedShelfId}
+          totalCount={allDocuments.length}
+          unfiledCount={unfiledCount}
+          onSelect={selectShelf}
+          onCreate={createShelf}
+          onRename={renameShelf}
+          onDelete={deleteShelf}
         />
-      ) : (
-        <div className={`library-grid library-grid--${viewMode}`}>
-          {documents.map((document) => (
-            <DocumentCard
-              key={document.id}
-              document={document}
-              isSelected={selectedDocumentId === document.id}
-              viewMode={viewMode}
-              onClick={() => handleDocumentClick(document)}
-              onDoubleClick={() => handleDocumentOpen(document)}
-              onDelete={() => handleDocumentDelete(document.id)}
-            />
-          ))}
-        </div>
-      )}
+
+        {documents.length === 0 ? (
+          <EmptyState
+            title={
+              selectedShelfId === null
+                ? "No recent documents"
+                : "Nothing on this shelf yet"
+            }
+            description={
+              selectedShelfId === null
+                ? "Open a PDF to add it to your library"
+                : "Right-click a book to file it here"
+            }
+            icon={<DocumentIcon />}
+          />
+        ) : (
+          <div className={`library-grid library-grid--${viewMode}`}>
+            {documents.map((document) => (
+              <DocumentCard
+                key={document.id}
+                document={document}
+                isSelected={selectedDocumentId === document.id}
+                viewMode={viewMode}
+                onClick={() => handleDocumentClick(document)}
+                onDoubleClick={() => handleDocumentOpen(document)}
+                onDelete={() => handleDocumentDelete(document.id)}
+                shelves={shelves}
+                shelfIds={shelvesForDocument(memberships, document.id)}
+                onToggleShelf={(shelfId, filed) =>
+                  handleToggleShelf(document.id, shelfId, filed)
+                }
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

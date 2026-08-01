@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 // Rect schema for highlight positioning (page coordinates)
 export const RectSchema = z.object({
@@ -63,7 +63,10 @@ export type HighlightCreate = z.infer<typeof HighlightCreateSchema>;
 
 // Highlight update input
 export const HighlightUpdateSchema = z.object({
-  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  color: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .optional(),
   note: z.string().nullable().optional(),
 });
 
@@ -76,7 +79,7 @@ export const SettingsSchema = z.object({
   ttsFollowAlong: z.boolean(),
   highlightColors: z.array(z.string().regex(/^#[0-9a-fA-F]{6}$/)),
   highlightDefaultColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
-  theme: z.enum(['light', 'dark', 'system']),
+  theme: z.enum(["light", "dark", "system"]),
   telemetryAnalytics: z.boolean(),
   telemetryErrors: z.boolean(),
 });
@@ -119,7 +122,9 @@ export const ListHighlightsResponseSchema = z.object({
   highlights: z.array(HighlightSchema),
 });
 
-export type ListHighlightsResponse = z.infer<typeof ListHighlightsResponseSchema>;
+export type ListHighlightsResponse = z.infer<
+  typeof ListHighlightsResponseSchema
+>;
 
 export const DeleteResponseSchema = z.object({
   success: z.boolean(),
@@ -141,3 +146,24 @@ export const FileExistsResponseSchema = z.object({
 });
 
 export type FileExistsResponse = z.infer<typeof FileExistsResponseSchema>;
+
+// A shelf — a named collection of documents. `documentCount` is computed by
+// the query, not stored.
+export const CollectionSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  documentCount: z.number().int().min(0),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export type Collection = z.infer<typeof CollectionSchema>;
+
+// One document filed under one shelf. A document may appear in as many as it
+// belongs to; reading progress stays on the document, never on the membership.
+export const CollectionMembershipSchema = z.object({
+  documentId: z.string(),
+  collectionId: z.string(),
+});
+
+export type CollectionMembership = z.infer<typeof CollectionMembershipSchema>;
