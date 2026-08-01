@@ -18,6 +18,7 @@
 use sqlx::{Column, Executor, Row, SqlitePool};
 
 const DB_INIT_TS: &str = include_str!("../../src/lib/db-init.ts");
+const TAURI_CONF_JSON: &str = include_str!("../tauri.conf.json");
 
 /// Pull the backtick-quoted SQL out of one declaration in `db-init.ts`.
 ///
@@ -243,14 +244,42 @@ async fn is_re_runnable_because_a_crash_before_the_stamp_replays_it() {
     }
 }
 
+/// The database's location is as much a contract as its columns: an external
+/// reader opens an absolute path, so moving the file is indistinguishable from
+/// deleting it. tauri-plugin-sql resolves `sqlite:pdf-reader.db` against the app
+/// config directory, which on Linux is `$XDG_CONFIG_HOME/<identifier>/` — so
+/// these two strings, and nothing else, decide where the file lands. It has
+/// moved once already: renaming the bundle from `com.voxpage.pdf-reader` to
+/// `com.lectrice.reader` shipped no migration and simply abandoned the old
+/// database beside the new one (`tools/import-legacy-db.sh` recovered it by
+/// hand). This test is the tripwire that failed to exist that time.
+///
+/// If it fails, the change may well be right — but it is not silent, and
+/// consumers listed in `docs/highlight-consumer-contract.md` need telling.
+#[test]
+fn keeps_the_database_where_external_readers_look_for_it() {
+    assert!(
+        TAURI_CONF_JSON.contains("\"identifier\": \"com.lectrice.reader\""),
+        "the bundle identifier changed, so the database moved out of \
+         ~/.config/com.lectrice.reader/ and every external reader now opens \
+         a path that does not exist"
+    );
+    assert!(
+        DB_INIT_TS.contains("Database.load(\"sqlite:pdf-reader.db\")"),
+        "the database filename changed; external readers open pdf-reader.db \
+         by name"
+    );
+}
+
 /// Exactly what an out-of-process consumer selects. Adding a column is a
 /// feature; removing or renaming one breaks somebody else's script silently, at
 /// runtime, on their machine. See `docs/highlight-consumer-contract.md`.
-const CITATION_COLUMNS: [&str; 10] = [
+const CITATION_COLUMNS: [&str; 11] = [
     "highlight_id",
     "document_id",
     "file_path",
     "title",
+    "page_count",
     "page_number",
     "text_content",
     "note",
@@ -297,6 +326,9 @@ async fn exposes_v_highlight_citations_to_external_readers() {
     assert_eq!(rows[0].get::<String, _>("highlight_id"), "hl-1");
     assert_eq!(rows[0].get::<String, _>("file_path"), "/books/ddia.pdf");
     assert_eq!(rows[0].get::<i64, _>("page_number"), 42);
+    // page_count comes off `documents`, page_number off `highlights`. A view
+    // that took both from the same side would still pass the column-name check.
+    assert_eq!(rows[0].get::<i64, _>("page_count"), 600);
     assert_eq!(
         rows[0].get::<String, _>("text_content"),
         "Reliability means the system continues to work correctly."
