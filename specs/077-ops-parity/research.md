@@ -58,6 +58,16 @@ repo/sink creates privacy, token and conflict failure modes without value.
 Keep private Notes authoritative; design a default-deny manifest/dry-run only
 when an audience exists. Workflow and sync activation remain Pedro-gated.
 
+### D6 — Product seed repair mechanizes every secret sink and restart boundary
+
+Product review of seed `e1e1b068` found that legacy migration alone could
+false-green current-session behavior. The executable contract now records
+settings/SQLite persistence calls, asserts password-masked default and
+accessible show/hide state, constructs a fresh production store after setting
+a key, requires re-entry with zero auto-initialization, and drives rapid
+duplicate submit. Packet:
+`/tmp/lectrice-077-product-seed-review-e1e1b068.md`.
+
 ## Rejected alternatives
 
 - OS secret store now: new native dependency/backend lifecycle and recovery

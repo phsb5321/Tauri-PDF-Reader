@@ -42,8 +42,11 @@ field/form and making Connect the only initializing action makes the boundary
 honest and testable.
 
 **Falsifier:** if a legacy canary reaches hydrated state/initialization or any
-current persisted payload, containment is false. If initialize is called before
-Connect or by cancel/visibility actions, the disclosure boundary is false.
+current persisted payload/settings-or-SQLite call, containment is false. If a
+fresh production store exposes the just-set key or auto-initializes, session
+containment is false. If the input starts revealed, its accessible state does
+not track show/hide, initialize is called before Connect/by cancel/visibility,
+or rapid duplicate submit calls it more than once, the UI boundary is false.
 
 ## Implementation sequence
 

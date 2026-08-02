@@ -16,18 +16,25 @@
   `ai-tts-storage` canary and proves the current code leaks it.
 - [ ] T011 [US1] Add a RED targeted test that setting a current key serializes
   it while non-secret preferences remain persistable.
-- [ ] T012 [US1] Add the minimal versioned migration/current partialization that
+- [ ] T012 [US1] Record every mocked settings/SQLite persistence call and prove
+  the canary occurs zero times without adding backend/schema work.
+- [ ] T013 [US1] After setting the key, hydrate a fresh production store and
+  prove `apiKey === null`, zero auto-initialization and re-entry-required UI.
+- [ ] T014 [US1] Add the minimal versioned migration/current partialization that
   strips legacy keys and excludes current keys; make reset session-honest.
-- [ ] T013 [US1] Run the two storage tests GREEN; record exact counts/exits.
+- [ ] T015 [US1] Run the storage tests GREEN; record exact counts/exits.
 
 ## User Story 2 — accessible remote boundary
 
 - [ ] T020 [US2] Add a RED component test for visible/provider-specific
   PDF-text egress disclosure, field association, stable control names/state,
-  zero calls before Connect/on cancel, and exactly one call on Connect.
+  password-masked default, zero calls before Connect/on cancel, and exactly one
+  call under rapid duplicate Connect submission.
 - [ ] T021 [US2] Add the minimum disclosure and accessible control semantics;
   rename ambiguous input clearing without claiming backend disconnection.
-- [ ] T022 [US2] Run the component test GREEN; record exact counts/exits.
+- [ ] T022 [US2] Prove the visibility control changes both input type and its
+  accessible pressed/state value.
+- [ ] T023 [US2] Run the component test GREEN; record exact counts/exits.
 
 ## Verification and review
 
