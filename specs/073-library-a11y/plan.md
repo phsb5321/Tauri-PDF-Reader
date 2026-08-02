@@ -22,8 +22,10 @@ and source order. It resolves `var()` and opaque `color-mix(in srgb, ...)`
 chains, then computes WCAG relative luminance for light, system-dark,
 explicit-dark, combined OS/explicit preferences, and their increased-contrast
 maps. Separate assertions reject non-global definitions masquerading as global
-tokens, undefined references, fill tokens in `color:`, and literal font sizes
-below the 12px floor.
+tokens, undefined references, fill tokens in `color:`, and explicit font sizes
+below the 12px floor. The size inventory resolves shipped `px`, `rem`, and
+typography `var()`/fallback chains at the default root and fails closed, with a
+source location, when a new explicit `font-size` form is unsupported.
 
 ## Architecture and platform impact
 

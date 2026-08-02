@@ -36,6 +36,8 @@ const TOKENS_CSS = join(SRC, "ui/tokens/colors.css");
 
 /** WCAG 2.1 AA: normal-size text. */
 const AA_TEXT = 4.5;
+const DEFAULT_ROOT_PX = 16;
+const MIN_TEXT_PX = 12;
 
 const stripCssComments = (css: string) =>
   css.replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\n]/g, " "));
@@ -511,6 +513,65 @@ const FILL_ONLY_TOKENS = new Set([
   "--error-color",
 ]);
 
+function fontSizeViolations(
+  sources: readonly StylesheetSource[],
+  tokens: ReadonlyMap<string, string>,
+): string[] {
+  const violations: string[] = [];
+
+  const resolveFontSizePx = (
+    rawValue: string,
+    seen = new Set<string>(),
+  ): number => {
+    const value = rawValue.trim();
+
+    const length = /^([\d.]+)(px|rem)$/.exec(value);
+    if (length) {
+      const amount = Number(length[1]);
+      if (!Number.isFinite(amount))
+        throw new Error(`invalid font-size value: ${value}`);
+      if (length[2] === "rem") return amount * DEFAULT_ROOT_PX;
+      return amount;
+    }
+
+    const variable = /^var\(\s*(--[\w-]+)\s*(?:,([\s\S]+))?\)$/.exec(value);
+    if (variable) {
+      const [, name, fallback] = variable;
+      if (seen.has(name))
+        throw new Error(`circular font-size token reference: ${name}`);
+      const tokenValue = tokens.get(name);
+      if (tokenValue !== undefined)
+        return resolveFontSizePx(tokenValue, new Set([...seen, name]));
+      if (fallback !== undefined) return resolveFontSizePx(fallback, seen);
+      throw new Error(`undefined font-size token: ${name}`);
+    }
+
+    throw new Error(`unsupported font-size value: ${value}`);
+  };
+
+  for (const source of sources) {
+    const css = stripCssComments(source.css);
+    for (const match of css.matchAll(
+      /(?:^|[;{])\s*font-size\s*:\s*([^;{}]+?)\s*(?=;|})/gm,
+    )) {
+      const [, value] = match;
+      const location = sourceLocation(source, match.index ?? 0);
+
+      try {
+        const pixels = resolveFontSizePx(value);
+        if (pixels >= MIN_TEXT_PX) continue;
+        const rendered = Number(pixels.toFixed(4));
+        violations.push(
+          `${location}  font-size ${value.trim()} resolves to ${rendered}px, below ${MIN_TEXT_PX}px`,
+        );
+      } catch (error) {
+        violations.push(`${location}  ${(error as Error).message}`);
+      }
+    }
+  }
+  return violations;
+}
+
 describe("design tokens: every referenced token is defined", () => {
   it("extracts runtime style sheets without parsing unrelated TSX", () => {
     const [sheet] = embeddedStylesheets(
@@ -871,18 +932,44 @@ describe("design tokens: WCAG AA contrast floor", () => {
     ).not.toBeNull();
     // rem keeps the scale proportional to the reader's root size; the floor is
     // the value at the 16px default.
-    expect(Number(xs?.[1]) * 16).toBeGreaterThanOrEqual(12);
+    expect(Number(xs?.[1]) * DEFAULT_ROOT_PX).toBeGreaterThanOrEqual(
+      MIN_TEXT_PX,
+    );
 
-    const undersized: string[] = [];
-    for (const source of stylesheetSources(SRC)) {
-      const css = source.css;
-      for (const match of css.matchAll(/font-size:\s*([\d.]+)px/g)) {
-        if (Number(match[1]) >= 12) continue;
-        undersized.push(
-          `${sourceLocation(source, match.index ?? 0)}  ${match[1]}px`,
-        );
-      }
-    }
-    expect(undersized).toEqual([]);
+    const typographyTokens = themeDeclarations(typography, {
+      colorScheme: "light",
+      contrastMore: false,
+    });
+    expect(
+      fontSizeViolations(stylesheetSources(SRC), typographyTokens),
+    ).toEqual([]);
+  });
+
+  it("rejects a rem size that renders below 12px at the default root", () => {
+    const probe = {
+      file: join(REPO_ROOT, "probe.css"),
+      css: ".probe { font-size: 0.5rem; }",
+      startLine: 1,
+    };
+
+    expect(fontSizeViolations([probe], new Map())).toEqual([
+      "probe.css:1  font-size 0.5rem resolves to 8px, below 12px",
+    ]);
+  });
+
+  it("fails closed on unsupported explicit font-size forms", () => {
+    const probe = {
+      file: join(REPO_ROOT, "probe.css"),
+      css: [
+        ".relative { font-size: 0.5em; }",
+        ".calculated { font-size: calc(1rem - 8px); }",
+      ].join("\n"),
+      startLine: 1,
+    };
+
+    expect(fontSizeViolations([probe], new Map())).toEqual([
+      "probe.css:1  unsupported font-size value: 0.5em",
+      "probe.css:2  unsupported font-size value: calc(1rem - 8px)",
+    ]);
   });
 });

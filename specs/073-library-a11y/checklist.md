@@ -8,6 +8,8 @@
 - [x] Frontend acceptance behavior is covered by a runnable assertion.
 - [x] Backend is unchanged, so no backend test is required for this slice.
 - [x] Accessibility impact is positive and numerically enforced.
+- [x] The 12px oracle resolves shipped `px`, `rem`, and typography `var()`
+      forms; unsupported explicit `font-size` forms fail with a source location.
 - [x] Frontend lint, typecheck, full Vitest suite, targeted acceptance test, and
       diff check pass locally.
 - [ ] Cross-family review is clean — **BLOCKED:** three Claude CLI attempts
@@ -23,5 +25,8 @@
       accent foreground. The inventory now parses only JSX style elements,
       fails closed on dynamic forms, and validates those sheets with the same
       token/foreground/size rules; the named components use measured semantic
-      pairs. A new verdict is pending.
+      pairs. Product then found the size oracle matched only literal `px`; the
+      repair adds a planted `0.5rem` RED, resolves the size forms the app ships,
+      and rejects unsupported explicit forms. Product re-review and the
+      different-family verdict remain pending.
 - [x] Rollback is one revert PR; see `rollback.md`.
