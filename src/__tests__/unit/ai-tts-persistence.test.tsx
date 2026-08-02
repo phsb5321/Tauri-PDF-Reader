@@ -7,8 +7,8 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const INVALID_API_KEY_CANARY =
-  "INVALID-077-CANARY-DO-NOT-USE-PLAINTEXT-API-KEY";
+const PERSISTENCE_TEST_MARKER =
+  "077-PERSISTENCE-MARKER-SYNTHETIC-NOT-RUNTIME-DATA";
 const STORAGE_KEY = "ai-tts-storage";
 
 const mocks = vi.hoisted(() => {
@@ -76,7 +76,7 @@ function seedStorage(
     version?: number;
   } = {
     state: {
-      apiKey: INVALID_API_KEY_CANARY,
+      apiKey: PERSISTENCE_TEST_MARKER,
       selectedVoiceId,
       speed: 1.75,
       autoPageEnabled: false,
@@ -166,7 +166,7 @@ describe("AI TTS session-secret persistence", () => {
     expect(
       JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}").state,
     ).not.toHaveProperty("apiKey");
-    expect(persistenceEvidence()).not.toContain(INVALID_API_KEY_CANARY);
+    expect(persistenceEvidence()).not.toContain(PERSISTENCE_TEST_MARKER);
   });
 
   it("does not auto-initialize the provider from a legacy plaintext key", async () => {
@@ -198,7 +198,7 @@ describe("AI TTS session-secret persistence", () => {
         autoPageEnabled: false,
       });
       const rawStorage = localStorage.getItem(STORAGE_KEY);
-      expect(rawStorage).not.toContain(INVALID_API_KEY_CANARY);
+      expect(rawStorage).not.toContain(PERSISTENCE_TEST_MARKER);
       expect(JSON.parse(rawStorage ?? "{}")).toMatchObject({
         state: {
           selectedVoiceId: voice,
@@ -207,12 +207,12 @@ describe("AI TTS session-secret persistence", () => {
         },
         version: 1,
       });
-      expect(persistenceEvidence()).not.toContain(INVALID_API_KEY_CANARY);
+      expect(persistenceEvidence()).not.toContain(PERSISTENCE_TEST_MARKER);
     },
   );
 
   it("removes malformed persisted bytes containing a plaintext key", async () => {
-    const malformedStorage = `{"state":{"apiKey":"${INVALID_API_KEY_CANARY}","selectedVoiceId":"unterminated`;
+    const malformedStorage = `{"state":{"apiKey":"${PERSISTENCE_TEST_MARKER}","selectedVoiceId":"unterminated`;
     localStorage.setItem(STORAGE_KEY, malformedStorage);
 
     await act(async () => {
@@ -227,7 +227,7 @@ describe("AI TTS session-secret persistence", () => {
       autoPageEnabled: true,
     });
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
-    expect(persistenceEvidence()).not.toContain(INVALID_API_KEY_CANARY);
+    expect(persistenceEvidence()).not.toContain(PERSISTENCE_TEST_MARKER);
   });
 
   it("serializes only safe preferences after a key is set", () => {
@@ -235,7 +235,7 @@ describe("AI TTS session-secret persistence", () => {
       useAiTtsStore.getState().setSelectedVoice("safe-current-voice");
       useAiTtsStore.getState().setSpeed(2.25);
       useAiTtsStore.getState().setAutoPageEnabled(false);
-      useAiTtsStore.getState().setApiKey(INVALID_API_KEY_CANARY);
+      useAiTtsStore.getState().setApiKey(PERSISTENCE_TEST_MARKER);
     });
 
     const persistedPayload = JSON.parse(
@@ -250,7 +250,7 @@ describe("AI TTS session-secret persistence", () => {
       version: 1,
     });
     expect(persistedPayload.state).not.toHaveProperty("apiKey");
-    expect(persistenceEvidence()).not.toContain(INVALID_API_KEY_CANARY);
+    expect(persistenceEvidence()).not.toContain(PERSISTENCE_TEST_MARKER);
     expect(mocks.settingsSet).not.toHaveBeenCalled();
     expect(mocks.settingsSetBatch).not.toHaveBeenCalled();
     expect(mocks.sqlLoad).not.toHaveBeenCalled();
@@ -260,7 +260,7 @@ describe("AI TTS session-secret persistence", () => {
 
   it("clears the in-memory key on a normal reset", () => {
     act(() => {
-      useAiTtsStore.getState().setApiKey(INVALID_API_KEY_CANARY);
+      useAiTtsStore.getState().setApiKey(PERSISTENCE_TEST_MARKER);
       useAiTtsStore.getState().reset();
     });
 
@@ -270,7 +270,7 @@ describe("AI TTS session-secret persistence", () => {
   it("requires key re-entry after a fresh production-store hydration", async () => {
     act(() => {
       useAiTtsStore.getState().setSelectedVoice("safe-fresh-voice");
-      useAiTtsStore.getState().setApiKey(INVALID_API_KEY_CANARY);
+      useAiTtsStore.getState().setApiKey(PERSISTENCE_TEST_MARKER);
     });
 
     vi.resetModules();
@@ -295,7 +295,7 @@ describe("AI TTS session-secret persistence", () => {
     expect(mocks.aiTtsInit).not.toHaveBeenCalled();
     expect(screen.getByLabelText("ElevenLabs API Key")).toHaveValue("");
     expect(screen.getByText("API key required")).toBeVisible();
-    expect(persistenceEvidence()).not.toContain(INVALID_API_KEY_CANARY);
+    expect(persistenceEvidence()).not.toContain(PERSISTENCE_TEST_MARKER);
 
     hook.unmount();
     view.unmount();
