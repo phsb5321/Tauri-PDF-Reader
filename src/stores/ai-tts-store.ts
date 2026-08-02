@@ -89,8 +89,41 @@ const initialState = {
   cacheCoverage: null as CoverageResponse | null, // T042: Audio cache coverage for current document
 };
 
+interface PersistedAiTtsPreferences {
+  selectedVoiceId: string | null;
+  speed: number;
+  autoPageEnabled: boolean;
+}
+
+const PERSISTENCE_VERSION = 1;
+
+function sanitizePersistedPreferences(
+  persistedState: unknown,
+): PersistedAiTtsPreferences {
+  const candidate =
+    persistedState && typeof persistedState === "object"
+      ? (persistedState as Partial<PersistedAiTtsPreferences>)
+      : {};
+
+  return {
+    selectedVoiceId:
+      typeof candidate.selectedVoiceId === "string" ||
+      candidate.selectedVoiceId === null
+        ? candidate.selectedVoiceId
+        : initialState.selectedVoiceId,
+    speed:
+      typeof candidate.speed === "number" && Number.isFinite(candidate.speed)
+        ? Math.max(MIN_SPEED, Math.min(MAX_SPEED, candidate.speed))
+        : initialState.speed,
+    autoPageEnabled:
+      typeof candidate.autoPageEnabled === "boolean"
+        ? candidate.autoPageEnabled
+        : initialState.autoPageEnabled,
+  };
+}
+
 export const useAiTtsStore = create<AiTtsState>()(
-  persist(
+  persist<AiTtsState, [], [], PersistedAiTtsPreferences>(
     (set, get) => ({
       ...initialState,
 
@@ -196,19 +229,22 @@ export const useAiTtsStore = create<AiTtsState>()(
       reset: () =>
         set({
           ...initialState,
-          // Preserve API key and voice selection across resets
-          apiKey: get().apiKey,
+          // Reset only the current session; the backend may still hold its copy.
           selectedVoiceId: get().selectedVoiceId,
         }),
     }),
     {
       name: "ai-tts-storage",
+      version: PERSISTENCE_VERSION,
       partialize: (state) => ({
-        // Only persist these fields
-        apiKey: state.apiKey,
         selectedVoiceId: state.selectedVoiceId,
         speed: state.speed,
         autoPageEnabled: state.autoPageEnabled,
+      }),
+      migrate: (persistedState) => sanitizePersistedPreferences(persistedState),
+      merge: (persistedState, currentState) => ({
+        ...currentState,
+        ...sanitizePersistedPreferences(persistedState),
       }),
     },
   ),

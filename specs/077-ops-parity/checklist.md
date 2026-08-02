@@ -4,22 +4,31 @@
 - [x] Worktree path ends in `-077-ops-parity`; main remains read-only.
 - [x] Product classes the key S4 and PDF-derived text P3.
 - [x] Quality/local-control gaps remain explicit and unclaimed.
-- [ ] Legacy version-0 payload cannot rehydrate a key.
-- [ ] Current persisted payload contains no key but retains safe preferences.
-- [ ] Mocked settings/SQLite persistence calls contain zero canary occurrences.
-- [ ] Fresh production-store hydration after setting a key yields null key,
-  zero auto-initialization and re-entry-required UI.
-- [ ] Reset wording/behavior does not claim backend disconnection.
-- [ ] Disclosure names ElevenLabs and PDF-text egress, associated accessibly.
-- [ ] Key input is password-masked by default; accessible show/hide state tracks
-  the actual input type.
-- [ ] Close/cancel/visibility cause zero initialization calls.
-- [ ] Rapid duplicate Connect causes exactly one initialization call.
-- [ ] Tests use invalid synthetic canary and mocked ports; no network/native.
-- [ ] No backend, schema, capability, workflow, sync, Notes or dependency diff.
-- [ ] Targeted lint, typecheck, tests, formatting and diff checks green.
+- [x] Legacy version-0 payload cannot rehydrate a key.
+- [x] Current persisted payload contains no key but retains safe preferences.
+- [x] Mocked settings/SQLite persistence calls contain zero canary occurrences.
+- [x] Fresh production-store hydration after setting a key yields null key,
+      zero auto-initialization and re-entry-required UI.
+- [x] Reset wording/behavior does not claim backend disconnection.
+- [x] Disclosure names ElevenLabs and PDF-text egress, associated accessibly.
+- [x] Key input is password-masked by default; accessible show/hide state tracks
+      the actual input type.
+- [x] Close/cancel/visibility cause zero initialization calls.
+- [x] Rapid duplicate Connect causes exactly one initialization call.
+- [x] Tests use invalid synthetic canary and mocked ports; no network/native.
+- [x] No backend, schema, capability, workflow, sync, Notes or dependency diff.
+- [x] Targeted lint, typecheck, tests, formatting and diff checks green.
 - [ ] Product and Quality typed reviews bind the immutable head.
 - [ ] Different-family typed verdict binds exact base/head/diff.
 - [ ] Safe PR merged and confirmed `state=MERGED`, or honestly blocked before push.
 
 **Rollback:** `git revert <077-squash-sha>` in one PR.
+
+## Engineer RED/GREEN receipts
+
+- RED storage: `pnpm exec vitest run src/__tests__/unit/ai-tts-persistence.test.tsx --pool=forks --poolOptions.forks.singleFork=true` — exit 1; 1 file, 5/5 failed. The version-0 canary rehydrated, triggered one `aiTtsInit` call, current persistence remained version 0 with four fields, reset retained the canary and fresh hydration entered the auto-init loop.
+- RED component: `pnpm exec vitest run src/__tests__/ui/AiTtsSettings.test.tsx --pool=forks --poolOptions.forks.singleFork=true` — exit 1; 1 file, 3/3 failed at the absent stable visibility/form/close boundaries.
+- GREEN targeted tests: `pnpm exec vitest run src/__tests__/unit/ai-tts-persistence.test.tsx src/__tests__/ui/AiTtsSettings.test.tsx --pool=forks --poolOptions.forks.singleFork=true` — exit 0; 2 files, 8/8 passed.
+- Targeted ESLint on the two production and two test files — exit 0; 0 errors and 3 pre-existing `console.debug` warnings in `ai-tts-store.ts`.
+- `pnpm typecheck` — exit 0.
+- Targeted Prettier on all six changed files and `git diff --check` — exit 0.
