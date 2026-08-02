@@ -85,6 +85,21 @@ describe("AiTtsSettings session-secret setup", () => {
     expect(mocks.onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("labels the submit action as Update after initialization", async () => {
+    mocks.useAiTts.mockReturnValue({
+      initialized: true,
+      apiKey: null,
+      needsApiKey: false,
+      initialize: mocks.initialize,
+      error: null,
+    });
+    await act(async () => {
+      render(<AiTtsSettings onClose={mocks.onClose} />);
+    });
+
+    expect(screen.getByRole("button", { name: "Update" })).toBeVisible();
+  });
+
   it("coalesces rapid duplicate Connect submissions while the first is pending", async () => {
     let resolveInitialize!: () => void;
     mocks.initialize.mockReturnValue(
@@ -96,6 +111,8 @@ describe("AiTtsSettings session-secret setup", () => {
       render(<AiTtsSettings onClose={mocks.onClose} />);
     });
 
+    expect(screen.getByRole("button", { name: "Connect" })).toBeVisible();
+
     fireEvent.change(screen.getByLabelText("ElevenLabs API Key"), {
       target: { value: "one-explicit-submit" },
     });
@@ -104,6 +121,9 @@ describe("AiTtsSettings session-secret setup", () => {
     fireEvent.submit(form);
 
     expect(mocks.initialize).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByRole("button", { name: "Connecting..." }),
+    ).toBeDisabled();
 
     await act(async () => {
       resolveInitialize();
