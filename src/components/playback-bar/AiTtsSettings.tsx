@@ -19,6 +19,12 @@ function formatBytes(bytes: number): string {
   return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
 }
 
+function getSubmitLabel(isSubmitting: boolean, initialized: boolean): string {
+  if (isSubmitting) return "Connecting...";
+  if (initialized) return "Update";
+  return "Connect";
+}
+
 export function AiTtsSettings({ onClose }: AiTtsSettingsProps) {
   const { initialized, apiKey, needsApiKey, initialize, error } = useAiTts();
   const [inputKey, setInputKey] = useState(apiKey || "");
@@ -27,6 +33,7 @@ export function AiTtsSettings({ onClose }: AiTtsSettingsProps) {
   const [cacheInfo, setCacheInfo] = useState<AiTtsCacheInfo | null>(null);
   const [isClearingCache, setIsClearingCache] = useState(false);
   const submittingRef = useRef(false);
+  const submitLabel = getSubmitLabel(isSubmitting, initialized);
 
   // Load cache info on mount and after clearing
   const loadCacheInfo = useCallback(async () => {
@@ -206,11 +213,7 @@ export function AiTtsSettings({ onClose }: AiTtsSettingsProps) {
             className="ai-tts-settings-btn primary"
             disabled={isSubmitting || !inputKey.trim()}
           >
-            {isSubmitting
-              ? "Connecting..."
-              : initialized
-                ? "Update"
-                : "Connect"}
+            {submitLabel}
           </button>
         </div>
       </form>
