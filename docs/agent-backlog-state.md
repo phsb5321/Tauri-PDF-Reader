@@ -2,6 +2,51 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #39 — 02/08/2026 16:00 BRT (077 session-secret slice merged)
+
+`OPS-PARITY-SLICE-MERGED` is now externally proven. PR
+[#73](https://github.com/phsb5321/Tauri-PDF-Reader/pull/73) was squash-merged
+as `db18998f0923b11a35de5a3a2206262512917c09` after all seven required checks
+passed and both CodeQL threads were resolved. The exact reviewed branch head was
+`69c75ce761648c0de493abbcf5078f47ae5394c4`; the remote feature branch and its
+clean worktree were removed after GitHub reported `state=MERGED`.
+
+Closed gaps: the ElevenLabs key is session-only across current, version-0,
+missing-version, injected-version-1 and malformed local-storage shapes; reset
+clears the frontend copy; fresh hydration requires re-entry and performs zero
+provider initialization; the settings UI is masked and accessible, discloses
+PDF-derived text egress to ElevenLabs, and coalesces rapid duplicate Connect
+submissions. The planted persistence marker remains discriminating. CodeQL
+check-run `91532808160` passed after the test-only neutral-marker repair.
+
+| Surface                   | Authoritative owner                                                                                    | Worktree / HEAD                                  | Disposition                                                                                                                                       |
+| ------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `main`                    | read-only shared base                                                                                  | repository root / `db18998f`                     | Clean and equal to `origin/main` after #73.                                                                                                       |
+| 073 library a11y / PR #72 | Engineer `side-projects:w1:p3` sole branch writer; Orchestrator owns PR disposition; Product read-only | `073-library-a11y` / `2264163`                   | Clean, unpushed one-commit repair; Product PASS and targeted 57/57, but the independent-family verdict remains unavailable. Do not push or merge. |
+| 074 App-root reachability | Engineer `side-projects:w1:p3`, paused behind 073                                                      | `074-app-root-reachability` / `9ee8eb7`          | Preserve the clean unpushed repair and inherited coordination diff; no writer action until 073 is disposed.                                       |
+| 075 user-simulation gate  | Quality `side-projects:w1:p4`                                                                          | `075-user-simulation-gate` / inherited dirty WIP | Public packaged Play remains non-clickable after 15 seconds. Preserve WIP; no native/full rerun was consumed by 077.                              |
+| 077 session-secret slice  | no active writer; Orchestrator owns merged receipt                                                     | merged #73 / `db18998f`                          | Complete. Product, Quality and explicit Kimi K2.6 rebinds PASS the exact head; no BLOCKER, MAJOR or MINOR remains.                                |
+| 078 receipt follow-up     | Orchestrator `side-projects:w1:p1` sole writer                                                         | `078-ops-parity-receipt` / based on `db18998f`   | Docs-only closure: task/checklist receipts plus this reconciled owner map. No product, workflow, sync or 075 mutation.                            |
+
+The next reviewed SpecKit control is 077 T102: a repo-owned Gitleaks 8.30.1
+configuration, synthetic canary and fail-closed local entry point using `dir` /
+`git`, never the removed `protect` syntax. It remains **sequenced after 073**.
+When released, Product reviews acceptance first, Engineer `side-projects:w1:p3`
+is the sole writer, Quality owns the negative-control review, and Orchestrator
+owns publication. No implementation worktree is assigned yet, so this record
+cannot be mistaken for concurrent write authority.
+
+Remaining ops-parity gaps are the Gitleaks/Semgrep and dependency controls,
+executable capability/CSP contract, SECURITY/privacy/retention policy,
+diagnostic redaction, durable evidence/machine receipts, and truthful
+offline/telemetry/removal behavior. Every `.github/workflows/**` change and all
+Notes/repo sync activation remain `[pending] Pedro`; none was changed by #73 or
+this receipt follow-up. The central five-project Notes index is a separate
+isolated-vault documentation PR, not sync activation.
+
+**Revert:** `git revert db18998f0923b11a35de5a3a2206262512917c09` in a new
+PR.
+
 ## Iteration #38 — 02/08/2026 13:54 BRT (operational-parity audit)
 
 `OPS-PARITY-AUDITED` was emitted before this worktree was created. The audit is
@@ -15,10 +60,10 @@ plus Engineer feasibility packet
 The complete matrix and falsifiers are in
 `specs/077-ops-parity/gap-matrix.md`.
 
-| Surface | Authoritative owner | Worktree / HEAD | Disposition |
-| --- | --- | --- | --- |
-| 073 library a11y / PR #72 | Engineer `side-projects:w1:p3` branch writer; Orchestrator PR disposition; Product read-only reviewer | `073-library-a11y` / `2264163debf87db81f5f849be2eff2a622ec24e5` | Product's relative-font-size MAJOR is closed: targeted 57/57, lint, typecheck and diff checks green. Commit is clean, ahead one and unpushed. Different-family verdict remains unavailable; do not push, reserve CI or merge. |
-| 077 ops-parity first slice | Orchestrator seeds SpecKit once, then Engineer `side-projects:w1:p3` is sole writer; Product and Quality review read-only | `077-ops-parity` / based on `1ffdf4d` plus this owner-map history | P0 local slice: strip current and legacy ElevenLabs keys from WebView persistence and disclose PDF-text egress accessibly before explicit Connect. No backend, workflow, sync, token, service or Notes mutation. |
+| Surface                    | Authoritative owner                                                                                                       | Worktree / HEAD                                                   | Disposition                                                                                                                                                                                                                   |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 073 library a11y / PR #72  | Engineer `side-projects:w1:p3` branch writer; Orchestrator PR disposition; Product read-only reviewer                     | `073-library-a11y` / `2264163debf87db81f5f849be2eff2a622ec24e5`   | Product's relative-font-size MAJOR is closed: targeted 57/57, lint, typecheck and diff checks green. Commit is clean, ahead one and unpushed. Different-family verdict remains unavailable; do not push, reserve CI or merge. |
+| 077 ops-parity first slice | Orchestrator seeds SpecKit once, then Engineer `side-projects:w1:p3` is sole writer; Product and Quality review read-only | `077-ops-parity` / based on `1ffdf4d` plus this owner-map history | P0 local slice: strip current and legacy ElevenLabs keys from WebView persistence and disclose PDF-text egress accessibly before explicit Connect. No backend, workflow, sync, token, service or Notes mutation.              |
 
 Product's verified causal finding is in current source: Zustand persists
 `apiKey` under `ai-tts-storage`, and the settings form has no disclosure that
@@ -55,15 +100,15 @@ The three `side-projects` specialist receipts were then observed directly in
 HERDR before this map was published. The old Orchestrator pane was told to
 freeze after receipt capture; `side-projects` now owns all coordination.
 
-| Surface | Authoritative owner | Worktree / HEAD | Disposition |
-| --- | --- | --- | --- |
-| `main` | read-only shared base | repository root / `1ffdf4d` | Clean and equal to `origin/main`; no writer. |
-| 072 E2E harness | Orchestrator classification queue; no writer | `.claude/worktrees/agent-a9f6ebb6f76486b2e` / `909eacd` | Clean committed harness; preserve and do not duplicate until classified after 073/074. |
-| 073 library a11y / PR #72 | Engineer `side-projects:w1:p3` is the sole branch writer; Orchestrator owns PR disposition; Product reviews read-only | `073-library-a11y` / `5c9155a` | Product found one verified 12px-oracle MAJOR after migration. Repair it RED→GREEN before external review or merge; the prior seven green checks are pre-repair evidence. |
-| 074 App-root reachability | Engineer `side-projects:w1:p3`, paused behind 073 | `074-app-root-reachability` / `9ee8eb7` | Unpushed one-commit slice; preserve the inherited uncommitted blackboard copy. Same-family Quality PASS is not the independent-family gate. No edit until 073 merges and Orchestrator advances the phase. |
-| 075 user-simulation gate | Quality `side-projects:w1:p4` | `075-user-simulation-gate` / `1ffdf4d` | Preserve eight modified and three untracked predecessor paths. Focused fuzz is green; packaged public Play remains BLOCKED after the 15-second pointer wait. |
-| Product & Intent | Product `side-projects:w1:p2`; no implementation worktree | read-only | Finish the PR #72 Product audit and hand a typed packet to Orchestrator; do not self-accept or edit. |
-| 076 coordination | Orchestrator `side-projects:w1:p1` | `076-orchestrator-control` / `fee8843` before this update | Sole writer for this blackboard, PR ordering, external review capture, and safe merge decisions. Must not edit 074 or 075. |
+| Surface                   | Authoritative owner                                                                                                   | Worktree / HEAD                                           | Disposition                                                                                                                                                                                               |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `main`                    | read-only shared base                                                                                                 | repository root / `1ffdf4d`                               | Clean and equal to `origin/main`; no writer.                                                                                                                                                              |
+| 072 E2E harness           | Orchestrator classification queue; no writer                                                                          | `.claude/worktrees/agent-a9f6ebb6f76486b2e` / `909eacd`   | Clean committed harness; preserve and do not duplicate until classified after 073/074.                                                                                                                    |
+| 073 library a11y / PR #72 | Engineer `side-projects:w1:p3` is the sole branch writer; Orchestrator owns PR disposition; Product reviews read-only | `073-library-a11y` / `5c9155a`                            | Product found one verified 12px-oracle MAJOR after migration. Repair it RED→GREEN before external review or merge; the prior seven green checks are pre-repair evidence.                                  |
+| 074 App-root reachability | Engineer `side-projects:w1:p3`, paused behind 073                                                                     | `074-app-root-reachability` / `9ee8eb7`                   | Unpushed one-commit slice; preserve the inherited uncommitted blackboard copy. Same-family Quality PASS is not the independent-family gate. No edit until 073 merges and Orchestrator advances the phase. |
+| 075 user-simulation gate  | Quality `side-projects:w1:p4`                                                                                         | `075-user-simulation-gate` / `1ffdf4d`                    | Preserve eight modified and three untracked predecessor paths. Focused fuzz is green; packaged public Play remains BLOCKED after the 15-second pointer wait.                                              |
+| Product & Intent          | Product `side-projects:w1:p2`; no implementation worktree                                                             | read-only                                                 | Finish the PR #72 Product audit and hand a typed packet to Orchestrator; do not self-accept or edit.                                                                                                      |
+| 076 coordination          | Orchestrator `side-projects:w1:p1`                                                                                    | `076-orchestrator-control` / `fee8843` before this update | Sole writer for this blackboard, PR ordering, external review capture, and safe merge decisions. Must not edit 074 or 075.                                                                                |
 
 Migration receipts:
 
@@ -113,6 +158,7 @@ authorized.
   `ca527924a1b547f5a66a62e162d63815908a387faabace06e01f358e6304cd1e`.
   PR #72 is now blocked on this verified MAJOR in addition to the unavailable
   different-family verdict; do not merge the currently green SHA.
+
 - **074-app-root-reachability — Engineer; Quality reviews read-only.** Preserve the unpushed App-root test,
   DOM-cleanup correction, and coverage blocker record. The initial
   `ENOENT coverage/.tmp/coverage-0.json` happened after an earlier full
@@ -201,6 +247,7 @@ authorized.
   independent-family T009; do not push. The packaged close/relaunch/page-214
   journey remains intentionally deferred to 075 and is not claimed here. The
   formal Quality evidence is `/tmp/lectrice-074-quality-9ee8eb7.md`.
+
 - **075-user-simulation-gate — Quality.** This worktree is active and dirty;
   do not touch it from another worktree. Its first native RED has proven the
   libclang wrapper defect and the post-071 Library startup change. The critical

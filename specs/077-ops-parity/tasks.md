@@ -50,12 +50,12 @@
 - [x] T031 Run `pnpm typecheck`.
 - [x] T032 Run only the two targeted test files with one worker/fork.
 - [x] T033 Run formatting and `git diff --check`; commit locally, do not push.
-- [ ] T034 Product re-reviews acceptance at the immutable SHA.
-- [ ] T035 Quality checks canary discrimination, no false privacy claim and no
+- [x] T034 Product re-reviews acceptance at the immutable SHA.
+- [x] T035 Quality checks canary discrimination, no false privacy claim and no
       forbidden workflow/sync/backend scope.
-- [ ] T036 Save a different-family verdict bound to exact base/head/diff. Stop
+- [x] T036 Save a different-family verdict bound to exact base/head/diff. Stop
       if unavailable; do not relabel Sol/Terra as independent.
-- [ ] T037 Orchestrator owns PR/CI/merge only after T034–T036 are clean.
+- [x] T037 Orchestrator owns PR/CI/merge only after T034–T036 are clean.
 
 ## Deferred, not completed
 
