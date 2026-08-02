@@ -53,6 +53,7 @@ describe("AiTtsSettings session-secret setup", () => {
       name: "API key visibility",
     });
 
+    expect(screen.getByRole("button", { name: "Connect" })).toBeVisible();
     expect(input).toHaveAttribute("type", "password");
     expect(visibility).toHaveAttribute("aria-pressed", "false");
     expect(input).toHaveAccessibleDescription(
@@ -85,10 +86,16 @@ describe("AiTtsSettings session-secret setup", () => {
     expect(mocks.onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("labels the submit action as Update after initialization", async () => {
+  it("prioritizes the pending label during duplicate Update submissions", async () => {
+    let resolveInitialize!: () => void;
+    mocks.initialize.mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveInitialize = resolve;
+      }),
+    );
     mocks.useAiTts.mockReturnValue({
       initialized: true,
-      apiKey: null,
+      apiKey: "current-session-key",
       needsApiKey: false,
       initialize: mocks.initialize,
       error: null,
@@ -98,29 +105,13 @@ describe("AiTtsSettings session-secret setup", () => {
     });
 
     expect(screen.getByRole("button", { name: "Update" })).toBeVisible();
-  });
 
-  it("coalesces rapid duplicate Connect submissions while the first is pending", async () => {
-    let resolveInitialize!: () => void;
-    mocks.initialize.mockReturnValue(
-      new Promise<void>((resolve) => {
-        resolveInitialize = resolve;
-      }),
-    );
-    await act(async () => {
-      render(<AiTtsSettings onClose={mocks.onClose} />);
-    });
-
-    expect(screen.getByRole("button", { name: "Connect" })).toBeVisible();
-
-    fireEvent.change(screen.getByLabelText("ElevenLabs API Key"), {
-      target: { value: "one-explicit-submit" },
-    });
     const form = screen.getByLabelText("Connect ElevenLabs");
     fireEvent.submit(form);
     fireEvent.submit(form);
 
     expect(mocks.initialize).toHaveBeenCalledTimes(1);
+    expect(mocks.initialize).toHaveBeenCalledWith("current-session-key");
     expect(
       screen.getByRole("button", { name: "Connecting..." }),
     ).toBeDisabled();
