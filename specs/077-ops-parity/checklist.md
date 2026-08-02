@@ -7,6 +7,8 @@
 - [x] Legacy version-0 payload cannot rehydrate a key.
 - [x] Missing-version and current-version-1 injected-key payloads are rewritten
       as canonical version-1 raw bytes with no key.
+- [x] Malformed canary bytes are removed on parse error; state remains at safe
+      defaults without claiming corrupt preferences survived.
 - [x] Current persisted payload contains no key but retains safe preferences.
 - [x] Mocked settings/SQLite persistence calls contain zero canary occurrences.
 - [x] Fresh production-store hydration after setting a key yields null key,
@@ -43,4 +45,14 @@
 - Repair ESLint: `pnpm exec eslint src/stores/ai-tts-store.ts src/__tests__/unit/ai-tts-persistence.test.tsx` — exit 0; 0 errors and the same 3 pre-existing `console.debug` warnings.
 - `pnpm typecheck` — exit 0.
 - Final targeted tests: `pnpm exec vitest run src/__tests__/unit/ai-tts-persistence.test.tsx src/__tests__/ui/AiTtsSettings.test.tsx --pool=forks --poolOptions.forks.singleFork=true` — exit 0; 2 files, 10/10 passed.
+- Targeted Prettier on the four repair files and `git diff --check` — exit 0.
+
+## Engineer malformed-storage repair receipts (parent `1140e49`)
+
+- Quality MAJOR packet SHA-256: `9b796efc5339564ccce8ca5fb725ea0ee9bc54fab1ae3a010d6a3869e4d6984d`.
+- RED persistence: `pnpm exec vitest run src/__tests__/unit/ai-tts-persistence.test.tsx --pool=forks --poolOptions.forks.singleFork=true` — exit 1; 1 file, 1 failed and 7 passed. The malformed case proved safe default state and zero initialization, then received the unchanged raw value `{"state":{"apiKey":"INVALID-077-CANARY-DO-NOT-USE-PLAINTEXT-API-KEY","selectedVoiceId":"unterminated` instead of `null`.
+- GREEN persistence: the same command — exit 0; 1 file, 8/8 passed. The malformed entry is absent, state remains at defaults and aggregated local/session/settings/SQLite evidence contains zero canaries.
+- Repair ESLint: `pnpm exec eslint src/stores/ai-tts-store.ts src/__tests__/unit/ai-tts-persistence.test.tsx` — exit 0; 0 errors and the same 3 pre-existing `console.debug` warnings.
+- `pnpm typecheck` — exit 0.
+- Final targeted tests: `pnpm exec vitest run src/__tests__/unit/ai-tts-persistence.test.tsx src/__tests__/ui/AiTtsSettings.test.tsx --pool=forks --poolOptions.forks.singleFork=true` — exit 0; 2 files, 11/11 passed.
 - Targeted Prettier on the four repair files and `git diff --check` — exit 0.

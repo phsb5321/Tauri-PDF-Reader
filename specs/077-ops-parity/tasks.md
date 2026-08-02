@@ -29,6 +29,8 @@
       wrapped persistence action without exposing the key or looping hydration.
 - [x] T018 [US1] Run the repaired persistence and final targeted tests GREEN;
       record exact counts, raw-byte evidence and exits.
+- [x] T019 [US1] Plant malformed canary bytes RED, then remove the corrupt entry
+      on hydration error while retaining safe defaults and zero initialization.
 
 ## User Story 2 — accessible remote boundary
 

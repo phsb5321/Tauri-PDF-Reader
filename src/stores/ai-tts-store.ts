@@ -96,6 +96,7 @@ interface PersistedAiTtsPreferences {
 }
 
 const PERSISTENCE_VERSION = 1;
+const PERSISTENCE_KEY = "ai-tts-storage";
 
 function sanitizePersistedPreferences(
   persistedState: unknown,
@@ -234,7 +235,7 @@ export const useAiTtsStore = create<AiTtsState>()(
         }),
     }),
     {
-      name: "ai-tts-storage",
+      name: PERSISTENCE_KEY,
       version: PERSISTENCE_VERSION,
       partialize: (state) => ({
         selectedVoiceId: state.selectedVoiceId,
@@ -247,8 +248,13 @@ export const useAiTtsStore = create<AiTtsState>()(
         ...sanitizePersistedPreferences(persistedState),
       }),
       onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          localStorage.removeItem(PERSISTENCE_KEY);
+          return;
+        }
+
         // A store action uses persist's wrapped set to rewrite canonical bytes.
-        if (!error) state?.setApiKey(null);
+        state?.setApiKey(null);
       },
     },
   ),

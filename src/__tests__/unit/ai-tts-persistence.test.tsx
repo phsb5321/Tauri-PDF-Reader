@@ -128,6 +128,13 @@ function clearInMemorySession(): void {
   });
 }
 
+async function expectNoAutomaticInitialization(): Promise<void> {
+  const { unmount } = renderHook(() => useAiTts());
+  await act(async () => undefined);
+  expect(mocks.aiTtsInit).not.toHaveBeenCalled();
+  unmount();
+}
+
 describe("AI TTS session-secret persistence", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -168,11 +175,7 @@ describe("AI TTS session-secret persistence", () => {
       await useAiTtsStore.persist.rehydrate();
     });
 
-    const { unmount } = renderHook(() => useAiTts());
-    await act(async () => undefined);
-
-    expect(mocks.aiTtsInit).not.toHaveBeenCalled();
-    unmount();
+    await expectNoAutomaticInitialization();
   });
 
   it.each([
@@ -186,8 +189,7 @@ describe("AI TTS session-secret persistence", () => {
       await act(async () => {
         await useAiTtsStore.persist.rehydrate();
       });
-      const { unmount } = renderHook(() => useAiTts());
-      await act(async () => undefined);
+      await expectNoAutomaticInitialization();
 
       expect(useAiTtsStore.getState()).toMatchObject({
         apiKey: null,
@@ -195,8 +197,6 @@ describe("AI TTS session-secret persistence", () => {
         speed: 1.75,
         autoPageEnabled: false,
       });
-      expect(mocks.aiTtsInit).not.toHaveBeenCalled();
-
       const rawStorage = localStorage.getItem(STORAGE_KEY);
       expect(rawStorage).not.toContain(INVALID_API_KEY_CANARY);
       expect(JSON.parse(rawStorage ?? "{}")).toMatchObject({
@@ -208,10 +208,27 @@ describe("AI TTS session-secret persistence", () => {
         version: 1,
       });
       expect(persistenceEvidence()).not.toContain(INVALID_API_KEY_CANARY);
-
-      unmount();
     },
   );
+
+  it("removes malformed persisted bytes containing a plaintext key", async () => {
+    const malformedStorage = `{"state":{"apiKey":"${INVALID_API_KEY_CANARY}","selectedVoiceId":"unterminated`;
+    localStorage.setItem(STORAGE_KEY, malformedStorage);
+
+    await act(async () => {
+      await useAiTtsStore.persist.rehydrate();
+    });
+    await expectNoAutomaticInitialization();
+
+    expect(useAiTtsStore.getState()).toMatchObject({
+      apiKey: null,
+      selectedVoiceId: "21m00Tcm4TlvDq8ikWAM",
+      speed: 1,
+      autoPageEnabled: true,
+    });
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+    expect(persistenceEvidence()).not.toContain(INVALID_API_KEY_CANARY);
+  });
 
   it("serializes only safe preferences after a key is set", () => {
     act(() => {
