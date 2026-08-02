@@ -2,6 +2,294 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #38 — 02/08/2026 13:54 BRT (operational-parity audit)
+
+`OPS-PARITY-AUDITED` was emitted before this worktree was created. The audit is
+bound to `origin/main` `1ffdf4db164ed758b5fece36b5040f69a4f7d371`, migration
+owner map `b62ba2fabd0d5771f87c7e85584d2dbb342bb58e`, Product packet
+`ea893ff18b362e4b68ebb0d08db880b72c384afb7cc0b96a0a4ad850811b5073`,
+and Quality packet
+`2f02c3b4740e439a6550272eb0bb3b7bc42d95fc8c93c349aa7627aaf0c23dc0`,
+plus Engineer feasibility packet
+`165e9166fa16c013e4b8be91ae6c5cdaf1f6e9483de1eb4b5527d27563aa8a68`.
+The complete matrix and falsifiers are in
+`specs/077-ops-parity/gap-matrix.md`.
+
+| Surface | Authoritative owner | Worktree / HEAD | Disposition |
+| --- | --- | --- | --- |
+| 073 library a11y / PR #72 | Engineer `side-projects:w1:p3` branch writer; Orchestrator PR disposition; Product read-only reviewer | `073-library-a11y` / `2264163debf87db81f5f849be2eff2a622ec24e5` | Product's relative-font-size MAJOR is closed: targeted 57/57, lint, typecheck and diff checks green. Commit is clean, ahead one and unpushed. Different-family verdict remains unavailable; do not push, reserve CI or merge. |
+| 077 ops-parity first slice | Orchestrator seeds SpecKit once, then Engineer `side-projects:w1:p3` is sole writer; Product and Quality review read-only | `077-ops-parity` / based on `1ffdf4d` plus this owner-map history | P0 local slice: strip current and legacy ElevenLabs keys from WebView persistence and disclose PDF-text egress accessibly before explicit Connect. No backend, workflow, sync, token, service or Notes mutation. |
+
+Product's verified causal finding is in current source: Zustand persists
+`apiKey` under `ai-tts-storage`, and the settings form has no disclosure that
+AI TTS sends PDF-derived text to ElevenLabs. Merely removing the field from
+`partialize` is insufficient: legacy version-0 payloads must be migrated so an
+old key cannot rehydrate and trigger `useAiTts` auto-initialization once after
+upgrade. The falsifier plants a legacy payload and proves the key never reaches
+rehydrated state or initialization.
+
+Quality's recommended Gitleaks canary is the next local control slice, not a
+substitute for fixing the live secret exposure. The installed Gitleaks is
+8.30.1, whose commands are `gitleaks dir` and `gitleaks git`; the stale
+`gitleaks protect --no-git` spelling in the audit recommendation must not be
+implemented.
+
+Engineer recommended reusing the existing `pnpm verify`, SpecKit, Specta/path
+ratchets and temp-dir/negative-control patterns rather than importing DeliCasa's
+`just`, lefthook or blackboard framework. That consolidation rule is accepted.
+Its Tauri-security-contract-first ordering predated Product's P0 finding; the
+verified S4 persistence takes precedence, while executable CSP/capability
+contracts remain the next architecture slice.
+
+**Pedro-gated and dormant:** every `.github/workflows/**` change; Notes/repo
+sync or exporter activation; a new repo/token/service/secret; public knowledge
+publishing. The one-way Notes architecture remains YAGNI until an approved P0/P1
+audience exists. Do not create a sink or edit shared Notes main in this slice.
+
+## Iteration #37 — 02/08/2026 00:03 BRT (fleet control record)
+
+### Lossless native-Codex migration — 02/08/2026 13:38 BRT
+
+All four `home` predecessors and all required migration/SOTA briefs were read.
+The three `side-projects` specialist receipts were then observed directly in
+HERDR before this map was published. The old Orchestrator pane was told to
+freeze after receipt capture; `side-projects` now owns all coordination.
+
+| Surface | Authoritative owner | Worktree / HEAD | Disposition |
+| --- | --- | --- | --- |
+| `main` | read-only shared base | repository root / `1ffdf4d` | Clean and equal to `origin/main`; no writer. |
+| 072 E2E harness | Orchestrator classification queue; no writer | `.claude/worktrees/agent-a9f6ebb6f76486b2e` / `909eacd` | Clean committed harness; preserve and do not duplicate until classified after 073/074. |
+| 073 library a11y / PR #72 | Engineer `side-projects:w1:p3` is the sole branch writer; Orchestrator owns PR disposition; Product reviews read-only | `073-library-a11y` / `5c9155a` | Product found one verified 12px-oracle MAJOR after migration. Repair it RED→GREEN before external review or merge; the prior seven green checks are pre-repair evidence. |
+| 074 App-root reachability | Engineer `side-projects:w1:p3`, paused behind 073 | `074-app-root-reachability` / `9ee8eb7` | Unpushed one-commit slice; preserve the inherited uncommitted blackboard copy. Same-family Quality PASS is not the independent-family gate. No edit until 073 merges and Orchestrator advances the phase. |
+| 075 user-simulation gate | Quality `side-projects:w1:p4` | `075-user-simulation-gate` / `1ffdf4d` | Preserve eight modified and three untracked predecessor paths. Focused fuzz is green; packaged public Play remains BLOCKED after the 15-second pointer wait. |
+| Product & Intent | Product `side-projects:w1:p2`; no implementation worktree | read-only | Finish the PR #72 Product audit and hand a typed packet to Orchestrator; do not self-accept or edit. |
+| 076 coordination | Orchestrator `side-projects:w1:p1` | `076-orchestrator-control` / `fee8843` before this update | Sole writer for this blackboard, PR ordering, external review capture, and safe merge decisions. Must not edit 074 or 075. |
+
+Migration receipts:
+
+- `MIGRATION-CAPTURED old=w2B:p2 role=Product head=1ffdf4d owned=none prs=72 next=read-only-Product-revalidation-of-PR72-and-handoff-to-w1:p1 blockers=#72-independent-family-verdict-unavailable;#075-public-Play-non-clickable-after-15s`
+- `MIGRATION-CAPTURED old=w2B:p4 role=Engineer head=9ee8eb7723d23e38f172e408761d4ee3b22f6dee owned=/home/notroot/Documents/Code/personal/tauri-pdf-reader-074-app-root-reachability prs=72 next=hold-074-read-only-for-reconciled-owner-map blockers=independent-family-review-unavailable;074-unpushed`
+- `MIGRATION-CAPTURED old=w2B:p3 role=Quality head=1ffdf4db164ed758b5fece36b5040f69a4f7d371 owned=/home/notroot/Documents/Code/personal/tauri-pdf-reader-075-user-simulation-gate prs=72 next=reconcile-and-adopt-075-WIP blockers=native-play-public-pointer-remains-BLOCKED-after-1200x800-diagnostic`
+- `MIGRATION-CAPTURED old=w2B:p1 role=Orchestrator head=1ffdf4db164ed758b5fece36b5040f69a4f7d371 owned=/home/notroot/Documents/Code/personal/tauri-pdf-reader-076-orchestrator-control prs=72 next=publish-reconciled-owner-map-then-capture-PR72-independent-family-verdict blockers=PR72-independent-family-review-unavailable;075-native-public-Play-non-clickable-after-15s`
+
+**Phase transition:** Engineer first repairs Product's verified #72 12px-oracle
+MAJOR in the existing 073 worktree: add a planted `0.5rem` RED, make the
+first-party font-size inventory resolve the shipped `px`, `rem`, and token/fallback
+forms and fail closed on unsupported declarations, then record targeted GREEN,
+lint, typecheck, and the immutable commit. Product re-reviews that SHA.
+Orchestrator then captures a typed different-family verdict bound to the current
+base/head; if clean and CI-green, Orchestrator merges #72 and verifies
+`state=MERGED`. Only then may Engineer update 074 onto the new `origin/main`,
+rerun the narrow post-rebase checks, and request a new immutable-SHA review.
+Quality keeps 075 paused except for read-only diagnosis until Orchestrator
+schedules its next single test/native slot. No competing heavy process is
+authorized.
+
+### Active ownership and gates
+
+- **073-library-a11y — Orchestrator PR disposition.** PR [#72] is the first reserved vm103
+  CI slot. The committed branch tip is `5c9155a`; it is tree-equivalent to the
+  same-family Quality-passed `e279918` content after a narrow DebugLogs repair.
+  All CI checks are green, including Contract Tests (6m07s), and Sonar main run
+  30720408650 is green on `1ffdf4d`. **Merge is nevertheless BLOCKED:** the
+  required saved different-family review is unavailable in this tool host.
+  Kimi completed source inspection through `glm-review`, but its queue client
+  response was not retained after the nonpersistent tool process exited, so it
+  is not admissible typed evidence. The same-family Terra review is contingency
+  evidence only, not an independent-family pass. Recovery is to run the saved
+  Kimi request from a persistent terminal session and attach its typed verdict;
+  do not merge #72 before that record exists.
+
+  **Product migration re-review — FAIL / MAJOR, 02/08/2026 13:39 BRT:** the
+  committed 12px contract validates `--text-xs` and literal `px` declarations
+  only. The exact existing expression accepts `.probe { font-size: 0.5rem; }`
+  with `undersized=[]`, even though it renders at 8px at the default root. The
+  shipped source inventory already contains literal `rem` declarations and
+  `var(...)` fallbacks, so narrowing the Product claim would discard a useful
+  existing guarantee. Required repair: resolve all first-party font-size forms
+  the inventory accepts, fail closed on unsupported forms, and retain a planted
+  `0.5rem` negative control that fails for the undersized-text reason. Packet:
+  `/tmp/lectrice-073-product-review-20260802-codex.md`, SHA-256
+  `ca527924a1b547f5a66a62e162d63815908a387faabace06e01f358e6304cd1e`.
+  PR #72 is now blocked on this verified MAJOR in addition to the unavailable
+  different-family verdict; do not merge the currently green SHA.
+- **074-app-root-reachability — Engineer; Quality reviews read-only.** Preserve the unpushed App-root test,
+  DOM-cleanup correction, and coverage blocker record. The initial
+  `ENOENT coverage/.tmp/coverage-0.json` happened after an earlier full
+  coverage process was yielded but not resumed/terminated, then a second full
+  coverage run started against the same reports directory. Vitest 2.1.9 uses a
+  shared `coverage/.tmp` and bare write, matching upstream race reports
+  #9378/#10111. This is a concurrency hypothesis, not a 074 product-code
+  failure. Once p3 releases the sole native slot, authorize exactly one
+  isolated serial coverage measurement with pre/post Vitest process audit:
+  metrics produced confirms the race; `ENOENT` with no competing Vitest
+  falsifies it. **Confirmed 02/08/2026 00:14 BRT:** the one audited run exited
+  0 with 70 files / 890 tests and 68.58 statements+lines, 91.41 branches, and
+  70.65 functions; pre/post audit found no competing coverage process. The
+  resulting ratchet is 68 / 91 / 70 / 68 and the coverage budget plus missing
+  074 SpecKit artifacts are updated in the 074 worktree. p4 is performing only
+  targeted lint/typecheck/diff, a scoped commit excluding the pre-existing
+  blackboard diff, then Product/Quality/different-family review; no push. 074
+  remains behind 073. Product acceptance stays the public Continue Reading
+  home and page-213 resume contract.
+
+  **Product approval, 02/08/2026 00:14 BRT:** PASS for this scoped headless
+  App-root reachability regression and its SpecKit artifacts: public App shell,
+  named Continue reading/progress, exact list-documents boundary, public Resume
+  to page 213, and the empty-App falsifier are all discriminating. This is not
+  independent-family adversarial evidence and not packaged-native completion;
+  p4 may mark Product task T008 complete, then must complete T007
+  lint/typecheck/diff, T009 saved different-family review, and T010 evidence
+  handoff before any push decision.
+
+  **Committed handoff:** p4 created unpushed
+  `7990a38e99d8c535460683e388c1991ad4528130`
+  (`test(home): gate App-root continue-reading reachability`), a scoped
+  ten-file commit excluding the inherited Iteration #37 blackboard edit. Its
+  evidence is: isolated coverage exit 0 (70 files / 890 tests; 68.58
+  statements+lines, 91.41 branches, 70.65 functions); targeted ESLint exit 0
+  (config-ignore warning only); typecheck, Prettier, and diff checks exit 0;
+  commit-hook related Vitest, ESLint/Prettier, and typecheck green. Product PASS
+  is saved in `.claude/reviews/074-product-review.md`. **Independent-family
+  gate UNAVAILABLE:** Kimi/DeepInfra review request
+  `20260802T031927-1447598-17768` timed out after 240 seconds and withdrew its
+  worker with zero verdict. This cannot satisfy T009; the commit remains
+  unpushed and merge-blocked. A read-only same-family Terra review is permitted
+  only for emergency defect discovery and must be labelled as degradation, not
+  an independent-family pass.
+
+  **Same-family emergency review — FAIL / MAJOR, 02/08/2026 00:25 BRT:**
+  `app-root-reachability.test.tsx` installs a permissive `mockInvoke`
+  implementation in `beforeEach`, while global setup only calls
+  `vi.clearAllMocks()`, which leaves implementations intact. The unknown-command
+  `Promise.resolve(null)` fallback can therefore leak into later serial files
+  and mask IPC behaviour. Required repair: local `afterEach` mock reset (or
+  equivalent safe isolation) plus a cross-file leakage regression. Reconcile
+  the stale `.claude/reviews/074-app-root-reachability.md` provenance that still
+  says coverage is unresolved. The App-root acceptance itself is strong; the
+  intentional packaged close/relaunch/page-214 gap remains a 075 task, not a
+  failure of this slice. This verdict is SAME-FAMILY degradation only and does
+  not satisfy T009.
+
+  **Repair and fresh same-family review — FAIL / MAJOR, 02/08/2026 00:35
+  BRT:** unpushed `55b9c1cf4ca180041608bdf8d5c97f0d44de0756` adds the correct
+  local `mockInvoke.mockReset()` and a same-worker two-file isolation harness;
+  its recorded RED omits only that reset. The first regression oracle is still
+  insufficient: `tests/app-root-mock-isolation.test.ts` checks only removal of
+  the `__lectriceAppRootMockInvoke` sentinel, not that the actual
+  `mockInvoke.getMockImplementation()` is `undefined`. Deleting the sentinel
+  while omitting `mockReset()` would therefore pass while the permissive IPC
+  implementation still leaks. Required repair: retain same-worker sequencing,
+  assert the real mock implementation is absent, and demonstrate RED with only
+  `mockReset()` omitted. This is a same-family emergency degradation finding;
+  it is not an independent-family pass. Keep 074 unpushed and merge-blocked.
+
+  **Second repair and same-family review — PASS, 02/08/2026 00:44 BRT:**
+  unpushed `9ee8eb7723d23e38f172e408761d4ee3b22f6dee` replaces the local reset
+  with `mockInvoke.mockRestore()` and makes the same-worker isolation module
+  import the real App test before asserting
+  `mockInvoke.getMockImplementation()` is `undefined`. Its recorded RED omits
+  only the local restore (the App acceptance test passes, then the direct mock
+  assertion fails); GREEN passes both tests. Targeted Prettier, ESLint,
+  typecheck, diff check, and the amend hook are recorded green. Coverage was
+  intentionally not rerun because the two `tests/**` regression files are
+  outside its denominator and the authorized isolated measurement is already
+  complete. The same-family emergency review found no BLOCKER, MAJOR, or
+  MINOR: importing/registering the App test before the direct spy assertion
+  proves that omitting only `mockRestore()` fails, so sentinel cleanup cannot
+  mask the leak. This limited PASS still cannot satisfy unavailable
+  independent-family T009; do not push. The packaged close/relaunch/page-214
+  journey remains intentionally deferred to 075 and is not claimed here. The
+  formal Quality evidence is `/tmp/lectrice-074-quality-9ee8eb7.md`.
+- **075-user-simulation-gate — Quality.** This worktree is active and dirty;
+  do not touch it from another worktree. Its first native RED has proven the
+  libclang wrapper defect and the post-071 Library startup change. The critical
+  loop is green after using public Ctrl+L; native-play renders but has an
+  enabled zero-geometry Play control and wrapped negative viewport. The
+  pointer-path replay is now precisely **BLOCKED**: the public
+  `.ai-playback-button` was non-clickable after 15 seconds
+  (`/tmp/lectrice-075-native-play-pointer.log`, exit 1). The Quality native
+  slot is released; no Lectrice tauri-driver/WebKit/Xvfb process remains (the
+  unrelated Xvfb `:99` belongs to web-automation and must not be stopped).
+  The earlier `browser.setWindowSize(1200, 800)` diagnostic remains evidence
+  to evaluate, not a claimed fix.
+
+### Frozen user-gate architecture
+
+The native actor uses only visible/a11y UI and keyboard inputs; deterministic
+observers own verdicts. First native adoption is an external-driver
+`@wdio/tauri-service` release-binary Library smoke, then a hermetic 585-page,
+page-213 Continue Reading/restart journey, then seeded fast-check model/replay.
+Native unavailability is `BLOCKED`, never skip-green. The visible Next
+persistence timing defect remains a post-073/074 red trace: zero writes before
+500 ms, exactly one correct write after, and identical toolbar/keyboard
+semantics.
+
+### 075 Product gate — 02/08/2026 00:08 BRT
+
+Product verdict is **CHANGES REQUIRED / native completion BLOCKED**. Quality
+must preserve diagnostics but may not count either forbidden actor route as a
+user journey:
+
+- `native-play.e2e.mjs` must replace DOM-executed element clicks with a
+  WebDriver element click or focused keyboard activation. If the public action
+  cannot work, retain evidence and report `BLOCKED`.
+- `critical-loop.e2e.mjs` may retain `window.__E2E__` operations only as an
+  explicitly labelled diagnostic lane; it must not be composed into
+  `test:user-gate` completion. Completion actions are public UI/a11y/keyboard
+  only.
+- The native task remains unchecked until both declared public-actor lanes are
+  green. A release binary, resolved libclang, screenshot, or bridge diagnostic
+  is not completion evidence.
+- The seeded model needs a versioned typed trace (revision, seed, path, run
+  budget, initial state, ordered actions, failed assertion, minimized trace,
+  replay command) and must accept recorded seed plus path without an LLM.
+
+**Quality reconciliation, 02/08/2026 00:12 BRT:** B1/B2/B3 and M1/M2 are
+implemented in the 075 worktree: the public pointer replay remains BLOCKED
+(exit 1 after 15 s), DOM-click evidence is diagnostic-only, `test:user-gate`
+excludes the bridge critical loop, the SpecKit artifacts state that disposition,
+and the seeded model accepts `FC_PATH` with a versioned typed JSON trace and an
+explicit 074 journey. Do not run fuzz/typecheck until p4's authorized 074
+coverage falsifier releases the shared slot.
+
+**Trace verification, 02/08/2026 00:15 BRT:** `pnpm test:fuzz` (2 tests) and
+`FC_SEED=17 FC_NUM_RUNS=2000 pnpm test:fuzz` pass. The planted oracle proves
+serialized minimized actions plus identical `FC_SEED` and `FC_PATH` replay;
+build revision is `HEAD`/`GITHUB_SHA` fail-closed, never unknown. 075 therefore
+remains BLOCKED only on the public native Play pointer path.
+
+**Product re-review, 02/08/2026 00:17 BRT:** accepts B1/B2/M1/M2. The only
+remaining Product blocker is the real packaged native-play public-pointer
+journey (non-clickable after 15 seconds); no DOM or bridge result is counted.
+
+**Quality migration receipt, 02/08/2026 13:36 BRT:** Quality adopted the 075
+worktree at `1ffdf4db164ed758b5fece36b5040f69a4f7d371` and preserved all
+uncommitted predecessor WIP. Focused `pnpm test:fuzz` passed 2/2, emitting
+`buildRevision=1ffdf4d`, seed `20260801`, and replay command
+`FC_SEED=20260801 FC_NUM_RUNS=100 pnpm test:fuzz`. No native rerun, edits, or
+074 interaction occurred. Native completion remains **BLOCKED**: after the
+1200×800 public-WebDriver pointer setup, the Play control was still not
+clickable after 15 seconds (`/tmp/lectrice-075-native-play-pointer.log`, exit
+1). This is a release gate, not a skip-green condition.
+
+The Quality worktree currently has its own `docs/agent-backlog-state.md` copy
+modified. It is not the durable coordination record: exclude it from the 075
+scoped commit, as p4 excludes the pre-existing 074 copy; 076 is authoritative
+for cross-slice state.
+
+**Explicit next feature journey — 074:** after the 075 scaffold is compliant,
+run the packaged, hermetic 585-page Continue Reading journey: Library → named
+Continue reading/title/Page 213 of 585 → public Resume → Document toolbar /
+Current page 213 / visible total → normal close → same-profile relaunch → same
+shelf and reader page. The following vertical uses visible Next and proves page
+214 after restart; hidden IPC timing is diagnostic only. Include rapid Resume,
+delayed/failed load, close-during-load, resize, and keyboard-only variants;
+retain original and minimized replay traces. This prevents generic native lanes
+from being mistaken for 074 acceptance.
+
+**Revert:** revert the coordination-only 076 PR; it changes no product code.
+
 ## Iteration #36 — 2026-08-01 (The reading home was finished, tested, merged — and unreachable)
 
 **Live state:** `origin/main` = `67101f3` after **#70 `070-verify-hardening`**,

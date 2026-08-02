@@ -1,7 +1,11 @@
-import { useState, useCallback, useEffect } from 'react';
-import { useAiTts } from '../../hooks/useAiTts';
-import { aiTtsCacheInfo, aiTtsCacheClear, type AiTtsCacheInfo } from '../../lib/api/ai-tts';
-import './AiTtsSettings.css';
+import { useState, useCallback, useEffect, useRef } from "react";
+import { useAiTts } from "../../hooks/useAiTts";
+import {
+  aiTtsCacheInfo,
+  aiTtsCacheClear,
+  type AiTtsCacheInfo,
+} from "../../lib/api/ai-tts";
+import "./AiTtsSettings.css";
 
 interface AiTtsSettingsProps {
   onClose?: () => void;
@@ -9,19 +13,20 @@ interface AiTtsSettingsProps {
 
 /** Format bytes to human-readable string */
 function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB'];
+  if (bytes === 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
   return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
 }
 
 export function AiTtsSettings({ onClose }: AiTtsSettingsProps) {
   const { initialized, apiKey, needsApiKey, initialize, error } = useAiTts();
-  const [inputKey, setInputKey] = useState(apiKey || '');
+  const [inputKey, setInputKey] = useState(apiKey || "");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const [cacheInfo, setCacheInfo] = useState<AiTtsCacheInfo | null>(null);
   const [isClearingCache, setIsClearingCache] = useState(false);
+  const submittingRef = useRef(false);
 
   // Load cache info on mount and after clearing
   const loadCacheInfo = useCallback(async () => {
@@ -29,7 +34,7 @@ export function AiTtsSettings({ onClose }: AiTtsSettingsProps) {
       const info = await aiTtsCacheInfo();
       setCacheInfo(info);
     } catch (err) {
-      console.error('Failed to load cache info:', err);
+      console.error("Failed to load cache info:", err);
     }
   }, []);
 
@@ -43,7 +48,7 @@ export function AiTtsSettings({ onClose }: AiTtsSettingsProps) {
       await aiTtsCacheClear();
       await loadCacheInfo();
     } catch (err) {
-      console.error('Failed to clear cache:', err);
+      console.error("Failed to clear cache:", err);
     } finally {
       setIsClearingCache(false);
     }
@@ -52,21 +57,23 @@ export function AiTtsSettings({ onClose }: AiTtsSettingsProps) {
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!inputKey.trim()) return;
+      if (submittingRef.current || !inputKey.trim()) return;
 
+      submittingRef.current = true;
       setIsSubmitting(true);
       try {
         await initialize(inputKey.trim());
         onClose?.();
       } finally {
+        submittingRef.current = false;
         setIsSubmitting(false);
       }
     },
-    [inputKey, initialize, onClose]
+    [inputKey, initialize, onClose],
   );
 
   const handleClear = useCallback(() => {
-    setInputKey('');
+    setInputKey("");
   }, []);
 
   return (
@@ -74,51 +81,102 @@ export function AiTtsSettings({ onClose }: AiTtsSettingsProps) {
       <div className="ai-tts-settings-header">
         <h3>AI TTS Settings</h3>
         {onClose && (
-          <button className="ai-tts-settings-close" onClick={onClose} title="Close">
+          <button
+            className="ai-tts-settings-close"
+            onClick={onClose}
+            title="Close"
+            aria-label="Close AI TTS settings"
+          >
             <svg viewBox="0 0 24 24" width="16" height="16">
-              <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <path
+                d="M18 6L6 18M6 6l12 12"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
             </svg>
           </button>
         )}
       </div>
 
-      <form onSubmit={handleSubmit} className="ai-tts-settings-form">
+      <form
+        onSubmit={handleSubmit}
+        className="ai-tts-settings-form"
+        aria-label="Connect ElevenLabs"
+      >
         <div className="ai-tts-settings-field">
           <label htmlFor="api-key">ElevenLabs API Key</label>
           <div className="ai-tts-settings-input-wrapper">
             <input
               id="api-key"
-              type={showKey ? 'text' : 'password'}
+              type={showKey ? "text" : "password"}
               value={inputKey}
               onChange={(e) => setInputKey(e.target.value)}
               placeholder="Enter your ElevenLabs API key"
               disabled={isSubmitting}
               autoComplete="off"
+              aria-describedby="ai-tts-egress-disclosure"
             />
             <button
               type="button"
               className="ai-tts-settings-toggle-visibility"
               onClick={() => setShowKey(!showKey)}
-              title={showKey ? 'Hide' : 'Show'}
+              title={showKey ? "Hide" : "Show"}
+              aria-label="API key visibility"
+              aria-pressed={showKey}
             >
               {showKey ? (
                 <svg viewBox="0 0 24 24" width="16" height="16">
-                  <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
-                  <line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  <path
+                    d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    fill="none"
+                    strokeLinecap="round"
+                  />
+                  <line
+                    x1="1"
+                    y1="1"
+                    x2="23"
+                    y2="23"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
                 </svg>
               ) : (
                 <svg viewBox="0 0 24 24" width="16" height="16">
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" strokeWidth="2" fill="none" />
-                  <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" fill="none" />
+                  <path
+                    d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    fill="none"
+                  />
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="3"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    fill="none"
+                  />
                 </svg>
               )}
             </button>
           </div>
           <p className="ai-tts-settings-hint">
-            Get your API key from{' '}
-            <a href="https://elevenlabs.io" target="_blank" rel="noopener noreferrer">
+            Get your API key from{" "}
+            <a
+              href="https://elevenlabs.io"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               elevenlabs.io
             </a>
+          </p>
+          <p id="ai-tts-egress-disclosure" className="ai-tts-settings-hint">
+            Requested PDF-derived text leaves this device and is sent to
+            ElevenLabs for speech generation.
           </p>
         </div>
 
@@ -141,14 +199,18 @@ export function AiTtsSettings({ onClose }: AiTtsSettingsProps) {
             onClick={handleClear}
             disabled={isSubmitting || !inputKey}
           >
-            Clear
+            Clear API key field
           </button>
           <button
             type="submit"
             className="ai-tts-settings-btn primary"
             disabled={isSubmitting || !inputKey.trim()}
           >
-            {isSubmitting ? 'Connecting...' : initialized ? 'Update' : 'Connect'}
+            {isSubmitting
+              ? "Connecting..."
+              : initialized
+                ? "Update"
+                : "Connect"}
           </button>
         </div>
       </form>
@@ -178,7 +240,7 @@ export function AiTtsSettings({ onClose }: AiTtsSettingsProps) {
           disabled={isClearingCache || !cacheInfo?.entryCount}
           title="Delete all cached audio files"
         >
-          {isClearingCache ? 'Clearing...' : 'Clear Cache'}
+          {isClearingCache ? "Clearing..." : "Clear Cache"}
         </button>
       </div>
     </div>
