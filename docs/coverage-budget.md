@@ -11,7 +11,35 @@ records the policy and the ratchet plan.
 - When you add tests that raise a metric, raise its floor to the new measured
   value in the same PR (ratchet up). Small steps are fine.
 
-## Current floor (065-session-typed, 2026-08-01)
+## Current floor (074-app-root-reachability, 02/08/2026)
+
+Measured with one isolated serial process:
+
+`pnpm exec vitest run --coverage --pool=forks --poolOptions.forks.singleFork`
+
+The run passed 70 files / 890 tests and produced:
+
+| Metric     | Measured | Floor (CI gate) | Target   |
+| ---------- | -------- | --------------- | -------- |
+| Lines      | 68.58%   | 68              | 80       |
+| Statements | 68.58%   | 68              | 80       |
+| Functions  | 70.65%   | 70              | 80       |
+| Branches   | 91.41%   | 91              | 80 (met) |
+
+The preceding main baseline recorded by 071 was 68.26% lines/statements,
+70.46% functions, and 91.33% branches. The App-root test raises each metric and
+closes the much larger unratcheted headroom left since 062. Floors remain the
+integer immediately below the measured value so deterministic runs retain a
+small margin.
+
+An earlier attempt did not produce a measurement: a yielded full coverage
+process was not resumed or terminated before another coverage process started
+against the same `coverage/.tmp`, and the second process failed writing
+`coverage-0.json`. A preflight confirmed no competing Vitest process before the
+successful command above. This is why the recorded baseline comes only from
+the isolated run.
+
+## Previous floor (065-session-typed, 01/08/2026)
 
 Measured via `pnpm test:coverage` (v8 provider):
 

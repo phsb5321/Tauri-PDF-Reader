@@ -51,22 +51,23 @@ export default defineConfig({
         // against a 62% floor, with no test deleted and no behaviour changed.
         "src/lib/bindings.ts",
       ],
-      // Coverage ratchet — last raised by 062-db-bootstrap (2026-08-01).
+      // Coverage ratchet — last raised by 074-app-root-reachability
+      // (02/08/2026).
       // Floors are pinned just under the MEASURED baseline at this commit, not
       // an aspirational 80%. They act as a REGRESSION gate — coverage may not
       // drop below the floor — and MUST be ratcheted UP as tests are added,
       // never silently down. Target: 80 across the board.
       // Policy + ratchet history: docs/coverage-budget.md.
       //
-      // 062 (2026-08-01): measured 62.33 / 90.90 / 67.55 / 62.33 for
-      // statements / branches / functions / lines. Covers this slice's
-      // `initDatabase` bootstrap tests plus the gains #59–#61 landed without
-      // ratcheting. See docs/coverage-budget.md for earlier baselines.
+      // 074 (02/08/2026): measured 68.58 / 91.41 / 70.65 / 68.58 for
+      // statements / branches / functions / lines after the App-root reading
+      // home regression test. See docs/coverage-budget.md for the isolated
+      // serial command, baseline, and earlier ratchets.
       thresholds: {
-        lines: 62,
-        functions: 67,
-        branches: 90,
-        statements: 62,
+        lines: 68,
+        functions: 70,
+        branches: 91,
+        statements: 68,
       },
     },
   },
