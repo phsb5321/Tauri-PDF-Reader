@@ -246,6 +246,10 @@ export const useAiTtsStore = create<AiTtsState>()(
         ...currentState,
         ...sanitizePersistedPreferences(persistedState),
       }),
+      onRehydrateStorage: () => (state, error) => {
+        // A store action uses persist's wrapped set to rewrite canonical bytes.
+        if (!error) state?.setApiKey(null);
+      },
     },
   ),
 );

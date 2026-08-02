@@ -23,6 +23,12 @@
 - [x] T014 [US1] Add the minimal versioned migration/current partialization that
       strips legacy keys and excludes current keys; make reset session-honest.
 - [x] T015 [US1] Run the storage tests GREEN; record exact counts/exits.
+- [x] T016 [US1] Add RED raw-storage cases for a missing version and current
+      version 1 with an injected key; both fail only on retained canary bytes.
+- [x] T017 [US1] Canonicalize every successful hydration through Zustand's
+      wrapped persistence action without exposing the key or looping hydration.
+- [x] T018 [US1] Run the repaired persistence and final targeted tests GREEN;
+      record exact counts, raw-byte evidence and exits.
 
 ## User Story 2 — accessible remote boundary
 

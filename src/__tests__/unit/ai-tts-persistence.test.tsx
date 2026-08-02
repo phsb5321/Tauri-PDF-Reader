@@ -62,19 +62,33 @@ vi.mock("@tauri-apps/plugin-sql", () => ({
 import { useAiTts } from "../../hooks/useAiTts";
 import { useAiTtsStore } from "../../stores/ai-tts-store";
 
+function seedStorage(
+  version: number | undefined,
+  selectedVoiceId: string,
+): void {
+  const payload: {
+    state: {
+      apiKey: string;
+      selectedVoiceId: string;
+      speed: number;
+      autoPageEnabled: boolean;
+    };
+    version?: number;
+  } = {
+    state: {
+      apiKey: INVALID_API_KEY_CANARY,
+      selectedVoiceId,
+      speed: 1.75,
+      autoPageEnabled: false,
+    },
+  };
+
+  if (version !== undefined) payload.version = version;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+}
+
 function seedVersionZeroStorage(): void {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({
-      state: {
-        apiKey: INVALID_API_KEY_CANARY,
-        selectedVoiceId: "safe-legacy-voice",
-        speed: 1.75,
-        autoPageEnabled: false,
-      },
-      version: 0,
-    }),
-  );
+  seedStorage(0, "safe-legacy-voice");
 }
 
 function storageEntries(storage: Storage): Record<string, string | null> {
@@ -160,6 +174,44 @@ describe("AI TTS session-secret persistence", () => {
     expect(mocks.aiTtsInit).not.toHaveBeenCalled();
     unmount();
   });
+
+  it.each([
+    { label: "no version", version: undefined, voice: "safe-no-version-voice" },
+    { label: "current version 1", version: 1, voice: "safe-version-one-voice" },
+  ])(
+    "canonicalizes raw storage after hydrating a $label payload with an extra key",
+    async ({ version, voice }) => {
+      seedStorage(version, voice);
+
+      await act(async () => {
+        await useAiTtsStore.persist.rehydrate();
+      });
+      const { unmount } = renderHook(() => useAiTts());
+      await act(async () => undefined);
+
+      expect(useAiTtsStore.getState()).toMatchObject({
+        apiKey: null,
+        selectedVoiceId: voice,
+        speed: 1.75,
+        autoPageEnabled: false,
+      });
+      expect(mocks.aiTtsInit).not.toHaveBeenCalled();
+
+      const rawStorage = localStorage.getItem(STORAGE_KEY);
+      expect(rawStorage).not.toContain(INVALID_API_KEY_CANARY);
+      expect(JSON.parse(rawStorage ?? "{}")).toMatchObject({
+        state: {
+          selectedVoiceId: voice,
+          speed: 1.75,
+          autoPageEnabled: false,
+        },
+        version: 1,
+      });
+      expect(persistenceEvidence()).not.toContain(INVALID_API_KEY_CANARY);
+
+      unmount();
+    },
+  );
 
   it("serializes only safe preferences after a key is set", () => {
     act(() => {
