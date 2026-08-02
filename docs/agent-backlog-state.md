@@ -2,6 +2,50 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #38 — 02/08/2026 13:54 BRT (operational-parity audit)
+
+`OPS-PARITY-AUDITED` was emitted before this worktree was created. The audit is
+bound to `origin/main` `1ffdf4db164ed758b5fece36b5040f69a4f7d371`, migration
+owner map `b62ba2fabd0d5771f87c7e85584d2dbb342bb58e`, Product packet
+`ea893ff18b362e4b68ebb0d08db880b72c384afb7cc0b96a0a4ad850811b5073`,
+and Quality packet
+`2f02c3b4740e439a6550272eb0bb3b7bc42d95fc8c93c349aa7627aaf0c23dc0`,
+plus Engineer feasibility packet
+`165e9166fa16c013e4b8be91ae6c5cdaf1f6e9483de1eb4b5527d27563aa8a68`.
+The complete matrix and falsifiers are in
+`specs/077-ops-parity/gap-matrix.md`.
+
+| Surface | Authoritative owner | Worktree / HEAD | Disposition |
+| --- | --- | --- | --- |
+| 073 library a11y / PR #72 | Engineer `side-projects:w1:p3` branch writer; Orchestrator PR disposition; Product read-only reviewer | `073-library-a11y` / `2264163debf87db81f5f849be2eff2a622ec24e5` | Product's relative-font-size MAJOR is closed: targeted 57/57, lint, typecheck and diff checks green. Commit is clean, ahead one and unpushed. Different-family verdict remains unavailable; do not push, reserve CI or merge. |
+| 077 ops-parity first slice | Orchestrator seeds SpecKit once, then Engineer `side-projects:w1:p3` is sole writer; Product and Quality review read-only | `077-ops-parity` / based on `1ffdf4d` plus this owner-map history | P0 local slice: strip current and legacy ElevenLabs keys from WebView persistence and disclose PDF-text egress accessibly before explicit Connect. No backend, workflow, sync, token, service or Notes mutation. |
+
+Product's verified causal finding is in current source: Zustand persists
+`apiKey` under `ai-tts-storage`, and the settings form has no disclosure that
+AI TTS sends PDF-derived text to ElevenLabs. Merely removing the field from
+`partialize` is insufficient: legacy version-0 payloads must be migrated so an
+old key cannot rehydrate and trigger `useAiTts` auto-initialization once after
+upgrade. The falsifier plants a legacy payload and proves the key never reaches
+rehydrated state or initialization.
+
+Quality's recommended Gitleaks canary is the next local control slice, not a
+substitute for fixing the live secret exposure. The installed Gitleaks is
+8.30.1, whose commands are `gitleaks dir` and `gitleaks git`; the stale
+`gitleaks protect --no-git` spelling in the audit recommendation must not be
+implemented.
+
+Engineer recommended reusing the existing `pnpm verify`, SpecKit, Specta/path
+ratchets and temp-dir/negative-control patterns rather than importing DeliCasa's
+`just`, lefthook or blackboard framework. That consolidation rule is accepted.
+Its Tauri-security-contract-first ordering predated Product's P0 finding; the
+verified S4 persistence takes precedence, while executable CSP/capability
+contracts remain the next architecture slice.
+
+**Pedro-gated and dormant:** every `.github/workflows/**` change; Notes/repo
+sync or exporter activation; a new repo/token/service/secret; public knowledge
+publishing. The one-way Notes architecture remains YAGNI until an approved P0/P1
+audience exists. Do not create a sink or edit shared Notes main in this slice.
+
 ## Iteration #37 — 02/08/2026 00:03 BRT (fleet control record)
 
 ### Lossless native-Codex migration — 02/08/2026 13:38 BRT
