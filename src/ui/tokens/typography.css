@@ -11,13 +11,18 @@
   --font-family-display: 'Space Grotesk', 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-family-mono: 'IBM Plex Mono', 'SF Mono', Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 
-  /* Font sizes */
-  --text-xs: 12px;
-  --text-sm: 14px;    /* Body text default */
-  --text-base: 16px;  /* Base size */
-  --text-lg: 18px;
-  --text-xl: 20px;    /* Headings */
-  --text-2xl: 24px;   /* Large headings */
+  /* Font sizes — rem, not px, so the whole scale tracks the reader's OS/browser
+   * text size. In px these are frozen at 16px-root and a low-vision user who
+   * raises their system font size gets nothing. Values match the previous px
+   * scale exactly at the default root, so nothing moves for anyone else.
+   * --text-xs is the floor: 12px at default root. Anything smaller is not a
+   * size the app is allowed to render text at. */
+  --text-xs: 0.75rem; /* 12px — smallest permitted */
+  --text-sm: 0.875rem; /* 14px — body text default */
+  --text-base: 1rem; /* 16px — base size */
+  --text-lg: 1.125rem; /* 18px */
+  --text-xl: 1.25rem; /* 20px — headings */
+  --text-2xl: 1.5rem; /* 24px — large headings */
 
   /* Line heights */
   --leading-tight: 1.25;

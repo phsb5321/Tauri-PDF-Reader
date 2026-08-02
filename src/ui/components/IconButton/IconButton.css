@@ -34,12 +34,12 @@
 
 .icon-button--primary {
   background-color: var(--color-accent);
-  color: var(--color-text-inverse);
+  color: var(--color-on-accent);
 }
 
 .icon-button--primary:hover:not(:disabled) {
   background-color: var(--color-accent-hover);
-  color: var(--color-text-inverse);
+  color: var(--color-on-accent);
 }
 
 .icon-button--ghost {
@@ -75,7 +75,7 @@
 
 .icon-button--active {
   background-color: var(--color-accent-alpha);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .icon-button--active:hover:not(:disabled) {

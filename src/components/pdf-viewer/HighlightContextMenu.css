@@ -27,7 +27,7 @@
 
 .context-menu-label {
   display: block;
-  font-size: 11px;
+  font-size: var(--text-xs);
   font-weight: 500;
   color: var(--text-secondary);
   text-transform: uppercase;
@@ -95,7 +95,7 @@
 }
 
 .context-menu-item-danger {
-  color: var(--error-color, #dc3545);
+  color: var(--color-error-text);
 }
 
 .context-menu-item-danger:hover {

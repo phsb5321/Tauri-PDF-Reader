@@ -36,5 +36,5 @@
 
 /* Selected state enhancements */
 .list-row--selected .session-item__icon {
-  color: var(--color-primary, #2563eb);
+  color: var(--color-accent-text);
 }

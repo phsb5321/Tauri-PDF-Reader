@@ -110,7 +110,7 @@
 
 .settings-nav-item.active {
   background: var(--primary-light, rgba(33, 150, 243, 0.1));
-  color: var(--primary-color, #2196f3);
+  color: var(--color-accent-text);
 }
 
 .settings-nav-item .nav-icon {
@@ -252,7 +252,7 @@
 .button-group-option.active {
   background: var(--primary-color, #2196f3);
   border-color: var(--primary-color, #2196f3);
-  color: white;
+  color: var(--color-on-accent);
 }
 
 /* Select dropdown */
@@ -524,7 +524,7 @@
   padding: var(--space-2) var(--space-4);
   font-size: 13px;
   font-weight: 500;
-  color: var(--color-text-inverse);
+  color: var(--color-on-accent);
   background: var(--primary-color, #2196f3);
   border: none;
   border-radius: 6px;

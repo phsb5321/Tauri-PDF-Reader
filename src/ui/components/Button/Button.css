@@ -28,7 +28,7 @@
 /* Variants */
 .button--primary {
   background-color: var(--color-accent);
-  color: var(--color-text-inverse);
+  color: var(--color-on-accent);
 }
 
 .button--primary:hover:not(:disabled) {

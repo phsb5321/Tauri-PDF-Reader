@@ -21,7 +21,13 @@ export function MemoryCapWarning({
   return (
     <div className="memory-cap-warning">
       <div className="warning-content">
-        <svg className="warning-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg
+          className="warning-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
           <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
         </svg>
         <div className="warning-text">
@@ -29,14 +35,27 @@ export function MemoryCapWarning({
           <p>
             Memory usage capped to {maxMegapixels} MP.
             {originalMegapixels && cappedMegapixels && (
-              <> Requested {originalMegapixels.toFixed(1)} MP, rendering at {cappedMegapixels.toFixed(1)} MP.</>
-            )}
-            {' '}Zoom out or increase limit in Settings to improve quality.
+              <>
+                {" "}
+                Requested {originalMegapixels.toFixed(1)} MP, rendering at{" "}
+                {cappedMegapixels.toFixed(1)} MP.
+              </>
+            )}{" "}
+            Zoom out or increase limit in Settings to improve quality.
           </p>
         </div>
         {onDismiss && (
-          <button className="dismiss-button" onClick={onDismiss} aria-label="Dismiss warning">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <button
+            className="dismiss-button"
+            onClick={onDismiss}
+            aria-label="Dismiss warning"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
@@ -59,8 +78,8 @@ export function MemoryCapWarning({
           align-items: flex-start;
           gap: 12px;
           padding: 12px 16px;
-          background: var(--info-bg, #e3f2fd);
-          border: 1px solid var(--info-border, #2196f3);
+          background: var(--color-info-bg);
+          border: 1px solid var(--color-info-border);
           border-radius: 8px;
           box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
@@ -69,7 +88,7 @@ export function MemoryCapWarning({
           width: 24px;
           height: 24px;
           flex-shrink: 0;
-          color: var(--info-color, #1565c0);
+          color: var(--color-info-text);
         }
 
         .memory-cap-warning .warning-text {
@@ -78,14 +97,14 @@ export function MemoryCapWarning({
 
         .memory-cap-warning .warning-text strong {
           display: block;
-          color: var(--info-color, #1565c0);
+          color: var(--color-info-text);
           font-size: 14px;
           margin-bottom: 4px;
         }
 
         .memory-cap-warning .warning-text p {
           margin: 0;
-          color: var(--info-text, #0d47a1);
+          color: var(--color-info-text);
           font-size: 13px;
           line-height: 1.4;
         }
@@ -95,7 +114,7 @@ export function MemoryCapWarning({
           background: none;
           border: none;
           cursor: pointer;
-          color: var(--info-color, #1565c0);
+          color: var(--color-info-text);
           opacity: 0.7;
           transition: opacity 0.2s;
         }
@@ -109,21 +128,6 @@ export function MemoryCapWarning({
           height: 18px;
         }
 
-        /* Dark theme support */
-        [data-theme="dark"] .memory-cap-warning .warning-content {
-          background: #1a237e;
-          border-color: #3f51b5;
-        }
-
-        [data-theme="dark"] .memory-cap-warning .warning-icon,
-        [data-theme="dark"] .memory-cap-warning .warning-text strong,
-        [data-theme="dark"] .memory-cap-warning .dismiss-button {
-          color: #64b5f6;
-        }
-
-        [data-theme="dark"] .memory-cap-warning .warning-text p {
-          color: #90caf9;
-        }
       `}</style>
     </div>
   );

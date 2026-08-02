@@ -99,7 +99,7 @@
 
 .empty-state__action--primary {
   background-color: var(--color-accent);
-  color: var(--color-text-inverse);
+  color: var(--color-on-accent);
 }
 
 .empty-state__action--primary:hover {
@@ -108,7 +108,7 @@
 
 .empty-state__action--secondary {
   background-color: transparent;
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .empty-state__action--secondary:hover {

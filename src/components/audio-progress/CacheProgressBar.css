@@ -37,7 +37,7 @@
 }
 
 .cache-progress-bar--complete .cache-progress-bar__label {
-  color: var(--color-success);
+  color: var(--color-success-text);
 }
 
 /* Compact variant */
@@ -51,6 +51,6 @@
 }
 
 .cache-progress-bar--compact .cache-progress-bar__label {
-  font-size: var(--text-xxs, 10px);
+  font-size: var(--text-xs);
   min-width: 24px;
 }

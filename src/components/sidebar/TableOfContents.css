@@ -219,5 +219,5 @@
 
 .toc-item-row.current .toc-item-page {
   background: var(--primary-color, #2196f3);
-  color: white;
+  color: var(--color-on-accent);
 }

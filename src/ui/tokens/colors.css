@@ -1,99 +1,318 @@
 /* Color Tokens — Lectrice brand
  * Palette: Catppuccin (Latte = light, Mocha = dark).
- * Token NAMES are stable; only values changed from the pre-brand Tailwind set.
  * Brand rule: blue = the app · mauve (--color-speak) = the voice (active TTS).
- * Hover/alpha derived with color-mix() so we never invent off-palette hex.
+ *
+ * Three layers, in order:
+ *   1. --ctp-*     the raw palette ramp. Data, not meaning. Components NEVER use it.
+ *   2. --color-*   semantic tokens. This is the only layer a component may name.
+ *   3. legacy      aliases for the pre-token vocabulary still spelled in ~40 CSS
+ *                  files. See the block at the bottom for why they exist.
+ *
+ * Every value is either a palette entry or a color-mix() of two palette entries,
+ * so nothing is invented off-palette AND every token stays resolvable by
+ * `src/__tests__/ui/design-tokens.test.ts`, which is what actually holds the
+ * contrast floor. Ratios in the comments below are measured, not estimated;
+ * change a value and the test tells you what you did.
  */
 
 :root {
-  /* Background colors — Catppuccin Latte */
-  --color-bg: #eff1f5;          /* base */
-  --color-bg-surface: #e6e9ef;  /* mantle */
-  --color-bg-toolbar: #e6e9ef;  /* mantle */
-  --color-bg-viewer: #dce0e8;   /* crust — area behind the page */
+  /* ── 1. Palette — Catppuccin Latte ─────────────────────────────────── */
+  --ctp-base: #eff1f5;
+  --ctp-mantle: #e6e9ef;
+  --ctp-crust: #dce0e8;
+  --ctp-surface0: #ccd0da;
+  --ctp-surface1: #bcc0cc;
+  --ctp-text: #4c4f69;
+  --ctp-subtext1: #5c5f77;
+  --ctp-subtext0: #6c6f85;
+  --ctp-blue: #1e66f5;
+  --ctp-mauve: #8839ef;
+  --ctp-red: #d20f39;
+  --ctp-peach: #fe640b;
+  --ctp-green: #40a02b;
+
+  /* ── 2a. Surfaces ──────────────────────────────────────────────────── */
+  --color-bg: var(--ctp-base);
+  --color-bg-surface: var(--ctp-mantle);
+  --color-bg-subtle: var(--ctp-crust); /* raised rows, thumbnail wells */
+  --color-bg-toolbar: var(--ctp-mantle);
+  --color-bg-viewer: var(--ctp-crust); /* area behind the page */
+  --color-bg-disabled: var(--ctp-crust);
   --color-bg-overlay: rgba(76, 79, 105, 0.45);
+  --color-track: var(--ctp-surface0); /* progress + loading rails */
 
-  /* Text colors */
-  --color-text-primary: #4c4f69;   /* text */
-  --color-text-secondary: #6c6f85; /* subtext0 */
-  --color-text-inverse: #eff1f5;
+  /* ── 2b. Text ──────────────────────────────────────────────────────────
+   * Measured against every text-bearing surface; the worst ratio is quoted.
+   * All clear WCAG AA 4.5:1 for normal text.
+   * `secondary` was --ctp-subtext0 and measured 4.06:1 on surface — it failed
+   * AA as a *defined* token, which is why the ramp shifted up one step. */
+  --color-text-primary: var(--ctp-text); /* 6.04 minimum */
+  --color-text-secondary: var(--ctp-subtext1); /* 4.73 minimum */
+  --color-text-tertiary: color-mix(
+    in srgb,
+    var(--ctp-subtext0) 55%,
+    var(--ctp-text)
+  ); /* 4.59 minimum */
 
-  /* Interactive colors — blue is the app */
-  --color-accent: #1e66f5;         /* blue */
-  --color-accent-hover: color-mix(in srgb, var(--color-accent), var(--color-text-primary) 18%);
-  --color-accent-alpha: color-mix(in srgb, var(--color-accent) 20%, transparent);
+  /* ── 2c. Accent — blue is the app ──────────────────────────────────── */
+  --color-accent: var(--ctp-blue); /* FILL only: 4.04 as text, AA-large */
+  --color-accent-hover: color-mix(
+    in srgb,
+    var(--color-accent),
+    var(--color-text-primary) 18%
+  );
+  --color-accent-alpha: color-mix(
+    in srgb,
+    var(--color-accent) 20%,
+    transparent
+  );
+  /* Accent rendered AS TEXT (links, quiet buttons) needs the darker cut. */
+  --color-accent-text: color-mix(
+    in srgb,
+    var(--ctp-blue) 64%,
+    var(--ctp-text)
+  ); /* 4.52 minimum */
+  --color-on-accent: #ffffff; /* 4.91 on --color-accent */
+  --color-on-dark: #ffffff;
+  --color-text-inverse: var(--color-on-dark); /* legacy ambiguous name */
 
-  /* Voice / TTS — mauve is the voice */
-  --color-speak: #8839ef;          /* mauve */
+  /* ── 2d. Voice / TTS — mauve is the voice ──────────────────────────── */
+  --color-speak: var(--ctp-mauve);
   --color-speak-alpha: color-mix(in srgb, var(--color-speak) 16%, transparent);
+  --color-speak-text: color-mix(
+    in srgb,
+    var(--ctp-mauve) 80%,
+    var(--ctp-text)
+  ); /* 4.57 minimum */
 
-  /* Semantic colors */
-  --color-error: #d20f39;    /* red */
-  --color-warning: #fe640b;  /* peach */
-  --color-success: #40a02b;  /* green */
-  --color-info: #1e66f5;     /* blue */
+  /* ── 2e. Semantics — `-text` variants clear AA; the bare token is a fill ── */
+  --color-error: var(--ctp-red);
+  --color-error-text: color-mix(
+    in srgb,
+    var(--ctp-red) 77%,
+    var(--ctp-text)
+  ); /* 4.60 minimum */
+  --color-error-bg: color-mix(
+    in srgb,
+    var(--ctp-red) 10%,
+    var(--color-bg-surface)
+  );
+  --color-error-border: color-mix(
+    in srgb,
+    var(--ctp-red) 35%,
+    var(--color-bg-surface)
+  );
+  --color-error-hover: color-mix(
+    in srgb,
+    var(--ctp-red) 8%,
+    var(--color-bg-surface)
+  );
 
-  /* UI Element colors */
-  --color-border: #ccd0da;        /* surface0 */
+  --color-warning: var(--ctp-peach);
+  --color-warning-text: color-mix(
+    in srgb,
+    var(--ctp-peach) 29%,
+    var(--ctp-text)
+  ); /* 4.61 minimum */
+  --color-warning-bg: color-mix(
+    in srgb,
+    var(--ctp-peach) 12%,
+    var(--color-bg-surface)
+  );
+  --color-warning-border: color-mix(
+    in srgb,
+    var(--ctp-peach) 35%,
+    var(--color-bg-surface)
+  );
+
+  --color-success: var(--ctp-green);
+  --color-success-text: color-mix(
+    in srgb,
+    var(--ctp-green) 29%,
+    var(--ctp-text)
+  ); /* 4.63 minimum */
+  --color-success-bg: color-mix(
+    in srgb,
+    var(--ctp-green) 12%,
+    var(--color-bg-surface)
+  );
+
+  --color-info: var(--ctp-blue);
+  --color-info-text: var(--color-accent-text);
+  --color-info-bg: color-mix(
+    in srgb,
+    var(--ctp-blue) 6%,
+    var(--color-bg-surface)
+  );
+  --color-info-border: color-mix(
+    in srgb,
+    var(--ctp-blue) 35%,
+    var(--color-bg-surface)
+  );
+
+  /* ── 2f. Chrome ────────────────────────────────────────────────────── */
+  --color-border: var(--ctp-surface0);
+  --color-border-hover: var(--ctp-surface1);
   --color-border-focus: var(--color-accent);
-  --color-button-bg: #e6e9ef;     /* mantle */
-  --color-button-bg-hover: #dce0e8;
-  --color-input-bg: #e6e9ef;
+  --color-button-bg: var(--ctp-mantle);
+  --color-button-bg-hover: var(--ctp-crust);
+  --color-input-bg: var(--ctp-mantle);
 
   /* TTS Highlight — the spoken sentence (voice = mauve) */
   --color-tts-highlight: var(--color-speak-alpha);
 }
 
-/* Dark mode — System preference (Catppuccin Mocha) */
+/* ── Dark — Catppuccin Mocha ───────────────────────────────────────────
+ * Only the palette ramp and the handful of tokens whose *derivation* differs
+ * are restated. Every semantic token above is defined in terms of --ctp-*, so
+ * re-pointing the ramp re-themes the whole system.
+ * Mocha's accents are pale on a dark base and already clear AA as text
+ * (blue 8.34, mauve 8.64, red 7.58, peach 9.92, green 11.81 on --ctp-mantle),
+ * so the `-text` cuts collapse back to the plain colour here. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --color-bg: #1e1e2e;          /* base */
-    --color-bg-surface: #181825;  /* mantle */
-    --color-bg-toolbar: #181825;  /* mantle */
-    --color-bg-viewer: #11111b;   /* crust */
+    --ctp-base: #1e1e2e;
+    --ctp-mantle: #181825;
+    --ctp-crust: #11111b;
+    --ctp-surface0: #313244;
+    --ctp-surface1: #45475a;
+    --ctp-text: #cdd6f4;
+    --ctp-subtext1: #bac2de;
+    --ctp-subtext0: #a6adc8;
+    --ctp-blue: #89b4fa;
+    --ctp-mauve: #cba6f7;
+    --ctp-red: #f38ba8;
+    --ctp-peach: #fab387;
+    --ctp-green: #a6e3a1;
+
     --color-bg-overlay: rgba(17, 17, 27, 0.7);
+    --color-bg-subtle: var(--ctp-surface0);
 
-    --color-text-primary: #cdd6f4;   /* text */
-    --color-text-secondary: #a6adc8; /* subtext0 */
-    --color-text-inverse: #11111b;
+    --color-accent-text: var(--ctp-blue); /* 8.34 */
+    --color-on-accent: var(--ctp-base); /* 7.79 on --color-accent */
+    --color-speak-text: var(--ctp-mauve); /* 8.64 */
+    --color-error-text: var(--ctp-red); /* 7.58 */
+    --color-warning-text: var(--ctp-peach); /* 9.92 */
+    --color-success-text: var(--ctp-green); /* 11.81 */
 
-    --color-accent: #89b4fa;         /* blue */
-    --color-speak: #cba6f7;          /* mauve */
-
-    --color-error: #f38ba8;    /* red */
-    --color-warning: #fab387;  /* peach */
-    --color-success: #a6e3a1;  /* green */
-    --color-info: #89b4fa;     /* blue */
-
-    --color-border: #313244;        /* surface0 */
-    --color-button-bg: #313244;     /* surface0 */
-    --color-button-bg-hover: #45475a;
-    --color-input-bg: #313244;
+    --color-button-bg: var(--ctp-surface0);
+    --color-button-bg-hover: var(--ctp-base);
+    --color-input-bg: var(--ctp-surface0);
   }
 }
 
-/* Dark mode — Explicit preference (Catppuccin Mocha) */
+/* Dark — explicit preference. Same body as the media query above; kept apart
+   because a media query cannot be re-scoped to an attribute selector. */
 [data-theme="dark"] {
-  --color-bg: #1e1e2e;
-  --color-bg-surface: #181825;
-  --color-bg-toolbar: #181825;
-  --color-bg-viewer: #11111b;
+  --ctp-base: #1e1e2e;
+  --ctp-mantle: #181825;
+  --ctp-crust: #11111b;
+  --ctp-surface0: #313244;
+  --ctp-surface1: #45475a;
+  --ctp-text: #cdd6f4;
+  --ctp-subtext1: #bac2de;
+  --ctp-subtext0: #a6adc8;
+  --ctp-blue: #89b4fa;
+  --ctp-mauve: #cba6f7;
+  --ctp-red: #f38ba8;
+  --ctp-peach: #fab387;
+  --ctp-green: #a6e3a1;
+
   --color-bg-overlay: rgba(17, 17, 27, 0.7);
+  --color-bg-subtle: var(--ctp-surface0);
 
-  --color-text-primary: #cdd6f4;
-  --color-text-secondary: #a6adc8;
-  --color-text-inverse: #11111b;
+  --color-accent-text: var(--ctp-blue);
+  --color-on-accent: var(--ctp-base);
+  --color-speak-text: var(--ctp-mauve);
+  --color-error-text: var(--ctp-red);
+  --color-warning-text: var(--ctp-peach);
+  --color-success-text: var(--ctp-green);
 
-  --color-accent: #89b4fa;
-  --color-speak: #cba6f7;
+  --color-button-bg: var(--ctp-surface0);
+  --color-button-bg-hover: var(--ctp-base);
+  --color-input-bg: var(--ctp-surface0);
+}
 
-  --color-error: #f38ba8;
-  --color-warning: #fab387;
-  --color-success: #a6e3a1;
-  --color-info: #89b4fa;
+/* ── More contrast, on request ─────────────────────────────────────────
+ * `prefers-contrast: more` is the OS-level "I can't read this" switch (macOS
+ * Increase Contrast, Windows contrast themes, GNOME high contrast). Honour it:
+ * collapse the muted text ramp onto the primary colour and harden the borders,
+ * which is where low-vision users actually lose the layout. */
+@media (prefers-contrast: more) {
+  :root,
+  :root:not([data-theme="light"]),
+  [data-theme="dark"] {
+    --color-text-secondary: var(--color-text-primary);
+    --color-text-tertiary: var(--color-text-primary);
+    --color-border: var(--ctp-subtext0);
+    --color-border-hover: var(--ctp-text);
+    --color-accent-text: var(--ctp-text);
+  }
+}
 
-  --color-border: #313244;
-  --color-button-bg: #313244;
-  --color-button-bg-hover: #45475a;
-  --color-input-bg: #313244;
+/* ── 3. Legacy aliases ─────────────────────────────────────────────────
+ * ~40 component stylesheets were written against a vocabulary this file never
+ * defined (`--text-primary`, not `--color-text-primary`). Because every call
+ * site spelled a fallback — `var(--text-primary, #1a1a1a)` — the miss was
+ * invisible at build time and each one silently painted a hard-coded LIGHT
+ * literal. In dark mode that put #1a1a1a text on the #1e1e2e base: a measured
+ * 1.06:1, i.e. invisible. 74 text rules failed AA that way, 21 of them at
+ * ~1.06:1.
+ *
+ * Defining the names here fixes every one of those call sites at once and lets
+ * them theme properly. It is a compatibility layer, not a second vocabulary:
+ * `src/__tests__/ui/design-tokens.test.ts` fails on any NEW undefined token, so
+ * this list can only shrink. Renaming the ~313 call sites is a separate
+ * mechanical PR with no behaviour change.
+ */
+:root,
+[data-theme="dark"] {
+  --text-primary: var(--color-text-primary);
+  --color-text-primary-dark: var(--color-text-primary);
+  --text-secondary: var(--color-text-secondary);
+  --text-tertiary: var(--color-text-tertiary);
+  --color-text-muted: var(--color-text-tertiary);
+
+  --primary-color: var(--color-accent);
+  --color-primary: var(--color-accent);
+  --primary-dark: var(--color-accent-hover);
+  --color-primary-hover: var(--color-accent-hover);
+  --accent-hover: var(--color-accent-hover);
+  --primary-light: var(--color-accent-alpha);
+  --color-primary-alpha: var(--color-accent-alpha);
+  --accent-color-light: var(--color-accent-alpha);
+
+  --bg-primary: var(--color-bg);
+  --background-primary: var(--color-bg);
+  --color-bg-primary: var(--color-bg);
+  --bg-secondary: var(--color-bg-surface);
+  --background-secondary: var(--color-bg-surface);
+  --color-bg-secondary: var(--color-bg-surface);
+  --color-bg-secondary-dark: var(--color-bg-surface);
+  --color-bg-surface-dark: var(--color-bg-surface);
+  --bg-tertiary: var(--color-bg-subtle);
+  --background-tertiary: var(--color-bg-subtle);
+
+  --hover-bg: var(--color-button-bg-hover);
+  --background-hover: var(--color-button-bg-hover);
+  --color-bg-hover: var(--color-button-bg-hover);
+  --color-bg-input: var(--color-input-bg);
+  --color-bg-input-dark: var(--color-input-bg);
+
+  --color-border-dark: var(--color-border);
+  --border-hover: var(--color-border-hover);
+
+  --progress-track: var(--color-track);
+  --loading-track: var(--color-track);
+
+  --error-bg: var(--color-error-bg);
+  --error-background: var(--color-error-bg);
+  --error-border: var(--color-error-border);
+  --error-text: var(--color-error-text);
+  --error-text-muted: var(--color-error-text);
+  --warning-bg: var(--color-warning-bg);
+  --warning-border: var(--color-warning-border);
+  --warning-text: var(--color-warning-text);
+
+  --highlight-color: var(--color-speak);
 }
