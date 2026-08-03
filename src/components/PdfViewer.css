@@ -127,7 +127,7 @@
   align-items: center;
   justify-content: center;
   background: var(--viewer-bg);
-  color: var(--error-color);
+  color: var(--color-error-text);
   text-align: center;
   padding: 2rem;
 }

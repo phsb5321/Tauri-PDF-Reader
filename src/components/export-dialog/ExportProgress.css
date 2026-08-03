@@ -65,7 +65,7 @@
 .export-progress__percent {
   font-size: var(--text-sm, 0.875rem);
   font-weight: var(--font-semibold, 600);
-  color: var(--color-primary, #2563eb);
+  color: var(--color-accent-text);
 }
 
 .export-progress__cancel {
@@ -97,7 +97,7 @@
   padding: var(--space-2, 8px) var(--space-3, 12px);
   background: var(--color-error-bg, #fef2f2);
   border-radius: var(--radius-md, 8px);
-  color: var(--color-error, #ef4444);
+  color: var(--color-error-text);
   font-size: var(--text-sm, 0.875rem);
 }
 

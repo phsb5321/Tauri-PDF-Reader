@@ -149,7 +149,7 @@
   background: var(--error-bg, #fff5f5);
   border: 1px solid var(--error-border, #ffcdd2);
   border-radius: 8px;
-  color: var(--error-color, #c62828);
+  color: var(--color-error-text);
   font-size: 14px;
 }
 
@@ -195,7 +195,7 @@
 
 .export-dialog-button-primary {
   background: var(--primary-color, #2196f3);
-  color: white;
+  color: var(--color-on-accent);
 }
 
 .export-dialog-button-primary:hover:not(:disabled) {

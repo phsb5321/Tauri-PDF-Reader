@@ -28,7 +28,7 @@
 }
 
 .audio-cache-progress--compact .audio-cache-progress__details {
-  font-size: var(--text-xxs, 10px);
+  font-size: var(--text-xs);
 }
 
 /* Loading state */

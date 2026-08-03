@@ -115,7 +115,7 @@
 .create-session-dialog__error {
   margin-top: var(--space-1, 4px);
   font-size: var(--text-sm, 0.875rem);
-  color: var(--color-error, #dc2626);
+  color: var(--color-error-text);
 }
 
 .create-session-dialog__doc-list {

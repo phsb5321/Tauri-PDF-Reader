@@ -31,7 +31,7 @@
   margin-bottom: var(--space-3, 12px);
   background: var(--color-error-bg, #fef2f2);
   border-radius: var(--radius-md, 8px);
-  color: var(--color-error, #ef4444);
+  color: var(--color-error-text);
   font-size: var(--text-sm, 0.875rem);
 }
 
@@ -41,7 +41,7 @@
   margin-bottom: var(--space-3, 12px);
   background: var(--color-success-bg, #ecfdf5);
   border-radius: var(--radius-md, 8px);
-  color: var(--color-success, #10b981);
+  color: var(--color-success-text);
   font-size: var(--text-sm, 0.875rem);
 }
 
@@ -167,7 +167,7 @@
   background: var(--color-error, #ef4444);
   border: none;
   border-radius: var(--radius-md, 8px);
-  color: var(--color-text-inverse);
+  color: var(--color-on-accent);
   cursor: pointer;
   transition: background-color 0.15s;
 }

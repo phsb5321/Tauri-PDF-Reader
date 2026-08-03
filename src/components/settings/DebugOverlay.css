@@ -5,11 +5,11 @@
   right: 16px;
   z-index: var(--z-floating);
   background: rgba(0, 0, 0, 0.85);
-  color: var(--color-text-inverse);
+  color: var(--color-on-dark);
   padding: var(--space-3) var(--space-4);
   border-radius: 8px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 11px;
+  font-size: var(--text-xs);
   min-width: 180px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(4px);
@@ -19,7 +19,7 @@
 .debug-overlay-header {
   font-size: 12px;
   font-weight: 600;
-  color: var(--color-text-inverse);
+  color: var(--color-on-dark);
   margin-bottom: var(--space-2);
   padding-bottom: 6px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
@@ -34,10 +34,10 @@
 }
 
 .debug-section-title {
-  font-size: 9px;
+  font-size: var(--text-xs);
   font-weight: 600;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--color-on-dark);
   margin-bottom: var(--space-1);
   letter-spacing: 0.5px;
 }
@@ -50,16 +50,16 @@
 }
 
 .debug-label {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--color-on-dark);
 }
 
 .debug-value {
   font-weight: 500;
-  color: var(--color-success);
+  color: var(--color-success-text);
 }
 
 .debug-value.debug-warning {
-  color: var(--color-warning);
+  color: var(--color-warning-text);
 }
 
 /* Dark theme adjustments */
@@ -75,17 +75,17 @@
 }
 
 [data-theme="light"] .debug-section-title {
-  color: rgba(0, 0, 0, 0.5);
+  color: var(--color-text-secondary);
 }
 
 [data-theme="light"] .debug-label {
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--color-text-secondary);
 }
 
 [data-theme="light"] .debug-value {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 [data-theme="light"] .debug-value.debug-warning {
-  color: var(--color-warning);
+  color: var(--color-warning-text);
 }

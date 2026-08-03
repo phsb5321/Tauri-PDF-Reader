@@ -1,9 +1,9 @@
-import { useState, useCallback } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { useState, useCallback } from "react";
+import { invoke } from "@tauri-apps/api/core";
 
 interface LogEntry {
   timestamp: string;
-  level: 'debug' | 'info' | 'warn' | 'error';
+  level: "debug" | "info" | "warn" | "error";
   target: string;
   message: string;
   context?: unknown;
@@ -13,15 +13,17 @@ export function DebugLogs() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [filter, setFilter] = useState<string>('debug');
+  const [filter, setFilter] = useState<string>("debug");
 
   const loadLogs = useCallback(async () => {
     setIsLoading(true);
     try {
-      const result = await invoke<LogEntry[]>('get_debug_logs', { minLevel: filter });
+      const result = await invoke<LogEntry[]>("get_debug_logs", {
+        minLevel: filter,
+      });
       setLogs(result);
     } catch (err) {
-      console.error('Failed to load logs:', err);
+      console.error("Failed to load logs:", err);
     } finally {
       setIsLoading(false);
     }
@@ -29,43 +31,39 @@ export function DebugLogs() {
 
   const copyLogs = useCallback(async () => {
     try {
-      const logsText = await invoke<string>('export_debug_logs', { format: 'text' });
+      const logsText = await invoke<string>("export_debug_logs", {
+        format: "text",
+      });
       await navigator.clipboard.writeText(logsText);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error('Failed to copy logs:', err);
+      console.error("Failed to copy logs:", err);
       // Fallback: try copying from state
       const fallbackText = logs
-        .map(l => `[${l.timestamp}] ${l.level.toUpperCase()} ${l.target} - ${l.message}`)
-        .join('\n');
+        .map(
+          (l) =>
+            `[${l.timestamp}] ${l.level.toUpperCase()} ${l.target} - ${l.message}`,
+        )
+        .join("\n");
       try {
         await navigator.clipboard.writeText(fallbackText);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       } catch {
-        console.error('Clipboard fallback also failed');
+        console.error("Clipboard fallback also failed");
       }
     }
   }, [logs]);
 
   const clearLogs = useCallback(async () => {
     try {
-      await invoke('clear_debug_logs');
+      await invoke("clear_debug_logs");
       setLogs([]);
     } catch (err) {
-      console.error('Failed to clear logs:', err);
+      console.error("Failed to clear logs:", err);
     }
   }, []);
-
-  const getLevelColor = (level: string) => {
-    switch (level) {
-      case 'error': return 'var(--error-color, #d32f2f)';
-      case 'warn': return 'var(--warning-color, #f57c00)';
-      case 'info': return 'var(--info-color, #1976d2)';
-      default: return 'var(--text-secondary, #666)';
-    }
-  };
 
   return (
     <div className="settings-section">
@@ -91,7 +89,7 @@ export function DebugLogs() {
           onClick={loadLogs}
           disabled={isLoading}
         >
-          {isLoading ? 'Loading...' : 'Load Logs'}
+          {isLoading ? "Loading..." : "Load Logs"}
         </button>
 
         <button
@@ -99,7 +97,7 @@ export function DebugLogs() {
           onClick={copyLogs}
           disabled={logs.length === 0}
         >
-          {copied ? 'Copied!' : 'Copy to Clipboard'}
+          {copied ? "Copied!" : "Copy to Clipboard"}
         </button>
 
         <button
@@ -120,8 +118,7 @@ export function DebugLogs() {
                   {new Date(log.timestamp).toLocaleTimeString()}
                 </span>
                 <span
-                  className="debug-log-level"
-                  style={{ color: getLevelColor(log.level) }}
+                  className={`debug-log-level debug-log-level--${log.level}`}
                 >
                   {log.level.toUpperCase()}
                 </span>
@@ -130,9 +127,7 @@ export function DebugLogs() {
               </div>
             ))}
           </div>
-          <div className="debug-logs-count">
-            {logs.length} log entries
-          </div>
+          <div className="debug-logs-count">{logs.length} log entries</div>
         </div>
       )}
 
@@ -170,13 +165,13 @@ export function DebugLogs() {
         }
 
         .debug-logs-button.primary {
-          background: var(--primary-color, #2196f3);
-          color: white;
-          border-color: var(--primary-color, #2196f3);
+          background: var(--color-accent);
+          color: var(--color-on-accent);
+          border-color: var(--color-accent);
         }
 
         .debug-logs-button.primary:hover:not(:disabled) {
-          background: var(--primary-dark, #1976d2);
+          background: var(--color-accent-hover);
         }
 
         .debug-logs-container {
@@ -213,6 +208,22 @@ export function DebugLogs() {
           font-weight: 600;
           flex-shrink: 0;
           width: 50px;
+        }
+
+        .debug-log-level--error {
+          color: var(--color-error-text);
+        }
+
+        .debug-log-level--warn {
+          color: var(--color-warning-text);
+        }
+
+        .debug-log-level--info {
+          color: var(--color-info-text);
+        }
+
+        .debug-log-level--debug {
+          color: var(--color-text-secondary);
         }
 
         .debug-log-target {

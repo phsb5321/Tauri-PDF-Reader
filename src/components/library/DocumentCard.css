@@ -75,9 +75,9 @@
   right: 8px;
   padding: 2px var(--space-2);
   background: var(--primary-color, #2196f3);
-  color: white;
+  color: var(--color-on-accent);
   border-radius: 12px;
-  font-size: 11px;
+  font-size: var(--text-xs);
   font-weight: 500;
 }
 
@@ -124,7 +124,7 @@
   justify-content: center;
   opacity: 0;
   transition: opacity 0.2s;
-  color: var(--error-color, #c62828);
+  color: var(--color-error-text);
 }
 
 .document-card--grid:hover .document-card-delete {
@@ -238,7 +238,7 @@
 
 .document-card--list .document-card-delete:hover {
   background: var(--error-bg, #ffebee);
-  color: var(--error-color, #c62828);
+  color: var(--color-error-text);
 }
 
 /* Shared Styles */
