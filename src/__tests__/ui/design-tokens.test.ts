@@ -20,7 +20,7 @@
  * Pixels are never the oracle here; the resolved token graph is.
  */
 
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, lstatSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
@@ -42,13 +42,30 @@ const MIN_TEXT_PX = 12;
 const stripCssComments = (css: string) =>
   css.replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\n]/g, " "));
 
+/**
+ * A symlink resolving outside `REPO_ROOT` must never be scanned as source: a
+ * symlinked directory would recurse arbitrarily far off-disk, and a symlinked
+ * file would be read as if it were repo content. `lstatSync` (not `statSync`)
+ * so a symlinked directory is never classified as a directory to recurse
+ * into, and every accepted file is additionally realpath-checked.
+ */
+function assertContained(path: string): string {
+  const real = realpathSync(path);
+  if (real !== REPO_ROOT && !real.startsWith(`${REPO_ROOT}/`))
+    throw new Error(`refusing to scan outside repo root: ${path} -> ${real}`);
+  return real;
+}
+
 function sourceFiles(dir: string): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir)) {
     if (entry === "node_modules") continue;
     const full = join(dir, entry);
-    if (statSync(full).isDirectory()) out.push(...sourceFiles(full));
-    else if (/\.(?:css|tsx|jsx)$/.test(entry)) out.push(full);
+    if (lstatSync(full).isDirectory()) out.push(...sourceFiles(full));
+    else if (/\.(?:css|tsx|jsx)$/.test(entry)) {
+      assertContained(full);
+      out.push(full);
+    }
   }
   return out;
 }
@@ -513,6 +530,61 @@ const FILL_ONLY_TOKENS = new Set([
   "--error-color",
 ]);
 
+/**
+ * CSS system-font and global keywords a `font` shorthand may carry instead of
+ * an explicit size. None resolve to a pixel value here (the UA or the
+ * cascade supplies it), so each is named explicitly rather than falling
+ * through to "no size token found" and being mistaken for a scanner miss.
+ */
+const UNRESOLVABLE_FONT_SHORTHAND_KEYWORDS = new Set([
+  "inherit",
+  "initial",
+  "unset",
+  "revert",
+  "revert-layer",
+  "caption",
+  "icon",
+  "menu",
+  "message-box",
+  "small-caption",
+  "status-bar",
+]);
+
+/** Split a `font` shorthand value into space-separated components, treating a
+ * `var(...)` call as one token even if its fallback contains spaces. */
+function shorthandTokens(value: string): string[] {
+  const tokens: string[] = [];
+  let depth = 0;
+  let current = "";
+  for (const char of value) {
+    if (char === "(") depth += 1;
+    if (char === ")") depth -= 1;
+    if (/\s/.test(char) && depth === 0) {
+      if (current) tokens.push(current);
+      current = "";
+    } else current += char;
+  }
+  if (current) tokens.push(current);
+  return tokens;
+}
+
+/**
+ * Extract the size component of a `font` shorthand value, ready to hand to
+ * `resolveFontSizePx`. Returns `undefined` for a known-unresolvable keyword
+ * (explicitly safe to skip) and throws for anything else it cannot locate.
+ */
+function shorthandFontSize(value: string): string | undefined {
+  const trimmed = value.trim();
+  if (UNRESOLVABLE_FONT_SHORTHAND_KEYWORDS.has(trimmed)) return undefined;
+
+  for (const token of shorthandTokens(trimmed)) {
+    const sizePart = token.split("/")[0];
+    if (/^[\d.]+(?:px|rem)$/.test(sizePart) || /^var\(/.test(sizePart))
+      return sizePart;
+  }
+  throw new Error(`unsupported font shorthand value: ${trimmed}`);
+}
+
 function fontSizeViolations(
   sources: readonly StylesheetSource[],
   tokens: ReadonlyMap<string, string>,
@@ -563,6 +635,29 @@ function fontSizeViolations(
         const rendered = Number(pixels.toFixed(4));
         violations.push(
           `${location}  font-size ${value.trim()} resolves to ${rendered}px, below ${MIN_TEXT_PX}px`,
+        );
+      } catch (error) {
+        violations.push(`${location}  ${(error as Error).message}`);
+      }
+    }
+
+    for (const match of css.matchAll(
+      /(?:^|[;{])\s*font\s*:\s*([^;{}]+?)\s*(?=;|})/gm,
+    )) {
+      const [, value] = match;
+      const location = sourceLocation(source, match.index ?? 0);
+
+      try {
+        const sizeValue = shorthandFontSize(value);
+        // A system-font keyword or a global CSS keyword has no resolvable
+        // pixel size here; the browser (or the inherited value) supplies it,
+        // so it is explicitly known-safe rather than silently skipped.
+        if (sizeValue === undefined) continue;
+        const pixels = resolveFontSizePx(sizeValue);
+        if (pixels >= MIN_TEXT_PX) continue;
+        const rendered = Number(pixels.toFixed(4));
+        violations.push(
+          `${location}  font ${value.trim()} resolves to ${rendered}px, below ${MIN_TEXT_PX}px`,
         );
       } catch (error) {
         violations.push(`${location}  ${(error as Error).message}`);
@@ -971,5 +1066,81 @@ describe("design tokens: WCAG AA contrast floor", () => {
       "probe.css:1  unsupported font-size value: 0.5em",
       "probe.css:2  unsupported font-size value: calc(1rem - 8px)",
     ]);
+  });
+
+  it("catches a `font` shorthand whose size is below 12px, not just `font-size`", () => {
+    const probe = {
+      file: join(REPO_ROOT, "probe.css"),
+      css: ".probe { font: 8px/1 sans-serif; }",
+      startLine: 1,
+    };
+
+    expect(fontSizeViolations([probe], new Map())).toEqual([
+      "probe.css:1  font 8px/1 sans-serif resolves to 8px, below 12px",
+    ]);
+  });
+
+  it("fails closed on a `font` shorthand whose size token cannot be resolved", () => {
+    const probe = {
+      file: join(REPO_ROOT, "probe.css"),
+      css: ".probe { font: var(--nope)/1.4 sans-serif; }",
+      startLine: 1,
+    };
+
+    expect(fontSizeViolations([probe], new Map())).toEqual([
+      "probe.css:1  undefined font-size token: --nope",
+    ]);
+  });
+
+  it("treats `font: inherit` and other system-font keywords as explicitly safe", () => {
+    const probe = {
+      file: join(REPO_ROOT, "probe.css"),
+      css: [
+        ".a { font: inherit; }",
+        ".b { font: caption; }",
+        ".c { font: menu; }",
+      ].join("\n"),
+      startLine: 1,
+    };
+
+    expect(fontSizeViolations([probe], new Map())).toEqual([]);
+  });
+
+  it("the three live `font: inherit` sites stay green", () => {
+    const typographyTokens = themeDeclarations(
+      readFileSync(join(SRC, "ui/tokens/typography.css"), "utf8"),
+      { colorScheme: "light", contrastMore: false },
+    );
+    expect(
+      fontSizeViolations(
+        [
+          {
+            file: join(SRC, "components/highlights/HighlightsPanel.css"),
+            css: readFileSync(
+              join(SRC, "components/highlights/HighlightsPanel.css"),
+              "utf8",
+            ),
+            startLine: 1,
+          },
+          {
+            file: join(SRC, "components/library/ContinueReading.css"),
+            css: readFileSync(
+              join(SRC, "components/library/ContinueReading.css"),
+              "utf8",
+            ),
+            startLine: 1,
+          },
+          {
+            file: join(SRC, "components/library/DocumentCard.css"),
+            css: readFileSync(
+              join(SRC, "components/library/DocumentCard.css"),
+              "utf8",
+            ),
+            startLine: 1,
+          },
+        ],
+        typographyTokens,
+      ),
+    ).toEqual([]);
   });
 });
