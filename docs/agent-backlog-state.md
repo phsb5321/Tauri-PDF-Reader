@@ -2,6 +2,18 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #40 — 04/08/2026 (079 token-oracle regression + shorthand hole closed)
+
+- **Branch:** `079-token-oracle` (off `origin/main` 9c279f6, worktree `../tauri-pdf-reader-079-token-oracle`).
+- **Regression found:** PR #72 squash-merged `9c279f6` from remote head `5c9155a`, but the real branch tip `2264163` — one commit ahead, the T010 `rem`-resolution repair — was never pushed. The blackboard said so in writing ("do not push or merge"), and `main` shipped without it. Rescued from local ref `rescue-073-t010` via `git cherry-pick -x 2264163` (clean, no conflicts) — recovered, not rewritten; original authorship preserved.
+- **D1 (rem gap):** closed by the cherry-pick alone. Baseline after recovery: 57/57.
+- **D2 (font shorthand hole, Codex BLOCKER on `2264163`):** the scanner matched only `font-size:`; `font: 8px/1 sans-serif;` set a genuinely sub-12px size and produced **zero** violations. Verified live: planted the probe in `HighlightsPanel.css`, ran the suite, captured **57/57 passing with the bug live** (the RED evidence). Fixed by extending `fontSizeViolations` to the `font` shorthand — a tokenizer respects `var(...)` parens, extracts the size component, resolves it through the existing `resolveFontSizePx` graph. Known-unresolvable keywords (`inherit`, `initial`, `unset`, `revert`, `caption`, `icon`, `menu`, `message-box`, `small-caption`, `status-bar`) are explicitly skip-listed with a comment — never a silent fallthrough. Re-ran the same probe post-fix: caught with `font 8px/1 sans-serif resolves to 8px, below 12px`.
+- **D3 (MINOR, same review):** `sourceFiles` used `statSync` with no path-containment check — a symlinked dir would recurse off-disk, a symlinked file would be read as repo content. Switched to `lstatSync` (never classifies a symlink as a directory to recurse into) plus an explicit `realpathSync` containment assertion on every accepted file. Verified: a symlink pointed at `/tmp` now throws `refusing to scan outside repo root` instead of being scanned; removed after the demo, baseline confirmed clean again.
+- **New tests (+4):** shorthand catches sub-12px; fails closed on an unresolvable `var()` inside a shorthand; `inherit`/`caption`/`menu` treated as explicitly safe; the three live `font: inherit` sites (`HighlightsPanel.css`, `ContinueReading.css`, `DocumentCard.css`) stay green.
+- **Verified:** `pnpm exec vitest run src/__tests__/ui/design-tokens.test.ts` → 61/61; `pnpm lint` → 0 errors / 92 warnings (unchanged baseline); `pnpm typecheck` clean. Frontend-only, no `cargo`.
+- **Revert:** `git revert <squash-commit>` on this one file (`src/__tests__/ui/design-tokens.test.ts`) — no token values changed, test-and-scanner scope only.
+- **Next slice:** none scheduled from this one; the fixed scanner did not surface any real sub-12px site in shipped CSS (checked — only the three known `inherit` sites and the typography floor itself reference `font`/`font-size` at all).
+
 ## Iteration #38 — 2026-08-04 (084 e2e-pointer: harness discriminated, geometry defect resolved as harness sequencing, not product)
 
 **Owner:** lectrice-qa → 084-e2e-pointer, `git worktree add

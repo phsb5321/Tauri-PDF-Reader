@@ -10,4 +10,5 @@
 | A fill token is reused as foreground text                                   | Reject fill-only roles in CSS `color:` declarations                     | Foreground-role assertion                      |
 | A legacy reference silently falls back again                                | Reject every undefined `var()` reference, even with a fallback          | Undefined-token assertion                      |
 | Higher minimum text clips dense controls                                    | Increase only values below 12px; preserve all other layout declarations | Targeted component CSS diff                    |
+| A relative or tokenized size bypasses the literal-pixel floor               | Resolve shipped size forms and reject unsupported explicit forms        | Planted `0.5rem` and unsupported-form controls |
 | Compatibility aliases become permanent debt                                 | Test prevents growth; wholesale renaming remains a mechanical follow-up | Non-goals and token-layer comment              |

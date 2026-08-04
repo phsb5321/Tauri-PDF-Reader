@@ -59,3 +59,12 @@ The three components now bind to measured warning, info, and on-accent pairs;
 the WCAG transfer breakpoint is the current 0.04045 value. A new committed-diff
 verdict is still due; this remains an emergency same-family degradation, never a
 cross-family pass.
+
+Product review on 02/08/2026 found one further MAJOR: the 12px contract scanned
+only literal `px`, so `.probe { font-size: 0.5rem; }` rendered at 8px while the
+gate returned no violation. The repair preserves criterion 6, resolves the
+`px`, `rem`, and typography `var()`/fallback forms shipped by first-party CSS
+and runtime style sheets, and reports unsupported explicit `font-size` forms
+with their source location. Its planted `0.5rem` control first reproduced RED
+with the original empty result, then passed only after producing the specific
+8px-below-12px diagnostic. Product re-review remains due.
