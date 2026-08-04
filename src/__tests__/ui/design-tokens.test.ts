@@ -574,7 +574,9 @@ function shorthandTokens(value: string): string[] {
  * (explicitly safe to skip) and throws for anything else it cannot locate.
  */
 function shorthandFontSize(value: string): string | undefined {
-  const trimmed = value.trim();
+  // `!important` is a cascade modifier, not part of the value; a bare
+  // keyword like `inherit !important` must skip-list the same as `inherit`.
+  const trimmed = value.trim().replace(/\s*!important\s*$/i, "");
   if (UNRESOLVABLE_FONT_SHORTHAND_KEYWORDS.has(trimmed)) return undefined;
 
   for (const token of shorthandTokens(trimmed)) {
@@ -1090,6 +1092,16 @@ describe("design tokens: WCAG AA contrast floor", () => {
     expect(fontSizeViolations([probe], new Map())).toEqual([
       "probe.css:1  undefined font-size token: --nope",
     ]);
+  });
+
+  it("treats a skip-listed keyword as safe even with an `!important` modifier", () => {
+    const probe = {
+      file: join(REPO_ROOT, "probe.css"),
+      css: ".a { font: inherit !important; }",
+      startLine: 1,
+    };
+
+    expect(fontSizeViolations([probe], new Map())).toEqual([]);
   });
 
   it("treats `font: inherit` and other system-font keywords as explicitly safe", () => {
