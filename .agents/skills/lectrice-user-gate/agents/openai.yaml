@@ -1,0 +1,4 @@
+interface:
+  display_name: "Lectrice User Gate"
+  short_description: "Gate Lectrice through real-user simulation"
+  default_prompt: "Use $lectrice-user-gate to prove this feature through a native user journey."

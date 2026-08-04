@@ -28,10 +28,15 @@ describe("Critical loop (load → render → synced karaoke → menu dispatch)",
       { timeout: 30000, timeoutMsg: "E2E bridge (window.__E2E__) never became ready" },
     );
     await expect($("[class*='toolbar']")).toBeExisting();
+    await browser.setWindowSize(1200, 800);
 
     // 2. Open the fixture PDF (no native dialog).
     const res = await browser.execute(async () => window.__E2E__.loadFixture());
     expect(res.pages).toBeGreaterThanOrEqual(2);
+
+    // The reading home is now the startup surface. Leave it through the real
+    // user command instead of giving the E2E bridge a test-only view setter.
+    await browser.keys(["Control", "l"]);
 
     // 3. REAL render: wait until a text-layer span actually carries the
     //    fixture's own words — proves pdf.js rendered the text, not just that an

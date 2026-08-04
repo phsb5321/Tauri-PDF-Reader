@@ -43,6 +43,22 @@ migration, `.github/workflows`/CODEOWNERS/release-tags, irreversible/destructive
 blast-radius > 1 service, MFA/secret/hardware/billing, or a required approval you
 cannot self-satisfy. NEVER `--admin`/`--no-verify`/force-push/direct-push to main.
 
+## Agent-Operated User Gate
+
+Invoke `$lectrice-user-gate` for every user-visible feature and for E2E, fuzz,
+soak, anomaly, or release-readiness work. The agent operating the packaged app
+is the actor; deterministic assertions are the judge. A missing native runner,
+fixture, public selector, or observable state is `BLOCKED`, never skipped-green.
+
+```bash
+pnpm test:fuzz       # seeded fast-check command model (PR-fast)
+pnpm test:user-gate  # fuzz + both existing packaged-app lanes
+```
+
+Record the seed and replay command for every fuzz failure. The actor may use
+only public UI/accessibility controls; observer instrumentation cannot perform
+actions on its behalf.
+
 ## Quick Reference
 
 ```bash
