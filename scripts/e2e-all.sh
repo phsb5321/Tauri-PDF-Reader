@@ -19,7 +19,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-NIX_PKGS="pkg-config openssl alsa-lib gnumake perl gtk3 webkitgtk_4_1 libayatana-appindicator librsvg speechd xvfb"
+NIX_PKGS="pkg-config openssl alsa-lib gnumake perl clang llvmPackages.libclang.lib gtk3 webkitgtk_4_1 libayatana-appindicator librsvg speechd xvfb"
+# Keep the standalone runner aligned with flake.nix. Merely putting libclang in
+# the Nix closure does not make its dlopen path discoverable to bindgen.
+export LIBCLANG_PATH="${LIBCLANG_PATH:-$(nix eval --raw nixpkgs#llvmPackages.libclang.lib)/lib}"
 
 echo "==================================================================="
 echo "Lane 1/2: critical-loop  (VITE_E2E bridge build, default features)"

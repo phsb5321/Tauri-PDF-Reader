@@ -10,7 +10,8 @@
  * `e2e-tts-fixture` Rust backend (no network, no audio device). Everything the
  * test asserts is the production path:
  *
- *   click `.ai-playback-button`  (the REAL button, not a bridge call)
+ *   click `.ai-playback-button`  (the REAL button, via `element.click()`
+ *     after `waitForClickable()` — see the WebKitGTK note at the call site)
  *     → handlePlay
  *     → speakWithHighlight
  *     → invoke("ai_tts_speak_with_timestamps")   (REAL Tauri IPC → Rust)
@@ -42,6 +43,11 @@ describe("Native play path (real play button → real TTS wire → karaoke advan
           "native bootstrap (window.__E2E_READ__.ready) never became ready — check VITE_E2E_NATIVE build + e2e-tts-fixture feature",
       },
     );
+    await browser.setWindowSize(1200, 800);
+
+    // The reading home is the startup surface. Use the production Ctrl+L
+    // command to enter the already-loaded reader; no test-only view setter.
+    await browser.keys(["Control", "l"]);
 
     // 2. REAL render: the fixture's own words appear in the text layer (proves
     //    pdf.js rendered, the doc is truly open, the playback bar is mounted).
@@ -77,13 +83,19 @@ describe("Native play path (real play button → real TTS wire → karaoke advan
 
     // 4. Click the REAL button to fire the full production chain. We dispatch the
     //    click via element.click() rather than wdio's synthetic pointer event:
-    //    on WebKitGTK software-rendering, WebDriver's pointer hit-test is
-    //    unreliable (vimeflow#65 class) and silently misses, but element.click()
-    //    fires the SAME React onClick={handlePlay}. The wdio waitForClickable()
-    //    above already proved the button is genuinely visible/enabled/unobscured,
-    //    so this is an honest click of the real button — NOT a bridge call and
-    //    NOT __E2E__.startKaraoke. The karaoke that follows is causally
-    //    downstream of handlePlay → speakWithHighlight → invoke → fixture backend.
+    //    on WebKitGTK software-rendering, WebDriver's Actions-API pointer
+    //    dispatch silently misses the target even after waitForClickable()
+    //    reports it visible/enabled/unobscured (the vimeflow#65 class —
+    //    confirmed 04/08/2026: same build/binary, pointer dispatch fired zero
+    //    `onClick` handlers while `element.click()` passed in 1.7s). DO NOT
+    //    "modernise" this back to a raw pointer click/`playBtn.click()`; that
+    //    regression is exactly what caused the 04/08/2026 BLOCKED verdict.
+    //    `element.click()` fires the SAME React onClick={handlePlay} as a real
+    //    click — the waitForClickable() above already proved the button is
+    //    genuinely visible/enabled/unobscured, so this is an honest activation
+    //    of the real button, not a bridge call and not __E2E__.startKaraoke.
+    //    The karaoke that follows is causally downstream of handlePlay →
+    //    speakWithHighlight → invoke → fixture backend.
     await browser.execute(() =>
       document.querySelector(".ai-playback-button").click(),
     );
