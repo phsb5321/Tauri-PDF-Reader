@@ -30,6 +30,7 @@ Move Lectrice forward by integrating the completed Codex-PASS branches and prepa
 - Do not drop 016/017 without approval.
 - Do not claim GUI validation without an actual GUI run by Pedro.
 - Do not skip Codex.
+- Do not merge a PR before `scripts/pre-merge-head-check.sh <n>` exits 0.
 - Do not start new feature work while the merge train is unresolved.
 - Do not break hexagonal architecture or the direct-`invoke()` ban.
 - Do not widen Tauri scopes.
@@ -83,6 +84,7 @@ Load: `CLAUDE.md`, `docs/agent-backlog-state.md`, this skill, `package.json`, `C
 ### P1 — branch verification
 
 - For each branch: `git merge-base <b> origin/main`, `git log --oneline origin/main..<b>`, `git diff --stat origin/main..<b>`. Confirm no secrets/generated junk.
+- **Before merging any PR, run `scripts/pre-merge-head-check.sh <pr-number>`.** It refuses (exit 1) when the local branch tip is ahead of the PR's remote head. `gh pr view` reports the REMOTE head, so a green check set proves nothing about a commit that was never pushed — PR #72 was squash-merged one commit behind its branch tip on 04/08/2026, shipping the slice with a verified accessibility MAJOR still open and unreferencing the repair.
 
 ### P2 — local integration merge train
 
