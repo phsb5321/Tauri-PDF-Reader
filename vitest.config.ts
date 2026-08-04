@@ -60,13 +60,17 @@ export default defineConfig({
       // Policy + ratchet history: docs/coverage-budget.md.
       //
       // 074 (02/08/2026): measured 68.58 / 91.41 / 70.65 / 68.58 for
-      // statements / branches / functions / lines after the App-root reading
-      // home regression test. See docs/coverage-budget.md for the isolated
-      // serial command, baseline, and earlier ratchets.
+      // statements / branches / functions / lines under an isolated
+      // singleFork run. CI runs `pnpm test:coverage` with the default
+      // (parallel) pool, which measures branches at 90.97% — pool mode
+      // affects which branches execute, so the floor must track CI's
+      // actual mode, not the isolated measurement. Branches floor stays 90.
+      // See docs/coverage-budget.md for the isolated serial command,
+      // baseline, and earlier ratchets.
       thresholds: {
         lines: 68,
         functions: 70,
-        branches: 91,
+        branches: 90,
         statements: 68,
       },
     },

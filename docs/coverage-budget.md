@@ -24,7 +24,7 @@ The run passed 70 files / 890 tests and produced:
 | Lines      | 68.58%   | 68              | 80       |
 | Statements | 68.58%   | 68              | 80       |
 | Functions  | 70.65%   | 70              | 80       |
-| Branches   | 91.41%   | 91              | 80 (met) |
+| Branches   | 91.41%   | 90              | 80 (met) |
 
 The preceding main baseline recorded by 071 was 68.26% lines/statements,
 70.46% functions, and 91.33% branches. The App-root test raises each metric and
@@ -38,6 +38,13 @@ against the same `coverage/.tmp`, and the second process failed writing
 `coverage-0.json`. A preflight confirmed no competing Vitest process before the
 successful command above. This is why the recorded baseline comes only from
 the isolated run.
+
+**Branches floor pinned at 90, not 91.** CI (`pnpm test:coverage`, ci.yml) runs
+the default parallel pool, not the isolated `singleFork` command above. That
+run measured branches at 90.97% (PR #81, 04/08/2026) — pool mode changes which
+branches actually execute, so the ratchet must track CI's real mode, not the
+isolated one. Ratchet branches to 91 only after a green CI run confirms
+`pnpm test:coverage` itself clears it.
 
 ## Previous floor (065-session-typed, 01/08/2026)
 
