@@ -227,10 +227,10 @@
 
 .ai-playback-progress-bar {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent-color, #7c3aed), #a855f7);
+  background: var(--color-speak);
   border-radius: 3px;
   transition: width 0.15s ease-out;
-  box-shadow: 0 0 8px rgba(124, 58, 237, 0.4);
+  box-shadow: 0 0 8px var(--color-speak-alpha);
 }
 
 .ai-playback-progress-text {

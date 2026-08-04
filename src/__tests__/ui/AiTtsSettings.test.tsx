@@ -43,6 +43,22 @@ describe("AiTtsSettings session-secret setup", () => {
 
   afterEach(cleanup);
 
+  it("opens at h2 with the cache section at h3, matching every sibling panel", async () => {
+    await act(async () => {
+      render(<AiTtsSettings onClose={mocks.onClose} />);
+    });
+
+    // This popover has no h1/h2 ancestor of its own (it mounts directly under
+    // the playback bar, unlike SettingsPanel/Dialog which open at h2) — so it
+    // must itself start the sequence at h2, not skip to h3.
+    expect(
+      screen.getByRole("heading", { level: 2, name: "AI TTS Settings" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("heading", { level: 3, name: "Audio Cache" }),
+    ).toBeVisible();
+  });
+
   it("masks the key and exposes stable visibility semantics and the egress disclosure", async () => {
     await act(async () => {
       render(<AiTtsSettings onClose={mocks.onClose} />);
