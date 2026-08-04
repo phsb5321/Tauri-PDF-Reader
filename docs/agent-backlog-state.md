@@ -2,6 +2,19 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #41 — 04/08/2026 (082 settings-menu: Settings wired to the shell, an already-built panel nobody mounted)
+
+- **Branch:** `082-settings-menu` (off `origin/main` 4fbd9de, worktree `../tauri-pdf-reader-082-settings-menu`).
+- **Defect:** the native `settings` menu action had no handler in `ReaderView`'s `commandHandlers`, so it silently no-opped (`useMenuActions.ts` treats an unhandled action as inert).
+- **Discovery that changed the plan:** the brief pointed at `AiTtsSettings` (the API-key/cache mini-panel inside `AiPlaybackBar`) as "the working panel" and framed the choice as lifting it out of the playback bar. Reading the tree first found something the brief didn't know about: `src/components/settings/SettingsPanel.tsx` — a complete, styled, 7-section app-wide settings dialog (appearance/rendering/tts/cache/highlights/shortcuts/telemetry), exported from `components/settings/index.ts`, and **mounted nowhere in the app**. Exactly the "shipped unreachable" defect class the brief itself names (#71/#69) — just a second, undiscovered instance of it.
+- **Decision:** wired `onSettings` to the already-built `SettingsPanel`, not to `AiTtsSettings`. `SettingsPanel` is the architecturally correct target for a generic "Settings" menu item (it already has a TTS section); `AiTtsSettings` stays exactly as-is, reachable only from the playback bar's gear icon, a separate quick-config surface. This is Option A's intent (settings reachable regardless of document state) achieved with zero new UI — smaller than either A or B as the brief posed them.
+- **Files:** `src/components/reader/ReaderView.tsx` (+`SettingsPanel` import, `showSettings` state, `onSettings` handler, unconditional mount inside `AppLayout` so it survives the reading-home ↔ document toggle); `CLAUDE.md` (corrected the stale "Settings ... have no panel" line).
+- **RED first:** new test `src/__tests__/ui/settings-menu.test.tsx` mounts `ReaderView` for real and fires the real `"settings"` menu action through the real `onMenuAction`/`dispatchMenuAction`/`useMenuActions` chain (only the Tauri `listen()` call is stubbed, same boundary substitution as every other shell test here). Failed on `main` with `TestingLibraryElementError: Unable to find role="dialog" and name "Settings"` — 2/2 red, pasted verbatim into the PR body.
+- **GREEN:** same 2 tests pass after the wiring; both the reading-home and inside-a-document states assert the dialog is present.
+- **Verified:** targeted suite (`settings-menu.test.tsx` + `reading-home.test.tsx` + `useMenuActions.test.ts` + `useCommandKeys.test.ts` + `AiTtsSettings.test.tsx`) all green, no regressions; `pnpm lint` 0 errors / 92 warnings (unchanged baseline); `pnpm typecheck` clean. Frontend-only.
+- **Out of scope, left alone:** `toggle-highlights` and `find` stay inert — no panel exists for either, and the brief explicitly forbids inventing one here.
+- **Revert:** `git revert <squash-commit>` — touches 3 files (ReaderView.tsx, CLAUDE.md, one new test file), one service.
+
 ## Iteration #40 — 04/08/2026 (079 token-oracle regression + shorthand hole closed)
 
 - **Branch:** `079-token-oracle` (off `origin/main` 9c279f6, worktree `../tauri-pdf-reader-079-token-oracle`).

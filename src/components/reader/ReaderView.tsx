@@ -18,6 +18,7 @@ import { Toolbar } from "../Toolbar";
 import { PdfViewer } from "../PdfViewer";
 import { LibraryView } from "../library/LibraryView";
 import { AiPlaybackBar } from "../playback-bar/AiPlaybackBar";
+import { SettingsPanel } from "../settings/SettingsPanel";
 import { useDocumentStore } from "../../stores/document-store";
 import { useAiTtsStore } from "../../stores/ai-tts-store";
 import { pdfService } from "../../services/pdf-service";
@@ -45,6 +46,12 @@ export function ReaderView() {
   // `pdfDocument` stays alive behind the home, which is what lets View ->
   // Library go back and forth without re-reading the file or losing the page.
   const [showLibrary, setShowLibrary] = useState(true);
+
+  // Settings lives at the shell level, not inside `AiPlaybackBar`, precisely
+  // because that bar only mounts once a document is open (below). A reader
+  // on the reading home — where they would go first to enter an API key —
+  // must be able to reach it too.
+  const [showSettings, setShowSettings] = useState(false);
 
   // Leave the home only once something is actually showing. A cancelled dialog
   // or a file that failed to load must not strand the reader on a blank page.
@@ -94,6 +101,7 @@ export function ReaderView() {
       void handleOpen();
     },
     onToggleLibrary: () => setShowLibrary((showing) => !showing),
+    onSettings: () => setShowSettings(true),
     onPlayPause: () => {
       void handleMenuPlayPause();
     },
@@ -167,6 +175,10 @@ export function ReaderView() {
       ) : (
         <PdfViewer />
       )}
+      <SettingsPanel
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+      />
     </AppLayout>
   );
 }

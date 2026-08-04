@@ -304,8 +304,11 @@ see:
   playback (`HighlightToolbar.tsx:118`, `HighlightContextMenu.tsx:38`,
   `AiPlaybackBar.tsx:278`) — whichever is open
 
-Settings, highlights and find have menu items but no panel to open, so they have
-no chord. An inert shortcut is indistinguishable from a broken one.
+Settings opens `SettingsPanel` (`src/components/settings/SettingsPanel.tsx`),
+mounted once in `ReaderView` regardless of whether a document is open, since
+that is where a new reader would go looking for it. Highlights and find have
+menu items but no panel to open, so they have no chord. An inert shortcut is
+indistinguishable from a broken one.
 
 ### The two surfaces
 
