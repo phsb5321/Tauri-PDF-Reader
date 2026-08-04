@@ -86,7 +86,7 @@ export function AiTtsSettings({ onClose }: AiTtsSettingsProps) {
   return (
     <div className="ai-tts-settings">
       <div className="ai-tts-settings-header">
-        <h3>AI TTS Settings</h3>
+        <h2>AI TTS Settings</h2>
         {onClose && (
           <button
             className="ai-tts-settings-close"
@@ -220,7 +220,7 @@ export function AiTtsSettings({ onClose }: AiTtsSettingsProps) {
 
       {/* Audio Cache Section */}
       <div className="ai-tts-settings-section">
-        <h4>Audio Cache</h4>
+        <h3>Audio Cache</h3>
         <p className="ai-tts-settings-hint">
           Generated audio is cached locally for instant playback.
         </p>
