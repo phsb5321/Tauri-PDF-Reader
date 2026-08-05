@@ -25,7 +25,7 @@
 }
 
 .library-title {
-  font-size: 24px;
+  font-size: var(--text-2xl);
   font-weight: 600;
   margin: 0;
   color: var(--text-primary, #1a1a1a);
@@ -45,7 +45,7 @@
 }
 
 .library-sort label {
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--text-secondary, #666);
 }
 
@@ -53,7 +53,7 @@
   padding: 6px var(--space-3);
   border: 1px solid var(--border-color, #ddd);
   border-radius: 6px;
-  font-size: 14px;
+  font-size: var(--text-sm);
   background: var(--bg-secondary, #fff);
   cursor: pointer;
 }
@@ -143,13 +143,13 @@
 
 .library-empty h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: var(--text-xl);
   color: var(--text-primary, #1a1a1a);
 }
 
 .library-empty p {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 
 .loading-spinner {
@@ -188,7 +188,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
+  font-size: var(--text-2xl);
   font-weight: bold;
   color: var(--color-error-text);
 }
@@ -200,7 +200,7 @@
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 
 .error-message button:hover {
