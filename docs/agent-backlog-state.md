@@ -2,6 +2,16 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #42 — 05/08/2026 (102-gitleaks: fail-closed secret-scan control landed)
+
+- **Branch:** `102-gitleaks` (off `origin/main` ada22bf, worktree `../tauri-pdf-reader-102-gitleaks`). T102 from specs/077-ops-parity/tasks.md — the ranked-slice #1 follow-on to 077.
+- **Control:** `.gitleaks.toml` extends Gitleaks 8.30.1 defaults with an `elevenlabs-api-key` rule (the app's own provider-secret class) and an allowlist limited to proven non-secrets (node_modules/target/dist/coverage paths, `sonar-project.properties` project key, deterministic cache-key fixtures). `tools/gitleaks-scan.sh` is the fail-closed entry point: `canary` (negative control), `dir`, `git`, `all`; missing binary or undetected canary exit 1.
+- **Discrimination proven:** default 8.30.1 config misses the low-entropy canary (`sk_`+40×A, entropy 0.47 — generic-api-key cannot claim it); the repo rule catches it with `RuleID: elevenlabs-api-key`. Canary is assembled from fragments at runtime into a temp dir — no literal secret-shaped bytes in repo content; the scanner can scan its own control (it caught its own first-draft literal constant — fixed).
+- **Baselines:** `dir` scan of the tree clean under the allowlist (the 3 default-config findings — sonar projectKey + two cache-key fixture hashes — verified non-secrets); `git` history scan clean over 132 commits. Real-dir allowlist proven (planted AWS-shaped + ElevenLabs-shaped keys under `node_modules/` are skipped).
+- **Entry points:** `pnpm scan:secrets`, `scan:secrets:git`, `scan:secrets:canary`, `scan:secrets:all`. Deliberately NOT wired into `pnpm verify` or any workflow (runner may lack the binary; workflow changes are Pedro-gated per 077 FR-012/013) — the local control stands alone, reversible.
+- **Verified:** `bash tools/gitleaks-scan.sh all` exit 0 (canary detected → dir clean → git clean); `git diff --check` clean. No TS changes (lint/typecheck unaffected; package.json scripts only).
+- **Revert:** revert this commit — deletes `.gitleaks.toml`, `tools/gitleaks-scan.sh`, package.json scripts and the three doc rows; one `git revert` PR.
+
 ## Iteration #41 — 04/08/2026 (082 settings-menu: Settings wired to the shell, an already-built panel nobody mounted)
 
 - **Branch:** `082-settings-menu` (off `origin/main` 4fbd9de, worktree `../tauri-pdf-reader-082-settings-menu`).
