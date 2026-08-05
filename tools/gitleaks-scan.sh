@@ -39,15 +39,19 @@ canary() {
 
   # Low-entropy by construction (repeated characters): generic-api-key cannot
   # claim it. Only the repo rule `elevenlabs-api-key` may. Findings print to
-  # stderr, so capture 2>&1; `|| true` keeps the capture from failing under
-  # `set -e` when gitleaks exits 1 on a finding.
-  local output
-  output="$(gitleaks dir "$tmp" -c "$CONFIG" --no-banner --no-color -v 2>&1 || true)"
-  if printf '%s\n' "$output" | grep -q "RuleID:.*elevenlabs-api-key" &&
+  # stderr, so capture 2>&1. Fail-closed on the tool's own exit code: a
+  # finding exits 1; 0 (rule broken — nothing found) or any other code (tool
+  # crash) must fail the control, so the exit code is inspected explicitly
+  # rather than assumed from a log-line grep.
+  local output exit_code
+  exit_code=0
+  output="$(gitleaks dir "$tmp" -c "$CONFIG" --no-banner --no-color -v 2>&1)" || exit_code=$?
+  if [[ "$exit_code" -eq 1 ]] &&
+    printf '%s\n' "$output" | grep -q "RuleID:.*elevenlabs-api-key" &&
     printf '%s\n' "$output" | grep -q "$CANARY_VALUE"; then
     echo "canary detected as elevenlabs-api-key — control discriminates."
   else
-    echo "FAIL-CLOSED: canary NOT detected — control is false-green." >&2
+    echo "FAIL-CLOSED: canary NOT detected (gitleaks exit $exit_code) — control is false-green." >&2
     exit 1
   fi
 }
