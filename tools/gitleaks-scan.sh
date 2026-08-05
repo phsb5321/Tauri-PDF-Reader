@@ -32,7 +32,7 @@ if ! command -v gitleaks >/dev/null 2>&1; then
 fi
 
 canary() {
-  local tmp
+  local tmp output exit_code planted
   tmp="$(mktemp -d)"
   trap 'rm -rf "$tmp"' RETURN
   printf 'elevenlabs key: %s\n' "$CANARY_VALUE" > "$tmp/canary.txt"
@@ -43,7 +43,6 @@ canary() {
   # finding exits 1; 0 (rule broken — nothing found) or any other code (tool
   # crash) must fail the control, so the exit code is inspected explicitly
   # rather than assumed from a log-line grep.
-  local output exit_code
   exit_code=0
   output="$(gitleaks dir "$tmp" -c "$CONFIG" --no-banner --no-color -v 2>&1)" || exit_code=$?
   if [[ "$exit_code" -eq 1 ]] &&
@@ -52,6 +51,25 @@ canary() {
     echo "canary detected as elevenlabs-api-key — control discriminates."
   else
     echo "FAIL-CLOSED: canary NOT detected (gitleaks exit $exit_code) — control is false-green." >&2
+    exit 1
+  fi
+
+  # Second arm: the canary must also trip the REAL working-tree scan. Planted
+  # inside \$ROOT so an allowlist regression (a future broad path entry) cannot
+  # blind the scan while the temp-dir arm still passes. Removed immediately;
+  # a stale leftover would make dir scans red — fail-closed, by design.
+  planted="$ROOT/tools/.gl-canary/canary.txt"
+  mkdir -p "$(dirname "$planted")"
+  trap 'rm -rf "$tmp" "$ROOT/tools/.gl-canary"' RETURN
+  printf 'elevenlabs key: %s\n' "$CANARY_VALUE" > "$planted"
+  exit_code=0
+  output="$(gitleaks dir "$ROOT" -c "$CONFIG" --no-banner --no-color -v 2>&1)" || exit_code=$?
+  if [[ "$exit_code" -eq 1 ]] &&
+    printf '%s\n' "$output" | grep -q "RuleID:.*elevenlabs-api-key" &&
+    printf '%s\n' "$output" | grep -q "$CANARY_VALUE"; then
+    echo "working-tree canary detected — scan path + allowlist verified."
+  else
+    echo "FAIL-CLOSED: working-tree canary NOT detected (gitleaks exit $exit_code) — scan path or allowlist is blind." >&2
     exit 1
   fi
 }

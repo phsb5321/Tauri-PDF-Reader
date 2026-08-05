@@ -8,9 +8,10 @@
 # only proven non-secrets. A finding is a red exit; a missing binary is a red
 # exit (fail-closed, never a silent green).
 #
-# Falsifier (gap-matrix Gitleaks row): the synthetic canary
-# (`tools/gitleaks-canary`, generated at scan time) must fail `gitleaks dir`
-# with rule id `elevenlabs-api-key`; a missing binary must not pass.
+# Falsifier (gap-matrix Gitleaks row): the synthetic canary (generated at
+# scan time into a temp dir by tools/gitleaks-scan.sh, never committed) must
+# fail `gitleaks dir` with rule id `elevenlabs-api-key`; a missing binary must
+# not pass.
 
 title = "Lectrice Gitleaks config (Gitleaks 8.30.1)"
 
@@ -35,9 +36,14 @@ paths = [
   '''(^|/)src-tauri/target/''',
   '''(^|/)dist/''',
   '''(^|/)coverage/''',
-  # SonarQube project key (phsb5321_lectrice_*) — configuration, not a secret.
-  '''sonar-project\.properties$''',
   # Deterministic audio-cache keys (SHA256 of text+voice+model per CLAUDE.md),
   # fixture data, not credentials.
   '''src/__tests__/fixtures/kokoro-af-heart-(multi|single)-chunk\.json$''',
+]
+# The SonarQube project key (phsb5321_lectrice*) is configuration, not a
+# secret. Scoped to the VALUE so sonar-project.properties itself stays
+# scannable — a future sonar.token/sonar.login would not match this pattern
+# and must be reported.
+regexes = [
+  '''phsb5321_lectrice[A-Za-z0-9_]*''',
 ]
