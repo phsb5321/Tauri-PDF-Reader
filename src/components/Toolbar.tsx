@@ -9,7 +9,16 @@ import { ZoomControls } from "./ZoomControls";
 import { SessionMenu } from "./session-menu/SessionMenu";
 import "./Toolbar.css";
 
-export function Toolbar() {
+interface ToolbarProps {
+  /**
+   * Fired when a reading session is restored. Toolbar only owns the menu
+   * surface; the shell (ReaderView) owns the document surface, so the open
+   * lands there — same shape as `LibraryView onDocumentSelect`.
+   */
+  onSessionRestored?: (sessionId: string) => void;
+}
+
+export function Toolbar({ onSessionRestored }: ToolbarProps) {
   const [isSessionMenuOpen, setIsSessionMenuOpen] = useState(false);
   const { openFile } = useFileDialog();
   const toolbarRef = useRef<HTMLDivElement>(null);
@@ -102,10 +111,12 @@ export function Toolbar() {
     }
   };
 
-  const handleSessionRestored = () => {
-    // Close the session menu after restoring
+  const handleSessionRestored = (sessionId: string) => {
+    // Close the session menu after restoring; the shell opens the session's
+    // document (previously a stub: "TODO: Open documents from the restored
+    // session" — restore closed the menu and opened nothing).
     setIsSessionMenuOpen(false);
-    // TODO: Open documents from the restored session
+    onSessionRestored?.(sessionId);
   };
 
   return (

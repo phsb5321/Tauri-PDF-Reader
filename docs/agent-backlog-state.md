@@ -12,6 +12,16 @@
 - **GREEN:** 3/3 (miss copy + scoped clear + unchanged empty-library copy); regression EmptyState 7 + reading-home 5 = 12/12. `pnpm lint` 0 errors / 92 warnings (baseline), `pnpm typecheck` clean, `git diff --check` clean. One file + one test file + doc entry.
 - **Revert:** `git revert <squash>` — one component file, one test file, one backlog entry.
 
+## Iteration #43 — 06/08/2026 (086-session-restore: restore opens the session's last-read document)
+
+- **Branch:** `086-session-restore` (off `origin/main` af99a226, worktree `../tauri-pdf-reader-086-session-restore`). Eng slice from the wave-2 dispatch; orchestrator holds the merge gate.
+- **Defect:** `Toolbar.handleSessionRestored` was a stub (`// TODO: Open documents from the restored session`) — SessionMenu UI, `restoreSession` store action and backend `session_restore` all work, but restore closed the menu and opened NOTHING. Same shipped-inert class as #82/#69.
+- **Wiring (prop drill, per brief point 5):** ReaderView owns the document surface → passes `onSessionRestored` to Toolbar (same shape as `LibraryView onDocumentSelect`) → Toolbar forwards through its existing `handleSessionRestored` (now takes `sessionId`), closes the menu, and the shell opens the document.
+- **Which document / page:** the SessionDocument with the highest `position` — backend returns them `ORDER BY sd.position ASC` ([V] `src-tauri/src/adapters/sqlite/session_repo.rs:46`), so the last-read doc is the max position; picked with an order-independent `reduce`. The session's `currentPage` is authoritative because NOTHING syncs SessionDocument pages to the library row while a session is active (no production caller of `updateDocumentInSession` — verified by grep). `resumeDocument` re-fetches the row (`libraryOpenDocument`) and lands on the ROW's page, so the shell lands on the saved page explicitly via `setCurrentPage` after a successful resume (store clamps to totalPages).
+- **RED first:** `src/__tests__/ui/session-restore.test.tsx` renders the real shell with the REAL Toolbar + SessionMenu (only PdfViewer/AiPlaybackBar stubbed, Tauri IPC mocked). On `main` both restore tests failed with `Unable to find an element by: [data-testid="pdf-viewer"]` — restore opened nothing (the bug). Empty-session test passed already (correct no-op). Failing output pasted into the PR body.
+- **GREEN:** 3/3 new; regression suite green: session-flow 20, SessionMenu 27, settings-menu 2, reading-home 5 = 54/54. `pnpm lint` 0 errors / 92 warnings (baseline), `pnpm typecheck` clean, `git diff --check` clean.
+- **Revert:** `git revert <squash>` — touches ReaderView.tsx, Toolbar.tsx, one new test file, one doc entry.
+
 ## Iteration #42 — 05/08/2026 (102-gitleaks: fail-closed secret-scan control landed)
 
 - **Branch:** `102-gitleaks` (off `origin/main` ada22bf, worktree `../tauri-pdf-reader-102-gitleaks`). T102 from specs/077-ops-parity/tasks.md — the ranked-slice #1 follow-on to 077.

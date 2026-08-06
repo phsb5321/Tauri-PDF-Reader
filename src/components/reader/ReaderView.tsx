@@ -32,11 +32,13 @@ import {
 import { useCommandKeys } from "../../hooks/useCommandKeys";
 import { usePageNavigation } from "../../hooks/usePageNavigation";
 import { aiTtsPause, aiTtsResume } from "../../lib/tauri-invoke";
+import { libraryGetDocument } from "../../lib/api/library";
+import { useSessionStore } from "../../stores/session-store";
 import type { Document } from "../../lib/schemas";
 import "./ReaderView.css";
 
 export function ReaderView() {
-  const { pdfDocument, currentPage, currentDocument, scrollPosition } =
+  const { pdfDocument, currentPage, currentDocument, scrollPosition, setCurrentPage } =
     useDocumentStore();
   const { openPdf, resumeDocument } = useOpenPdf();
 
@@ -65,6 +67,37 @@ export function ReaderView() {
   const handleOpen = useCallback(async () => {
     if (await openPdf()) setShowLibrary(false);
   }, [openPdf]);
+
+  // Restore a reading session: open the document the reader was last on (the
+  // SessionDocument with the highest `position` — the backend returns them
+  // ordered by position ASC, session_repo.rs:46) at ITS saved page. The
+  // session's page is authoritative here: nothing syncs SessionDocument
+  // currentPage to the library row while a session is active, so the row's
+  // page can be stale. A session with nothing openable leaves the library
+  // showing — the SessionMenu already reports missing documents, and the
+  // reader must never be stranded on a blank surface.
+  const handleSessionRestored = useCallback(
+    async (_sessionId: string) => {
+      const session = useSessionStore.getState().activeSession;
+      if (!session || session.documents.length === 0) return;
+
+      const lastRead = session.documents.reduce((latest, doc) =>
+        doc.position > latest.position ? doc : latest,
+      );
+      const document = await libraryGetDocument(lastRead.documentId);
+      if (!document) return; // missing — store-side missingDocuments covers it
+
+      // `resumeDocument` re-fetches the row (libraryOpenDocument) and lands on
+      // the row's page, which can be stale — nothing syncs SessionDocument
+      // currentPage to the library row while a session is active. Land on the
+      // session's saved page explicitly; the store clamps to totalPages.
+      if (await resumeDocument(document)) {
+        setCurrentPage(lastRead.currentPage);
+        setShowLibrary(false);
+      }
+    },
+    [resumeDocument, setCurrentPage],
+  );
 
   // One set of reader commands, reached two ways: the native menu (File / View
   // / Playback / Help — exported over AT-SPI on Linux to a global menu bar,
@@ -163,7 +196,7 @@ export function ReaderView() {
 
   return (
     <AppLayout
-      header={<Toolbar />}
+      header={<Toolbar onSessionRestored={handleSessionRestored} />}
       footer={pdfDocument && <AiPlaybackBar getText={getCurrentPageText} />}
     >
       {libraryShowing ? (
