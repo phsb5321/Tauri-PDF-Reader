@@ -669,20 +669,6 @@ function fontSizeViolations(
   return violations;
 }
 
-/**
- * A second, separate hole from the one `fontSizeViolations` closes: a raw
- * `14px` literal at or above the 12px floor passes that check cleanly, but
- * it is frozen to the 16px-root default and never moves when the reader
- * raises their OS/browser text size — the exact harm `typography.css`'s own
- * comment names. This only fires on a bare `NNpx` literal; `var(--text-sm)`
- * and a raw `rem` value both pass, since both resolve relative to the root.
- *
- * Deliberately scoped to `GUARDED_REM_STYLESHEETS`, not every stylesheet in
- * the tree: a repo-wide run today finds 103 pre-existing hits, which is a
- * separately ranked, wide-blast-radius cleanup (P3 in the 04/08 UX audit),
- * not this fix. Grow the list file-by-file as each surface converts; it must
- * never shrink once a file is on it.
- */
 const GUARDED_REM_STYLESHEETS = [
   "components/library/LibraryView.css",
   "components/library/ContinueReading.css",
@@ -728,6 +714,55 @@ function nonRemFontSizeViolations(
   }
   return violations;
 }
+/**
+ * The keyboard-only focus convention: the global ring in `src/styles/
+ * index.css` (:focus-visible) is the ONLY focus style; a bare `:focus` on an
+ * interactive control paints the same ring for a mouse click as for a Tab.
+ * Text-entry controls (input/textarea/select) are the sanctioned exception —
+ * clicking into them must still show where the caret went.
+ *
+ * Scans component sheets only (`src/components/**` and `src/ui/components/**`):
+ * the global stylesheet itself contains `:focus:not(:focus-visible)` — the
+ * convention, not a violation.
+ */
+function focusVisibleViolations(
+  sources: readonly StylesheetSource[],
+): string[] {
+  const violations: string[] = [];
+  const bareFocus = /:focus(?!-visible|-within)/;
+  // Substring, not word-boundary: element names AND class names like
+  // `.search-input` / `.create-session-dialog__input` both carry the marker.
+  const textEntry = /(?:input|textarea|select)/;
+
+  for (const source of sources) {
+    if (!source.file.includes(`${SRC}/components/`)) continue;
+    const css = stripCssComments(source.css);
+
+    // Walk rules: the text before every `{` at brace depth 0 is a selector;
+    // nested blocks (@media) are handled by depth tracking.
+    let depth = 0;
+    let selector = "";
+    for (let i = 0; i < css.length; i++) {
+      const ch = css[i];
+      if (ch === "{") {
+        if (depth === 0 && bareFocus.test(selector) && !textEntry.test(selector)) {
+          const line =
+            source.startLine + css.slice(0, i).split("\n").length - 1;
+          violations.push(
+            `${source.file.slice(REPO_ROOT.length + 1)}:${line}  bare :focus on non-input selector: ${selector.trim()}`,
+          );
+        }
+        depth += 1;
+        selector = "";
+      } else if (ch === "}") {
+        depth = Math.max(0, depth - 1);
+      } else if (depth === 0) {
+        selector += ch;
+      }
+    }
+  }
+  return violations;
+} (fix(a11y): keyboard-only focus convention — sweep :focus to :focus-visible)
 
 describe("design tokens: every referenced token is defined", () => {
   it("extracts runtime style sheets without parsing unrelated TSX", () => {
@@ -1233,5 +1268,13 @@ describe("design tokens: WCAG AA contrast floor", () => {
         typographyTokens,
       ),
     ).toEqual([]);
+  });
+
+  it("focus rings are keyboard-only — no bare :focus on interactive controls", () => {
+    // The convention is the global :focus-visible ring; a bare :focus on a
+    // button/menu/nav paints it for mouse clicks too. Only text-entry
+    // controls (input/textarea/select) keep :focus. A regression to a bare
+    // :focus on any control fails here.
+    expect(focusVisibleViolations(stylesheetSources(SRC))).toEqual([]);
   });
 });

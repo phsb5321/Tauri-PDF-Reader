@@ -59,7 +59,7 @@
   box-shadow: 0 0 0 2px var(--toolbar-bg);
 }
 
-.context-menu-color-button:focus {
+.context-menu-color-button:focus-visible {
   outline: none;
   border-color: var(--accent-color);
 }
@@ -89,7 +89,7 @@
   background: var(--hover-bg);
 }
 
-.context-menu-item:focus {
+.context-menu-item:focus-visible {
   outline: none;
   background: var(--hover-bg);
 }

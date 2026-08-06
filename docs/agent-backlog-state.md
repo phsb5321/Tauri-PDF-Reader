@@ -2,6 +2,18 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #46 — 06/08/2026 (089-focus-visible: keyboard-only focus convention enforced)
+
+- **Branch:** `089-focus-visible` (off `origin/main` c993ad6, worktree `../tauri-pdf-reader-089-focus-visible`). UX finding #3 / PO next-3 item #3. Orchestrator holds the merge gate.
+- **Defect:** ~component stylesheets styled `:focus` directly, painting the same ring for a mouse click as for a Tab — visual noise inconsistent with the global keyboard-only convention (`src/styles/index.css` :focus-visible ring).
+- **Inventory (11 bare `:focus` hits; 3 sweeps, 8 keeps):**
+  - SWEEP → `:focus-visible`: `HighlightToolbar.css:47` `.highlight-color-button`; `HighlightContextMenu.css:62` `.context-menu-color-button`; `HighlightContextMenu.css:92` `.context-menu-item`. (3 interactive controls.)
+  - KEEP `:focus` (text-entry): `AiTtsSettings.css:74` input; `AiVoiceSelector.css:35` select; `NoteEditor.css:144` textarea; `PageNavigation.css:64` input; `SearchBar.css:28` input; `ZoomControls.css:60` select; `CreateSessionDialog.css:104` input; `SettingsPanel.css:270` select.
+- **Regression guard:** `focusVisibleViolations` in `design-tokens.test.ts` — a scanner over component sheets (src/components/** + src/ui/components/**, the global sheet excluded: its `:focus:not(:focus-visible)` rule IS the convention) that flags any bare `:focus` whose selector carries no text-entry marker (input/textarea/select, substring match so `__input` class names count). Test: `focus rings are keyboard-only — no bare :focus on interactive controls`.
+- **RED first:** guard failed on `main` with exactly the 3 sweeps listed (plus an early classification miss on `create-session-dialog__input` fixed in the scanner, not in the CSS). Failing output pasted into the PR body. After the sweep: 63/63 design-tokens, 88/88 with native-html-semantics + highlight-keyboard-shortcut; lint 0/92; typecheck clean; diff clean.
+- **One-token edits only** (`:focus` → `:focus-visible` ×3); no TSX, no behavior changes. CSS + test + doc only.
+- **Revert:** `git revert <squash>` — three CSS files, one test file, one backlog entry.
+
 ## Iteration #44 — 06/08/2026 (087-search-empty-state: search misses say so)
 
 - **Branch:** `087-search-empty-state` (off `origin/main` af99a226, worktree `../tauri-pdf-reader-087-search-empty-state`). UX finding #1 / Huly prio 2. PO dispatch; orchestrator holds the merge gate.
