@@ -12,6 +12,15 @@
 - **GREEN:** 3/3 (miss copy + scoped clear + unchanged empty-library copy); regression EmptyState 7 + reading-home 5 = 12/12. `pnpm lint` 0 errors / 92 warnings (baseline), `pnpm typecheck` clean, `git diff --check` clean. One file + one test file + doc entry.
 - **Revert:** `git revert <squash>` — one component file, one test file, one backlog entry.
 
+## Iteration #45 — 06/08/2026 (088-resume-aria-label: shelf row names its resume action)
+
+- **Branch:** `088-resume-aria-label` (off `origin/main` af99a226, worktree `../tauri-pdf-reader-088-resume-aria-label`). UX finding #4 / PO next-3 item #2. Orchestrator holds the merge gate.
+- **Defect:** the Continue-reading shelf row button carried no explicit accessible name — the computed name was the contents concatenated (title + place text), with the sr-only `<progress>` exposing its own separate `progressbar` role named "{title} progress". A screen reader announced a row with no verb: the shelf's primary action was semantically opaque.
+- **Fix:** `aria-label` on the row button: `Resume {label}, page {currentPage} of {pageCount}, {percent}%` (percent via the existing `progressPercent`; page-count clause omitted when `pageCount` is null, keeping the existing unknown-total behavior). Layout unaffected — a label is non-visual. The existing `onClick` handler is untouched.
+- **RED first:** added the assertion to `reading-home.test.tsx` (`getByRole("button", { name: /Resume Moby-Dick, page 213 of 585, 36%/ })` inside the Continue-reading region). Failed on `main` with `Unable to find an accessible element with the role "button" and name /Resume …/` — the diagnostic listed the then-current name `Moby-Dick Page 213 of 585 36`. Failing output pasted into the PR body.
+- **GREEN:** reading-home 6/6, ContinueReading 7/7 (existing regex `shelfEntry` queries and click-by-role flows unaffected — substring name matching). `pnpm lint` 0 errors / 92 warnings (baseline), `pnpm typecheck` clean, `git diff --check` clean, `tools/alignment-gate.sh --base origin/main` green on the committed diff.
+- **Revert:** `git revert <squash>` — one component file, one test file, one backlog entry.
+
 ## Iteration #43 — 06/08/2026 (086-session-restore: restore opens the session's last-read document)
 
 - **Branch:** `086-session-restore` (off `origin/main` af99a226, worktree `../tauri-pdf-reader-086-session-restore`). Eng slice from the wave-2 dispatch; orchestrator holds the merge gate.
@@ -22,6 +31,7 @@
 - **GREEN:** 3/3 new; regression suite green: session-flow 20, SessionMenu 27, settings-menu 2, reading-home 5 = 54/54. `pnpm lint` 0 errors / 92 warnings (baseline), `pnpm typecheck` clean, `git diff --check` clean.
 - **Revert:** `git revert <squash>` — touches ReaderView.tsx, Toolbar.tsx, one new test file, one doc entry.
 
+||||||| parent of 0b9fe47 (fix(a11y): name the continue-reading shelf row as a resume action)0b9fe47 (fix(a11y): name the continue-reading shelf row as a resume action)
 ## Iteration #42 — 05/08/2026 (102-gitleaks: fail-closed secret-scan control landed)
 
 - **Branch:** `102-gitleaks` (off `origin/main` ada22bf, worktree `../tauri-pdf-reader-102-gitleaks`). T102 from specs/077-ops-parity/tasks.md — the ranked-slice #1 follow-on to 077.

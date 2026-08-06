@@ -97,6 +97,22 @@ async function shelfEntry(title: RegExp) {
 }
 
 describe("the reading home", () => {
+  it("names the shelf row as a resume action for assistive tech", async () => {
+    render(<ReaderView />);
+
+    const shelf = await screen.findByRole("region", {
+      name: "Continue reading",
+    });
+    // UX finding #4: the row button's accessible name must say "resume" —
+    // without it, a screen reader announces only the composed contents
+    // (title + place + the sr-only progress label).
+    expect(
+      within(shelf).getByRole("button", {
+        name: /Resume Moby-Dick, page 213 of 585, 36%/,
+      }),
+    ).toBeInTheDocument();
+  });
+
   it("is what the app shows when no document is open", async () => {
     render(<ReaderView />);
 
