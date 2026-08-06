@@ -1,10 +1,10 @@
 /**
  * Restoring a reading session opens its last-read document at the saved page.
  *
- * `Toolbar.handleSessionRestored` shipped as a stub (`// TODO: Open documents
- * from the restored session`) — the SessionMenu UI, the store action and the
- * backend `session_restore` all exist and work, but restore closes the menu
- * and opens NOTHING. A unit test on `SessionMenu` in isolation cannot catch
+ * `Toolbar.handleSessionRestored` shipped as a stub that closed the menu and
+ * opened nothing — the SessionMenu UI, the store action and the backend
+ * `session_restore` all exist and work, but restore never reached the shell.
+ * A unit test on `SessionMenu` in isolation cannot catch
  * that the shell never learns about the restore, so this test goes through
  * the real shell: `ReaderView` is rendered for real, and so are `Toolbar` and
  * `SessionMenu` (the surface under test sits inside them — unlike the

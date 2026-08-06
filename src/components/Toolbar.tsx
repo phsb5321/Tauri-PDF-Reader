@@ -113,8 +113,7 @@ export function Toolbar({ onSessionRestored }: ToolbarProps) {
 
   const handleSessionRestored = (sessionId: string) => {
     // Close the session menu after restoring; the shell opens the session's
-    // document (previously a stub: "TODO: Open documents from the restored
-    // session" — restore closed the menu and opened nothing).
+    // document (restore previously closed the menu and opened nothing).
     setIsSessionMenuOpen(false);
     onSessionRestored?.(sessionId);
   };
