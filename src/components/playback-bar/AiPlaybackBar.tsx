@@ -17,11 +17,19 @@ import "./AiPlaybackBar.css";
 interface AiPlaybackBarProps {
   getText: () => Promise<string | null>;
   enableHighlighting?: boolean;
+  /**
+   * Incremented by the catch-up home's opt-in "Resume & Read Aloud" action.
+   * Any new value (not the value itself) requests one play attempt — a
+   * counter rather than a boolean so a second request is distinguishable
+   * from the first even if the first never actually started.
+   */
+  autoPlayToken?: number;
 }
 
 export function AiPlaybackBar({
   getText,
   enableHighlighting = true,
+  autoPlayToken = 0,
 }: AiPlaybackBarProps) {
   const {
     initialized,
@@ -240,6 +248,21 @@ export function AiPlaybackBar({
     enableHighlighting,
     currentPage,
   ]);
+
+  // Resume-and-play: consume each new `autoPlayToken` at most once, tracked
+  // by a ref rather than by comparing against the playback state, so a value
+  // that arrives before `canPlay` goes true (TTS still initializing) is not
+  // lost — the effect re-runs as `canPlay` changes and fires the first time
+  // both are true. Degrades silently (see brief): no key or an init failure
+  // means `canPlay` never goes true, so this never fires — the caller already
+  // showed the normal, silent, no-audio Resume outcome.
+  const consumedAutoPlayToken = useRef(0);
+  useEffect(() => {
+    if (autoPlayToken > consumedAutoPlayToken.current && canPlay) {
+      consumedAutoPlayToken.current = autoPlayToken;
+      void handlePlay();
+    }
+  }, [autoPlayToken, canPlay, handlePlay]);
 
   const handlePause = useCallback(async () => {
     if (enableHighlighting) {

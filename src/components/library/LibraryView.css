@@ -91,6 +91,15 @@
   height: 16px;
 }
 
+.library-body-heading {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-3);
+}
+
 /* Shelves on the left, books on the right. min-height:0 so the grid — not the
    page — is what scrolls when the library outgrows the window. */
 .library-body {

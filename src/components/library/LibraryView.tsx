@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useMemo } from "react";
 import { useLibraryStore } from "../../stores/library-store";
-import { ContinueReading } from "./ContinueReading";
+import { ResumeSection } from "./ResumeSection";
 import { useCollectionsStore } from "../../stores/collections-store";
 import { DocumentCard } from "./DocumentCard";
 import { ShelfSidebar } from "./ShelfSidebar";
@@ -16,9 +16,14 @@ import "./LibraryView.css";
 
 interface LibraryViewProps {
   onDocumentSelect: (document: Document) => void;
+  /** Opt-in resume path: land on the page, then start narration. */
+  onResumeAndPlay: (document: Document) => void;
 }
 
-export function LibraryView({ onDocumentSelect }: LibraryViewProps) {
+export function LibraryView({
+  onDocumentSelect,
+  onResumeAndPlay,
+}: LibraryViewProps) {
   const {
     documents: allDocuments,
     isLoading,
@@ -104,6 +109,14 @@ export function LibraryView({ onDocumentSelect }: LibraryViewProps) {
     [healDocument, onDocumentSelect],
   );
 
+  const handleResumeAndPlay = useCallback(
+    async (document: Document) => {
+      const healed = await healDocument(document.id);
+      onResumeAndPlay(healed ?? document);
+    },
+    [healDocument, onResumeAndPlay],
+  );
+
   const handleDocumentDelete = useCallback(
     async (documentId: string) => {
       if (window.confirm("Remove this document from the library?")) {
@@ -179,7 +192,13 @@ export function LibraryView({ onDocumentSelect }: LibraryViewProps) {
         </div>
       </div>
 
-      <ContinueReading documents={documents} onResume={handleDocumentOpen} />
+      <ResumeSection
+        documents={documents}
+        onResume={handleDocumentOpen}
+        onResumeAndPlay={handleResumeAndPlay}
+      />
+
+      <h2 className="library-body-heading">Your library</h2>
 
       <div className="library-body">
         <ShelfSidebar
