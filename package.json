@@ -26,7 +26,11 @@
     "test:e2e:native": "bash scripts/e2e-native.sh",
     "test:e2e:all": "bash scripts/e2e-all.sh",
     "test:fuzz": "vitest run src/hooks/usePageNavigation.property.test.ts --pool=forks --poolOptions.forks.singleFork",
-    "test:user-gate": "pnpm test:fuzz && pnpm test:e2e:native"
+    "test:user-gate": "pnpm test:fuzz && pnpm test:e2e:native",
+    "scan:secrets": "bash tools/gitleaks-scan.sh dir",
+    "scan:secrets:git": "bash tools/gitleaks-scan.sh git",
+    "scan:secrets:canary": "bash tools/gitleaks-scan.sh canary",
+    "scan:secrets:all": "bash tools/gitleaks-scan.sh all"
   },
   "lint-staged": {
     "src/**/*.{ts,tsx}": [

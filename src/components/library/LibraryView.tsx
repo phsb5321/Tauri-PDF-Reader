@@ -25,6 +25,7 @@ export function LibraryView({ onDocumentSelect }: LibraryViewProps) {
     error,
     viewMode,
     sortOrder,
+    searchQuery,
     loadDocuments,
     setSearchQuery,
     setSortOrder,
@@ -194,19 +195,36 @@ export function LibraryView({ onDocumentSelect }: LibraryViewProps) {
         />
 
         {documents.length === 0 ? (
-          <EmptyState
-            title={
-              selectedShelfId === null
-                ? "No recent documents"
-                : "Nothing on this shelf yet"
-            }
-            description={
-              selectedShelfId === null
-                ? "Open a PDF to add it to your library"
-                : "Right-click a book to file it here"
-            }
-            icon={<DocumentIcon />}
-          />
+          searchQuery.trim() !== "" ? (
+            // UX finding #1: a search that matches nothing must say so —
+            // "No recent documents" implies an empty library, not a missed
+            // query. The SearchBar also shows its own icon-only clear button
+            // while a query is set; this visible-text action clears the store
+            // query (the SearchBar's local input value is its own state).
+            <EmptyState
+              title={`No results for "${searchQuery.trim()}"`}
+              description="Try a different title, or clear the search."
+              action={{
+                label: "Clear search",
+                onClick: () => setSearchQuery(""),
+              }}
+              icon={<DocumentIcon />}
+            />
+          ) : (
+            <EmptyState
+              title={
+                selectedShelfId === null
+                  ? "No recent documents"
+                  : "Nothing on this shelf yet"
+              }
+              description={
+                selectedShelfId === null
+                  ? "Open a PDF to add it to your library"
+                  : "Right-click a book to file it here"
+              }
+              icon={<DocumentIcon />}
+            />
+          )
         ) : (
           <div className={`library-grid library-grid--${viewMode}`}>
             {documents.map((document) => (

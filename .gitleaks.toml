@@ -1,0 +1,49 @@
+# Lectrice Gitleaks config — control T102 (ops-parity sequence).
+#
+# Target CLI: Gitleaks 8.30.1 (`gitleaks dir` / `gitleaks git`). The removed
+# `protect` subcommand is NOT used (see specs/077-ops-parity/research.md D6).
+#
+# Policy: extend the shipped default ruleset with rules for the secret
+# classes this repo and its host infrastructure actually carry, and allowlist
+# only proven non-secrets. A finding is a red exit; a missing binary is a red
+# exit (fail-closed, never a silent green).
+#
+# Falsifier (gap-matrix Gitleaks row): the synthetic canary (generated at
+# scan time into a temp dir by tools/gitleaks-scan.sh, never committed) must
+# fail `gitleaks dir` with rule id `elevenlabs-api-key`; a missing binary must
+# not pass.
+
+title = "Lectrice Gitleaks config (Gitleaks 8.30.1)"
+
+[extend]
+useDefault = true
+
+# ElevenLabs provider key — the app's own session-only secret (spec 077).
+# Keys are `sk_` + 40+ base62 chars. The canary deliberately uses repeated
+# characters so generic high-entropy rules cannot claim it; only this rule
+# may.
+[[rules]]
+id = "elevenlabs-api-key"
+description = "ElevenLabs API key"
+regex = '''\bsk_[A-Za-z0-9]{40,}\b'''
+keywords = ["sk_"]
+
+[allowlist]
+description = "Proven non-secrets and vendored/build paths."
+paths = [
+  # Build/vendor trees — never repo-authored, never scanned by `git` mode.
+  '''(^|/)node_modules/''',
+  '''(^|/)src-tauri/target/''',
+  '''(^|/)dist/''',
+  '''(^|/)coverage/''',
+  # Deterministic audio-cache keys (SHA256 of text+voice+model per CLAUDE.md),
+  # fixture data, not credentials.
+  '''src/__tests__/fixtures/kokoro-af-heart-(multi|single)-chunk\.json$''',
+]
+# The SonarQube project key (phsb5321_lectrice*) is configuration, not a
+# secret. Scoped to the VALUE so sonar-project.properties itself stays
+# scannable — a future sonar.token/sonar.login would not match this pattern
+# and must be reported.
+regexes = [
+  '''phsb5321_lectrice[A-Za-z0-9_]*''',
+]

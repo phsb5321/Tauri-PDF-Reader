@@ -62,5 +62,9 @@
 - [ ] T100 `[pending] Pedro`: authorize any future workflow change.
 - [ ] T101 `[pending] Pedro`: authorize Notes/repo sync activation or a new
       repo/token/service/secret proposal.
-- [ ] T102 Next local control slice: current-CLI Gitleaks config plus synthetic
-      canary; use Gitleaks 8.30.1 `dir`/`git`, not removed `protect` syntax.
+- [x] T102 05/08/2026 Next local control slice: current-CLI Gitleaks config
+      (`102-gitleaks`): `.gitleaks.toml` extending defaults with an
+      `elevenlabs-api-key` rule, `tools/gitleaks-scan.sh` fail-closed
+      entry point (`dir`/`git`/`canary`) on Gitleaks 8.30.1, runtime-
+      generated low-entropy canary proving `gitleaks dir` detection;
+      `pnpm scan:secrets{,:git,:canary,:all}`.

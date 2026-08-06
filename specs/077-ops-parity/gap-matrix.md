@@ -23,7 +23,7 @@ Engineer feasibility packet SHA-256
 | Alignment gate | present | `tools/alignment-gate.sh` plus planted TODO/suppression test | Planted completion-theater diff passes. Debug remains warning by policy. |
 | Knip | present-but-false-green | pinned package but CI uses `--no-exit-code` and broad ignores | A new unused export/file does not make the exact gate non-zero. |
 | Coverage helper | present-but-false-green | CI coverage is blocking; `test:coverage:check` ends with `|| echo` | A below-floor run returns zero. |
-| Gitleaks | missing | host 8.30.1 exists; no repo config/canary/local entry point | Synthetic canary does not fail `gitleaks dir`; missing binary does not fail closed. |
+| Gitleaks | present | `.gitleaks.toml` (extends defaults; `elevenlabs-api-key` rule; allowlist for node_modules/target/dist/coverage, sonar-project.properties, cache-key fixtures); `tools/gitleaks-scan.sh` fail-closed entry point (`dir`/`git`/`canary`, 8.30.1); runtime-generated low-entropy canary never committed | Synthetic canary does not fail `gitleaks dir` with rule `elevenlabs-api-key`; missing binary exits 0; or a planted key under `node_modules/` is reported. |
 | Semgrep | missing | no repo rules/fixtures; only host `opengrep` found | Must-match and must-not-match fixtures are not both enforced. |
 | Dependency/SBOM/license/vulnerability policy | missing | lockfiles only; no audit/deny/OSV/SBOM/license gate | Synthetic advisory/policy violation passes or scanner silently skips. |
 | SECURITY/privacy/retention policy | missing | old spec 008 is scoped hardening, not current reporting/threat/data policy | Current doc fails to name classes, trust boundaries, retention, deletion and reporting. |
@@ -38,8 +38,8 @@ Engineer feasibility packet SHA-256
 
 ## Ranked slices after 077
 
-1. Repo-owned Gitleaks 8.30.1 config plus synthetic canary and fail-closed local
-   entry point.
+1. ~~Repo-owned Gitleaks 8.30.1 config plus synthetic canary and fail-closed local
+   entry point~~ **DONE — T102, 05/08/2026 (`102-gitleaks`).**
 2. Executable Tauri CSP/capability contract, followed only by tightenings that
    survive a packaged-app falsifier; reuse the Specta and path ratchets.
 3. Current SECURITY/privacy/retention and threat/dataflow policy.

@@ -2,6 +2,26 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #44 — 06/08/2026 (087-search-empty-state: search misses say so)
+
+- **Branch:** `087-search-empty-state` (off `origin/main` af99a226, worktree `../tauri-pdf-reader-087-search-empty-state`). UX finding #1 / Huly prio 2. PO dispatch; orchestrator holds the merge gate.
+- **Defect:** `LibraryView` rendered the SAME `EmptyState` for a search that matches nothing as for an empty library — "No recent documents / Open a PDF to add it to your library" while a query is set implied the library was empty, not that the search missed.
+- **Fix (one branch in LibraryView.tsx):** when `documents.length === 0` and `searchQuery.trim() !== ""`, render `No results for "{query}"` + "Try a different title, or clear the search." + an `EmptyState` action "Clear search" → `setSearchQuery("")`. Empty query keeps the original copy (shelf variant untouched). Added `searchQuery` to the store destructure.
+- **Discovery / documented deviation:** the `SearchBar` ALREADY renders its own icon-only "Clear search" button while a query is set, so the empty state now has two clear affordances (the new visible-text one + the existing icon one). The new action clears the STORE query (source of truth for results) but the SearchBar input keeps its local value (uncontrolled) — the falsifier's "empties the query and restores the grid" holds; the SearchBar's own clear remains as the input-clearing recovery path. Noted in the PR body; SearchBar behavior untouched per the constraint.
+- **RED first:** `src/__tests__/ui/library-search-empty.test.tsx` (direct LibraryView render, real SearchBar, seeded store) failed on `main` with `Unable to find an element with the text: No results for "zzzz"` while the DOM showed the wrong "No recent documents" copy with a "zzzz" query — the bug, verbatim. Failing output pasted into the PR body.
+- **GREEN:** 3/3 (miss copy + scoped clear + unchanged empty-library copy); regression EmptyState 7 + reading-home 5 = 12/12. `pnpm lint` 0 errors / 92 warnings (baseline), `pnpm typecheck` clean, `git diff --check` clean. One file + one test file + doc entry.
+- **Revert:** `git revert <squash>` — one component file, one test file, one backlog entry.
+
+## Iteration #42 — 05/08/2026 (102-gitleaks: fail-closed secret-scan control landed)
+
+- **Branch:** `102-gitleaks` (off `origin/main` ada22bf, worktree `../tauri-pdf-reader-102-gitleaks`). T102 from specs/077-ops-parity/tasks.md — the ranked-slice #1 follow-on to 077.
+- **Control:** `.gitleaks.toml` extends Gitleaks 8.30.1 defaults with an `elevenlabs-api-key` rule (the app's own provider-secret class) and an allowlist limited to proven non-secrets (node_modules/target/dist/coverage paths, `sonar-project.properties` project key, deterministic cache-key fixtures). `tools/gitleaks-scan.sh` is the fail-closed entry point: `canary` (negative control), `dir`, `git`, `all`; missing binary or undetected canary exit 1.
+- **Discrimination proven:** default 8.30.1 config misses the low-entropy canary (`sk_`+40×A, entropy 0.47 — generic-api-key cannot claim it); the repo rule catches it with `RuleID: elevenlabs-api-key`. Canary is assembled from fragments at runtime into a temp dir — no literal secret-shaped bytes in repo content; the scanner can scan its own control (it caught its own first-draft literal constant — fixed). Two canary arms: a temp-dir arm (rule fires) and a working-tree arm planted inside `$ROOT` (a future broad allowlist entry cannot blind the real scan path while the temp arm still passes). Falsifiers executed: rule block removed → fail-closed exit 1; planted canary in tree → `dir` exit 1; planted high-entropy `sonar.token` in a copy of sonar-project.properties → caught by generic-api-key (the value-scoped allowlist masks only `phsb5321_lectrice*`, keeping the file scannable).
+- **Baselines:** `dir` scan of the tree clean under the allowlist (the 3 default-config findings — sonar projectKey + two cache-key fixture hashes — verified non-secrets); `git` history scan clean over 132 commits. Real-dir allowlist proven (planted AWS-shaped + ElevenLabs-shaped keys under `node_modules/` are skipped).
+- **Entry points:** `pnpm scan:secrets`, `scan:secrets:git`, `scan:secrets:canary`, `scan:secrets:all`. Deliberately NOT wired into `pnpm verify` or any workflow (runner may lack the binary; workflow changes are Pedro-gated per 077 FR-012/013) — the local control stands alone, reversible.
+- **Verified:** `bash tools/gitleaks-scan.sh all` exit 0 (canary detected → dir clean → git clean); `git diff --check` clean. No TS changes (lint/typecheck unaffected; package.json scripts only).
+- **Revert:** revert this commit — deletes `.gitleaks.toml`, `tools/gitleaks-scan.sh`, package.json scripts and the three doc rows; one `git revert` PR.
+
 ## Iteration #41 — 04/08/2026 (082 settings-menu: Settings wired to the shell, an already-built panel nobody mounted)
 
 - **Branch:** `082-settings-menu` (off `origin/main` 4fbd9de, worktree `../tauri-pdf-reader-082-settings-menu`).
