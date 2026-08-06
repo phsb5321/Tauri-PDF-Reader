@@ -2,6 +2,16 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #44 — 06/08/2026 (087-search-empty-state: search misses say so)
+
+- **Branch:** `087-search-empty-state` (off `origin/main` af99a226, worktree `../tauri-pdf-reader-087-search-empty-state`). UX finding #1 / Huly prio 2. PO dispatch; orchestrator holds the merge gate.
+- **Defect:** `LibraryView` rendered the SAME `EmptyState` for a search that matches nothing as for an empty library — "No recent documents / Open a PDF to add it to your library" while a query is set implied the library was empty, not that the search missed.
+- **Fix (one branch in LibraryView.tsx):** when `documents.length === 0` and `searchQuery.trim() !== ""`, render `No results for "{query}"` + "Try a different title, or clear the search." + an `EmptyState` action "Clear search" → `setSearchQuery("")`. Empty query keeps the original copy (shelf variant untouched). Added `searchQuery` to the store destructure.
+- **Discovery / documented deviation:** the `SearchBar` ALREADY renders its own icon-only "Clear search" button while a query is set, so the empty state now has two clear affordances (the new visible-text one + the existing icon one). The new action clears the STORE query (source of truth for results) but the SearchBar input keeps its local value (uncontrolled) — the falsifier's "empties the query and restores the grid" holds; the SearchBar's own clear remains as the input-clearing recovery path. Noted in the PR body; SearchBar behavior untouched per the constraint.
+- **RED first:** `src/__tests__/ui/library-search-empty.test.tsx` (direct LibraryView render, real SearchBar, seeded store) failed on `main` with `Unable to find an element with the text: No results for "zzzz"` while the DOM showed the wrong "No recent documents" copy with a "zzzz" query — the bug, verbatim. Failing output pasted into the PR body.
+- **GREEN:** 3/3 (miss copy + scoped clear + unchanged empty-library copy); regression EmptyState 7 + reading-home 5 = 12/12. `pnpm lint` 0 errors / 92 warnings (baseline), `pnpm typecheck` clean, `git diff --check` clean. One file + one test file + doc entry.
+- **Revert:** `git revert <squash>` — one component file, one test file, one backlog entry.
+
 ## Iteration #42 — 05/08/2026 (102-gitleaks: fail-closed secret-scan control landed)
 
 - **Branch:** `102-gitleaks` (off `origin/main` ada22bf, worktree `../tauri-pdf-reader-102-gitleaks`). T102 from specs/077-ops-parity/tasks.md — the ranked-slice #1 follow-on to 077.
