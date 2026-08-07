@@ -43,7 +43,6 @@
 - **GREEN:** 3/3 new; regression suite green: session-flow 20, SessionMenu 27, settings-menu 2, reading-home 5 = 54/54. `pnpm lint` 0 errors / 92 warnings (baseline), `pnpm typecheck` clean, `git diff --check` clean.
 - **Revert:** `git revert <squash>` — touches ReaderView.tsx, Toolbar.tsx, one new test file, one doc entry.
 
-||||||| parent of 0b9fe47 (fix(a11y): name the continue-reading shelf row as a resume action)0b9fe47 (fix(a11y): name the continue-reading shelf row as a resume action)
 ## Iteration #42 — 05/08/2026 (102-gitleaks: fail-closed secret-scan control landed)
 
 - **Branch:** `102-gitleaks` (off `origin/main` ada22bf, worktree `../tauri-pdf-reader-102-gitleaks`). T102 from specs/077-ops-parity/tasks.md — the ranked-slice #1 follow-on to 077.

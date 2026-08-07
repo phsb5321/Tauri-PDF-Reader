@@ -762,7 +762,7 @@ function focusVisibleViolations(
     }
   }
   return violations;
-} (fix(a11y): keyboard-only focus convention — sweep :focus to :focus-visible)
+}
 
 describe("design tokens: every referenced token is defined", () => {
   it("extracts runtime style sheets without parsing unrelated TSX", () => {
