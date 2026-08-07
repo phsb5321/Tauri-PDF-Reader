@@ -107,7 +107,9 @@ describe("App-root reachability", () => {
     expect(
       within(shelf).getByRole("progressbar", { name: "Moby-Dick progress" }),
     ).toHaveAttribute("value", "36");
-    fireEvent.click(within(shelf).getByRole("button", { name: /Moby-Dick/ }));
+    fireEvent.click(
+      within(shelf).getByRole("button", { name: /^Resume Moby-Dick, page/ }),
+    );
 
     await waitFor(() =>
       expect(screen.getByTestId("pdf-viewer")).toBeInTheDocument(),

@@ -68,6 +68,25 @@ export function ReaderView() {
     if (await openPdf()) setShowLibrary(false);
   }, [openPdf]);
 
+  // The catch-up shelf's opt-in "Resume & play" action. Off by default —
+  // plain resume never plays audio — because auto-playing sound the moment a
+  // reader lands on the page would be hostile, and this path degrades
+  // honestly (see AiPlaybackBar's auto-play effect) when there is no TTS key,
+  // which is the common case right after a fresh launch since the key is
+  // session-only by design (#73). Bumping a token rather than a boolean lets
+  // a second resume-and-play (a different book) fire again even if the
+  // previous one never actually started.
+  const [autoPlayToken, setAutoPlayToken] = useState(0);
+  const handleResumeAndPlay = useCallback(
+    async (document: Document) => {
+      if (await resumeDocument(document)) {
+        setShowLibrary(false);
+        setAutoPlayToken((token) => token + 1);
+      }
+    },
+    [resumeDocument],
+  );
+
   // Restore a reading session: open the document the reader was last on (the
   // SessionDocument with the highest `position` — the backend returns them
   // ordered by position ASC, session_repo.rs:46) at ITS saved page. The
@@ -197,12 +216,22 @@ export function ReaderView() {
   return (
     <AppLayout
       header={<Toolbar onSessionRestored={handleSessionRestored} />}
-      footer={pdfDocument && <AiPlaybackBar getText={getCurrentPageText} />}
+      footer={
+        pdfDocument && (
+          <AiPlaybackBar
+            getText={getCurrentPageText}
+            autoPlayToken={autoPlayToken}
+          />
+        )
+      }
     >
       {libraryShowing ? (
         <LibraryView
           onDocumentSelect={(document) => {
             void handleResume(document);
+          }}
+          onResumeAndPlay={(document) => {
+            void handleResumeAndPlay(document);
           }}
         />
       ) : (

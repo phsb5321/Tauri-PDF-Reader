@@ -89,11 +89,20 @@ beforeEach(() => {
 /**
  * The Continue-reading shelf's entry for a book. Scoped to that section because
  * the same book also has a card in the grid below, and it is the shelf — the
- * catch-up surface — that this file is about.
+ * catch-up surface — that this file is about. The row now carries TWO
+ * buttons (plain resume + the opt-in "resume and play"), both named after the
+ * title, so this specifically targets the plain one — the accessible name
+ * always ends in a percent sign ("..., page N of M, P%"); the secondary
+ * control's name ends in "and start reading aloud".
  */
 async function shelfEntry(title: RegExp) {
   const shelf = await screen.findByRole("region", { name: "Continue reading" });
-  return within(shelf).getByRole("button", { name: title });
+  const candidates = within(shelf).getAllByRole("button", { name: title });
+  const plainResume = candidates.find((button) =>
+    /%$/.test(button.getAttribute("aria-label") ?? ""),
+  );
+  if (!plainResume) throw new Error("plain resume button not found");
+  return plainResume;
 }
 
 describe("the reading home", () => {

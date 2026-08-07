@@ -28,7 +28,8 @@
     "bar   bar";
   align-items: baseline;
   gap: var(--space-1) var(--space-3);
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   padding: var(--space-3);
   border: 1px solid var(--border-color, #ddd);
   border-radius: 6px;
@@ -36,6 +37,16 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+.continue-reading-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.continue-reading-play {
+  flex-shrink: 0;
 }
 
 .continue-reading-item:hover {
