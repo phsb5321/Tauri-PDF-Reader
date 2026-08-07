@@ -90,7 +90,7 @@
 
 .document-card--grid .document-card-title {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: 500;
   color: var(--text-primary, #1a1a1a);
   overflow: hidden;
@@ -101,7 +101,7 @@
 .document-card--grid .document-card-meta {
   display: flex;
   justify-content: space-between;
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-secondary, #666);
 }
 
@@ -174,7 +174,7 @@
 }
 
 .document-card--list .document-card-title {
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: 500;
   color: var(--text-primary, #1a1a1a);
   overflow: hidden;
@@ -183,7 +183,7 @@
 }
 
 .document-card--list .document-card-path {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-secondary, #666);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -195,7 +195,7 @@
   flex-direction: column;
   align-items: flex-end;
   gap: 2px;
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-secondary, #666);
   min-width: 100px;
 }
@@ -208,7 +208,7 @@
 }
 
 .document-card--list .progress-text {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-secondary, #666);
   min-width: 32px;
   text-align: right;
@@ -283,7 +283,7 @@
   border: none;
   background: transparent;
   text-align: left;
-  font-size: 14px;
+  font-size: var(--text-sm);
   cursor: pointer;
   color: var(--text-primary, #1a1a1a);
 }
@@ -314,7 +314,7 @@
   align-items: center;
   gap: var(--space-2);
   padding: 6px var(--space-4);
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--text-primary, #1a1a1a);
   cursor: pointer;
 }

@@ -669,6 +669,66 @@ function fontSizeViolations(
   return violations;
 }
 
+/**
+ * A second, separate hole from the one `fontSizeViolations` closes: a raw
+ * `14px` literal at or above the 12px floor passes that check cleanly, but
+ * it is frozen to the 16px-root default and never moves when the reader
+ * raises their OS/browser text size — the exact harm `typography.css`'s own
+ * comment names. This only fires on a bare `NNpx` literal; `var(--text-sm)`
+ * and a raw `rem` value both pass, since both resolve relative to the root.
+ *
+ * Deliberately scoped to `GUARDED_REM_STYLESHEETS`, not every stylesheet in
+ * the tree: a repo-wide run today finds 103 pre-existing hits, which is a
+ * separately ranked, wide-blast-radius cleanup (P3 in the 04/08 UX audit),
+ * not this fix. Grow the list file-by-file as each surface converts; it must
+ * never shrink once a file is on it.
+ */
+const GUARDED_REM_STYLESHEETS = [
+  "components/library/LibraryView.css",
+  "components/library/ContinueReading.css",
+  "components/library/DocumentCard.css",
+  "components/library/ShelfSidebar.css",
+  "components/library/SearchBar.css",
+];
+
+function nonRemFontSizeViolations(
+  sources: readonly StylesheetSource[],
+): string[] {
+  const violations: string[] = [];
+  const isLiteralPx = (value: string) => /^[\d.]+px$/.test(value.trim());
+
+  for (const source of sources) {
+    const css = stripCssComments(source.css);
+
+    for (const match of css.matchAll(
+      /(?:^|[;{])\s*font-size\s*:\s*([^;{}]+?)\s*(?=;|})/gm,
+    )) {
+      const [, value] = match;
+      if (!isLiteralPx(value)) continue;
+      violations.push(
+        `${sourceLocation(source, match.index ?? 0)}  font-size ${value.trim()} is a literal px value — use rem or a --text-* token so it tracks the reader's OS/browser text size`,
+      );
+    }
+
+    for (const match of css.matchAll(
+      /(?:^|[;{])\s*font\s*:\s*([^;{}]+?)\s*(?=;|})/gm,
+    )) {
+      const [, value] = match;
+      let sizeValue: string | undefined;
+      try {
+        sizeValue = shorthandFontSize(value);
+      } catch {
+        continue; // fontSizeViolations already reports unsupported forms
+      }
+      if (sizeValue === undefined || !isLiteralPx(sizeValue)) continue;
+      violations.push(
+        `${sourceLocation(source, match.index ?? 0)}  font ${value.trim()} sets a literal px size — use rem or a --text-* token so it tracks the reader's OS/browser text size`,
+      );
+    }
+  }
+  return violations;
+}
+
 describe("design tokens: every referenced token is defined", () => {
   it("extracts runtime style sheets without parsing unrelated TSX", () => {
     const [sheet] = embeddedStylesheets(
@@ -1040,6 +1100,25 @@ describe("design tokens: WCAG AA contrast floor", () => {
     expect(
       fontSizeViolations(stylesheetSources(SRC), typographyTokens),
     ).toEqual([]);
+  });
+
+  it("guarded reading-home stylesheets never set font-size in a bare px literal", () => {
+    const guarded = stylesheetSources(SRC).filter((s) =>
+      GUARDED_REM_STYLESHEETS.some((rel) => s.file === join(SRC, rel)),
+    );
+    expect(guarded).toHaveLength(GUARDED_REM_STYLESHEETS.length);
+    expect(nonRemFontSizeViolations(guarded)).toEqual([]);
+  });
+
+  it("catches a bare px literal even when it clears the 12px floor", () => {
+    const probe = {
+      file: join(REPO_ROOT, "probe.css"),
+      css: ".probe { font-size: 14px; }",
+      startLine: 1,
+    };
+    expect(nonRemFontSizeViolations([probe])).toEqual([
+      "probe.css:1  font-size 14px is a literal px value \u2014 use rem or a --text-* token so it tracks the reader's OS/browser text size",
+    ]);
   });
 
   it("rejects a rem size that renders below 12px at the default root", () => {

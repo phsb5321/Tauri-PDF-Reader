@@ -3,7 +3,7 @@
 }
 
 .continue-reading-heading {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -49,7 +49,7 @@
 
 .continue-reading-title {
   grid-area: title;
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: 500;
   color: var(--text-primary, #1a1a1a);
   overflow: hidden;
@@ -59,7 +59,7 @@
 
 .continue-reading-place {
   grid-area: place;
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-secondary, #666);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
