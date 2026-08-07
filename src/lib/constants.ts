@@ -45,3 +45,11 @@ export const STORAGE_KEYS = {
   TTS_VOICE: 'tts_voice',
   DEFAULT_HIGHLIGHT_COLOR: 'default_highlight_color',
 } as const;
+
+/**
+ * The single source of truth for the AI-TTS setup message — used by the
+ * playback bar's setup prompt AND the reading home's quiet setup signal
+ * (slice 093). Never duplicate this copy at a call site.
+ */
+export const AI_TTS_SETUP_MESSAGE =
+  "AI TTS requires an ElevenLabs API key";

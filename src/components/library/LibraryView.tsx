@@ -18,11 +18,14 @@ interface LibraryViewProps {
   onDocumentSelect: (document: Document) => void;
   /** Opt-in resume path: land on the page, then start narration. */
   onResumeAndPlay: (document: Document) => void;
+  /** Opens the app-wide settings panel (the home's TTS-setup signal). */
+  onOpenSettings: () => void;
 }
 
 export function LibraryView({
   onDocumentSelect,
   onResumeAndPlay,
+  onOpenSettings,
 }: LibraryViewProps) {
   const {
     documents: allDocuments,
@@ -197,6 +200,7 @@ export function LibraryView({
         documents={documents}
         onResume={handleDocumentOpen}
         onResumeAndPlay={handleResumeAndPlayOpen}
+        onOpenSettings={onOpenSettings}
       />
 
       <h2 className="library-body-heading">Your library</h2>

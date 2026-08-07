@@ -43,6 +43,7 @@ describe("ResumeSection", () => {
         ]}
         onResume={noop}
         onResumeAndPlay={noop}
+        onOpenSettings={noop}
       />,
     );
 
@@ -59,6 +60,7 @@ describe("ResumeSection", () => {
         ]}
         onResume={noop}
         onResumeAndPlay={noop}
+        onOpenSettings={noop}
       />,
     );
 
@@ -86,6 +88,7 @@ describe("ResumeSection", () => {
         ]}
         onResume={noop}
         onResumeAndPlay={noop}
+        onOpenSettings={noop}
       />,
     );
 
@@ -106,6 +109,7 @@ describe("ResumeSection", () => {
         documents={[reading]}
         onResume={onResume}
         onResumeAndPlay={noop}
+        onOpenSettings={noop}
       />,
     );
     // The resume line is typographic — the title is NOT inside the button
@@ -133,6 +137,7 @@ describe("ResumeSection", () => {
         documents={[primary, secondary]}
         onResume={onResume}
         onResumeAndPlay={noop}
+        onOpenSettings={noop}
       />,
     );
     fireEvent.click(screen.getByText("Secondary"));
@@ -155,6 +160,7 @@ describe("ResumeSection", () => {
         documents={[primary, secondary]}
         onResume={onResume}
         onResumeAndPlay={onResumeAndPlay}
+        onOpenSettings={noop}
       />,
     );
 
@@ -176,6 +182,7 @@ describe("ResumeSection", () => {
         documents={[doc({ currentPage: 42, pageCount: 100 })]}
         onResume={noop}
         onResumeAndPlay={noop}
+        onOpenSettings={noop}
       />,
     );
 
@@ -193,6 +200,7 @@ describe("ResumeSection", () => {
         documents={[doc({ currentPage: 42, pageCount: null })]}
         onResume={noop}
         onResumeAndPlay={noop}
+        onOpenSettings={noop}
       />,
     );
 
@@ -207,6 +215,7 @@ describe("ResumeSection", () => {
         ]}
         onResume={noop}
         onResumeAndPlay={noop}
+        onOpenSettings={noop}
       />,
     );
 
@@ -219,6 +228,7 @@ describe("ResumeSection", () => {
         documents={[doc({ currentPage: 42, pageCount: 100 })]}
         onResume={noop}
         onResumeAndPlay={noop}
+        onOpenSettings={noop}
       />,
     );
 

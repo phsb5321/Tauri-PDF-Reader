@@ -46,7 +46,13 @@ beforeEach(() => {
 });
 
 function renderLibrary() {
-  return render(<LibraryView onDocumentSelect={() => {}} />);
+  return render(
+    <LibraryView
+      onDocumentSelect={() => {}}
+      onResumeAndPlay={() => {}}
+      onOpenSettings={() => {}}
+    />,
+  );
 }
 
 describe("the library search empty state", () => {

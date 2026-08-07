@@ -2,6 +2,16 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #49 — 07/08/2026 (093-tts-signal: the home says narration needs setup, once, quietly)
+
+- **Branch:** `093-tts-signal` (off `origin/main` 7b1450c post-#91, worktree `../tauri-pdf-reader-093-tts-signal`). Wave-3 next-3 item #2, unblocked by the catch-up epic landing.
+- **Defect:** the AI-TTS empty state (the discoverable "AI TTS requires an ElevenLabs API key" prompt) lived only in `AiPlaybackBar`, which mounts once a document is open. On the reading home — where resume-and-play now ships (#89/#91) — every play affordance was, without a key, a promise it could not keep, with zero signal up front. Sharper because the key is session-only (#73): the discovery repeats every launch.
+- **Design (argued in the PR body):** a quiet one-line setup signal inside `ResumeSection` (only while `selectNeedsApiKey`), body-size `--text-sm` secondary text + an inline "Configure" text action that opens the existing `SettingsPanel` via a new `onOpenSettings` prop (ReaderView → LibraryView → ResumeSection). Nothing auto-opens; reading without narration stays a first-class path; the resume-and-play buttons are untouched (clicking one with no key still lands the reader on the page, where AiPlaybackBar's existing prompt takes over). Chose the signal over disabling the play buttons because the PO falsifier demands a settings-opening affordance on the home — a disabled button cannot be one.
+- **One source of truth:** the message copy was lifted to `AI_TTS_SETUP_MESSAGE` in `src/lib/constants.ts`; `AiPlaybackBar` now imports it (its literal was removed) and the home signal uses the same constant. No duplicated copy.
+- **RED first (both directions):** `catchup-home.test.tsx` — no key → the signal is on the home, nothing auto-opens, and clicking Configure opens the Settings dialog; key present → no signal, no Configure. On `main` the first failed (`Unable to find an element with the text: AI TTS requires an ElevenLabs API key`) and the second passed vacuously — the honest two-sided state. Output pasted into the PR body.
+- **GREEN:** full suite 1019/1019 (84 files); catchup-home 7/7, ResumeSection 10/10, all ResumeSection/LibraryView callers updated for the new required prop (library-search-empty, resume-and-play, settings-menu, app-root, reading-home all green). `pnpm lint` 0 errors / 92 warnings (baseline), `pnpm typecheck` clean, `git diff --check` clean, `tools/alignment-gate.sh --base origin/main` PASS on the committed diff.
+- **Revert:** `git revert <squash>` — two component files, one constant, two test files, one backlog entry.
+
 ## Iteration #48 — 07/08/2026 (090-catchup-home: one book gets the answer — 5.1 + 5.2)
 
 - **Branch:** `090-catchup-home` (off `origin/main` 6b15743 post-#90, worktree `../tauri-pdf-reader-090-catchup-home`). Huly 5.1/5.2, the epic Pedro asked for on 04/08. Orch confirmed ownership; merged after 091 per sequencing.
