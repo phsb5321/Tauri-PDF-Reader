@@ -1,17 +1,19 @@
 /**
- * Tests for the Continue reading shelf.
+ * Tests for the ResumeSection (the catch-up surface).
  *
  * Verifies:
  * - Only in-flight documents appear (unread and finished are excluded)
  * - Nothing renders when nothing is in flight
- * - Most recently opened comes first
- * - Clicking the row resumes silently; the secondary control resumes and plays
- * - Place and progress are reported for assistive technology
+ * - Most recently opened becomes the resume line, the rest drop to rows
+ * - Clicking the line's Resume / a row resumes silently; the play control
+ *   resumes AND starts narration — and never fires the plain resume
+ * - Place, percent, and relative last-read time are reported
+ * - Accessible names carry "Resume" for assistive tech
  */
 
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { ContinueReading } from "../../components/library/ContinueReading";
+import { ResumeSection } from "../../components/library/ResumeSection";
 import type { Document } from "../../lib/schemas";
 
 const doc = (over: Partial<Document> = {}): Document =>
@@ -31,10 +33,10 @@ const doc = (over: Partial<Document> = {}): Document =>
 
 const noop = () => {};
 
-describe("ContinueReading", () => {
+describe("ResumeSection", () => {
   it("renders nothing when no document is in flight", () => {
     const { container } = render(
-      <ContinueReading
+      <ResumeSection
         documents={[
           doc({ currentPage: 1 }),
           doc({ id: "d2", currentPage: 100 }),
@@ -49,7 +51,7 @@ describe("ContinueReading", () => {
 
   it("lists only the documents in flight", () => {
     render(
-      <ContinueReading
+      <ResumeSection
         documents={[
           doc({ id: "unread", title: "Unread", currentPage: 1 }),
           doc({ id: "reading", title: "Reading", currentPage: 42 }),
@@ -65,9 +67,9 @@ describe("ContinueReading", () => {
     expect(screen.queryByText("Done")).not.toBeInTheDocument();
   });
 
-  it("puts the most recently opened first", () => {
+  it("puts the most recently opened first as the resume line", () => {
     render(
-      <ContinueReading
+      <ResumeSection
         documents={[
           doc({
             id: "older",
@@ -87,53 +89,90 @@ describe("ContinueReading", () => {
       />,
     );
 
-    const titles = screen
-      .getAllByRole("button", { name: /^Resume / })
-      .filter((button) => /%$/.test(button.getAttribute("aria-label") ?? ""))
-      .map((b) => b.textContent ?? "");
-    expect(titles[0]).toContain("Newer");
-    expect(titles[1]).toContain("Older");
+    // The newer book is the resume line (h2 section's primary button); the
+    // older one is an "also in progress" row. Assert via heading positions:
+    // the primary title sits in the resume line, the other in the list.
+    const resumeLineTitle = screen.getByText("Newer");
+    expect(resumeLineTitle.className).toContain("resume-line-title");
+    expect(screen.getByText("Older").className).toContain("list-row__primary");
   });
 
-  it("resumes the document that was clicked", () => {
+  it("resumes the document that was clicked (line)", () => {
     const onResume = vi.fn();
     const reading = doc({ id: "reading", title: "Reading", currentPage: 42 });
 
     render(
-      <ContinueReading
+      <ResumeSection
         documents={[reading]}
         onResume={onResume}
         onResumeAndPlay={noop}
       />,
     );
-    fireEvent.click(screen.getByText("Reading"));
+    // The resume line is typographic — the title is NOT inside the button
+    // (unlike the old card row), so click the actual Resume button.
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /^Resume Reading, page 42 of 100, 42%$/,
+      }),
+    );
 
     expect(onResume).toHaveBeenCalledWith(reading);
   });
 
-  it("resumes and plays through the secondary control, without touching plain resume", () => {
+  it("resumes through an 'also in progress' row", () => {
     const onResume = vi.fn();
-    const onResumeAndPlay = vi.fn();
-    const reading = doc({ id: "reading", title: "Reading", currentPage: 42 });
+    const primary = doc({ id: "primary", title: "Primary", currentPage: 10 });
+    const secondary = doc({
+      id: "secondary",
+      title: "Secondary",
+      currentPage: 5,
+    });
 
     render(
-      <ContinueReading
-        documents={[reading]}
+      <ResumeSection
+        documents={[primary, secondary]}
+        onResume={onResume}
+        onResumeAndPlay={noop}
+      />,
+    );
+    fireEvent.click(screen.getByText("Secondary"));
+
+    expect(onResume).toHaveBeenCalledWith(secondary);
+  });
+
+  it("resumes AND plays through each play control, without touching plain resume", () => {
+    const onResume = vi.fn();
+    const onResumeAndPlay = vi.fn();
+    const primary = doc({ id: "primary", title: "Primary", currentPage: 10 });
+    const secondary = doc({
+      id: "secondary",
+      title: "Secondary",
+      currentPage: 5,
+    });
+
+    render(
+      <ResumeSection
+        documents={[primary, secondary]}
         onResume={onResume}
         onResumeAndPlay={onResumeAndPlay}
       />,
     );
+
     fireEvent.click(
-      screen.getByRole("button", { name: /Reading and start reading aloud/ }),
+      screen.getByRole("button", { name: /Primary and start reading aloud/ }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: /Secondary and start reading aloud/ }),
     );
 
-    expect(onResumeAndPlay).toHaveBeenCalledWith(reading);
+    expect(onResumeAndPlay).toHaveBeenCalledWith(primary);
+    expect(onResumeAndPlay).toHaveBeenCalledWith(secondary);
     expect(onResume).not.toHaveBeenCalled();
   });
 
-  it("reports the place in the book", () => {
+  it("reports the place in the book and percent", () => {
     render(
-      <ContinueReading
+      <ResumeSection
         documents={[doc({ currentPage: 42, pageCount: 100 })]}
         onResume={noop}
         onResumeAndPlay={noop}
@@ -141,6 +180,7 @@ describe("ContinueReading", () => {
     );
 
     expect(screen.getByText("Page 42 of 100")).toBeInTheDocument();
+    expect(screen.getByText("42%")).toBeInTheDocument();
     // Native <progress> carries value/max rather than the aria-value* trio.
     const bar = screen.getByRole("progressbar");
     expect(bar).toHaveAttribute("value", "42");
@@ -149,7 +189,7 @@ describe("ContinueReading", () => {
 
   it("omits the total when the page count is unknown", () => {
     render(
-      <ContinueReading
+      <ResumeSection
         documents={[doc({ currentPage: 42, pageCount: null })]}
         onResume={noop}
         onResumeAndPlay={noop}
@@ -161,7 +201,7 @@ describe("ContinueReading", () => {
 
   it("falls back to the file path when a document has no title", () => {
     render(
-      <ContinueReading
+      <ResumeSection
         documents={[
           doc({ title: null, filePath: "/books/untitled.pdf", currentPage: 5 }),
         ]}
@@ -171,5 +211,24 @@ describe("ContinueReading", () => {
     );
 
     expect(screen.getByText("/books/untitled.pdf")).toBeInTheDocument();
+  });
+
+  it("names both actions with the resume verb for assistive tech", () => {
+    render(
+      <ResumeSection
+        documents={[doc({ currentPage: 42, pageCount: 100 })]}
+        onResume={noop}
+        onResumeAndPlay={noop}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: /^Resume One, page 42 of 100, 42%$/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: /Resume One and start reading aloud/,
+      }),
+    ).toBeInTheDocument();
   });
 });
