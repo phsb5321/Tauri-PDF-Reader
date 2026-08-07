@@ -141,7 +141,9 @@ describe("the Settings menu action", () => {
     const shelf = await screen.findByRole("region", {
       name: "Continue reading",
     });
-    fireEvent.click(within(shelf).getByRole("button", { name: /Moby-Dick/ }));
+    fireEvent.click(
+      within(shelf).getByRole("button", { name: /^Resume Moby-Dick, page/ }),
+    );
     await waitFor(() =>
       expect(screen.getByTestId("pdf-viewer")).toBeInTheDocument(),
     );

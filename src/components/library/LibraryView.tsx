@@ -16,9 +16,14 @@ import "./LibraryView.css";
 
 interface LibraryViewProps {
   onDocumentSelect: (document: Document) => void;
+  /** Opt-in resume path: land on the page, then start narration. */
+  onResumeAndPlay: (document: Document) => void;
 }
 
-export function LibraryView({ onDocumentSelect }: LibraryViewProps) {
+export function LibraryView({
+  onDocumentSelect,
+  onResumeAndPlay,
+}: LibraryViewProps) {
   const {
     documents: allDocuments,
     isLoading,
@@ -105,6 +110,14 @@ export function LibraryView({ onDocumentSelect }: LibraryViewProps) {
     [healDocument, onDocumentSelect],
   );
 
+  const handleResumeAndPlayOpen = useCallback(
+    async (document: Document) => {
+      const healed = await healDocument(document.id);
+      onResumeAndPlay(healed ?? document);
+    },
+    [healDocument, onResumeAndPlay],
+  );
+
   const handleDocumentDelete = useCallback(
     async (documentId: string) => {
       if (window.confirm("Remove this document from the library?")) {
@@ -180,7 +193,11 @@ export function LibraryView({ onDocumentSelect }: LibraryViewProps) {
         </div>
       </div>
 
-      <ContinueReading documents={documents} onResume={handleDocumentOpen} />
+      <ContinueReading
+        documents={documents}
+        onResume={handleDocumentOpen}
+        onResumeAndPlay={handleResumeAndPlayOpen}
+      />
 
       <div className="library-body">
         <ShelfSidebar

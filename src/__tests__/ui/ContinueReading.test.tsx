@@ -5,7 +5,7 @@
  * - Only in-flight documents appear (unread and finished are excluded)
  * - Nothing renders when nothing is in flight
  * - Most recently opened comes first
- * - Clicking a row resumes that document
+ * - Clicking the row resumes silently; the secondary control resumes and plays
  * - Place and progress are reported for assistive technology
  */
 
@@ -40,6 +40,7 @@ describe("ContinueReading", () => {
           doc({ id: "d2", currentPage: 100 }),
         ]}
         onResume={noop}
+        onResumeAndPlay={noop}
       />,
     );
 
@@ -55,6 +56,7 @@ describe("ContinueReading", () => {
           doc({ id: "done", title: "Done", currentPage: 100 }),
         ]}
         onResume={noop}
+        onResumeAndPlay={noop}
       />,
     );
 
@@ -81,11 +83,13 @@ describe("ContinueReading", () => {
           }),
         ]}
         onResume={noop}
+        onResumeAndPlay={noop}
       />,
     );
 
     const titles = screen
-      .getAllByRole("button")
+      .getAllByRole("button", { name: /^Resume / })
+      .filter((button) => /%$/.test(button.getAttribute("aria-label") ?? ""))
       .map((b) => b.textContent ?? "");
     expect(titles[0]).toContain("Newer");
     expect(titles[1]).toContain("Older");
@@ -95,10 +99,36 @@ describe("ContinueReading", () => {
     const onResume = vi.fn();
     const reading = doc({ id: "reading", title: "Reading", currentPage: 42 });
 
-    render(<ContinueReading documents={[reading]} onResume={onResume} />);
-    fireEvent.click(screen.getByRole("button"));
+    render(
+      <ContinueReading
+        documents={[reading]}
+        onResume={onResume}
+        onResumeAndPlay={noop}
+      />,
+    );
+    fireEvent.click(screen.getByText("Reading"));
 
     expect(onResume).toHaveBeenCalledWith(reading);
+  });
+
+  it("resumes and plays through the secondary control, without touching plain resume", () => {
+    const onResume = vi.fn();
+    const onResumeAndPlay = vi.fn();
+    const reading = doc({ id: "reading", title: "Reading", currentPage: 42 });
+
+    render(
+      <ContinueReading
+        documents={[reading]}
+        onResume={onResume}
+        onResumeAndPlay={onResumeAndPlay}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: /Reading and start reading aloud/ }),
+    );
+
+    expect(onResumeAndPlay).toHaveBeenCalledWith(reading);
+    expect(onResume).not.toHaveBeenCalled();
   });
 
   it("reports the place in the book", () => {
@@ -106,6 +136,7 @@ describe("ContinueReading", () => {
       <ContinueReading
         documents={[doc({ currentPage: 42, pageCount: 100 })]}
         onResume={noop}
+        onResumeAndPlay={noop}
       />,
     );
 
@@ -121,6 +152,7 @@ describe("ContinueReading", () => {
       <ContinueReading
         documents={[doc({ currentPage: 42, pageCount: null })]}
         onResume={noop}
+        onResumeAndPlay={noop}
       />,
     );
 
@@ -134,6 +166,7 @@ describe("ContinueReading", () => {
           doc({ title: null, filePath: "/books/untitled.pdf", currentPage: 5 }),
         ]}
         onResume={noop}
+        onResumeAndPlay={noop}
       />,
     );
 

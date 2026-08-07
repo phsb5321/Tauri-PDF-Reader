@@ -2,12 +2,19 @@ import {
   continueReading,
   progressPercent,
 } from "../../domain/library/reading-progress";
+import { IconButton } from "../../ui/components/IconButton/IconButton";
 import type { Document } from "../../lib/schemas";
 import "./ContinueReading.css";
 
 interface ContinueReadingProps {
   documents: readonly Document[];
   onResume: (document: Document) => void;
+  /**
+   * Opt-in: land on the stored page AND start narrating in one action. The
+   * row's main click (`onResume`) stays silent — a reader who wants to read
+   * quietly must never be ambushed by audio.
+   */
+  onResumeAndPlay: (document: Document) => void;
 }
 
 /**
@@ -17,6 +24,7 @@ interface ContinueReadingProps {
 export function ContinueReading({
   documents,
   onResume,
+  onResumeAndPlay,
 }: Readonly<ContinueReadingProps>) {
   const inFlight = continueReading(documents);
 
@@ -35,7 +43,7 @@ export function ContinueReading({
           const percent = progressPercent(document);
           const label = document.title || document.filePath;
           return (
-            <li key={document.id}>
+            <li key={document.id} className="continue-reading-row">
               <button
                 type="button"
                 className="continue-reading-item"
@@ -68,10 +76,29 @@ export function ContinueReading({
                   />
                 </span>
               </button>
+              {/* Sibling, not nested — two interactive elements inside one
+                  <button> is invalid HTML and mangles the accessibility tree. */}
+              <IconButton
+                label={`Resume ${label} and start reading aloud`}
+                variant="ghost"
+                size="sm"
+                className="continue-reading-play"
+                onClick={() => onResumeAndPlay(document)}
+              >
+                <PlayIcon />
+              </IconButton>
             </li>
           );
         })}
       </ul>
     </section>
+  );
+}
+
+function PlayIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M4 2.5v11l9-5.5-9-5.5z" fill="currentColor" />
+    </svg>
   );
 }

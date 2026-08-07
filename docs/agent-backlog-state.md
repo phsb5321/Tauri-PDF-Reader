@@ -2,6 +2,17 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #47 — 07/08/2026 (091-resume-and-play: catch up means resume AND narrate, one action)
+
+- **Branch:** `091-resume-and-play` (off `origin/main` 526b2ea, worktree `../tauri-pdf-reader-091-resume-and-play`). Supersedes an earlier `090-resume-and-play` numbering collision with orch's own reserved 090 slot — that worktree/branch was cleaned up externally mid-work with no PR opened; nothing lost, redone here. Huly `5.3 — Resume-and-play`, prio 2, highest open row.
+- **Defect:** resuming from the Continue-reading shelf landed on the saved page and stopped; Play was a separate, undiscoverable act for an app whose whole premise is reading aloud.
+- **Fix:** a secondary, opt-in control on each shelf row (`IconButton`, accessible name `Resume {title} and start reading aloud`), sibling to the existing row button — not nested (button-in-button is invalid HTML). The row's main click (`onResume`) is byte-for-byte unchanged: still silent.
+- **Wiring:** `ContinueReading` gets a new required `onResumeAndPlay` prop → `LibraryView` (heals the document first, mirroring the existing `handleDocumentOpen`) → `ReaderView.handleResumeAndPlay` (resumes, then bumps a new `autoPlayToken` counter state) → `AiPlaybackBar`'s new `autoPlayToken` prop. A counter, not a boolean, because a second resume-and-play must be distinguishable from the first even if the first never actually started (no key yet). `AiPlaybackBar` consumes each new token at most once (ref-tracked) and calls the SAME `handlePlay` the visible Play button calls — no duplicated TTS-start logic.
+- **Degrade path:** `canPlay = initialized && !error`; with no key, `canPlay` never goes true, so the auto-play effect never fires — the reader still lands on the page (the normal resume path ran), and sees the existing, truthful "AI TTS requires an ElevenLabs API key" setup prompt instead of a silent no-op.
+- **RED first:** new shell-level test `resume-and-play.test.tsx` mounts the real shell (unlike `reading-home.test.tsx`, `AiPlaybackBar` is NOT stubbed — the claim is specifically that the TTS state machine leaves `idle`). On `main`, 2 of 3 failed with `Unable to find role="button" and name /Resume Moby-Dick and start reading aloud/` (the control didn't exist yet); the plain-resume-stays-silent assertion already passed on `main` (proving it isn't a tautology). Failing output pasted into the PR body.
+- **GREEN:** 26/26 across the touched surface — resume-and-play 3/3, reading-home 6/6, ContinueReading 8/8 (added a resume-and-play discrimination case; three existing tests needed name-disambiguation fixes now that each row carries two "Resume ..."-prefixed buttons), settings-menu 2/2, session-restore 3/3, AiTtsSettings 4/4. `pnpm lint` 0 errors / 92 warnings (baseline), `pnpm typecheck` clean, `git diff --check` clean, `tools/alignment-gate.sh --base origin/main` PASS on the committed diff.
+- **Revert:** `git revert <squash>` — four component files, three test files, one backlog entry.
+
 ## Iteration #46 — 06/08/2026 (089-focus-visible: keyboard-only focus convention enforced)
 
 - **Branch:** `089-focus-visible` (off `origin/main` c993ad6, worktree `../tauri-pdf-reader-089-focus-visible`). UX finding #3 / PO next-3 item #3. Orchestrator holds the merge gate.

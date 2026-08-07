@@ -17,11 +17,19 @@ import "./AiPlaybackBar.css";
 interface AiPlaybackBarProps {
   getText: () => Promise<string | null>;
   enableHighlighting?: boolean;
+  /**
+   * Incremented by the catch-up shelf's opt-in "Resume & play" action. Any
+   * new value (not the value itself) requests one play attempt — a counter
+   * rather than a boolean so a second request is distinguishable from the
+   * first even if the first never actually started (e.g. no API key yet).
+   */
+  autoPlayToken?: number;
 }
 
 export function AiPlaybackBar({
   getText,
   enableHighlighting = true,
+  autoPlayToken = 0,
 }: AiPlaybackBarProps) {
   const {
     initialized,
@@ -248,6 +256,22 @@ export function AiPlaybackBar({
       await pause();
     }
   }, [pause, pauseHighlight, enableHighlighting]);
+
+  // Resume-and-play: consume each new `autoPlayToken` at most once, tracked
+  // by a ref rather than by comparing against the playback state, so a value
+  // that arrives before `canPlay` goes true (TTS still initializing) is not
+  // lost — the effect re-runs as `canPlay` changes and fires the first time
+  // both are true. Degrades honestly: no key means `canPlay` never goes true,
+  // so this never fires — the reader already landed on the page via the
+  // normal resume path, and the existing setup prompt (below, `needsApiKey`)
+  // is what they see instead of a silent no-op.
+  const consumedAutoPlayToken = useRef(0);
+  useEffect(() => {
+    if (autoPlayToken > consumedAutoPlayToken.current && canPlay) {
+      consumedAutoPlayToken.current = autoPlayToken;
+      void handlePlay();
+    }
+  }, [autoPlayToken, canPlay, handlePlay]);
 
   const handleStop = useCallback(async () => {
     playingRef.current = false;
