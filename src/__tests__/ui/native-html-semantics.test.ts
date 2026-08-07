@@ -14,7 +14,7 @@ const NATIVE_SEMANTIC_SURFACES = [
   ["../../hooks/useAnnounce.tsx", /<output\b/],
   ["../../ui/components/Dialog/Dialog.tsx", /<dialog\b/],
   ["../../components/highlights/NoteEditor.tsx", /<dialog\b/],
-  ["../../components/library/ContinueReading.tsx", /<progress\b/],
+  ["../../components/library/ResumeSection.tsx", /<progress\b/],
   ["../../components/library/DocumentCard.tsx", /<button\b/],
   ["../../components/library/DocumentCard.tsx", /<fieldset\b/],
   // The <legend> is listed separately because the fieldset is only an

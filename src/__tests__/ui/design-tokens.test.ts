@@ -671,7 +671,7 @@ function fontSizeViolations(
 
 const GUARDED_REM_STYLESHEETS = [
   "components/library/LibraryView.css",
-  "components/library/ContinueReading.css",
+  "components/library/ResumeSection.css",
   "components/library/DocumentCard.css",
   "components/library/ShelfSidebar.css",
   "components/library/SearchBar.css",
@@ -1232,7 +1232,7 @@ describe("design tokens: WCAG AA contrast floor", () => {
     expect(fontSizeViolations([probe], new Map())).toEqual([]);
   });
 
-  it("the three live `font: inherit` sites stay green", () => {
+  it("the two live `font: inherit` sites stay green", () => {
     const typographyTokens = themeDeclarations(
       readFileSync(join(SRC, "ui/tokens/typography.css"), "utf8"),
       { colorScheme: "light", contrastMore: false },
@@ -1244,14 +1244,6 @@ describe("design tokens: WCAG AA contrast floor", () => {
             file: join(SRC, "components/highlights/HighlightsPanel.css"),
             css: readFileSync(
               join(SRC, "components/highlights/HighlightsPanel.css"),
-              "utf8",
-            ),
-            startLine: 1,
-          },
-          {
-            file: join(SRC, "components/library/ContinueReading.css"),
-            css: readFileSync(
-              join(SRC, "components/library/ContinueReading.css"),
               "utf8",
             ),
             startLine: 1,

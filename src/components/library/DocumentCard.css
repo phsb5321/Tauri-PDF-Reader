@@ -28,7 +28,9 @@
 
 .document-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  /* Quieted per the catch-up spec §2: the grid should recede against the
+     resume line above it rather than compete card-for-card. */
+  box-shadow: var(--shadow-sm);
 }
 
 .document-card.selected {

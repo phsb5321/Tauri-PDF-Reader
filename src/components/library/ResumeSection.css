@@ -1,0 +1,100 @@
+.resume-section {
+  margin-bottom: var(--space-8);
+}
+
+.resume-section-heading {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-3);
+}
+
+.resume-line {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.resume-line-title {
+  font-family: var(--font-family-display);
+  font-size: var(--text-2xl);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+}
+
+.resume-line-meta {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Full-width progress, thin, accent fill — navigation chrome, NOT the TTS
+   voice colour (--color-speak is that; --color-accent is this). */
+.resume-line-bar {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-border);
+  overflow: hidden;
+}
+
+.resume-line-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--color-accent);
+}
+
+.resume-line-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.resume-line-play {
+  flex-shrink: 0;
+}
+
+.also-in-progress {
+  margin-top: var(--space-8);
+}
+
+.also-in-progress-heading {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-2);
+}
+
+.also-in-progress-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.also-in-progress-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.also-in-progress-row-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.also-in-progress-row-play {
+  flex-shrink: 0;
+}
+
+.also-in-progress-chevron {
+  width: 16px;
+  height: 16px;
+  color: var(--color-text-secondary);
+}

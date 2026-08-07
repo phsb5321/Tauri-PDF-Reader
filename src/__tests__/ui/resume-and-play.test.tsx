@@ -7,7 +7,7 @@
  * PLAIN resume (the row's main click) stays exactly as it was, so a reader
  * who wants to read silently is never ambushed by audio.
  *
- * Mounts the real shell end to end: `ReaderView`, the real `ContinueReading`
+ * Mounts the real shell end to end: `ReaderView`, the real `ResumeSection`
  * row, and the real `AiPlaybackBar` (unlike `reading-home.test.tsx`, which
  * stubs it — the claim here is specifically that the TTS state machine
  * leaves `idle`, which a stub can't prove). Only the Tauri IPC boundary and

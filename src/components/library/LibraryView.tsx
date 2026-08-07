@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useMemo } from "react";
 import { useLibraryStore } from "../../stores/library-store";
-import { ContinueReading } from "./ContinueReading";
+import { ResumeSection } from "./ResumeSection";
 import { useCollectionsStore } from "../../stores/collections-store";
 import { DocumentCard } from "./DocumentCard";
 import { ShelfSidebar } from "./ShelfSidebar";
@@ -193,11 +193,13 @@ export function LibraryView({
         </div>
       </div>
 
-      <ContinueReading
+      <ResumeSection
         documents={documents}
         onResume={handleDocumentOpen}
         onResumeAndPlay={handleResumeAndPlayOpen}
       />
+
+      <h2 className="library-body-heading">Your library</h2>
 
       <div className="library-body">
         <ShelfSidebar
