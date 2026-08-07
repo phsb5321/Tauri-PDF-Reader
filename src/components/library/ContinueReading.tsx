@@ -40,6 +40,9 @@ export function ContinueReading({
                 type="button"
                 className="continue-reading-item"
                 onClick={() => onResume(document)}
+                aria-label={`Resume ${label}, page ${document.currentPage}${
+                  document.pageCount ? ` of ${document.pageCount}` : ""
+                }, ${percent}%`}
               >
                 <span className="continue-reading-title">{label}</span>
                 <span className="continue-reading-place">
