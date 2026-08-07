@@ -6,6 +6,8 @@ import { formatRelativeReadTime } from "../../domain/library/relative-time";
 import { Button } from "../../ui/components/Button/Button";
 import { ListRow } from "../../ui/components/ListRow/ListRow";
 import { IconButton } from "../../ui/components/IconButton/IconButton";
+import { useAiTtsStore, selectNeedsApiKey } from "../../stores/ai-tts-store";
+import { AI_TTS_SETUP_MESSAGE } from "../../lib/constants";
 import type { Document } from "../../lib/schemas";
 import "./ResumeSection.css";
 
@@ -18,6 +20,8 @@ interface ResumeSectionProps {
    * quietly must never be ambushed by audio.
    */
   onResumeAndPlay: (document: Document) => void;
+  /** Opens the app-wide settings panel (the TTS-setup signal's action). */
+  onOpenSettings: () => void;
 }
 
 function placeText(document: Document): string {
@@ -37,7 +41,14 @@ export function ResumeSection({
   documents,
   onResume,
   onResumeAndPlay,
+  onOpenSettings,
 }: Readonly<ResumeSectionProps>) {
+  // The key is session-only (#73), so a fresh launch has none — and the
+  // resume-and-play affordances below cannot play until it is configured.
+  // Signal that once, quietly, with a path to fix it; never auto-open.
+  // Read before the early return: hooks must run unconditionally.
+  const needsApiKey = useAiTtsStore(selectNeedsApiKey);
+
   const inFlight = continueReading(documents);
   if (inFlight.length === 0) return null;
 
@@ -58,14 +69,26 @@ export function ResumeSection({
         onResumeAndPlay={onResumeAndPlay}
       />
 
+      {needsApiKey && (
+        <p className="resume-section-tts-signal">
+          <span>{AI_TTS_SETUP_MESSAGE}</span>
+          <button
+            type="button"
+            className="resume-section-tts-signal-action"
+            onClick={onOpenSettings}
+          >
+            Configure
+          </button>
+        </p>
+      )}
+
       {rest.length > 0 && (
         <AlsoInProgress
           documents={rest}
           onResume={onResume}
           onResumeAndPlay={onResumeAndPlay}
         />
-      )}
-    </section>
+      )}    </section>
   );
 }
 

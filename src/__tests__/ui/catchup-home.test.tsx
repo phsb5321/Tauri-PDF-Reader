@@ -13,13 +13,15 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, within, fireEvent } from "@testing-library/react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { mockInvoke } from "../../../tests/setup";
 import { ReaderView } from "../../components/reader/ReaderView";
 import { useDocumentStore } from "../../stores/document-store";
 import { useLibraryStore } from "../../stores/library-store";
 import { useCollectionsStore } from "../../stores/collections-store";
+import { useAiTtsStore } from "../../stores/ai-tts-store";
+import { AI_TTS_SETUP_MESSAGE } from "../../lib/constants";
 import type { Document } from "../../lib/schemas";
 
 vi.mock("../../services/pdf-service", () => ({
@@ -98,6 +100,8 @@ function mockLibrary(documents: Document[]) {
       case "library_heal_document":
       case "library_open_document":
         return Promise.resolve(documents[0]);
+      case "settings_get_all_v2":
+        return Promise.resolve({ settings: {} });
       default:
         return Promise.resolve(null);
     }
@@ -108,6 +112,7 @@ beforeEach(() => {
   useDocumentStore.getState().reset();
   useLibraryStore.getState().reset();
   useCollectionsStore.getState().reset();
+  useAiTtsStore.getState().reset();
   loadDocument.mockReset();
   loadDocument.mockResolvedValue({
     numPages: 529,
@@ -193,5 +198,36 @@ describe("the catch-up home", () => {
     expect(
       await screen.findByRole("heading", { name: "Your library" }),
     ).toBeInTheDocument();
+  });
+
+  it("signals TTS setup on the home with no key, and the signal opens settings", async () => {
+    // Default store state — no API key (session-only, #73). The home offers
+    // resume-and-play affordances that cannot play yet; it must say so and
+    // give a path to fix it, without auto-opening anything.
+    render(<ReaderView />);
+
+    await screen.findByRole("region", { name: "Continue reading" });
+    expect(screen.getByText(AI_TTS_SETUP_MESSAGE)).toBeInTheDocument();
+    // Nothing may be auto-opened by the mere presence of the signal.
+    expect(
+      screen.queryByRole("dialog", { name: "Settings" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Configure" }));
+
+    expect(
+      await screen.findByRole("dialog", { name: "Settings" }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows no TTS-setup signal when a key is present", async () => {
+    useAiTtsStore.setState({ apiKey: "test-key", initialized: true });
+    render(<ReaderView />);
+
+    await screen.findByRole("region", { name: "Continue reading" });
+    expect(screen.queryByText(AI_TTS_SETUP_MESSAGE)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Configure" }),
+    ).not.toBeInTheDocument();
   });
 });

@@ -233,6 +233,7 @@ export function ReaderView() {
           onResumeAndPlay={(document) => {
             void handleResumeAndPlay(document);
           }}
+          onOpenSettings={() => setShowSettings(true)}
         />
       ) : (
         <PdfViewer />

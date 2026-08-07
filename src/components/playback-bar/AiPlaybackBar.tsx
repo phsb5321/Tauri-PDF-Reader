@@ -7,6 +7,7 @@ import { useDocumentStore } from "../../stores/document-store";
 import { useAiTtsStore } from "../../stores/ai-tts-store";
 import { pdfService } from "../../services/pdf-service";
 import { reducedMotionScrollBehavior } from "../../lib/reduced-motion";
+import { AI_TTS_SETUP_MESSAGE } from "../../lib/constants";
 import { AiVoiceSelector } from "./AiVoiceSelector";
 import { AiSpeedSlider } from "./AiSpeedSlider";
 import { AiTtsSettings } from "./AiTtsSettings";
@@ -339,7 +340,7 @@ export function AiPlaybackBar({
               strokeWidth="2"
             />
           </svg>
-          <span>AI TTS requires an ElevenLabs API key</span>
+          <span>{AI_TTS_SETUP_MESSAGE}</span>
           <button
             className="ai-playback-setup-btn"
             onClick={() => setShowSettings(true)}
