@@ -14,10 +14,13 @@
  *
  * Markers are deliberately narrow to avoid false positives: `reqwest::`
  * usage (the HTTP crate, optional behind the `elevenlabs-tts` feature) for
- * the backend; `fetch(`/XHR/WebSocket/EventSource and the jsDelivr literal
- * for the frontend. A bare `https://` in a comment or an external link is
- * NOT a marker — links open the browser via `shell:allow-open`, they do not
- * transmit app data (SECURITY.md says exactly this).
+ * the backend; `fetch(`/XHR/WebSocket/EventSource for the frontend. The
+ * jsDelivr literal marker is retained as a regression guard: slice 100
+ * bundled the CMap tables locally, and a reintroduced CDN URL would put
+ * `pdf-service.ts` back in the egress set and turn this RED. A bare
+ * `https://` in a comment or an external link is NOT a marker — links open
+ * the browser via `shell:allow-open`, they do not transmit app data
+ * (SECURITY.md says exactly this).
  */
 
 import { readFileSync, readdirSync } from "node:fs";
@@ -42,7 +45,7 @@ const FRONTEND_MARKERS = [
 const BACKEND_MARKERS = [/reqwest::/];
 
 /** The egress modules SECURITY.md names, relative to the repo root. */
-const DOCUMENTED_FRONTEND = new Set(["src/services/pdf-service.ts"]);
+const DOCUMENTED_FRONTEND = new Set([]);
 const DOCUMENTED_BACKEND = new Set([
   "src-tauri/src/ai_tts/elevenlabs.rs",
 ]);

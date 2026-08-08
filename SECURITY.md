@@ -18,9 +18,11 @@ program.
 | What | To whom | Triggered by | Code |
 | --- | --- | --- | --- |
 | PDF-derived page text (the page you ask to be read) | ElevenLabs (`https://api.elevenlabs.io/v1`) | Any TTS speak action: the playback bar's Play, resume-and-play on the reading home, auto-page continuation | `src-tauri/src/ai_tts/elevenlabs.rs:15,149,230,286` (reqwest client; the crate is optional and gated behind the `elevenlabs-tts` feature, `Cargo.toml:50,73`) |
-| PDF CMap tables | jsDelivr CDN (`https://cdn.jsdelivr.net/…/cmaps/`) | Rendering a PDF whose fonts require CMap data; the CSP explicitly permits this host | `src/services/pdf-service.ts:85,117`; `src-tauri/tauri.conf.json:26` (`connect-src … https://cdn.jsdelivr.net`) |
 
-Nothing else makes an outbound network call. Telemetry rows exist in the
+Nothing else makes an outbound network call. PDF CMap tables were the
+second egress (jsDelivr CDN) until slice 100 bundled them into the app
+(`node_modules/pdfjs-dist/cmaps` → `public/cmaps` at build time); the CSP
+no longer permits any third-party host. Telemetry rows exist in the
 settings store (`telemetry.analytics` / `telemetry.errors`,
 `src/lib/db-init.ts:246-247`) but **no sender exists** — toggling them
 changes nothing on the wire. There is no crash-reporting, analytics or
@@ -86,9 +88,11 @@ entry surface (untrusted PDF content, XSS).
   can `SELECT` from it directly (`src-tauri/tests/frontend_schema_contract.rs:363-385`).
   Anyone with read access to the SQLite file (same user, same machine) can
   read your highlights without going through the app.
-- **Offline reading is not fully offline.** PDFs whose fonts need CMap data
-  fetch them from jsDelivr (dataflow table); deny the network and those pages
-  fail to render text. The core read path is local, the CMap path is not.
+- **Offline reading is fully offline.** PDF CMap tables are bundled into
+  the app at build time (`node_modules/pdfjs-dist/cmaps` → `public/cmaps`,
+  vite plugin in `vite.config.ts`), so PDFs whose fonts need CMap data
+  render with no network. The only egress left is the AI-TTS text path
+  documented above.
 - **CodeQL covers the TypeScript surface only; Rust is out of scope**, and
   the CSP requires `'unsafe-eval'` for pdf.js (`src-tauri/tauri.conf.json:26`).
   These are known, deliberate boundaries, recorded in the ops-parity gap

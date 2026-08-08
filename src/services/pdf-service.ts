@@ -37,6 +37,17 @@ GlobalWorkerOptions.workerSrc = new URL(
   import.meta.url
 ).toString();
 
+// CMaps are bundled into the app at build time (vite copies
+// node_modules/pdfjs-dist/cmaps -> public/cmaps); never a CDN. The URL is
+// built against the document base so it is absolute: pdf.js resolves a bare
+// relative path against the worker script URL when useWorkerFetch is on
+// (http-served Windows builds), and against the document in the tauri://
+// main-thread path — an absolute URL is identical in both.
+const CMAP_URL =
+  typeof document !== 'undefined'
+    ? new URL('cmaps/', document.baseURI).toString()
+    : 'cmaps/';
+
 export interface PageRenderOptions {
   canvas: HTMLCanvasElement;
   scale: number;
@@ -82,7 +93,8 @@ export const pdfService = {
       const loadingTask = getDocument({
         data: fileData,
         // Enable built-in CMap support for better character rendering
-        cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',
+        // Bundled locally at build time — see CMAP_URL above.
+        cMapUrl: CMAP_URL,
         cMapPacked: true,
       });
 
@@ -114,8 +126,9 @@ export const pdfService = {
   async loadDocumentFromUrl(url: string): Promise<PDFDocumentProxy> {
     const loadingTask = getDocument({
       url,
-      cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',
-      cMapPacked: true,
+    // Bundled locally at build time — see CMAP_URL above.
+    cMapUrl: CMAP_URL,
+    cMapPacked: true,
     });
 
     return loadingTask.promise;

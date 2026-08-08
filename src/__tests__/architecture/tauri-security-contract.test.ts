@@ -114,12 +114,7 @@ describe("Tauri security contract", () => {
         "blob:",
         "data:",
       ].sort(),
-      "connect-src": [
-        "'self'",
-        "asset:",
-        "http://asset.localhost",
-        "https://cdn.jsdelivr.net",
-      ].sort(),
+      "connect-src": ["'self'", "asset:", "http://asset.localhost"].sort(),
       "worker-src": ["'self'", "blob:"].sort(),
     };
 
