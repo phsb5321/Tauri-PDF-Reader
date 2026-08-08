@@ -123,7 +123,7 @@ describe("ResumeSection", () => {
     expect(onResume).toHaveBeenCalledWith(reading);
   });
 
-  it("resumes through an 'also in progress' row", () => {
+  it("resumes through an 'also in progress' row — by accessible name, not by text", () => {
     const onResume = vi.fn();
     const primary = doc({ id: "primary", title: "Primary", currentPage: 10 });
     const secondary = doc({
@@ -140,7 +140,13 @@ describe("ResumeSection", () => {
         onOpenSettings={noop}
       />,
     );
-    fireEvent.click(screen.getByText("Secondary"));
+    // Role + name, never by text: a query-by-text cannot notice a missing
+    // accessible name — the exact blind spot that let the rows ship without
+    // a resume verb in their name.
+    const row = screen.getByRole("button", {
+      name: /^Resume Secondary, page 5 of 100/,
+    });
+    fireEvent.click(row);
 
     expect(onResume).toHaveBeenCalledWith(secondary);
   });
