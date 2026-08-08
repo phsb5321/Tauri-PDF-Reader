@@ -218,6 +218,74 @@ pub fn format_logs_as_json(entries: &[LogEntry]) -> String {
     serde_json::to_string_pretty(entries).unwrap_or_else(|_| "[]".to_string())
 }
 
+/// Redact sensitive shapes from a log entry before it leaves the process
+/// (M2.4). Applied at BOTH egress commands (`get_debug_logs`, which feeds
+/// the settings UI, and `export_debug_logs`, which feeds the clipboard) so
+/// raw values never reach display or paste.
+///
+/// The buffer has no producers today (verified 08/08: zero callers of the
+/// `log_entry` helpers outside this module), so this is a boundary guard for
+/// the moment the surface gains producers — patterns are derived from what
+/// the producers WOULD emit: absolute file paths in error strings
+/// (`FILE_READ_ERROR: Cannot open file: /home/…`), and the session-only
+/// ElevenLabs key shape held in engine memory.
+pub fn redact_text(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let bytes = text.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        // Home-prefixed absolute path: redact the user segment, keep the rest
+        // (so a path still reads as a path without naming the user).
+        if text[i..].starts_with("/home/") || text[i..].starts_with("/Users/") {
+            let marker_end = i + if text[i..].starts_with("/home/") {
+                6
+            } else {
+                7
+            };
+            let mut j = marker_end;
+            while j < bytes.len()
+                && !bytes[j].is_ascii_whitespace()
+                && bytes[j] != b'/'
+                && bytes[j] != b'"'
+                && bytes[j] != b'\''
+                && bytes[j] != b','
+            {
+                j += 1;
+            }
+            out.push_str(&text[i..marker_end]);
+            out.push_str("<redacted-user>");
+            i = j;
+            continue;
+        }
+        // ElevenLabs key shape (`sk_` + 20+ base62): redact the whole token.
+        if text[i..].starts_with("sk_") {
+            let mut j = i + 3;
+            while j < bytes.len()
+                && (bytes[j].is_ascii_alphanumeric() || bytes[j] == b'_' || bytes[j] == b'-')
+            {
+                j += 1;
+            }
+            if j - (i + 3) >= 20 {
+                out.push_str("sk_<redacted>");
+                i = j;
+                continue;
+            }
+        }
+        out.push(bytes[i] as char);
+        i += 1;
+    }
+    out
+}
+
+fn redact_entry(mut entry: LogEntry) -> LogEntry {
+    entry.message = redact_text(&entry.message);
+    entry.target = redact_text(&entry.target);
+    if let Some(ctx) = entry.context.take() {
+        entry.context = Some(serde_json::Value::String(redact_text(&ctx.to_string())));
+    }
+    entry
+}
+
 /// Tauri command to get debug logs
 #[tauri::command]
 pub async fn get_debug_logs(min_level: Option<String>) -> Result<Vec<LogEntry>, String> {
@@ -229,7 +297,10 @@ pub async fn get_debug_logs(min_level: Option<String>) -> Result<Vec<LogEntry>, 
         _ => LogLevel::Debug,
     };
 
-    Ok(get_logs_filtered(level))
+    Ok(get_logs_filtered(level)
+        .into_iter()
+        .map(redact_entry)
+        .collect())
 }
 
 /// Tauri command to clear debug logs
@@ -242,10 +313,63 @@ pub async fn clear_debug_logs() -> Result<(), String> {
 /// Tauri command to export debug logs as text
 #[tauri::command]
 pub async fn export_debug_logs(format: Option<String>) -> Result<String, String> {
-    let entries = get_logs();
+    let entries: Vec<LogEntry> = get_logs().into_iter().map(redact_entry).collect();
 
     match format.as_deref() {
         Some("json") => Ok(format_logs_as_json(&entries)),
         _ => Ok(format_logs_for_export(&entries)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The canary key is assembled at runtime (never a literal in source) so
+    /// neither the repo's gitleaks control nor GitHub push protection trips
+    /// on the test fixture — same fragment pattern as the 102-gitleaks canary.
+    fn canary_key() -> String {
+        format!("sk_{}", "ABCDEFGHIJKLMNOPQRSTUVWX1234567890xyz")
+    }
+
+    #[test]
+    fn redacts_home_paths_and_secret_shaped_tokens() {
+        let key = canary_key();
+        let text =
+            format!("FILE_READ_ERROR: Cannot open file: /home/alice/books/secret.pdf | {key}");
+        let redacted = redact_text(&text);
+
+        assert!(!redacted.contains("alice"));
+        assert!(redacted.contains("/home/<redacted-user>/books/secret.pdf"));
+        assert!(!redacted.contains(&key));
+        assert!(redacted.contains("sk_<redacted>"));
+    }
+
+    #[test]
+    fn leaves_short_sk_prefixes_and_non_secrets_alone() {
+        let text = "skill is not a secret; sk_short; /home/own/notes.md";
+        let redacted = redact_text(text);
+        assert!(redacted.contains("skill"));
+        assert!(redacted.contains("sk_short"));
+        assert!(redacted.contains("/home/<redacted-user>/notes.md"));
+    }
+
+    #[test]
+    fn export_and_display_paths_never_carry_raw_values() {
+        log_entry(
+            LogEntry::new(
+                LogLevel::Warn,
+                "library",
+                "FILE_READ_ERROR: Cannot open file: /home/alice/books/secret.pdf",
+            )
+            .with_context(serde_json::json!({"key": canary_key()})),
+        );
+
+        let exported =
+            format_logs_for_export(&get_logs().into_iter().map(redact_entry).collect::<Vec<_>>());
+        assert!(!exported.contains("alice"));
+        assert!(!exported.contains(&canary_key()));
+        assert!(exported.contains("/home/<redacted-user>/books/secret.pdf"));
+        clear_logs();
     }
 }
