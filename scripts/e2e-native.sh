@@ -35,6 +35,12 @@ exec nix-shell -p $NIX_PKGS --run '
   export WEBKIT_WEBDRIVER="$(command -v WebKitWebDriver)"
   # Force software rendering so WebKit can create a session headless (vimeflow#65).
   export WEBKIT_DISABLE_COMPOSITING_MODE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1 LIBGL_ALWAYS_SOFTWARE=1
+  # Pin the X11 backend (see e2e-home.sh): without it GTK inherits the host
+  # session WAYLAND_DISPLAY, the app window lands on the real compositor
+  # with a garbage scale, and WebKit reports a NEGATIVE devicePixelRatio /
+  # inverted viewport — every element hit-test then fails. This is the
+  # 02/08/2026 "wrapped negative viewport" class; deterministic with x11.
+  export GDK_BACKEND=x11
   # Let Xvfb pick a FREE display and report it via -displayfd (avoids collisions
   # with stale/sibling Xvfb on a fixed :NN, and is a real readiness signal rather
   # than a blind sleep — the number is written only once the display is up).

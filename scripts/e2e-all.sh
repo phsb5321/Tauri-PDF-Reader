@@ -35,6 +35,10 @@ nix-shell -p $NIX_PKGS --run '
   ( cd src-tauri && cargo build )
   export WEBKIT_WEBDRIVER="$(command -v WebKitWebDriver)"
   export WEBKIT_DISABLE_COMPOSITING_MODE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1 LIBGL_ALWAYS_SOFTWARE=1
+  # Pin the X11 backend (see e2e-home.sh): prevents the host Wayland
+  # session leak that makes WebKit report a negative devicePixelRatio and an
+  # inverted viewport (the 02/08/2026 wrapped-negative-viewport class).
+  export GDK_BACKEND=x11
   # Free-display auto-pick + readiness via -displayfd (see scripts/e2e-native.sh).
   DISPNUM_FILE=$(mktemp)
   Xvfb -displayfd 3 -screen 0 1280x1024x24 3>$DISPNUM_FILE >/tmp/lectrice-e2e-all-xvfb1.log 2>&1 &
