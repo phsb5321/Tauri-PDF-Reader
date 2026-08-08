@@ -190,6 +190,9 @@ function AlsoInProgress({
                 metadata={placeText(document)}
                 trailing={<ChevronIcon />}
                 onClick={() => onResume(document)}
+                ariaLabel={`Resume ${label}, page ${document.currentPage}${
+                  document.pageCount ? ` of ${document.pageCount}` : ""
+                }`}
               />
               {/* Sibling, not nested — two interactive elements inside one
                   <button> is invalid HTML and mangles the accessibility tree. */}

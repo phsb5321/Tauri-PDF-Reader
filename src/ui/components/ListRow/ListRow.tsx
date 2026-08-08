@@ -18,6 +18,12 @@ export interface ListRowProps {
   selected?: boolean;
   /** Disabled state */
   disabled?: boolean;
+  /**
+   * Accessible name for the interactive row. Without it the name is the
+   * contents concatenated — a screen-reader user hears the title with no
+   * indication the row is actionable (see slice 096 item 1).
+   */
+  ariaLabel?: string;
   /** Additional CSS class */
   className?: string;
 }
@@ -31,6 +37,7 @@ export function ListRow({
   onClick,
   selected = false,
   disabled = false,
+  ariaLabel,
   className = '',
 }: ListRowProps) {
   const isInteractive = !!onClick;
@@ -79,6 +86,7 @@ export function ListRow({
         onKeyDown={handleKeyDown}
         disabled={disabled}
         aria-selected={selected}
+        aria-label={ariaLabel}
       >
         {content}
       </button>

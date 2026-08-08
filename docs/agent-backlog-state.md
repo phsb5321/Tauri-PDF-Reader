@@ -2,6 +2,15 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #51 — 07/08/2026 (096-resume-gaps: the resume surface's two honest gaps)
+
+- **Branch:** `096-resume-gaps` (off `origin/main` 05c2bdd post-#93, worktree `../tauri-pdf-reader-096-resume-gaps`). Wave-4 items 1 and 3, one slice (both live in ResumeSection).
+- **Item 1 — AlsoInProgress rows had no resume verb in their accessible name.** `ListRow` had no `aria-label` prop, so a screen-reader user heard "Secondary Page 5 of 100" — no indication the row resumes anything. The suite encoded the same asymmetry (primary asserted by role+name, secondary clicked by text — a query style that cannot notice a missing name). Fix: optional `ariaLabel` prop on `ListRow` (spread on the interactive button only), wired from AlsoInProgress as `Resume {label}, page N of M` — the same shape as the resume line's name minus the percent the row does not display. Query style fixed along with the markup: the row test now clicks by role+name; catchup-home's row assertions updated to the new names.
+- **RED item 1:** `getByRole("button", { name: /^Resume Secondary, page 5 of 100/ })` failed on `main` with the diagnostic listing the then-current name `Secondary Page 5 of 100`.
+- **Item 3 — the TTS setup signal cannot render on an all-unread library.** `ResumeSection` returns null when nothing is in flight, so the signal (below the return) never shows. **Decision: absent, deliberately, pinned** — the signal exists to explain affordances that cannot play; an all-unread library has no resume-and-play affordances (no Continue-reading section at all), so there is nothing to explain, and a Configure line floating over an empty shelf would fight #92's "once, quietly" framing. The in-document prompt (AiPlaybackBar) still surfaces the same message on first open, so the setting stays reachable. Pin test in catchup-home.test.tsx: all-unread fixture → no region, no message, no Configure. Falsified by a flip experiment (signal rendered above the early return → the pin went RED with `expected document not to contain element, found <span>`), then reverted.
+- **GREEN:** full suite 1022/1022 (85 files, +1 pin test); ResumeSection 10/10, catchup-home 8/8. `pnpm lint` 0 errors / 92 warnings (baseline), `pnpm typecheck` clean, `git diff --check` clean, `tools/alignment-gate.sh --base origin/main` PASS on the committed diff.
+- **Revert:** `git revert <squash>` — two component files, three test files, one backlog entry.
+
 ## Iteration #50 — 07/08/2026 (095-security-policy: SECURITY.md grounded in code, with a dataflow gate)
 
 - **Branch:** `095-security-policy` (off `origin/main` 4ff16f3 post-#92, worktree `../tauri-pdf-reader-095-security-policy`). Ops-parity ladder 2.3, after 2.1 Gitleaks (#84) and 2.2 the Tauri contract (#90).

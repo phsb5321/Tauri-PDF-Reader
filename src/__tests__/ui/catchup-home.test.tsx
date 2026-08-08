@@ -161,12 +161,12 @@ describe("the catch-up home", () => {
     ).toBeInTheDocument();
     expect(
       within(shelf).getByRole("button", {
-        name: /^Logic and Structure Page 88 of 340/,
+        name: /^Resume Logic and Structure, page 88 of 340/,
       }),
     ).toBeInTheDocument();
     expect(
       within(shelf).getByRole("button", {
-        name: /^Mapping Experiences Page 12 of 240/,
+        name: /^Resume Mapping Experiences, page 12 of 240/,
       }),
     ).toBeInTheDocument();
     // Domain-Driven Design is the resume line's primary book, not a second
@@ -225,6 +225,25 @@ describe("the catch-up home", () => {
     render(<ReaderView />);
 
     await screen.findByRole("region", { name: "Continue reading" });
+    expect(screen.queryByText(AI_TTS_SETUP_MESSAGE)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Configure" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows no TTS-setup signal on an all-unread library — deliberate absence (096 item 3)", async () => {
+    // A fresh library of never-opened books: continueReading counts only
+    // currentPage > 1, so there is no resume section and no resume-and-play
+    // affordance. The setup signal exists to explain affordances that
+    // cannot play; with none on the surface, it must not nag. Decision:
+    // absent, deliberately, pinned here so a future flip fails this test.
+    mockLibrary([{ ...DDD, currentPage: 1 }]);
+    render(<ReaderView />);
+
+    await screen.findByRole("heading", { name: "Library" });
+    expect(
+      screen.queryByRole("region", { name: "Continue reading" }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText(AI_TTS_SETUP_MESSAGE)).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Configure" }),
