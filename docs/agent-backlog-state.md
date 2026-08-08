@@ -2,6 +2,16 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #50 — 07/08/2026 (095-security-policy: SECURITY.md grounded in code, with a dataflow gate)
+
+- **Branch:** `095-security-policy` (off `origin/main` 4ff16f3 post-#92, worktree `../tauri-pdf-reader-095-security-policy`). Ops-parity ladder 2.3, after 2.1 Gitleaks (#84) and 2.2 the Tauri contract (#90).
+- **Deliverable:** root `SECURITY.md` — the conventional, GitHub-surfaced location — short, and every claim carries a `file:line` citation; sentences that could not be cited were cut. Contents: supported versions/reporting; dataflow map (what leaves the device, to whom, triggered by what); session-only secrets (#73); local retention + clear paths; a threat model that names the known gaps rather than hiding them.
+- **Claims verified in code, not taken on trust (each cited in the doc):** egress = ElevenLabs backend client (`elevenlabs.rs:15,149,230,286`, reqwest behind the optional `elevenlabs-tts` feature) + jsDelivr CMaps (`pdf-service.ts:85,117`, CSP permits); no telemetry sender exists (settings rows only, `db-init.ts:246-247`); the key is excluded from `partialize` (`ai-tts-store.ts:240-244`); the TTS cache lives at `{app_cache_dir}/tts_cache` (SHA256-keyed) cleared via `ai_tts_cache_clear` → `AudioCacheAdapter::clear`; the fs-scope bypass is stated VERBATIM from #90's contract header (`tauri-security-contract.test.ts:15-23`); highlights are readable out-of-process via `v_highlight_citations` (`db-init.ts:221-238`, contract test asserts external SELECTs).
+- **One correction found while walking (worth stating):** the brief asked whether anything else clears the cache — per-document/per-voice invalidation exists (`audio_cache_clear_document`, `ai_tts_cache_invalidate_voice`), and deleting a library document removes the cache METADATA row but not the on-disk audio file (orphan gap, recorded in the doc from the ops-parity audit).
+- **The gate (not a prose test):** `security-dataflow-contract.test.ts` derives the egress module set from the code — production files carrying narrow markers (`fetch(`/XHR/WS/EventSource/jsDelivr literal frontend; `reqwest::` backend) must equal exactly `{src/services/pdf-service.ts, src-tauri/src/ai_tts/elevenlabs.rs}`, and SECURITY.md must keep naming each. Falsified both ways: a planted `fetch(` in constants.ts turned it RED (`expected Set{'src/lib/constants.ts', …} to deeply equal Set{'src/services/pdf-service.ts'}`), revert restored GREEN.
+- **GREEN:** full suite 1021/1021 (85 files, +2 new); lint 0/92 baseline; typecheck clean; diff clean; alignment gate PASS on the committed diff.
+- **Revert:** `git revert <squash>` — one document, one test file, one backlog entry.
+
 ## Iteration #49 — 07/08/2026 (093-tts-signal: the home says narration needs setup, once, quietly)
 
 - **Branch:** `093-tts-signal` (off `origin/main` 7b1450c post-#91, worktree `../tauri-pdf-reader-093-tts-signal`). Wave-3 next-3 item #2, unblocked by the catch-up epic landing.
