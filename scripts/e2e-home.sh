@@ -47,10 +47,11 @@ NIX_PKGS="pkg-config openssl alsa-lib gnumake perl clang llvmPackages.libclang.l
 # the Nix closure does not make its dlopen path discoverable to bindgen.
 export LIBCLANG_PATH="${LIBCLANG_PATH:-$(nix eval --raw nixpkgs#llvmPackages.libclang.lib)/lib}"
 
-# Hermetic profile dir, known at BUILD time so the bootstrap can seed through
-# real IPC (VITE_E2E_PROFILE_DIR) AND at RUN time (XDG_DATA_HOME).
-PROFILE_DIR="$(mktemp -d)"
-APP_DIR="$PROFILE_DIR/com.lectrice.reader"
+# Hermetic profile via the SHARED helper (one entry point for all lanes —
+# scripts/e2e-profile.sh). Known at BUILD time so the bootstrap can seed
+# through real IPC (VITE_E2E_PROFILE_DIR) AND at RUN time (XDG_* exported).
+source ./scripts/e2e-profile.sh
+APP_DIR="$E2E_PROFILE_DIR/com.lectrice.reader"
 mkdir -p "$APP_DIR"
 node scripts/gen-e2e-fixtures.mjs "$APP_DIR"
 
@@ -78,12 +79,9 @@ exec nix-shell -p $NIX_PKGS --run '
   # record, reproduced 07/08/2026 and fixed by this line (verified: dpr -1/96
   # without it, +1.04 with it). Do not "modernise" this away.
   export GDK_BACKEND=x11
-  # Hermetic profile at RUN time: the app resolves BOTH its config dir (the
-  # sqlite library DB — tauri-plugin-sql resolves relative paths against
-  # app_config_dir, Linux ~/.config) and its data dir (fs-scope
-  # $APPLOCALDATA, hw-accel flags) under this profile. Without XDG_CONFIG_HOME
-  # the e2e would write into the real user library (learned 07/08/2026).
-  export XDG_DATA_HOME="'"$PROFILE_DIR"'" XDG_CONFIG_HOME="'"$PROFILE_DIR"'"
+  # XDG_DATA_HOME / XDG_CONFIG_HOME were exported by scripts/e2e-profile.sh in
+  # the outer shell and pass through nix-shell unchanged — the app config
+  # dir (sqlite library) and data dir (fs scope, flags) stay hermetic.
   # Let Xvfb pick a FREE display and report it via -displayfd (avoids collisions
   # with stale/sibling Xvfb on a fixed :NN, and is a real readiness signal rather
   # than a blind sleep — the number is written only once the display is up).

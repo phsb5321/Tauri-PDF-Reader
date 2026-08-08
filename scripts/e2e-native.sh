@@ -18,6 +18,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# Hermetic profile — the ONE shared entry point for every e2e lane. Points
+# XDG_CONFIG_HOME (sqlite library DB) + XDG_DATA_HOME (fs scope, flags) at a
+# fresh temp dir; the e2e-tts-fixture build refuses to boot without it.
+source ./scripts/e2e-profile.sh
+
 NIX_PKGS="pkg-config openssl alsa-lib gnumake perl clang llvmPackages.libclang.lib gtk3 webkitgtk_4_1 libayatana-appindicator librsvg speechd xvfb"
 # Keep the standalone runner aligned with flake.nix. Merely putting libclang in
 # the Nix closure does not make its dlopen path discoverable to bindgen.

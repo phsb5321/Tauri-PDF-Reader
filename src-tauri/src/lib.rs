@@ -397,8 +397,48 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
     ])
 }
 
+/// E2E hermetic-profile guard — fail-closed.
+///
+/// The `e2e-tts-fixture` build runs the REAL app against the REAL SQLite
+/// library. tauri-plugin-sql resolves its relative DB path against
+/// `app_config_dir` (Linux: `$XDG_CONFIG_HOME/com.lectrice.reader`), so a lane
+/// that forgets to set XDG_CONFIG_HOME silently opens AND writes the real
+/// user library — WAL transactions on every run, hidden because WAL mode does
+/// not touch the main DB file's mtime (confirmed 08/08/2026 by stat of
+/// `pdf-reader.db-wal` after a native-play run). Every e2e lane MUST source
+/// `scripts/e2e-profile.sh`, which points XDG_DATA_HOME + XDG_CONFIG_HOME at a
+/// fresh temp profile. This guard makes that mandatory: refuse to boot when
+/// the config dir is not under the temp root, so a misconfigured lane — or a
+/// lane that does not exist yet — FAILS instead of leaking user data. Runs
+/// before the crash-flag write, so no state leaks into the real data dir
+/// either.
+#[cfg(feature = "e2e-tts-fixture")]
+fn assert_hermetic_profile() {
+    let config_root = dirs::config_dir().expect("no config dir");
+    let config_dir = config_root.join("com.lectrice.reader");
+    // Accept either the process temp root (honours TMPDIR) or literal /tmp:
+    // nix-shell overrides TMPDIR to /tmp/nix-shell-* for ITS process tree, so
+    // a profile created by the lane script's `mktemp` (outer shell, real
+    // TMPDIR=/tmp) must still pass. Both checks are Linux-temp semantics —
+    // the fixture feature is a WebKitGTK/Linux-only harness.
+    let temp_root = std::env::temp_dir();
+    let is_temp = config_dir.starts_with(&temp_root) || config_dir.starts_with("/tmp");
+    if !is_temp {
+        panic!(
+            "REFUSING TO BOOT: e2e-tts-fixture build would open the real user \
+             library DB at {config_dir:?} (not under temp root {temp_root:?}). \
+             Run e2e lanes through scripts/e2e-profile.sh so XDG_CONFIG_HOME \
+             points at a temp profile."
+        );
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Fail-closed before ANY state is written (crash flags, sqlite, settings).
+    #[cfg(feature = "e2e-tts-fixture")]
+    assert_hermetic_profile();
+
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
