@@ -11,7 +11,26 @@ records the policy and the ratchet plan.
 - When you add tests that raise a metric, raise its floor to the new measured
   value in the same PR (ratchet up). Small steps are fine.
 
-## Current floor (074-app-root-reachability, 02/08/2026)
+## Current floor (097-coverage-ratchet, 07/08/2026)
+
+Measured by CI run `31215577664` at `4ff16f3` — the default parallel pool, CI's
+real mode (`pnpm test:coverage`, ci.yml):
+
+| Metric     | Measured (CI) | Floor (CI gate) | Target   |
+| ---------- | ------------- | --------------- | -------- |
+| Lines      | 76.42%        | 76              | 80       |
+| Statements | 76.42%        | 76              | 80       |
+| Functions  | 72.84%        | 72              | 80       |
+| Branches   | 90.58%        | 90              | 80 (met) |
+
+The 074 ratchet left 8.42 points of headroom on lines/statements (five PRs
+added tests without ratcheting — the policy says raise in the same PR that
+lifts a metric). Branches stays at 90: pool mode changes which branches
+execute, and 90.58 leaves no safe integer above it — 90.5/91 would be
+measurement noise, not headroom. Floors are the integers at or just below the
+CI-measured value.
+
+## Previous floor (074-app-root-reachability, 02/08/2026)
 
 Measured with one isolated serial process:
 

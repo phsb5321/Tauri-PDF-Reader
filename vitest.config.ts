@@ -59,19 +59,20 @@ export default defineConfig({
       // never silently down. Target: 80 across the board.
       // Policy + ratchet history: docs/coverage-budget.md.
       //
-      // 074 (02/08/2026): measured 68.58 / 91.41 / 70.65 / 68.58 for
-      // statements / branches / functions / lines under an isolated
-      // singleFork run. CI runs `pnpm test:coverage` with the default
-      // (parallel) pool, which measures branches at 90.97% — pool mode
-      // affects which branches execute, so the floor must track CI's
-      // actual mode, not the isolated measurement. Branches floor stays 90.
-      // See docs/coverage-budget.md for the isolated serial command,
-      // baseline, and earlier ratchets.
+      // 097-coverage-ratchet (07/08/2026): CI run 31215577664 at `4ff16f3`
+      // (default parallel pool — CI's real mode) measured 76.42 / 90.58 /
+      // 72.84 / 76.42 for lines / branches / functions / statements. That is
+      // 8.42 points of unratcheted headroom the previous triage called
+      // "close" — it is not. Floors raised to lines 76 / statements 76 /
+      // functions 72; branches stays 90 because pool mode shifts which
+      // branches execute and 90.58 leaves no safe integer above it.
+      // See docs/coverage-budget.md for the CI baseline and earlier
+      // ratchets.
       thresholds: {
-        lines: 68,
-        functions: 70,
+        lines: 76,
+        functions: 72,
         branches: 90,
-        statements: 68,
+        statements: 76,
       },
     },
   },
