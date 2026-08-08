@@ -32,6 +32,14 @@ The in-app disclosure, word for word (#73): *"Requested PDF-derived text
 leaves this device and is sent to ElevenLabs for speech generation."*
 (`src/components/playback-bar/AiTtsSettings.tsx:184-186`).
 
+**Diagnostics:** the debug-logs surface (`DebugLogs.tsx`, fed by
+`get_debug_logs`/`export_debug_logs`) redacts at the export boundary —
+user paths (`/home/<redacted-user>/…`) and secret-shaped tokens
+(`sk_<redacted>`) cannot survive into display or clipboard
+(`src-tauri/src/services/logging.rs`, `redact_text`). The surface's in-memory
+buffer has no producers today (verified 08/08: zero callers of the `log_entry`
+helpers outside that module), so this is a guard for the moment it gains some.
+
 ## Secrets
 
 The ElevenLabs API key is **session-only by design** (#73):
