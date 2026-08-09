@@ -12,19 +12,24 @@
  * @module components/reader/ReaderView
  */
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AppLayout } from "../layout/AppLayout";
 import { Toolbar } from "../Toolbar";
 import { PdfViewer } from "../PdfViewer";
 import { LibraryView } from "../library/LibraryView";
 import { AiPlaybackBar } from "../playback-bar/AiPlaybackBar";
 import { SettingsPanel } from "../settings/SettingsPanel";
+import { HighlightsPanel } from "../highlights/HighlightsPanel";
 import { useDocumentStore } from "../../stores/document-store";
 import { useAiTtsStore } from "../../stores/ai-tts-store";
 import { pdfService } from "../../services/pdf-service";
 import { useAutoSave } from "../../hooks/useAutoSave";
 import { useTtsPrebuffer } from "../../hooks/useTtsPrebuffer";
 import { useOpenPdf } from "../../hooks/useOpenPdf";
+import {
+  useHighlightPersistence,
+  loadHighlights,
+} from "../../hooks/useHighlightPersistence";
 import {
   useMenuActions,
   type MenuActionHandlers,
@@ -34,12 +39,22 @@ import { usePageNavigation } from "../../hooks/usePageNavigation";
 import { aiTtsPause, aiTtsResume } from "../../lib/tauri-invoke";
 import { libraryGetDocument } from "../../lib/api/library";
 import { useSessionStore } from "../../stores/session-store";
-import type { Document } from "../../lib/schemas";
+import type { Document, Highlight } from "../../lib/schemas";
 import "./ReaderView.css";
 
 export function ReaderView() {
-  const { pdfDocument, currentPage, currentDocument, scrollPosition, setCurrentPage } =
-    useDocumentStore();
+  const {
+    pdfDocument,
+    currentPage,
+    currentDocument,
+    scrollPosition,
+    setCurrentPage,
+    highlights,
+    selectedHighlightId,
+    setHighlights,
+    setSelectedHighlight,
+    removeHighlight,
+  } = useDocumentStore();
   const { openPdf, resumeDocument } = useOpenPdf();
 
   // The reading home is the landing surface, so this starts true: a reader with
@@ -54,6 +69,28 @@ export function ReaderView() {
   // on the reading home — where they would go first to enter an API key —
   // must be able to reach it too.
   const [showSettings, setShowSettings] = useState(false);
+
+  // Highlights: the panel is document-scoped, so it lives at the shell level
+  // (like settings) and is gated on a document being open. The native
+  // toggle-highlights menu item drives it — it shipped dead, exactly like the
+  // settings item #82 fixed. Deletion goes through the same persistence hook
+  // the create path uses (debounced write + retry), so the store and the DB
+  // cannot disagree.
+  const [showHighlights, setShowHighlights] = useState(false);
+  const { deleteHighlight } = useHighlightPersistence({
+    documentId: currentDocument?.id ?? null,
+  });
+
+  // Load saved highlights the moment a document opens — this is the reload
+  // that was never wired: rows sat in SQLite, never shown again.
+  useEffect(() => {
+    const documentId = currentDocument?.id;
+    if (!documentId) {
+      setHighlights([]);
+      return;
+    }
+    void loadHighlights(documentId).then(setHighlights);
+  }, [currentDocument?.id, setHighlights]);
 
   // Leave the home only once something is actually showing. A cancelled dialog
   // or a file that failed to load must not strand the reader on a blank page.
@@ -148,12 +185,33 @@ export function ReaderView() {
     }
   }, []);
 
+  const handleHighlightDelete = useCallback(
+    (highlightId: string) => {
+      const highlight = highlights.find((h) => h.id === highlightId);
+      if (!highlight) return;
+      removeHighlight(highlightId);
+      deleteHighlight(highlight);
+    },
+    [highlights, removeHighlight, deleteHighlight],
+  );
+
+  const handleHighlightClick = useCallback(
+    (highlight: Highlight) => {
+      setSelectedHighlight(highlight.id);
+      // Jump to the page the highlight lives on — the panel is a navigation
+      // surface, not just a listing.
+      setCurrentPage(highlight.pageNumber);
+    },
+    [setSelectedHighlight, setCurrentPage],
+  );
+
   const commandHandlers: MenuActionHandlers = {
     onOpen: () => {
       void handleOpen();
     },
     onToggleLibrary: () => setShowLibrary((showing) => !showing),
     onSettings: () => setShowSettings(true),
+    onToggleHighlights: () => setShowHighlights((showing) => !showing),
     onPlayPause: () => {
       void handleMenuPlayPause();
     },
@@ -242,6 +300,15 @@ export function ReaderView() {
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
       />
+      {showHighlights && currentDocument && (
+        <HighlightsPanel
+          highlights={highlights}
+          selectedHighlightId={selectedHighlightId}
+          onHighlightClick={handleHighlightClick}
+          onHighlightDelete={handleHighlightDelete}
+          onClose={() => setShowHighlights(false)}
+        />
+      )}
     </AppLayout>
   );
 }
