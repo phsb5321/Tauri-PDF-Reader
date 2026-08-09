@@ -22,11 +22,8 @@ cd "$(dirname "$0")/.."
 # XDG_CONFIG_HOME (sqlite library DB) + XDG_DATA_HOME (fs scope, flags) at a
 # fresh temp dir; the e2e-tts-fixture build refuses to boot without it.
 source ./scripts/e2e-profile.sh
+source ./scripts/e2e-toolchain.sh
 
-NIX_PKGS="pkg-config openssl alsa-lib gnumake perl clang llvmPackages.libclang.lib gtk3 webkitgtk_4_1 libayatana-appindicator librsvg speechd xvfb"
-# Keep the standalone runner aligned with flake.nix. Merely putting libclang in
-# the Nix closure does not make its dlopen path discoverable to bindgen.
-export LIBCLANG_PATH="${LIBCLANG_PATH:-$(nix eval --raw nixpkgs#llvmPackages.libclang.lib)/lib}"
 
 echo "==> Building frontend (VITE_E2E_NATIVE=true)"
 VITE_E2E_NATIVE=true pnpm build
@@ -34,7 +31,7 @@ VITE_E2E_NATIVE=true pnpm build
 touch src-tauri/src/lib.rs
 
 echo "==> Building debug binary (--features e2e-tts-fixture) + running E2E under Xvfb"
-exec nix-shell -p $NIX_PKGS --run '
+toolchain_exec '
   set -euo pipefail
   ( cd src-tauri && cargo build --features e2e-tts-fixture )
   export WEBKIT_WEBDRIVER="$(command -v WebKitWebDriver)"

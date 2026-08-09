@@ -40,6 +40,11 @@
           atk
           librsvg
           libayatana-appindicator
+          # E2E lanes (101): the lanes' former hand-maintained list had these
+          # three — the flake is now the ONE source, so they live here.
+          perl
+          speechd
+          xvfb
         ];
       in
       {

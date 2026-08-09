@@ -42,15 +42,12 @@ case "$LANE" in
   *) echo "ERROR: unknown E2E_LANE=$LANE (no-key|key)" >&2; exit 2 ;;
 esac
 
-NIX_PKGS="pkg-config openssl alsa-lib gnumake perl clang llvmPackages.libclang.lib gtk3 webkitgtk_4_1 libayatana-appindicator librsvg speechd xvfb"
-# Keep the standalone runner aligned with flake.nix. Merely putting libclang in
-# the Nix closure does not make its dlopen path discoverable to bindgen.
-export LIBCLANG_PATH="${LIBCLANG_PATH:-$(nix eval --raw nixpkgs#llvmPackages.libclang.lib)/lib}"
 
 # Hermetic profile via the SHARED helper (one entry point for all lanes —
 # scripts/e2e-profile.sh). Known at BUILD time so the bootstrap can seed
 # through real IPC (VITE_E2E_PROFILE_DIR) AND at RUN time (XDG_* exported).
 source ./scripts/e2e-profile.sh
+source ./scripts/e2e-toolchain.sh
 APP_DIR="$E2E_PROFILE_DIR/com.lectrice.reader"
 mkdir -p "$APP_DIR"
 node scripts/gen-e2e-fixtures.mjs "$APP_DIR"
@@ -65,7 +62,7 @@ VITE_E2E_NATIVE=true \
 touch src-tauri/src/lib.rs
 
 echo "==> Building debug binary (--features e2e-tts-fixture) + running E2E under Xvfb"
-exec nix-shell -p $NIX_PKGS --run '
+toolchain_exec '
   set -euo pipefail
   ( cd src-tauri && cargo build --features e2e-tts-fixture )
   export WEBKIT_WEBDRIVER="$(command -v WebKitWebDriver)"
