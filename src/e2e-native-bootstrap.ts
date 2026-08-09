@@ -69,6 +69,10 @@ export interface E2ENativeRead {
   hasKey: () => boolean;
   /** Real document-store current page (read-only page oracle). */
   currentPage: () => number;
+  /** Store-side highlights array (read-only; the load-path oracle). */
+  storeHighlights: () => unknown[];
+  /** Read IPC result for the seeded document (read-only; data-presence oracle). */
+  ipcHighlights: () => Promise<unknown>;
   /** Observer log buffer: console messages since bootstrap (diagnostics). */
   logs: () => string[];
 }
@@ -123,7 +127,13 @@ async function seedLibraryProfile(): Promise<void> {
   // Stamp A most-recently-opened so it is the resume line's primary book.
   const openedA = await commands.libraryOpenDocument(addedA.data.id);
   if (openedA.status === "error") throw new Error(`stamp A: ${openedA.error}`);
+
+  // The read oracle's target: the seeded resume book.
+  seededDocId = addedA.data.id;
 }
+
+/** The seeded document id (home lane) — the highlight read oracle targets it. */
+let seededDocId: string | null = null;
 
 export async function installE2ENativeBootstrap(): Promise<void> {
   const read: E2ENativeRead = {
@@ -135,6 +145,17 @@ export async function installE2ENativeBootstrap(): Promise<void> {
     playbackState: () => useAiTtsStore.getState().playbackState,
     hasKey: () => useAiTtsStore.getState().apiKey !== null,
     currentPage: () => useDocumentStore.getState().currentPage,
+    storeHighlights: () => useDocumentStore.getState().highlights,
+    ipcHighlights: async () => {
+      if (!seededDocId) return { status: "error", error: "no seeded doc" };
+      const res = await commands.highlightsListForDocument(seededDocId);
+      if (res.status === "error") return res;
+      return {
+        status: "ok",
+        count: res.data.highlights.length,
+        first: res.data.highlights[0]?.textContent?.slice(0, 60) ?? null,
+      };
+    },
     logs: () =>
       ((window as unknown as Record<string, unknown>).__E2E_LOG_BUFFER__ as
         | string[]
