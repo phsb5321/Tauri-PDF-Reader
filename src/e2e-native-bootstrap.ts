@@ -71,6 +71,8 @@ export interface E2ENativeRead {
   currentPage: () => number;
   /** Store-side highlights array (read-only; the load-path oracle). */
   storeHighlights: () => unknown[];
+  /** Document-store error (read-only; the failed-open oracle). */
+  storeError: () => string | null;
   /** Read IPC result for the seeded document (read-only; data-presence oracle). */
   ipcHighlights: () => Promise<unknown>;
   /** Observer log buffer: console messages since bootstrap (diagnostics). */
@@ -159,6 +161,7 @@ export async function installE2ENativeBootstrap(): Promise<void> {
     hasKey: () => useAiTtsStore.getState().apiKey !== null,
     currentPage: () => useDocumentStore.getState().currentPage,
     storeHighlights: () => useDocumentStore.getState().highlights,
+    storeError: () => useDocumentStore.getState().error,
     ipcHighlights: async () => {
       if (!seededDocId) return { status: "error", error: "no seeded doc" };
       const res = await commands.highlightsListForDocument(seededDocId);
