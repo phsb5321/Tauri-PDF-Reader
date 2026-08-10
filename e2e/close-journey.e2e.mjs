@@ -46,12 +46,20 @@ const PHASE = process.env.CLOSE_PHASE || "dl1-create";
 
 /**
  * Where closeAndObserve() publishes the timings the runner reports. The runner
- * hands down a per-run path: a fixed /tmp name would collide between the
- * concurrent sibling worktrees this lane already anchors its pkill for — one
- * runner would delete the in-flight evidence of another, or report its numbers.
+ * hands down a per-run path; the fallback stays inside the hermetic profile
+ * (scripts/e2e-profile.sh mktemp -d) so a standalone spec run still works.
+ *
+ * There is deliberately NO shared-/tmp default. A predictable path in a
+ * world-writable directory is both a symlink-clobber hazard (CodeQL
+ * js/insecure-temporary-file) and the collision this lane already guards
+ * against elsewhere: it would outlive its run and clash with the concurrent
+ * sibling worktrees the pkill anchor exists for — one runner deleting the
+ * in-flight evidence of another, or printing its numbers as its own.
  */
+const TIMING_DIR = process.env.XDG_DATA_HOME;
 const TIMING_PATH =
-  process.env.CLOSE_TIMING_PATH || `/tmp/lectrice-close-timing-${PHASE}.json`;
+  process.env.CLOSE_TIMING_PATH ||
+  (TIMING_DIR ? `${TIMING_DIR}/close-timing-${PHASE}.json` : null);
 
 /**
  * The debounce the close is racing: 500 ms, the explicit argument at
@@ -147,11 +155,16 @@ async function closeAndObserve(tAction) {
     windowCloseToDeathMs:
       windowClosedAt && tDeath ? tDeath - windowClosedAt : null,
   };
+  const record = JSON.stringify(timings);
+  if (!TIMING_PATH) {
+    throw new Error(
+      "no timing destination: set CLOSE_TIMING_PATH (the runner does) or run under a hermetic profile that exports XDG_DATA_HOME — refusing to fall back to a predictable shared /tmp path",
+    );
+  }
   const fs = await import("node:fs");
-  fs.writeFileSync(TIMING_PATH, JSON.stringify(timings));
+  fs.writeFileSync(TIMING_PATH, record);
 
   // The close is the phase's product; an unobserved close is not a close.
-  const record = JSON.stringify(timings);
   if (!windowSeenBefore) {
     throw new Error(
       `close NOT OBSERVABLE: no window named Lectrice on DISPLAY=${process.env.DISPLAY} before the close — the lane cannot prove a genuine WM_DELETE_WINDOW. ${record}`,
