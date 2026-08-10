@@ -90,6 +90,11 @@ const PROFILE_DIR: string | undefined = import.meta.env.VITE_E2E_PROFILE_DIR;
 async function seedLibraryProfile(): Promise<void> {
   if (!SEED_LANE || !PROFILE_DIR) return;
 
+  // The page is seeded ONLY on the first launch of a profile: the reader lane
+  // (108) relaunches the app on the SAME profile to prove reading-position
+  // persistence, and an unconditional re-seed would clobber the page the
+  // previous app just saved. The add is idempotent (file-hash dedupe); the
+  // progress write must be first-launch-only.
   const pathA = `${PROFILE_DIR}/e2e-resume-fixture-a.pdf`;
   const addedA = await commands.libraryAddDocument(
     pathA,
@@ -97,14 +102,18 @@ async function seedLibraryProfile(): Promise<void> {
     5,
   );
   if (addedA.status === "error") throw new Error(`seed A: ${addedA.error}`);
-  const progA = await commands.libraryUpdateProgress(
-    addedA.data.id,
-    2,
-    null,
-    null,
-  );
-  if (progA.status === "error")
-    throw new Error(`seed progress A: ${progA.error}`);
+  const knownA = await commands.libraryGetDocumentByPath(pathA);
+  if (knownA.status === "error") throw new Error(`probe A: ${knownA.error}`);
+  if (knownA.data?.currentPage === 1) {
+    const progA = await commands.libraryUpdateProgress(
+      addedA.data.id,
+      2,
+      null,
+      null,
+    );
+    if (progA.status === "error")
+      throw new Error(`seed progress A: ${progA.error}`);
+  }
 
   if (SEED_LANE === "dual") {
     const pathB = `${PROFILE_DIR}/e2e-resume-fixture-b.pdf`;
@@ -114,14 +123,18 @@ async function seedLibraryProfile(): Promise<void> {
       3,
     );
     if (addedB.status === "error") throw new Error(`seed B: ${addedB.error}`);
-    const progB = await commands.libraryUpdateProgress(
-      addedB.data.id,
-      2,
-      null,
-      null,
-    );
-    if (progB.status === "error")
-      throw new Error(`seed progress B: ${progB.error}`);
+    const knownB = await commands.libraryGetDocumentByPath(pathB);
+    if (knownB.status === "error") throw new Error(`probe B: ${knownB.error}`);
+    if (knownB.data?.currentPage === 1) {
+      const progB = await commands.libraryUpdateProgress(
+        addedB.data.id,
+        2,
+        null,
+        null,
+      );
+      if (progB.status === "error")
+        throw new Error(`seed progress B: ${progB.error}`);
+    }
   }
 
   // Stamp A most-recently-opened so it is the resume line's primary book.
