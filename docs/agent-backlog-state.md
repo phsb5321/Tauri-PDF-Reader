@@ -2,6 +2,17 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #54 — 09/08/2026 (102-highlights-reload: saved highlights are shown again)
+
+- **Branch:** `102-highlights-reload` (off `origin/main` 2ffe415 post-#101, worktree `../tauri-pdf-reader-102-highlights-reload`). Priority reorder from orch — ahead of the 103-105 queue, because it is a user-visible defect with packaged proof (QA's #100 lane caught it).
+- **Defect:** `HighlightsPanel` was exported, fully implemented, and imported by NO production file; `onToggleHighlights` had zero handlers (the menu item was inert, same class as Settings #82); and nothing loaded highlights on document open. Rows sat in SQLite, never shown again — data not lost, visibility is. The packaged highlight-journey lane proved it: phase create passed (row persisted, observer saw it), phase verify failed with `highlight overlay absent after relaunch` (`storeCount: 0` while the IPC read returned count 1).
+- **Fix (mirror #82):** `ReaderView` now (1) loads saved highlights on document open via `loadHighlights(documentId)` → `setHighlights` (which also builds the page-grouped map the overlay reads — no per-page loads needed); (2) wires `onToggleHighlights` in `commandHandlers` to a new `showHighlights` state; (3) mounts `HighlightsPanel` at the shell level, gated on a document being open; (4) delete goes through the same `useHighlightPersistence` hook the create path uses (debounced write + retry) so store and DB cannot disagree; click selects + jumps to the highlight's page. `CLAUDE.md` corrected: highlights now has a panel; find remains panel-less.
+- **RED first (jsdom):** `highlights-reload.test.tsx` (real shell, menu-listener captured) — highlights never load into the store on open, panel never appears, 2/3 RED on `main`; the no-document case already passed. GREEN after wiring.
+- **Packaged RED→GREEN (the proof-of-record, both runs pasted in the PR body):** `bash e2e/run-highlight-journey.sh` on the pre-fix head (scratch worktree at `2ffe415`): `✖ verify: highlight is still rendered after relaunch — highlight overlay absent after relaunch (storeCount: 0, IPC count 1)`. Same lane on the fixed head: `✓ create 1 passing, ✓ verify 1 passing (fresh app process, same profile)` — the overlay survives a REAL restart, loaded from real SQLite through real IPC.
+- **One build-caught type fix en route:** the panel's `onHighlightDelete` takes the highlight ID (string), not the object — fixed the handler + the schema `Highlight` import (the first packaged build failed on tsc; the jsdom test had not caught the signature because the panel was never mounted).
+- **GREEN:** full suite 1031/1031 (86 files, +3); lint 0/94 baseline; typecheck clean; diff clean; alignment gate PASS on the committed diff. (Main's node_modules was again a dangling symlink — repaired in the MAIN checkout before running.)
+- **Revert:** `git revert <squash>` — one component file, CLAUDE.md, one test file, one backlog entry.
+
 ## Iteration #53 — 09/08/2026 (101-flake-provisioning: e2e toolchain lives in ONE pinned place)
 
 - **Branch:** `101-flake-provisioning` (off `origin/main` 5cdeb7e post-#98, worktree `../tauri-pdf-reader-101-flake-provisioning`). Unblocks M2.6 (Semgrep/SBOM), whose precondition is "reproducible local tool provisioning is specified".

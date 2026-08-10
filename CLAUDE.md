@@ -306,8 +306,11 @@ see:
 
 Settings opens `SettingsPanel` (`src/components/settings/SettingsPanel.tsx`),
 mounted once in `ReaderView` regardless of whether a document is open, since
-that is where a new reader would go looking for it. Highlights and find have
-menu items but no panel to open, so they have no chord. An inert shortcut is
+that is where a new reader would go looking for it. Highlights opens
+`HighlightsPanel` (`src/components/highlights/HighlightsPanel.tsx`),
+mounted in `ReaderView` while a document is open, with saved highlights
+loaded into the store on document open (slice 102). Find has a menu item but
+no panel to open, so it has no chord. An inert shortcut is
 indistinguishable from a broken one.
 
 ### The two surfaces
