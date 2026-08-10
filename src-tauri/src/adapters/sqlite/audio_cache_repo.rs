@@ -645,6 +645,41 @@ mod tests {
         (pool, cache_dir)
     }
 
+    /// Slice 104: deleting a document must remove its cached .mp3 files AND
+    /// shrink the cache stats — the machinery the library delete path now
+    /// invokes. Seeded with a REAL file on disk, not just a metadata row.
+    #[tokio::test]
+    async fn delete_for_document_removes_files_and_drops_stats() {
+        let (pool, cache_dir) = setup_test_db().await;
+        let repo = SqliteAudioCacheRepo::new(pool, cache_dir.clone());
+
+        // Seed a real entry: the repo's store writes BOTH the .mp3 file and
+        // the metadata row — the exact shape a played-back document leaves.
+        let entry = make_test_entry(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "doc-1",
+            1,
+            0,
+        );
+        repo.store(entry, b"fake-mp3-bytes".to_vec()).await.unwrap();
+        let audio_path = cache_dir
+            .join("tts_cache")
+            .join("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.mp3");
+        assert!(audio_path.exists());
+
+        let before = repo.get_stats().await.unwrap();
+        assert!(before.total_size_bytes > 0);
+        assert!(audio_path.exists());
+
+        let removed = repo.delete_for_document("doc-1").await.unwrap();
+        assert_eq!(removed, 1);
+
+        let after = repo.get_stats().await.unwrap();
+        assert_eq!(after.total_size_bytes, 0);
+        assert_eq!(after.entry_count, 0);
+        assert!(!audio_path.exists());
+    }
+
     fn make_test_entry(cache_key: &str, doc_id: &str, page: i32, chunk: i32) -> AudioCacheEntry {
         AudioCacheEntry::new(
             cache_key.to_string(),

@@ -2,6 +2,15 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #57 — 09/08/2026 (104-cache-gc: deleting a book no longer leaks its cached audio)
+
+- **Branch:** `104-cache-gc` (off `origin/main` c7dcbcf post-#105-telemetry, worktree `../tauri-pdf-reader-104-cache-gc`). Wave-6 queue item 2 (M2.5 second half).
+- **Defect:** deleting a library document was a bare `DELETE FROM documents` — its `tts_cache/` .mp3 files and metadata rows survived on disk forever (SECURITY.md retention section documented it). The cleanup machinery ALREADY existed (`AudioCacheService::clear_document` → repo `delete_for_document` removes files + metadata); only the wiring was missing.
+- **Fix (service call beside the delete — argued in the PR body):** `library_remove_document` now takes `AppHandle`, constructs the audio-cache service (`create_service` made `pub(crate)`), and clears the document's cache BEFORE the row delete — best-effort (a cache failure is logged, never blocks the delete the user asked for). Chose a service call over a SQLite trigger because the cleanup performs filesystem I/O — side effects in DB triggers are the wrong layering (surprising, untestable in isolation), and the tested service already existed; the app's architecture routes document mutations through commands/services.
+- **RED first:** source-pin test (`library-delete-cache.test.ts`) failed on `main` (`expected ... to contain 'create_audio_cache_service'` — the bare delete); GREEN after. Behavioral test (`delete_for_document_removes_files_and_drops_stats`, Rust): seeds a REAL .mp3 via `repo.store`, asserts the file is gone and `get_stats().total_size_bytes` drops to 0 after the clear — the dispatch's falsifier at the service level.
+- **GREEN:** full suite 1035/1035; cargo audio_cache_repo 7/7; `cargo build --features test-mocks` clean; fmt clean; clippy `-D warnings` clean; lint 0/94 baseline; typecheck clean; diff clean; alignment gate PASS on the committed diff.
+- **Revert:** `git revert <squash>` — two Rust files, two test files, one backlog entry.
+
 ## Iteration #56 — 09/08/2026 (103-telemetry-deletion: the Privacy & Data fiction is deleted)
 
 - **Branch:** `103-telemetry-deletion` (off `origin/main` 6bd6675, worktree `../tauri-pdf-reader-103-telemetry`). Wave-6 queue item 1.
