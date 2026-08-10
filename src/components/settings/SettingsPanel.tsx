@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useSettingsStore } from "../../stores/settings-store";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
-import { TtsSettings } from "./TtsSettings";
+import { AiTtsSettings } from "../playback-bar/AiTtsSettings";
 import { HighlightSettings } from "./HighlightSettings";
 import { ThemeToggle } from "./ThemeToggle";
 import { KeyboardShortcuts } from "./KeyboardShortcuts";
@@ -128,7 +128,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
           <div className="settings-content">
             {activeSection === "appearance" && <ThemeToggle />}
             {activeSection === "rendering" && <RenderSettings />}
-            {activeSection === "tts" && <TtsSettings />}
+            {activeSection === "tts" && <AiTtsSettings />}
             {activeSection === "cache" && <CacheSettings />}
             {activeSection === "highlights" && <HighlightSettings />}
             {activeSection === "shortcuts" && <KeyboardShortcuts />}

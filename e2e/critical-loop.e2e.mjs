@@ -21,6 +21,60 @@
 // `speakWithHighlight` → Tauri-TTS playback path, or the native menu → Rust
 // `on_menu_event` mapping. Those are tracked harness follow-ups.
 describe("Critical loop (load → render → synced karaoke → menu dispatch)", () => {
+  it("B1 (slice 109): the toolbar Open button leaves the library and shows the reader", async () => {
+    // The app just launched — the reading home is the startup surface. The
+    // toolbar Open button is the ONLY visible open path on packaged Linux
+    // (the native File->Open menu is hidden); before 109 it loaded the book
+    // and never left the library.
+    await browser.waitUntil(
+      async () =>
+        browser.execute(() => !!(window.__E2E__ && window.__E2E__.ready)),
+      { timeout: 30000, timeoutMsg: "E2E bridge never became ready" },
+    );
+    const installed = await browser.execute(async () =>
+      window.__E2E__.installDialogFixture(),
+    );
+    expect(installed).toBe(true);
+
+    // Library is showing (startup surface).
+    expect(await $("h1").getText()).toBe("Library");
+
+    // Click the REAL toolbar Open button — the dialog IPC is intercepted by
+    // the bridge, so the handler runs to completion.
+    await browser.execute(() =>
+      document.querySelector("button.open-button")?.click(),
+    );
+
+    // The reader must appear: the page input exists and the library h1 is
+    // gone. This is the assertion that was red before 109.
+    await browser.waitUntil(
+      async () =>
+        browser.execute(() => {
+          const h1 = document.querySelector("h1");
+          const pageInput = document.querySelector(
+            'input[aria-label="Current page"]',
+          );
+          return (
+            !!pageInput && (!h1 || (h1.textContent || "").trim() !== "Library")
+          );
+        }),
+      {
+        timeout: 30000,
+        timeoutMsg: "toolbar Open never left the library (slice 109 B1)",
+      },
+    );
+    const diag = await browser.execute(() => ({
+      pageInput: !!document.querySelector('input[aria-label="Current page"]'),
+      h1: document.querySelector("h1")?.textContent ?? null,
+      title: document.querySelector(".document-title")?.textContent ?? null,
+    }));
+    console.log("DIAG open-toolbar:", JSON.stringify(diag));
+
+    // Return to the library for the next it-block (the existing flow expects
+    // the startup surface and toggles its own way in).
+    await browser.keys(["Control", "l"]);
+  });
+
   it("launches, loads+renders the fixture, the real rAF loop advances the karaoke index, and a menu-action dispatches", async () => {
     // 1. App launched + E2E bridge present.
     await browser.waitUntil(
@@ -92,3 +146,31 @@ describe("Critical loop (load → render → synced karaoke → menu dispatch)",
     );
   });
 });
+
+  it("B4 (slice 109): a failed open surfaces the error banner on the library", async () => {
+    await browser.execute(async () =>
+      window.__E2E__.installCorruptOpenFixture(),
+    );
+    await browser.execute(() =>
+      document.querySelector("button.open-button")?.click(),
+    );
+    // The corrupt bytes are not a PDF: the open fails and the library must
+    // show the error banner (role=alert), never a silent nothing.
+    await browser.waitUntil(
+      async () =>
+        browser.execute(() => {
+          const banner = document.querySelector('[role="alert"]');
+          return !!banner;
+        }),
+      { timeout: 30000, timeoutMsg: "failed open never surfaced an error banner (slice 109 B4)" },
+    );
+    const diag = await browser.execute(() => ({
+      alert: document.querySelector('[role="alert"]')?.textContent ?? null,
+      library: document.querySelector("h1")?.textContent ?? null,
+    }));
+    console.log("DIAG open-failed:", JSON.stringify(diag));
+    // Dismiss and return to a clean library for any following steps.
+    await browser.execute(() =>
+      document.querySelector('[role="alert"] button')?.click(),
+    );
+  });

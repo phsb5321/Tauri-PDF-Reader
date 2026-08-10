@@ -16,9 +16,16 @@ interface ToolbarProps {
    * lands there — same shape as `LibraryView onDocumentSelect`.
    */
   onSessionRestored?: (sessionId: string) => void;
+  /**
+   * Fired after the toolbar's Open button successfully loads a document.
+   * Toolbar loads the file into the store; the shell owns the surface swap,
+   * so it must be told to leave the library (slice 109 B1 — the book loaded
+   * and the user kept staring at the library).
+   */
+  onOpen?: () => void;
 }
 
-export function Toolbar({ onSessionRestored }: ToolbarProps) {
+export function Toolbar({ onSessionRestored, onOpen }: ToolbarProps) {
   const [isSessionMenuOpen, setIsSessionMenuOpen] = useState(false);
   const { openFile } = useFileDialog();
   const toolbarRef = useRef<HTMLDivElement>(null);
@@ -101,6 +108,7 @@ export function Toolbar({ onSessionRestored }: ToolbarProps) {
       }
 
       setDocument(document);
+      onOpen?.();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to open PDF";

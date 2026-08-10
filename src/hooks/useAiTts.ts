@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from "react";
 import {
   aiTtsInit,
   aiTtsListVoices,
@@ -15,8 +15,8 @@ import {
   onAiTtsPaused,
   onAiTtsResumed,
   onAiTtsError,
-} from '../lib/tauri-invoke';
-import { useAiTtsStore } from '../stores/ai-tts-store';
+} from "../lib/tauri-invoke";
+import { useAiTtsStore } from "../stores/ai-tts-store";
 
 /**
  * Hook for AI TTS (ElevenLabs) operations
@@ -26,44 +26,47 @@ export function useAiTts() {
   const initializingRef = useRef(false);
 
   // Initialize TTS when API key is available
-  const initialize = useCallback(async (apiKey: string) => {
-    if (initializingRef.current) return;
-    initializingRef.current = true;
+  const initialize = useCallback(
+    async (apiKey: string) => {
+      if (initializingRef.current) return;
+      initializingRef.current = true;
 
-    store.setPlaybackState('loading');
+      store.setPlaybackState("loading");
 
-    try {
-      const result = await aiTtsInit(apiKey);
+      try {
+        const result = await aiTtsInit(apiKey);
 
-      if (result.success) {
-        store.setApiKey(apiKey);
-        store.setInitialized(true);
+        if (result.success) {
+          store.setApiKey(apiKey);
+          store.setInitialized(true);
 
-        // Fetch voices
-        const voicesResult = await aiTtsListVoices();
-        store.setVoices(voicesResult.voices);
+          // Fetch voices
+          const voicesResult = await aiTtsListVoices();
+          store.setVoices(voicesResult.voices);
 
-        // Set voice if one is selected
-        if (store.selectedVoiceId) {
-          await aiTtsSetVoice(store.selectedVoiceId);
+          // Set voice if one is selected
+          if (store.selectedVoiceId) {
+            await aiTtsSetVoice(store.selectedVoiceId);
+          }
+
+          // Set speed
+          await aiTtsSetSpeed(store.speed);
         }
-
-        // Set speed
-        await aiTtsSetSpeed(store.speed);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        store.setInitialized(false, message);
+      } finally {
+        initializingRef.current = false;
+        // Only reset to idle if we're still in loading state from init
+        // Don't clobber playing/paused states from ongoing playback
+        const currentState = store.playbackState;
+        if (currentState === "loading") {
+          store.setPlaybackState("idle");
+        }
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      store.setInitialized(false, message);
-    } finally {
-      initializingRef.current = false;
-      // Only reset to idle if we're still in loading state from init
-      // Don't clobber playing/paused states from ongoing playback
-      const currentState = store.playbackState;
-      if (currentState === 'loading') {
-        store.setPlaybackState('idle');
-      }
-    }
-  }, [store]);
+    },
+    [store],
+  );
 
   // Auto-initialize if API key exists
   useEffect(() => {
@@ -82,8 +85,11 @@ export function useAiTts() {
       try {
         const unsub1 = await onAiTtsStarted((event) => {
           if (mounted) {
-            console.debug('[TTS] State transition: -> playing (started event)', { text: event.text.substring(0, 50) });
-            store.setPlaybackState('playing');
+            console.debug(
+              "[TTS] State transition: -> playing (started event)",
+              { text: event.text.substring(0, 50) },
+            );
+            store.setPlaybackState("playing");
             store.setCurrentText(event.text);
           }
         });
@@ -91,8 +97,8 @@ export function useAiTts() {
 
         const unsub2 = await onAiTtsFinished(() => {
           if (mounted) {
-            console.debug('[TTS] State transition: -> idle (finished event)');
-            store.setPlaybackState('idle');
+            console.debug("[TTS] State transition: -> idle (finished event)");
+            store.setPlaybackState("idle");
             store.setCurrentText(null);
           }
         });
@@ -100,8 +106,8 @@ export function useAiTts() {
 
         const unsub3 = await onAiTtsStopped(() => {
           if (mounted) {
-            console.debug('[TTS] State transition: -> idle (stopped event)');
-            store.setPlaybackState('idle');
+            console.debug("[TTS] State transition: -> idle (stopped event)");
+            store.setPlaybackState("idle");
             store.setCurrentText(null);
           }
         });
@@ -109,30 +115,32 @@ export function useAiTts() {
 
         const unsub4 = await onAiTtsPaused(() => {
           if (mounted) {
-            console.debug('[TTS] State transition: -> paused (paused event)');
-            store.setPlaybackState('paused');
+            console.debug("[TTS] State transition: -> paused (paused event)");
+            store.setPlaybackState("paused");
           }
         });
         if (mounted) unsubscribers.push(unsub4);
 
         const unsub5 = await onAiTtsResumed(() => {
           if (mounted) {
-            console.debug('[TTS] State transition: -> playing (resumed event)');
-            store.setPlaybackState('playing');
+            console.debug("[TTS] State transition: -> playing (resumed event)");
+            store.setPlaybackState("playing");
           }
         });
         if (mounted) unsubscribers.push(unsub5);
 
         const unsub6 = await onAiTtsError((event) => {
           if (mounted) {
-            console.debug('[TTS] State transition: -> error (error event)', { error: event.error });
+            console.debug("[TTS] State transition: -> error (error event)", {
+              error: event.error,
+            });
             store.setError(event.error);
-            store.setPlaybackState('error');
+            store.setPlaybackState("error");
           }
         });
         if (mounted) unsubscribers.push(unsub6);
       } catch (error) {
-        console.error('Failed to setup TTS event listeners:', error);
+        console.error("Failed to setup TTS event listeners:", error);
       }
     };
 
@@ -145,7 +153,7 @@ export function useAiTts() {
         try {
           unsub();
         } catch (error) {
-          console.error('Error unsubscribing from TTS event:', error);
+          console.error("Error unsubscribing from TTS event:", error);
         }
       });
     };
@@ -155,62 +163,64 @@ export function useAiTts() {
   const speak = useCallback(
     async (text: string) => {
       if (!store.initialized) {
-        console.warn('AI TTS not initialized');
+        console.warn("AI TTS not initialized");
         return;
       }
 
-      store.setPlaybackState('loading');
+      store.setPlaybackState("loading");
       store.setError(null);
 
       try {
         await aiTtsSpeak(text, store.selectedVoiceId ?? undefined);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        console.debug('[TTS] State transition: -> error (speak failed)', { error: message });
+        console.debug("[TTS] State transition: -> error (speak failed)", {
+          error: message,
+        });
         store.setError(message);
-        store.setPlaybackState('error');
+        store.setPlaybackState("error");
       }
     },
-    [store]
+    [store],
   );
 
   // Stop playback
   const stop = useCallback(async () => {
     try {
       await aiTtsStop();
-      store.setPlaybackState('idle');
+      store.setPlaybackState("idle");
     } catch (error) {
-      console.error('Failed to stop TTS:', error);
+      console.error("Failed to stop TTS:", error);
     }
   }, [store]);
 
   // Pause playback
   const pause = useCallback(async () => {
     try {
-      console.debug('[TTS] Pause requested');
+      console.debug("[TTS] Pause requested");
       await aiTtsPause();
       // State will be set by the ai-tts:paused event listener
     } catch (error) {
-      console.error('Failed to pause TTS:', error);
+      console.error("Failed to pause TTS:", error);
     }
   }, []);
 
   // Resume playback
   const resume = useCallback(async () => {
     try {
-      console.debug('[TTS] Resume requested');
+      console.debug("[TTS] Resume requested");
       await aiTtsResume();
       // State will be set by the ai-tts:resumed event listener
     } catch (error) {
-      console.error('Failed to resume TTS:', error);
+      console.error("Failed to resume TTS:", error);
     }
   }, []);
 
   // Toggle play/pause
   const togglePlayback = useCallback(async () => {
-    if (store.playbackState === 'playing') {
+    if (store.playbackState === "playing") {
       await pause();
-    } else if (store.playbackState === 'paused') {
+    } else if (store.playbackState === "paused") {
       await resume();
     }
   }, [store.playbackState, pause, resume]);
@@ -222,10 +232,10 @@ export function useAiTts() {
         await aiTtsSetVoice(voiceId);
         store.setSelectedVoice(voiceId);
       } catch (error) {
-        console.error('Failed to set voice:', error);
+        console.error("Failed to set voice:", error);
       }
     },
-    [store]
+    [store],
   );
 
   // Set speed
@@ -235,10 +245,10 @@ export function useAiTts() {
         await aiTtsSetSpeed(speed);
         store.setSpeed(speed);
       } catch (error) {
-        console.error('Failed to set speed:', error);
+        console.error("Failed to set speed:", error);
       }
     },
-    [store]
+    [store],
   );
 
   // Refresh state from backend
@@ -247,13 +257,13 @@ export function useAiTts() {
       const state = await aiTtsGetState();
       store.updateFromBackend(state);
     } catch (error) {
-      console.error('Failed to refresh TTS state:', error);
+      console.error("Failed to refresh TTS state:", error);
     }
   }, [store]);
 
   // Clear error and reset to idle state (T025)
   const clearError = useCallback(() => {
-    console.debug('[TTS] Clearing error state');
+    console.debug("[TTS] Clearing error state");
     store.clearError();
   }, [store]);
 
@@ -264,6 +274,7 @@ export function useAiTts() {
     playbackState: store.playbackState,
     currentText: store.currentText,
     error: store.error,
+    initError: store.initError,
     voices: store.voices,
     selectedVoiceId: store.selectedVoiceId,
     speed: store.speed,

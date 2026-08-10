@@ -27,6 +27,7 @@ vi.mock("../../lib/api/ai-tts", () => ({
 }));
 
 import { AiTtsSettings } from "../../components/playback-bar/AiTtsSettings";
+import { useAiTtsStore } from "../../stores/ai-tts-store";
 
 describe("AiTtsSettings session-secret setup", () => {
   beforeEach(() => {
@@ -117,6 +118,10 @@ describe("AiTtsSettings session-secret setup", () => {
       error: null,
     });
     await act(async () => {
+      // Slice 109 B2: the dialog closes only on ACTUAL success — the store
+      // must be initialized (a successful initialize sets it), matching the
+      // real flow.
+      useAiTtsStore.setState({ initialized: true });
       render(<AiTtsSettings onClose={mocks.onClose} />);
     });
 

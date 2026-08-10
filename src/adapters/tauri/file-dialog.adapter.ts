@@ -38,6 +38,16 @@ export class TauriFileDialogAdapter implements FileDialogPort {
    * Open a file selection dialog
    */
   async open(options?: OpenDialogOptions): Promise<string | string[] | null> {
+    // Slice 109 B1 test seam (VITE_E2E build only, tree-shaken out of
+    // production): the packaged lane cannot drive the native file dialog, so
+    // the bridge plants a pre-written, in-scope fixture path here when set.
+    // Everything else — the fs read, the backend hash, the store, the shell
+    // surface flip — is the REAL flow.
+    const fixture = (globalThis as Record<string, unknown>)
+      .__E2E_DIALOG_FIXTURE__;
+    if (import.meta.env.VITE_E2E === "true" && typeof fixture === "string") {
+      return fixture;
+    }
     const result = await open({
       title: options?.title,
       filters: toDialogFilters(options?.filters),
