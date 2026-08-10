@@ -79,7 +79,7 @@ describe("settings-store", () => {
       const after = useSettingsStore.getState();
       expect(after.theme).toBe("system");
       expect(after.ttsRate).toBe(DEFAULT_TTS_RATE);
-      expect(after.telemetryErrors).toBe(true);
+      expect(after.telemetryErrors).toBe(false); // slice 103: default flipped to match the DB seed
       expect(after.telemetryAnalytics).toBe(false);
     });
   });

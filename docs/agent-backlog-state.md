@@ -2,6 +2,15 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #56 — 09/08/2026 (103-telemetry-deletion: the Privacy & Data fiction is deleted)
+
+- **Branch:** `103-telemetry-deletion` (off `origin/main` 6bd6675, worktree `../tauri-pdf-reader-103-telemetry`). Wave-6 queue item 1.
+- **Defect (verified):** `TelemetrySettings.tsx` rendered a live Privacy & Data panel claiming it "sends crash reports and error logs" — nothing sends anything (no sentry/posthog/mixpanel client anywhere; the only egress is ElevenLabs; CMaps went local in #97). Compounding: the store defaulted `telemetryErrors: true` while both DB seeds are `'false'` — store and schema disagreed on the shipped default, unpinned by any test.
+- **Fix:** deleted `TelemetrySettings.tsx`; stripped the SettingsPanel wiring (import, "Privacy & Data" nav item, section render, now-unused ChartIcon + telemetry section type); removed the barrel export in `settings/index.ts`; flipped the store default to `false`. The settings keys remain as inert compat shims (schemas + settings-store persistence + db-init seeds) so existing installs do not churn — the #90 "compat shim, no behavior" precedent, stated in the PR body.
+- **RED first:** `telemetry-absence.test.ts` failed 3/3 on `main` (UI file exists, default true, and the production-scan assertion — after excluding the test's own regex literals from the scan). GREEN after: 3/3 pins (no UI, defaults false, no analytics client in src/src-tauri). The existing settings-store "restores defaults" test asserted the old true — updated to the new false with a slice reference.
+- **GREEN:** full suite 1034/1034; lint 0/94 baseline; typecheck clean (one dangling barrel export caught); diff clean; alignment gate PASS on the committed diff.
+- **Revert:** `git revert <squash>` — one deleted component, SettingsPanel/index edits, store default, three test files, one backlog entry.
+
 ## Iteration #55 — 09/08/2026 (107-session-page: restore lands on the RIGHT page — the snapshot was the lie)
 
 - **Branch:** `107-session-page` (off `origin/main` ef00ce3 post-qa-#103-lane, worktree `../tauri-pdf-reader-107-session-page`).

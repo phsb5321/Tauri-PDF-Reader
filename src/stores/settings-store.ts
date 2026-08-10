@@ -62,7 +62,7 @@ const initialState = {
   highlightDefaultColor: DEFAULT_HIGHLIGHT_COLOR,
   theme: 'system' as Theme,
   telemetryAnalytics: false,
-  telemetryErrors: true,
+  telemetryErrors: false,
   ttsAvailable: false,
   ttsInitialized: false,
 };
