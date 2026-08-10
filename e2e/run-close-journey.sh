@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 #
 # Reproducible runner for the packaged close-journey E2E
-# (e2e/close-journey.e2e.mjs) — four phases over ONE hermetic profile, each
-# a fresh app process:
+# (e2e/close-journey.e2e.mjs) — four phases, each a fresh app process. The
+# dl1 pair and the dl2 pair run on SEPARATE hermetic profiles: on a shared
+# profile the dl1 residue (its highlight row, and a lingering app still
+# running its 30 s autosave with a stale page) overwrote the dl2 row and
+# produced a false "resume-side defect" reading.
 #
 #   dl1-create  resume → drag-select → Yellow → capture the success toast →
 #               GENUINE window close (xdotool windowclose = WM_DELETE_WINDOW,
@@ -17,8 +20,20 @@
 #   dl2-verify  relaunch → resume → the page must be 3. Expected RED on
 #               main (DL-2).
 #
-# The runner also verifies the observer side after each phase: the profile
-# DB's highlight row (v_highlight_citations) and the library row's page.
+# The runner also PRINTS the observer side after each phase — the profile
+# DB highlight row (v_highlight_citations) and the library row page. Those
+# are evidence for a human reading the log; only the four phase exit codes
+# gate the lane summary.
+#
+# TIMING: each create phase publishes its own record to
+# /tmp/lectrice-close-timing-<phase>.json and the runner prints it verbatim.
+# The decisive figure is actionToWindowCloseMs — an UPPER bound on the
+# interval from the debounce-enqueuing action to the window actually going
+# away, measured by the spec, which is the only process alive at the close.
+# Under 500 ms means the close landed INSIDE the debounce window, so the
+# debounce cannot have flushed by itself and any survival is attributable to
+# the close handler. The runner must never time the close itself: by the
+# time it regains control it has already killed the app.
 #
 # Inherits the shared entry points — NO hand-rolled profile or package list:
 #   scripts/e2e-profile.sh   (hermetic XDG_* profile, #99)
@@ -28,11 +43,17 @@
 # Run from anywhere:   bash e2e/run-close-journey.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# Exported so the profile-2 rebuild inside toolchain_exec can return to the
+# repo root without hardcoding one worktree's absolute path.
+export E2E_REPO_ROOT="$PWD"
 
 source ./scripts/e2e-profile.sh
 source ./scripts/e2e-toolchain.sh
 APP_DIR="$E2E_PROFILE_DIR/com.lectrice.reader"
 mkdir -p "$APP_DIR"
+# STALE EVIDENCE GUARD: these files outlive a run. If a create phase dies
+# before its close, a leftover file would be reported as THIS run's numbers.
+rm -f /tmp/lectrice-close-timing-*.json
 node scripts/gen-e2e-fixtures.mjs "$APP_DIR" >/dev/null
 
 echo "==> Building frontend (VITE_E2E_NATIVE=true, seed=single, no TTS)"
@@ -49,63 +70,68 @@ toolchain_exec '
   export WEBKIT_DISABLE_COMPOSITING_MODE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1 LIBGL_ALWAYS_SOFTWARE=1
   export GDK_BACKEND=x11
   DISPNUM_FILE=$(mktemp)
-  Xvfb -displayfd 3 -screen 0 1280x1024x24 3>$DISPNUM_FILE >/tmp/lectrice-e2e-close-xvfb.log 2>&1 &
+  Xvfb -displayfd 3 -screen 0 1280x1024x24 3>"$DISPNUM_FILE" >/tmp/lectrice-e2e-close-xvfb.log 2>&1 &
   XVFB_PID=$!
-  trap "kill $XVFB_PID 2>/dev/null || true" EXIT
-  for _ in $(seq 1 100); do [ -s $DISPNUM_FILE ] && break; sleep 0.1; done
-  export DISPLAY=:$(cat $DISPNUM_FILE)
+  trap "kill $XVFB_PID 2>/dev/null || true; rm -f $DISPNUM_FILE" EXIT
+  for _ in $(seq 1 100); do [ -s "$DISPNUM_FILE" ] && break; sleep 0.1; done
+  export DISPLAY=":$(cat "$DISPNUM_FILE")"
   echo "Xvfb ready on DISPLAY=$DISPLAY profile=$XDG_DATA_HOME"
 
   DB="$XDG_DATA_HOME/com.lectrice.reader/pdf-reader.db"
+  # ANCHORED to this worktree: an unanchored "target/debug/tauri-pdf-reade[r]"
+  # also matches the binary of a sibling worktree, so the lane would kill an
+  # app belonging to another agent — and the wait below could spin on that
+  # sibling and then fall through as if our own app had died. The [r] bracket
+  # keeps the pattern from matching this script own command line.
+  : "${E2E_REPO_ROOT:?E2E_REPO_ROOT unset — the kill pattern would match nothing and phase isolation would silently not happen}"
+  APP_PAT="^${E2E_REPO_ROOT}/src-tauri/target/debug/tauri-pdf-reade[r]"
   # run_phase NEVER returns non-zero (set -e would kill the whole lane on the
   # first RED phase); the status lands in the global PHASE_STATUS.
   PHASE_STATUS=0
   run_phase() {
     local PHASE="$1"
+    # RESET FIRST: without this a passing phase inherits an earlier phase
+    # non-zero status, and the four-boolean summary this lane exists to
+    # produce stops being four independent readings.
+    PHASE_STATUS=0
     CLOSE_PHASE="$PHASE" E2E_SPEC=./e2e/close-journey.e2e.mjs pnpm test:e2e || PHASE_STATUS=$?
     echo "==> PHASE $PHASE exit: $PHASE_STATUS"
     # PHASE ISOLATION: the verify phases never close the window, and a
     # lingering app keeps running its 30s autosave interval with its stale
     # page — which overwrote the next phase fresh row (the false
     # "resume-side defect" of the pre-isolation runs). KILL the app after
-    # every phase and wait for the death. The [r] bracket keeps the pattern
-    # from matching this script own command line.
-    pkill -f "target/debug/tauri-pdf-reade[r]" 2>/dev/null || true
+    # every phase and wait for the death.
+    pkill -f "$APP_PAT" 2>/dev/null || true
+    local DEAD=0
     for _ in $(seq 1 100); do
-      if ! pgrep -f "target/debug/tauri-pdf-reade[r]" >/dev/null 2>&1; then break; fi
+      if ! pgrep -f "$APP_PAT" >/dev/null 2>&1; then DEAD=1; break; fi
       sleep 0.2
     done
+    [ "$DEAD" -eq 1 ] || echo "==> WARNING: app still alive after 20s — phase isolation NOT guaranteed for the next phase"
+  }
+
+  # The spec publishes its own timings per phase; the runner only reports them,
+  # verbatim. It must NOT recompute the death timestamp: run_phase has already
+  # pkilled the app and waited for it, so a poll here would measure the latency
+  # of the runner itself and come out >= 500 ms for any app, fixed or broken.
+  report_timing() {
+    local PHASE="$1" F="/tmp/lectrice-close-timing-$1.json"
+    if [ -f "$F" ]; then
+      echo "==> $PHASE TIMING: $(cat "$F")"
+    else
+      echo "==> $PHASE TIMING: no timing file — the phase never reached its close"
+    fi
   }
 
   echo "==> PHASE dl1-create"
   run_phase dl1-create; D1C=$PHASE_STATUS
 
-  # ── THE DECISIVE NUMBER: the interval between the Yellow click and the
-  #    window close, joined with the app-death timestamp (teardown latency).
-  #    clickToClose > 500 ms would mean the debounce flushed BEFORE the close
-  #    and DL-1 was never tested; clickToDeath >= 500 ms names the 500 ms
-  #    timer as the persistence mechanism (it fired during teardown).
-  if [ -f /tmp/lectrice-dl1-timing.json ]; then
-    TCLICK=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))[sys.argv[2]])" /tmp/lectrice-dl1-timing.json tClick)
-    TCLOSE=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))[sys.argv[2]])" /tmp/lectrice-dl1-timing.json tClose)
-    TTOAST=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))[sys.argv[2]])" /tmp/lectrice-dl1-timing.json tToastDone)
-    # Poll for the app process death (the debug binary launched by tauri-driver).
-    TDEATH=""
-    for _ in $(seq 1 200); do
-      if ! pgrep -f "target/debug/tauri-pdf-reade[r]" >/dev/null 2>&1; then
-        TDEATH=$(date +%s%3N)
-        break
-      fi
-      sleep 0.05
-    done
-    if [ -n "$TDEATH" ]; then
-      echo "==> DL1 TIMING: clickToToast=$((TTOAST - TCLICK))ms clickToClose=$((TCLOSE - TCLICK))ms closeToDeath=$((TDEATH - TCLOSE))ms clickToDeath=$((TDEATH - TCLICK))ms"
-    else
-      echo "==> DL1 TIMING: clickToClose=$((TCLOSE - TCLICK))ms (app process never observed dying within 10s)"
-    fi
-  else
-    echo "==> DL1 TIMING: no timing file (spec did not reach the click)"
-  fi
+  # ── THE DECISIVE NUMBER: actionToWindowCloseMs — an UPPER bound on the
+  #    interval from the Yellow click (the debounce enqueue) to the window
+  #    actually going away. Under 500 ms means the close landed INSIDE the
+  #    debounce window, so the debounce cannot have flushed on its own and the
+  #    survival of the highlight is attributable to the close handler.
+  report_timing dl1-create
 
   echo "==> observer: highlight rows after dl1-create (ZERO would confirm the write never flushed)"
   sqlite3 "$DB" "SELECT count(*) FROM v_highlight_citations;" 2>&1 || echo "no view/rows"
@@ -118,12 +144,14 @@ toolchain_exec '
   #    fresh build (the fixture paths are baked at build time).
   echo "==> switching to profile 2 for the dl2 pair"
   PROFILE2="$(mktemp -d)"
+  # Re-arm the trap now that PROFILE2 exists, so neither temp dir leaks.
+  trap "kill $XVFB_PID 2>/dev/null || true; rm -f $DISPNUM_FILE; rm -rf $PROFILE2" EXIT
   APP_DIR2="$PROFILE2/com.lectrice.reader"
   mkdir -p "$APP_DIR2"
   node scripts/gen-e2e-fixtures.mjs "$APP_DIR2" >/dev/null
   export XDG_DATA_HOME="$PROFILE2" XDG_CONFIG_HOME="$PROFILE2"
   DB2="$XDG_DATA_HOME/com.lectrice.reader/pdf-reader.db"
-  ( cd /home/notroot/Documents/Code/personal/tauri-pdf-reader-114-dl1-timing && \
+  ( cd "$E2E_REPO_ROOT" && \
     CI=true VITE_E2E_NATIVE=true VITE_E2E_NATIVE_TTS=none VITE_E2E_NATIVE_SEED=single \
     VITE_E2E_PROFILE_DIR="$APP_DIR2" pnpm build >/dev/null 2>&1 )
   touch src-tauri/src/lib.rs
@@ -131,8 +159,9 @@ toolchain_exec '
 
   echo "==> PHASE dl2-create (profile 2)"
   run_phase dl2-create; D2C=$PHASE_STATUS
+  report_timing dl2-create
   echo "==> observer: library row after dl2-create (3 confirms the close-flush landed)"
-  sqlite3 "$DB2" "SELECT title, current_page FROM documents ORDER BY last_opened_at DESC LIMIT 1;" 2>&1
+  sqlite3 "$DB2" "SELECT title, current_page FROM documents ORDER BY last_opened_at DESC LIMIT 1;" 2>&1 || echo "no row/db"
 
   echo "==> PHASE dl2-verify (profile 2)"
   run_phase dl2-verify; D2V=$PHASE_STATUS

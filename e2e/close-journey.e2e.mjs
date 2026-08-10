@@ -44,6 +44,9 @@ import { spawn } from "node:child_process";
 
 const PHASE = process.env.CLOSE_PHASE || "dl1-create";
 
+/** Where closeAndObserve() publishes the timings the runner reports. */
+const TIMING_PATH = `/tmp/lectrice-close-timing-${PHASE}.json`;
+
 /**
  * The actor closes the window the way a user does: WM_DELETE_WINDOW through
  * the X server (xdotool windowclose). Runs under the lane's DISPLAY.
@@ -59,6 +62,84 @@ function closeWindow() {
     detached: true,
     stdio: "ignore",
   }).unref();
+}
+
+/**
+ * Close the window as a user does, then OBSERVE the close — and FAIL if it
+ * did not happen. Without that assertion a silent xdotool failure (wrong
+ * DISPLAY, renamed window) ends the phase green, and the runner's pkill then
+ * substitutes a SIGTERM — a process kill, which proves nothing about
+ * CloseRequested and would pass a broken fix. The window is confirmed alive
+ * BEFORE the close for the same reason: otherwise "gone" latches on the first
+ * poll and reports a spurious ~0 ms.
+ *
+ * `windowClosedAt` is the only sound close instant. A timestamp stamped just
+ * before the detached spawn excludes the fork/exec and xdotool's X-tree walk,
+ * so it UNDER-states the click→close interval — the wrong direction for an
+ * "inside the 500 ms debounce" claim, which needs an upper bound.
+ */
+async function closeAndObserve(tAction) {
+  const { execFileSync } = await import("node:child_process");
+  // execFileSync (argv, no shell) so a repo path containing a quote or a
+  // regex metacharacter cannot reshape the pattern.
+  const cwdRe = process.cwd().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const appPattern = `^${cwdRe}/src-tauri/target/debug/tauri-pdf-reader`;
+  const alive = (file, args) => {
+    try {
+      execFileSync(file, args, { stdio: "ignore" });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const windowAlive = () => alive("xdotool", ["search", "--name", "Lectrice"]);
+  const appAlive = () => alive("pgrep", ["-f", appPattern]);
+
+  const windowSeenBefore = windowAlive();
+  const appSeenBefore = appAlive();
+  closeWindow();
+
+  let windowClosedAt = null;
+  let tDeath = null;
+  for (let i = 0; i < 200; i++) {
+    if (windowClosedAt === null && windowSeenBefore && !windowAlive()) {
+      windowClosedAt = Date.now();
+    }
+    if (!appAlive()) {
+      tDeath = Date.now();
+      break;
+    }
+    await new Promise((r) => setTimeout(r, 50));
+  }
+
+  const timings = {
+    phase: PHASE,
+    tAction,
+    windowSeenBefore,
+    appSeenBefore,
+    windowClosedAt,
+    tDeath,
+    // The decisive, sound number: an UPPER bound on action→close-delivered.
+    actionToWindowCloseMs: windowClosedAt ? windowClosedAt - tAction : null,
+    actionToDeathMs: tDeath ? tDeath - tAction : null,
+    windowCloseToDeathMs:
+      windowClosedAt && tDeath ? tDeath - windowClosedAt : null,
+  };
+  const fs = await import("node:fs");
+  fs.writeFileSync(TIMING_PATH, JSON.stringify(timings));
+
+  // The close is the phase's product; an unobserved close is not a close.
+  if (!windowSeenBefore) {
+    throw new Error(
+      `close NOT OBSERVABLE: no window named Lectrice on DISPLAY=${process.env.DISPLAY} before the close — the lane cannot prove a genuine WM_DELETE_WINDOW`,
+    );
+  }
+  if (windowClosedAt === null) {
+    throw new Error(
+      "window NEVER CLOSED after xdotool windowclose — the close never reached the app, so this phase proves nothing about CloseRequested",
+    );
+  }
+  return timings;
 }
 
 describe("Packaged close journey (DL-1 highlight loss, DL-2 position loss)", () => {
@@ -198,61 +279,19 @@ describe("Packaged close journey (DL-1 highlight loss, DL-2 position loss)", () 
         return t ?? null;
       });
       const tToastDone = Date.now();
-      const tClose = Date.now();
-      console.log("DIAG dl1-create:", JSON.stringify({ toastText }));
-      closeWindow();
-
-      // ── Node-side death poll: the WebDriver session is dead with the
-      //    window, but plain Node still runs. Poll the app process AND the X
-      //    window to get close→death (the teardown latency) and click→death
-      //    (>= 500 ms names the debounce timer as the persistence mechanism).
-      //    Also answers the prior question: does the WINDOW even close?
-      const { execSync } = await import("node:child_process");
-      const appPattern =
-        "^" + process.cwd() + "/src-tauri/target/debug/tauri-pdf-reader";
-      let tDeath = null;
-      let windowClosedAt = null;
-      let windowStillThere = null;
-      for (let i = 0; i < 200; i++) {
-        let appAlive = true;
-        try {
-          execSync(`pgrep -f '${appPattern}'`, { stdio: "ignore" });
-        } catch {
-          appAlive = false;
-        }
-        let winAlive = true;
-        try {
-          execSync("xdotool search --name Lectrice", { stdio: "ignore" });
-        } catch {
-          winAlive = false;
-        }
-        if (windowClosedAt === null && !winAlive) {
-          windowClosedAt = Date.now();
-        }
-        if (!appAlive) {
-          tDeath = Date.now();
-          break;
-        }
-        if (i === 199) windowStillThere = winAlive;
-        await new Promise((r) => setTimeout(r, 50));
+      // DL-1's premise is that the app SAID it saved. If the toast never
+      // appeared, the premise is absent and a later green would be vacuous.
+      if (!toastText) {
+        throw new Error(
+          "no success toast after the Yellow click — DL-1's premise (the app claimed it saved) is unproven, so the close would test nothing",
+        );
       }
-      const fs = await import("node:fs");
-      fs.writeFileSync(
-        "/tmp/lectrice-dl1-timing.json",
-        JSON.stringify({
-          tClick,
-          tToastDone,
-          tClose,
-          tDeath,
-          windowClosedAt,
-          windowStillThere,
-          clickToToastMs: tToastDone - tClick,
-          clickToCloseMs: tClose - tClick,
-          closeToDeathMs: tDeath ? tDeath - tClose : null,
-          clickToDeathMs: tDeath ? tDeath - tClick : null,
-          closeToWindowCloseMs: windowClosedAt ? windowClosedAt - tClose : null,
-        }),
+      console.log(
+        "DIAG dl1-create:",
+        JSON.stringify({ toastText, clickToToastMs: tToastDone - tClick }),
       );
+      const timings = await closeAndObserve(tClick);
+      console.log("DIAG dl1-close:", JSON.stringify(timings));
     } else if (PHASE === "dl1-verify") {
       // ── THE CLAIM: the highlight survived — the app said it saved. ───────
       await browser.waitUntil(
@@ -275,6 +314,10 @@ describe("Packaged close journey (DL-1 highlight loss, DL-2 position loss)", () 
       //    useAutoSave debounce. The close is the final statement. ─────────
       const next = await $('button[title="Next page (Right Arrow)"]');
       await next.waitForClickable({ timeout: 10000 });
+      // The debounce is enqueued by the page change, so the interval that
+      // matters starts HERE — not after the confirmation and probe below,
+      // which would silently discard part of the window being raced.
+      const tPageTurn = Date.now();
       await browser.execute(() =>
         document.querySelector('button[title="Next page (Right Arrow)"]')?.click(),
       );
@@ -289,7 +332,8 @@ describe("Packaged close journey (DL-1 highlight loss, DL-2 position loss)", () 
         rowPage: await window.__E2E_READ__.ipcDocumentPage(),
       }));
       console.log("DIAG dl2-create:", JSON.stringify(rowAtClose));
-      closeWindow();
+      const timings = await closeAndObserve(tPageTurn);
+      console.log("DIAG dl2-close:", JSON.stringify(timings));
     } else {
       // ── THE CLAIM: the position survived — the reader must return to the
       //    page the user was on (3), not revert to the last flushed value. ──
