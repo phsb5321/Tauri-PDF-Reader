@@ -45,6 +45,33 @@ import { spawn } from "node:child_process";
 const PHASE = process.env.CLOSE_PHASE || "dl1-create";
 
 /**
+ * Where closeAndObserve() publishes the timings the runner reports. The runner
+ * hands down a per-run path; the fallback stays inside the hermetic profile
+ * (scripts/e2e-profile.sh mktemp -d) so a standalone spec run still works.
+ *
+ * There is deliberately NO shared-/tmp default. A predictable path in a
+ * world-writable directory is both a symlink-clobber hazard (CodeQL
+ * js/insecure-temporary-file) and the collision this lane already guards
+ * against elsewhere: it would outlive its run and clash with the concurrent
+ * sibling worktrees the pkill anchor exists for — one runner deleting the
+ * in-flight evidence of another, or printing its numbers as its own.
+ */
+const TIMING_DIR = process.env.XDG_DATA_HOME;
+const TIMING_PATH =
+  process.env.CLOSE_TIMING_PATH ||
+  (TIMING_DIR ? `${TIMING_DIR}/close-timing-${PHASE}.json` : null);
+
+/**
+ * The debounce the close is racing: 500 ms, the explicit argument at
+ * useAutoSave.ts:90 (page progress) and useHighlightPersistence.ts:30
+ * (highlights). A close that lands OUTSIDE this window proves nothing — the
+ * debounce would have flushed by itself — so exceeding it is a hard failure,
+ * never a pass. Note wdio's waitforInterval default is also 500 ms, so a
+ * single missed poll inside a timed window is enough to blow the budget.
+ */
+const DEBOUNCE_MS = 500;
+
+/**
  * The actor closes the window the way a user does: WM_DELETE_WINDOW through
  * the X server (xdotool windowclose). Runs under the lane's DISPLAY.
  *
@@ -61,6 +88,110 @@ function closeWindow() {
   }).unref();
 }
 
+/**
+ * Close the window as a user does, then OBSERVE the close — and FAIL if it
+ * did not happen. Without that assertion a silent xdotool failure (wrong
+ * DISPLAY, renamed window) ends the phase green, and the runner's pkill then
+ * substitutes a SIGTERM — a process kill, which proves nothing about
+ * CloseRequested and would pass a broken fix. The window is confirmed alive
+ * BEFORE the close for the same reason: otherwise "gone" latches on the first
+ * poll and reports a spurious ~0 ms.
+ *
+ * `windowClosedAt` is the only sound close instant. A timestamp stamped just
+ * before the detached spawn excludes the fork/exec and xdotool's X-tree walk,
+ * so it UNDER-states the click→close interval — the wrong direction for an
+ * "inside the 500 ms debounce" claim, which needs an upper bound.
+ */
+async function closeAndObserve(tAction) {
+  const { execFileSync } = await import("node:child_process");
+  // execFileSync (argv, no shell) so a repo path containing a quote or a
+  // regex metacharacter cannot reshape the pattern.
+  const cwdRe = process.cwd().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const appPattern = `^${cwdRe}/src-tauri/target/debug/tauri-pdf-reader`;
+  const alive = (file, args) => {
+    try {
+      execFileSync(file, args, { stdio: "ignore" });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const windowAlive = () => alive("xdotool", ["search", "--name", "Lectrice"]);
+  const appAlive = () => alive("pgrep", ["-f", appPattern]);
+
+  const windowSeenBefore = windowAlive();
+  const appSeenBefore = appAlive();
+  closeWindow();
+
+  let windowClosedAt = null;
+  let tDeath = null;
+  for (let i = 0; i < 200; i++) {
+    if (windowClosedAt === null && windowSeenBefore && !windowAlive()) {
+      windowClosedAt = Date.now();
+    }
+    if (!appAlive()) {
+      tDeath = Date.now();
+      // The app can die between this iteration's window probe and its app
+      // probe. Without this last look the close would be recorded as "never
+      // happened" and reported as a false RED blaming the wrong thing.
+      if (windowClosedAt === null && windowSeenBefore && !windowAlive()) {
+        windowClosedAt = Date.now();
+      }
+      break;
+    }
+    await new Promise((r) => setTimeout(r, 50));
+  }
+
+  const timings = {
+    phase: PHASE,
+    tAction,
+    windowSeenBefore,
+    appSeenBefore,
+    windowClosedAt,
+    tDeath,
+    // The decisive, sound number: an UPPER bound on action→close-delivered.
+    actionToWindowCloseMs: windowClosedAt ? windowClosedAt - tAction : null,
+    actionToDeathMs: tDeath ? tDeath - tAction : null,
+    windowCloseToDeathMs:
+      windowClosedAt && tDeath ? tDeath - windowClosedAt : null,
+  };
+  const record = JSON.stringify(timings);
+  if (!TIMING_PATH) {
+    throw new Error(
+      "no timing destination: set CLOSE_TIMING_PATH (the runner does) or run under a hermetic profile that exports XDG_DATA_HOME — refusing to fall back to a predictable shared /tmp path",
+    );
+  }
+  const fs = await import("node:fs");
+  fs.writeFileSync(TIMING_PATH, record);
+
+  // The close is the phase's product; an unobserved close is not a close.
+  if (!windowSeenBefore) {
+    throw new Error(
+      `close NOT OBSERVABLE: no window named Lectrice on DISPLAY=${process.env.DISPLAY} before the close — the lane cannot prove a genuine WM_DELETE_WINDOW. ${record}`,
+    );
+  }
+  if (!appSeenBefore) {
+    throw new Error(
+      `app process NOT MATCHED before the close (pattern ${appPattern}) — the death poll would exit immediately and every interval would be wrong. ${record}`,
+    );
+  }
+  if (windowClosedAt === null) {
+    throw new Error(
+      `window NEVER CLOSED after xdotool windowclose — the close never reached the app, so this phase proves nothing about CloseRequested. ${record}`,
+    );
+  }
+  // THE PREMISE, ASSERTED — not merely measured. Everything this lane concludes
+  // rests on the close beating the debounce; if it did not, a later green is
+  // vacuous (the debounce flushed on its own) and must not be reported as a
+  // pass. This is the fail-open link that the rest of the lane exists to close.
+  if (timings.actionToWindowCloseMs >= DEBOUNCE_MS) {
+    throw new Error(
+      `close TOO SLOW to test the race: ${timings.actionToWindowCloseMs}ms >= the ${DEBOUNCE_MS}ms debounce, so the debounce could have flushed by itself and this phase proves nothing either way. ${record}`,
+    );
+  }
+  return timings;
+}
+
 describe("Packaged close journey (DL-1 highlight loss, DL-2 position loss)", () => {
   it(`${PHASE}: ${PHASE.includes("dl1") ? "highlight survives an immediate close" : "reading position survives an immediate close"}`, async () => {
     await browser.waitUntil(
@@ -72,7 +203,29 @@ describe("Packaged close journey (DL-1 highlight loss, DL-2 position loss)", () 
     );
     await browser.setWindowSize(1200, 800);
 
-    // Every phase starts the same: resume the seeded fixture.
+    // PRE-RESUME probe (dl2-verify only): the row's page BEFORE any actor
+    // action, plus the app's boot logs — pins whether the 3→2 revert happens
+    // in the app's boot or in the resume.
+    if (PHASE === "dl2-verify") {
+      console.log(
+        "DIAG dl2-pre-resume:",
+        JSON.stringify(
+          await browser.execute(async () => ({
+            rowPage: await window.__E2E_READ__.ipcDocumentPage(),
+            storePage: window.__E2E_READ__.currentPage(),
+            logs: window.__E2E_READ__.logs().slice(-15),
+          })),
+        ),
+      );
+    }
+
+    // Every phase starts the same: resume the seeded fixture, landing on the
+    // row's ACTUAL page (the seed default is 2, but after dl2-create the row
+    // is 3 — a hardcoded 2 would fail the post-fix world).
+    const rowPage =
+      (await browser.execute(async () =>
+        window.__E2E_READ__.ipcDocumentPage(),
+      )) ?? 2;
     const resume = await $(
       'button[aria-label^="Resume E2E Resume Fixture A, page"]',
     );
@@ -85,8 +238,12 @@ describe("Packaged close journey (DL-1 highlight loss, DL-2 position loss)", () 
     );
     await browser.waitUntil(
       async () =>
-        (await $('input[aria-label="Current page"]').getValue()) === "2",
-      { timeout: 15000, timeoutMsg: "resume did not land on page 2" },
+        (await $('input[aria-label="Current page"]').getValue()) ===
+        String(rowPage),
+      {
+        timeout: 15000,
+        timeoutMsg: `resume did not land on the row page ${rowPage}`,
+      },
     );
 
     if (PHASE === "dl1-create") {
@@ -147,6 +304,13 @@ describe("Packaged close journey (DL-1 highlight loss, DL-2 position loss)", () 
       await browser.releaseActions();
       const yellow = await $('button[aria-label="Highlight with Yellow"]');
       await yellow.waitForClickable({ timeout: 10000 });
+
+      // ── TIMING INSTRUMENTATION (the decisive number for the DL-1 re-check):
+      //    the interval between the Yellow click (the debounce enqueue) and
+      //    the window close. Written to a file the runner can join with the
+      //    app-death timestamp to also get close→death (the teardown latency)
+      //    and click→death (whether the 500 ms timer could have fired).
+      const tClick = Date.now();
       await browser.execute(() =>
         document
           .querySelector('button[aria-label="Highlight with Yellow"]')
@@ -164,8 +328,20 @@ describe("Packaged close journey (DL-1 highlight loss, DL-2 position loss)", () 
           .find((t) => t && /highlight/i.test(t));
         return t ?? null;
       });
-      console.log("DIAG dl1-create:", JSON.stringify({ toastText }));
-      closeWindow();
+      const tToastDone = Date.now();
+      // DL-1's premise is that the app SAID it saved. If the toast never
+      // appeared, the premise is absent and a later green would be vacuous.
+      if (!toastText) {
+        throw new Error(
+          "no success toast after the Yellow click — DL-1's premise (the app claimed it saved) is unproven, so the close would test nothing",
+        );
+      }
+      console.log(
+        "DIAG dl1-create:",
+        JSON.stringify({ toastText, clickToToastMs: tToastDone - tClick }),
+      );
+      const timings = await closeAndObserve(tClick);
+      console.log("DIAG dl1-close:", JSON.stringify(timings));
     } else if (PHASE === "dl1-verify") {
       // ── THE CLAIM: the highlight survived — the app said it saved. ───────
       await browser.waitUntil(
@@ -188,6 +364,10 @@ describe("Packaged close journey (DL-1 highlight loss, DL-2 position loss)", () 
       //    useAutoSave debounce. The close is the final statement. ─────────
       const next = await $('button[title="Next page (Right Arrow)"]');
       await next.waitForClickable({ timeout: 10000 });
+      // The debounce is enqueued by the page change, so the interval that
+      // matters starts HERE — not after the confirmation and probe below,
+      // which would silently discard part of the window being raced.
+      const tPageTurn = Date.now();
       await browser.execute(() =>
         document.querySelector('button[title="Next page (Right Arrow)"]')?.click(),
       );
@@ -196,10 +376,25 @@ describe("Packaged close journey (DL-1 highlight loss, DL-2 position loss)", () 
           (await $('input[aria-label="Current page"]').getValue()) === "3",
         { timeout: 10000, timeoutMsg: "Next did not move to page 3" },
       );
-      closeWindow();
+      // Single fast probe for the record (the close-flush makes the debounce
+      // moot, but the pre-close row state is evidence).
+      const rowAtClose = await browser.execute(async () => ({
+        rowPage: await window.__E2E_READ__.ipcDocumentPage(),
+      }));
+      console.log("DIAG dl2-create:", JSON.stringify(rowAtClose));
+      const timings = await closeAndObserve(tPageTurn);
+      console.log("DIAG dl2-close:", JSON.stringify(timings));
     } else {
       // ── THE CLAIM: the position survived — the reader must return to the
       //    page the user was on (3), not revert to the last flushed value. ──
+      // At-launch probe: what does the row say BEFORE any resume action, and
+      // what does the home's resume line show?
+      const launchProbe = await browser.execute(async () => ({
+        rowPage: await window.__E2E_READ__.ipcDocumentPage(),
+        homeMeta: document.querySelector(".resume-line-meta")?.textContent ?? null,
+        storePage: window.__E2E_READ__.currentPage(),
+      }));
+      console.log("DIAG dl2-verify-launch:", JSON.stringify(launchProbe));
       try {
         await browser.waitUntil(
           async () =>
