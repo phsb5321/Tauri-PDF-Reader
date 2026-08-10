@@ -44,8 +44,24 @@ import { spawn } from "node:child_process";
 
 const PHASE = process.env.CLOSE_PHASE || "dl1-create";
 
-/** Where closeAndObserve() publishes the timings the runner reports. */
-const TIMING_PATH = `/tmp/lectrice-close-timing-${PHASE}.json`;
+/**
+ * Where closeAndObserve() publishes the timings the runner reports. The runner
+ * hands down a per-run path: a fixed /tmp name would collide between the
+ * concurrent sibling worktrees this lane already anchors its pkill for — one
+ * runner would delete the in-flight evidence of another, or report its numbers.
+ */
+const TIMING_PATH =
+  process.env.CLOSE_TIMING_PATH || `/tmp/lectrice-close-timing-${PHASE}.json`;
+
+/**
+ * The debounce the close is racing: 500 ms, the explicit argument at
+ * useAutoSave.ts:90 (page progress) and useHighlightPersistence.ts:30
+ * (highlights). A close that lands OUTSIDE this window proves nothing — the
+ * debounce would have flushed by itself — so exceeding it is a hard failure,
+ * never a pass. Note wdio's waitforInterval default is also 500 ms, so a
+ * single missed poll inside a timed window is enough to blow the budget.
+ */
+const DEBOUNCE_MS = 500;
 
 /**
  * The actor closes the window the way a user does: WM_DELETE_WINDOW through
@@ -107,6 +123,12 @@ async function closeAndObserve(tAction) {
     }
     if (!appAlive()) {
       tDeath = Date.now();
+      // The app can die between this iteration's window probe and its app
+      // probe. Without this last look the close would be recorded as "never
+      // happened" and reported as a false RED blaming the wrong thing.
+      if (windowClosedAt === null && windowSeenBefore && !windowAlive()) {
+        windowClosedAt = Date.now();
+      }
       break;
     }
     await new Promise((r) => setTimeout(r, 50));
@@ -129,14 +151,29 @@ async function closeAndObserve(tAction) {
   fs.writeFileSync(TIMING_PATH, JSON.stringify(timings));
 
   // The close is the phase's product; an unobserved close is not a close.
+  const record = JSON.stringify(timings);
   if (!windowSeenBefore) {
     throw new Error(
-      `close NOT OBSERVABLE: no window named Lectrice on DISPLAY=${process.env.DISPLAY} before the close — the lane cannot prove a genuine WM_DELETE_WINDOW`,
+      `close NOT OBSERVABLE: no window named Lectrice on DISPLAY=${process.env.DISPLAY} before the close — the lane cannot prove a genuine WM_DELETE_WINDOW. ${record}`,
+    );
+  }
+  if (!appSeenBefore) {
+    throw new Error(
+      `app process NOT MATCHED before the close (pattern ${appPattern}) — the death poll would exit immediately and every interval would be wrong. ${record}`,
     );
   }
   if (windowClosedAt === null) {
     throw new Error(
-      "window NEVER CLOSED after xdotool windowclose — the close never reached the app, so this phase proves nothing about CloseRequested",
+      `window NEVER CLOSED after xdotool windowclose — the close never reached the app, so this phase proves nothing about CloseRequested. ${record}`,
+    );
+  }
+  // THE PREMISE, ASSERTED — not merely measured. Everything this lane concludes
+  // rests on the close beating the debounce; if it did not, a later green is
+  // vacuous (the debounce flushed on its own) and must not be reported as a
+  // pass. This is the fail-open link that the rest of the lane exists to close.
+  if (timings.actionToWindowCloseMs >= DEBOUNCE_MS) {
+    throw new Error(
+      `close TOO SLOW to test the race: ${timings.actionToWindowCloseMs}ms >= the ${DEBOUNCE_MS}ms debounce, so the debounce could have flushed by itself and this phase proves nothing either way. ${record}`,
     );
   }
   return timings;

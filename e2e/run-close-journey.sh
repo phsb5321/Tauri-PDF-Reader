@@ -25,15 +25,17 @@
 # are evidence for a human reading the log; only the four phase exit codes
 # gate the lane summary.
 #
-# TIMING: each create phase publishes its own record to
-# /tmp/lectrice-close-timing-<phase>.json and the runner prints it verbatim.
+# TIMING: each create phase publishes its own record under
+# $E2E_PROFILE_DIR/close-timing/<phase>.json and the runner prints it verbatim.
 # The decisive figure is actionToWindowCloseMs — an UPPER bound on the
 # interval from the debounce-enqueuing action to the window actually going
 # away, measured by the spec, which is the only process alive at the close.
 # Under 500 ms means the close landed INSIDE the debounce window, so the
 # debounce cannot have flushed by itself and any survival is attributable to
-# the close handler. The runner must never time the close itself: by the
-# time it regains control it has already killed the app.
+# the close handler. The spec ASSERTS that bound rather than only printing it:
+# a close slower than the debounce makes the phase RED, because a green there
+# would be vacuous. The runner must never time the close itself — by the time
+# it regains control it has already killed the app.
 #
 # Inherits the shared entry points — NO hand-rolled profile or package list:
 #   scripts/e2e-profile.sh   (hermetic XDG_* profile, #99)
@@ -51,9 +53,14 @@ source ./scripts/e2e-profile.sh
 source ./scripts/e2e-toolchain.sh
 APP_DIR="$E2E_PROFILE_DIR/com.lectrice.reader"
 mkdir -p "$APP_DIR"
-# STALE EVIDENCE GUARD: these files outlive a run. If a create phase dies
-# before its close, a leftover file would be reported as THIS run's numbers.
-rm -f /tmp/lectrice-close-timing-*.json
+# STALE + CONCURRENT EVIDENCE GUARD: a fixed path outlives its run AND collides
+# with the sibling worktrees this lane anchors its pkill for. Per-run directory,
+# emptied up front, so a create phase that dies before its close cannot publish
+# an older run numbers, and two lanes cannot overwrite each other.
+TIMING_DIR="$E2E_PROFILE_DIR/close-timing"
+rm -rf "$TIMING_DIR"
+mkdir -p "$TIMING_DIR"
+export TIMING_DIR
 node scripts/gen-e2e-fixtures.mjs "$APP_DIR" >/dev/null
 
 echo "==> Building frontend (VITE_E2E_NATIVE=true, seed=single, no TTS)"
@@ -85,6 +92,13 @@ toolchain_exec '
   # keeps the pattern from matching this script own command line.
   : "${E2E_REPO_ROOT:?E2E_REPO_ROOT unset — the kill pattern would match nothing and phase isolation would silently not happen}"
   APP_PAT="^${E2E_REPO_ROOT}/src-tauri/target/debug/tauri-pdf-reade[r]"
+  # Validate the ANCHOR itself, once, against the file it must name. A pattern
+  # that matches nothing makes pgrep fail on the first poll, so the death wait
+  # would exit instantly and report isolation it never performed — fail-open.
+  [ -x "$E2E_REPO_ROOT/src-tauri/target/debug/tauri-pdf-reader" ] || {
+    echo "FATAL: no debug binary at $E2E_REPO_ROOT/src-tauri/target/debug/tauri-pdf-reader — the kill pattern cannot match the app" >&2
+    exit 1
+  }
   # run_phase NEVER returns non-zero (set -e would kill the whole lane on the
   # first RED phase); the status lands in the global PHASE_STATUS.
   PHASE_STATUS=0
@@ -94,7 +108,8 @@ toolchain_exec '
     # non-zero status, and the four-boolean summary this lane exists to
     # produce stops being four independent readings.
     PHASE_STATUS=0
-    CLOSE_PHASE="$PHASE" E2E_SPEC=./e2e/close-journey.e2e.mjs pnpm test:e2e || PHASE_STATUS=$?
+    CLOSE_TIMING_PATH="$TIMING_DIR/$PHASE.json" \
+      CLOSE_PHASE="$PHASE" E2E_SPEC=./e2e/close-journey.e2e.mjs pnpm test:e2e || PHASE_STATUS=$?
     echo "==> PHASE $PHASE exit: $PHASE_STATUS"
     # PHASE ISOLATION: the verify phases never close the window, and a
     # lingering app keeps running its 30s autosave interval with its stale
@@ -115,7 +130,7 @@ toolchain_exec '
   # pkilled the app and waited for it, so a poll here would measure the latency
   # of the runner itself and come out >= 500 ms for any app, fixed or broken.
   report_timing() {
-    local PHASE="$1" F="/tmp/lectrice-close-timing-$1.json"
+    local PHASE="$1" F="$TIMING_DIR/$1.json"
     if [ -f "$F" ]; then
       echo "==> $PHASE TIMING: $(cat "$F")"
     else
