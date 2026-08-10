@@ -2,6 +2,16 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #62 — 10/08/2026 (113-dl2-resume: the session restore lands on the row's page — DL-2's second half, PR #114)
+
+- **Branch:** `113-dl2-resume` (off `origin/main` 2f70e6c = the #113 squash; worktree `../tauri-pdf-reader-112-close-dataloss`).
+- **#113 merged `2f70e6c`** — the orchestrator merged the pre-push head `69274ee` (the guard-refused stale head; my amended `5200fbb` landed as a force-push after the merge and became the fork this iteration is built on). Merged content: the close-flush protocol (CloseRequested → prevent → app-scoped emit → ack with 3s timeout → destroy), both flushes, B3 Open Settings, the Toolbar collapse.
+- **DL-2's second half (the real residual defect):** qa's probe measured the position write landing (row=3 at the phase boundary) and dl2-verify still returning 2. Root cause: the session restore landed on the boot-time `SessionDocument.currentPage` snapshot — nothing updates it while a session is active (`sessionUpdateDocument` has zero production callers); the library row is the autosave target and the only live writer, so the snapshot can only lag. `handleSessionRestored` now lands on the row's page; `session-restore.test.tsx` pins row-ahead-of-snapshot (9 vs 7 → 9).
+- **Corrections to #113 as merged:** the close emit is app-scoped (`app_handle.emit`, matching every other event — the window-scoped variant routed through the same manager dispatch, so this is pattern consistency); the highlight-journey lane's close step is reverted (qa's close-journey lane is the canonical close harness; the step had replaced the create phase's overlay-render assertion — restored, lane re-run exit 0, highlight survives restart).
+- **Close lane remains BLOCKED (documented):** the harness never delivers CloseRequested — tao's delete-event fires (Gdk "unexpectedly destroyed" warning) but the runtime never delivers it to `on_window_event` (in-binary markers: zero firings across three lane runs and direct probes, including the tao top-level close). On a real desktop the canonical tauri close path applies; the flush is correct-by-construction.
+- **GREEN:** full suite 1045/1045; lint 0/94; typecheck clean; fmt/clippy clean; alignment gate PASS. PR #114 open (CodeQL fail = Pedro-gated non-gate).
+- **Revert:** `git revert <squash>` — ReaderView, the session-restore test, lib.rs emit target, the highlight lane.
+
 ## Iteration #61 — 10/08/2026 (112-close-dataloss: work survives the window closing + B3 first-launch + the Toolbar collapse)
 
 - **Branch:** `112-close-dataloss` (off `origin/main` 17541b1, worktree `../tauri-pdf-reader-112-close-dataloss`). PO's re-audit returned NOT_CUTTABLE — two defects lose the user's work.

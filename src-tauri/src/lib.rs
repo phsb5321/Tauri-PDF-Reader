@@ -507,7 +507,10 @@ pub fn run() {
 
                 let app_handle = window.app_handle().clone();
                 let win = window.clone();
-                let _ = window.emit("app-close-requested", ());
+                // app-scoped emit: the frontend's listen() subscribes at the app
+                // level (matching every other event in this codebase); a
+                // window-scoped emit would never reach it.
+                let _ = app_handle.emit("app-close-requested", ());
                 tauri::async_runtime::spawn(async move {
                     use tauri::Listener;
                     // watch::Sender::send is &self, so the listen callback

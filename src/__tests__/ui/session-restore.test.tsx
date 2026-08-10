@@ -13,12 +13,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import {
-  render,
-  screen,
-  waitFor,
-  fireEvent,
-} from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { mockInvoke } from "../../../tests/setup";
 import { ReaderView } from "../../components/reader/ReaderView";
@@ -49,7 +44,10 @@ const LIBRARY_ROW: Document = {
   filePath: "/books/paper-1.pdf",
   title: "Paper 1",
   pageCount: 20,
-  currentPage: 1, // deliberately divergent from the session's saved page
+  // The row is the autosave target — the authoritative page (DL-2: the
+  // session snapshot only lags it). Deliberately AHEAD of the session's
+  // saved page (7) to pin that the row wins.
+  currentPage: 9,
   scrollPosition: 0,
   lastTtsChunkId: null,
   lastOpenedAt: "2026-08-05T10:00:00Z",
@@ -64,7 +62,7 @@ const SESSION: ReadingSession = {
     {
       documentId: "doc-1",
       position: 0,
-      currentPage: 7, // the saved page the reader was last on
+      currentPage: 7, // a boot-time snapshot of the page at open — stale by the time it is read
       scrollPosition: 400,
       createdAt: "2026-08-05T10:00:00Z",
       title: "Paper 1",
@@ -90,7 +88,9 @@ beforeEach(() => {
   useCollectionsStore.getState().reset();
   useSessionStore.getState().reset();
   loadDocument.mockReset();
-  loadDocument.mockResolvedValue({ numPages: 20 } as unknown as PDFDocumentProxy);
+  loadDocument.mockResolvedValue({
+    numPages: 20,
+  } as unknown as PDFDocumentProxy);
 
   mockInvoke.mockImplementation((command: string) => {
     switch (command) {
@@ -125,11 +125,13 @@ async function openSessionMenu() {
 }
 
 describe("restoring a reading session", () => {
-  it("opens the session's document at its saved page, leaving the library", async () => {
+  it("opens the session's document at the library row's page (the autosave target), leaving the library", async () => {
     render(<ReaderView />);
 
     // Reading home is showing first.
-    expect(await screen.findByRole("heading", { name: "Library" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Library" }),
+    ).toBeInTheDocument();
 
     fireEvent.click(await openSessionMenu());
     fireEvent.click(screen.getByRole("button", { name: /Research Papers/ }));
@@ -138,10 +140,12 @@ describe("restoring a reading session", () => {
     await waitFor(() =>
       expect(screen.getByTestId("pdf-viewer")).toBeInTheDocument(),
     );
-    // …and land on the SAVED page (7), not the library row's page (1).
+    // …and land on the ROW's page (9) — the autosave target — not the
+    // session snapshot (7): the snapshot is from app boot and nothing
+    // updates it while a session is active (the DL-2 resume defect).
     const state = useDocumentStore.getState();
     expect(state.currentDocument?.id).toBe("doc-1");
-    expect(state.currentPage).toBe(7);
+    expect(state.currentPage).toBe(9);
     expect(loadDocument).toHaveBeenCalledWith("/books/paper-1.pdf");
   });
 
@@ -175,6 +179,7 @@ describe("restoring a reading session", () => {
           id: "doc-2",
           filePath: "/books/paper-2.pdf",
           title: "Paper 2",
+          currentPage: 12,
         });
       if (command === "library_open_document")
         return Promise.resolve({
@@ -221,7 +226,10 @@ describe("restoring a reading session", () => {
       if (command === "session_list") return Promise.resolve([SUMMARY]);
       if (command === "library_list_documents")
         return Promise.resolve([LIBRARY_ROW]);
-      if (command === "collections_list" || command === "collections_list_memberships")
+      if (
+        command === "collections_list" ||
+        command === "collections_list_memberships"
+      )
         return Promise.resolve([]);
       return Promise.resolve(null);
     });
