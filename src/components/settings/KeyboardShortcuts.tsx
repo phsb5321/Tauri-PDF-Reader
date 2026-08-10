@@ -1,47 +1,32 @@
+import { COMMAND_CHORDS, COMPONENT_CHORDS } from "../../hooks/useCommandKeys";
+
 /**
- * Keyboard shortcuts reference
- * Grouped by category for better organization
+ * Keyboard shortcuts reference — DERIVED from the real chord sources
+ * (slice 111): COMMAND_CHORDS is the same table `useCommandKeys` matches
+ * against, and COMPONENT_CHORDS lists the component-owned bindings with
+ * their code locations in `useCommandKeys.ts`. A hand-maintained second
+ * list is how chords that never existed (Ctrl+F, Ctrl+,, Ctrl+H, Ctrl+B,
+ * F11, zoom, chunks) and the Space-as-play/pause lie (Space is next-page)
+ * got advertised. Nothing is shown here unless the binding exists.
  */
-const shortcuts = [
-  // File operations
-  { action: "Open File", keys: ["Ctrl", "O"], category: "File" },
-  { action: "Find in Document", keys: ["Ctrl", "F"], category: "File" },
+// COMMAND_CHORDS carries {key, label}; the panel renders the human label as
+// the key chip. COMPONENT_CHORDS already carries a keys array.
+const FILE_CHORDS = COMMAND_CHORDS.filter((c) =>
+  ["open", "toggle-library"].includes(c.action),
+).map((c) => ({ action: c.action, keys: [c.label] }));
+const NAV_CHORDS = COMMAND_CHORDS.filter((c) =>
+  ["prev-page", "next-page"].includes(c.action),
+).map((c) => ({ action: c.action, keys: [c.label] }));
 
-  // Navigation - Panels
-  { action: "Open Settings", keys: ["Ctrl", ","], category: "Navigation" },
-  {
-    action: "Toggle Highlights Panel",
-    keys: ["Ctrl", "H"],
-    category: "Navigation",
-  },
-  {
-    action: "Toggle Library Sidebar",
-    keys: ["Ctrl", "B"],
-    category: "Navigation",
-  },
-  { action: "Close Modal / Panel", keys: ["Escape"], category: "Navigation" },
-
-  // Navigation - Document
-  { action: "Previous Page", keys: ["←"], category: "Document" },
-  { action: "Next Page", keys: ["→"], category: "Document" },
-  { action: "Go to First Page", keys: ["Home"], category: "Document" },
-  { action: "Go to Last Page", keys: ["End"], category: "Document" },
-  { action: "Page Up", keys: ["Page Up"], category: "Document" },
-  { action: "Page Down", keys: ["Page Down"], category: "Document" },
-
-  // View
-  { action: "Zoom In", keys: ["Ctrl", "+"], category: "View" },
-  { action: "Zoom Out", keys: ["Ctrl", "-"], category: "View" },
-  { action: "Reset Zoom", keys: ["Ctrl", "0"], category: "View" },
-  { action: "Toggle Fullscreen", keys: ["F11"], category: "View" },
-
-  // TTS Playback
-  { action: "Play / Pause TTS", keys: ["Space"], category: "Playback" },
-  { action: "Stop TTS", keys: ["Escape"], category: "Playback" },
-  { action: "Previous Chunk", keys: ["Ctrl", "["], category: "Playback" },
-  { action: "Next Chunk", keys: ["Ctrl", "]"], category: "Playback" },
-];
-
+/**
+ * Keyboard shortcuts reference — DERIVED from the real chord sources
+ * (slice 111): COMMAND_CHORDS is the same table `useCommandKeys` matches
+ * against, and COMPONENT_CHORDS lists the component-owned bindings with
+ * their code locations. A hand-maintained second list is how Ctrl+F, F11,
+ * zoom and chunk chords (which never existed) and the Space-as-play/pause
+ * lie (Space is next-page) got advertised. Nothing here exists unless the
+ * binding does.
+ */
 export function KeyboardShortcuts() {
   return (
     <div className="settings-section">
@@ -51,22 +36,42 @@ export function KeyboardShortcuts() {
       </p>
 
       <div className="shortcut-list">
-        {shortcuts.map((shortcut) => (
-          <div key={shortcut.action} className="shortcut-row">
-            <span className="shortcut-action">{shortcut.action}</span>
-            <div className="shortcut-keys">
-              {shortcut.keys.map((key, index) => (
-                <span key={index}>
-                  <span className="shortcut-key">{key}</span>
-                  {index < shortcut.keys.length - 1 && (
-                    <span className="shortcut-separator">+</span>
-                  )}
-                </span>
-              ))}
-            </div>
-          </div>
-        ))}
+        <ShortcutGroup title="File" chords={FILE_CHORDS} />
+        <ShortcutGroup title="Document" chords={NAV_CHORDS} />
+        <ShortcutGroup
+          title="Reader (component-owned)"
+          chords={COMPONENT_CHORDS}
+        />
       </div>
     </div>
+  );
+}
+
+function ShortcutGroup({
+  title,
+  chords,
+}: {
+  title: string;
+  chords: readonly { action: string; keys: string[] }[];
+}) {
+  return (
+    <>
+      <div className="shortcut-group-title">{title}</div>
+      {chords.map((chord) => (
+        <div key={chord.action} className="shortcut-row">
+          <span className="shortcut-action">{chord.action}</span>
+          <div className="shortcut-keys">
+            {chord.keys.map((key, index) => (
+              <span key={index}>
+                <span className="shortcut-key">{key}</span>
+                {index < chord.keys.length - 1 && (
+                  <span className="shortcut-separator">+</span>
+                )}
+              </span>
+            ))}
+          </div>
+        </div>
+      ))}
+    </>
   );
 }

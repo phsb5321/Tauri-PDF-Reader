@@ -54,6 +54,8 @@ export interface E2EBridge {
   installDialogFixture: () => Promise<boolean>;
   /** Slice 109 B4: arm the seams with corrupt bytes — a failed open must be visible. */
   installCorruptOpenFixture: () => Promise<boolean>;
+  /** Slice 111 measure: grow the root font size so the lane can assert rem scaling. */
+  setRootFontSize: (px: number) => void;
   /** True once the bridge is installed (sanity probe). */
   ready: true;
 }
@@ -119,6 +121,9 @@ export function installE2EBridge(): void {
       (globalThis as Record<string, unknown>).__E2E_FS_FIXTURE_BYTES__ =
         new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x00, 0x00, 0x00]);
       return true;
+    },
+    setRootFontSize(px) {
+      document.documentElement.style.fontSize = `${px}px`;
     },
     ready: true,
   };

@@ -70,6 +70,32 @@ export const COMMAND_CHORDS: readonly Chord[] = [
   { action: "next-page", key: " ", ctrl: false, label: "Space" },
 ] as const;
 
+/**
+ * Chords that deliberately live on components rather than this window-level
+ * table, each with the binding that exists in code (slice 111: the shortcuts
+ * panel must not advertise a chord it cannot point at). Kept beside
+ * `COMMAND_CHORDS` so the panel derives from one module.
+ *
+ * - Ctrl+Space play/pause: `AiPlaybackBar` keydown (`" "` + ctrlKey); its
+ *   handler can start playback from idle, which the menu handler cannot.
+ * - Escape dismiss/stop: `PdfViewer`, `AiPlaybackBar` and the highlight
+ *   toolbar each close the innermost open thing — a window listener cannot
+ *   express that.
+ * - Ctrl+Shift+H highlight: `HighlightCreationHandler` — skips the toolbar
+ *   and applies the default colour to the pending selection.
+ * - Home/End first/last page: `PdfViewer` keydown.
+ */
+export const COMPONENT_CHORDS: readonly {
+  action: string;
+  keys: string[];
+}[] = [
+  { action: "Play / Pause TTS", keys: ["Ctrl", "Space"] },
+  { action: "Close / stop the innermost open thing", keys: ["Escape"] },
+  { action: "Highlight the pending selection", keys: ["Ctrl", "Shift", "H"] },
+  { action: "Go to the first page", keys: ["Home"] },
+  { action: "Go to the last page", keys: ["End"] },
+] as const;
+
 /** True when the event came from somewhere the user is typing. */
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;

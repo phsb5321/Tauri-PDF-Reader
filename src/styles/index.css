@@ -8,7 +8,9 @@
     Helvetica,
     Arial,
     sans-serif;
-  font-size: 16px;
+  /* Slice 111: no font-size declaration — the browser default (which IS the
+     user's OS/browser text-size preference) applies, so the rem scale tracks
+     it. #108's 69 rem conversions pay off because the root can scale now. */
   line-height: 24px;
   font-weight: 400;
 
