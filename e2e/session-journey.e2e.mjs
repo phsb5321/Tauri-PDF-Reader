@@ -156,8 +156,13 @@ describe("Packaged session journey (create → restore → survive restart → d
       await browser.pause(800);
       const pageAfterRestore = await $('input[aria-label="Current page"]').getValue();
 
-      // ── 6. Tracking check: navigate 1→2 while the session is active, then
-      //       restore again — the session's own record must have advanced. ──
+      // ── 6. Tracking check: navigate forward while the session is active,
+      //       then restore again. The session record is a SNAPSHOT (slice
+      //       107: the page is captured from the library row at add time),
+      //       so it must NOT chase the reader: from the restored page 2,
+      //       Next goes to 3, and the second restore lands back on the
+      //       snapshot's 2. The step's original "navigate 1→2" premise only
+      //       held while restore wrongly landed at 1. ──
       const next = await $('button[title="Next page (Right Arrow)"]');
       await next.waitForClickable({ timeout: 10000 });
       await browser.execute(() =>
@@ -165,7 +170,7 @@ describe("Packaged session journey (create → restore → survive restart → d
       );
       await browser.waitUntil(
         async () =>
-          (await $('input[aria-label="Current page"]').getValue()) === "2",
+          (await $('input[aria-label="Current page"]').getValue()) === "3",
         { timeout: 10000, timeoutMsg: "next-page navigation failed" },
       );
 

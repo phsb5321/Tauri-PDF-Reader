@@ -2,6 +2,17 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #55 — 09/08/2026 (107-session-page: restore lands on the RIGHT page — the snapshot was the lie)
+
+- **Branch:** `107-session-page` (off `origin/main` ef00ce3 post-qa-#103-lane, worktree `../tauri-pdf-reader-107-session-page`).
+- **Defect (qa's packaged lane):** `DIAG session-verify: {"survivedRestart":true,"pageAfterRestart":"1"}` — restore opened the right document and the session survived a restart, but landed on page 1 when the saved page was 2. #85's read-side override (`setCurrentPage(lastRead.currentPage)`) was correct and ran — the page was still 1.
+- **Root cause (instrumented, not assumed):** the backend hardcoded `current_page = 1` at every session-document insert (`session_repo.rs` create/update/add_document: `VALUES (?, ?, ?, 1, 0.0, ?)`). The session snapshot NEVER captured the reader's actual page — so `lastRead.currentPage` was always 1, and the override faithfully landed on it. The read side was never the bug; the write side never wrote the truth. The race hypotheses in the dispatch were all eliminated by reading the code (loadDocument fully resolves numPages; store clamp runs after totalPages is set; no viewer effect resets the page) before the SQL was inspected.
+- **Fix:** all three insert sites now capture the library row's page: `COALESCE((SELECT current_page FROM documents WHERE id = ?), 1)` — the snapshot copies the row at add time (row missing → 1). The add_document conflict-update also refreshes `current_page`. This honors the authority the existing comment establishes (session snapshot vs stale row) instead of inverting it.
+- **Packaged proof (both runs in the PR body):** pre-fix `pageAfterRestore:"1" pageAfterNavRestore:"1" pageAfterRestart:"1"`; post-fix `pageAfterRestore:"2" pageAfterNavRestore:"2" pageAfterRestart:"2"` — the same lane, exit 0. The lane's create-phase step-2 premise ("navigate 1→2") only held while restore landed at 1; corrected minimally (navigate 2→3, wait "3") with every numeric assertion unchanged, argued in the PR body.
+- **Tests:** 2 new Rust tests (`test_create_session_captures_the_library_rows_page`, `test_add_document_captures_the_library_rows_page`) — 12/12 session_repo tests. The frontend ordering was already pinned by 086's session-restore test (row=1, session=7 → 7); the missing piece was backend-only, which jsdom cannot see — that is exactly why the packaged lane is the oracle.
+- **GREEN:** full suite 1031/1031; cargo session_repo 12/12; lint 0/94 baseline; typecheck clean; diff clean; alignment gate PASS on the committed diff.
+- **Revert:** `git revert <squash>` — one Rust adapter, one lane premise fix, one backlog entry.
+
 ## Iteration #54 — 09/08/2026 (102-highlights-reload: saved highlights are shown again)
 
 - **Branch:** `102-highlights-reload` (off `origin/main` 2ffe415 post-#101, worktree `../tauri-pdf-reader-102-highlights-reload`). Priority reorder from orch — ahead of the 103-105 queue, because it is a user-visible defect with packaged proof (QA's #100 lane caught it).

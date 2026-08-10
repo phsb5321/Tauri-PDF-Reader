@@ -118,12 +118,13 @@ impl SessionRepository for SqliteSessionRepo {
             sqlx::query(
                 r#"
                 INSERT INTO session_documents (session_id, document_id, position, current_page, scroll_position, created_at)
-                VALUES (?, ?, ?, 1, 0.0, ?)
+                VALUES (?, ?, ?, COALESCE((SELECT current_page FROM documents WHERE id = ?), 1), 0.0, ?)
                 "#,
             )
             .bind(&id)
             .bind(document_id)
             .bind(position as i32)
+            .bind(document_id)
             .bind(&doc_now)
             .execute(&self.pool)
             .await
@@ -262,12 +263,13 @@ impl SessionRepository for SqliteSessionRepo {
                 sqlx::query(
                     r#"
                     INSERT INTO session_documents (session_id, document_id, position, current_page, scroll_position, created_at)
-                    VALUES (?, ?, ?, 1, 0.0, ?)
+                    VALUES (?, ?, ?, COALESCE((SELECT current_page FROM documents WHERE id = ?), 1), 0.0, ?)
                     "#,
                 )
                 .bind(session_id)
                 .bind(document_id)
                 .bind(position as i32)
+                .bind(document_id)
                 .bind(&doc_now)
                 .execute(&self.pool)
                 .await
@@ -355,13 +357,14 @@ impl SessionRepository for SqliteSessionRepo {
         sqlx::query(
             r#"
             INSERT INTO session_documents (session_id, document_id, position, current_page, scroll_position, created_at)
-            VALUES (?, ?, ?, 1, 0.0, ?)
-            ON CONFLICT(session_id, document_id) DO UPDATE SET position = excluded.position
+            VALUES (?, ?, ?, COALESCE((SELECT current_page FROM documents WHERE id = ?), 1), 0.0, ?)
+            ON CONFLICT(session_id, document_id) DO UPDATE SET position = excluded.position, current_page = excluded.current_page
             "#,
         )
         .bind(session_id)
         .bind(document_id)
         .bind(insert_pos)
+        .bind(document_id)
         .bind(&now)
         .execute(&self.pool)
         .await
@@ -559,6 +562,56 @@ mod tests {
         assert_eq!(session.documents[0].position, 0);
         assert_eq!(session.documents[1].document_id, "doc-2");
         assert_eq!(session.documents[1].position, 1);
+    }
+
+    #[tokio::test]
+    async fn test_create_session_captures_the_library_rows_page() {
+        // Slice 107: session_documents used to hardcode current_page = 1 at
+        // insert, so restore always landed on page 1 no matter where the
+        // reader actually was. The snapshot must copy the library row's page.
+        let pool = setup_test_db().await;
+        sqlx::query("UPDATE documents SET current_page = 5 WHERE id = 'doc-1'")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let repo = SqliteSessionRepo::new(pool);
+        let session = repo
+            .create(CreateSessionInput {
+                name: "Capture".to_string(),
+                document_ids: vec!["doc-1".to_string()],
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(session.documents[0].current_page, 5);
+    }
+
+    #[tokio::test]
+    async fn test_add_document_captures_the_library_rows_page() {
+        let pool = setup_test_db().await;
+        sqlx::query("UPDATE documents SET current_page = 7 WHERE id = 'doc-2'")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let repo = SqliteSessionRepo::new(pool);
+        let session = repo
+            .create(CreateSessionInput {
+                name: "Add Capture".to_string(),
+                document_ids: vec!["doc-1".to_string()],
+            })
+            .await
+            .unwrap();
+        repo.add_document(&session.id, "doc-2", None).await.unwrap();
+
+        let session = repo.get(&session.id).await.unwrap().unwrap();
+        let added = session
+            .documents
+            .iter()
+            .find(|d| d.document_id == "doc-2")
+            .unwrap();
+        assert_eq!(added.current_page, 7);
     }
 
     #[tokio::test]
