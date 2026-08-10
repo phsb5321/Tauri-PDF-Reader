@@ -24,6 +24,10 @@ import { useDocumentStore } from "../../stores/document-store";
 import { useAiTtsStore } from "../../stores/ai-tts-store";
 import { pdfService } from "../../services/pdf-service";
 import { useAutoSave } from "../../hooks/useAutoSave";
+import {
+  onAppCloseRequested,
+  emitAppCloseAck,
+} from "../../lib/api/app-close";
 import { useTtsPrebuffer } from "../../hooks/useTtsPrebuffer";
 import { useOpenPdf } from "../../hooks/useOpenPdf";
 import {
@@ -79,7 +83,7 @@ export function ReaderView() {
   // the create path uses (debounced write + retry), so the store and the DB
   // cannot disagree.
   const [showHighlights, setShowHighlights] = useState(false);
-  const { deleteHighlight } = useHighlightPersistence({
+  const { deleteHighlight, flushImmediately } = useHighlightPersistence({
     documentId: currentDocument?.id ?? null,
   });
 
@@ -225,12 +229,37 @@ export function ReaderView() {
   useCommandKeys(commandHandlers);
 
   // Auto-save reading progress
-  useAutoSave({
+  const { flushProgress } = useAutoSave({
     documentId: currentDocument?.id ?? null,
     currentPage,
     scrollPosition,
     enabled: !!currentDocument,
   });
+  // Slice 112 DL-1/DL-2: the backend's CloseRequested handler prevents the
+  // close and waits for our ack. Flush every debounced writer (highlights at
+  // 500ms, reading position at 500ms) before acknowledging — the user was
+  // told the write happened, so it must not be dropped by the close.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    void onAppCloseRequested(async () => {
+      try {
+        await Promise.all([flushImmediately(), flushProgress()]);
+      } catch (error) {
+        console.error("Failed to flush on close:", error);
+      } finally {
+        if (!cancelled) void emitAppCloseAck();
+      }
+    }).then((fn) => {
+      if (cancelled) fn();
+      else unlisten = fn;
+    });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, [flushImmediately, flushProgress]);
+
 
   // Pre-buffer TTS audio for current and next pages
   // This ensures instant playback when user clicks play

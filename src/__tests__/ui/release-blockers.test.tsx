@@ -148,6 +148,31 @@ describe("release blockers (109)", () => {
     expect(screen.getByLabelText("ElevenLabs API Key")).toBeInTheDocument();
   });
 
+  it("B3 (112): a fresh install has a path to Settings — the empty library offers it", async () => {
+    // No documents at all: the first-launch surface. Before 112 there was no
+    // path to Settings (no in-flight books -> no ResumeSection, no document
+    // -> no playback bar, native menu hidden on packaged Linux).
+    mockInvoke.mockImplementation((command: string) => {
+      if (command === "library_list_documents") return Promise.resolve([]);
+      if (
+        command === "collections_list" ||
+        command === "collections_list_memberships"
+      )
+        return Promise.resolve([]);
+      return Promise.resolve(null);
+    });
+    render(<ReaderView />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Library" }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Open Settings" }));
+
+    expect(
+      await screen.findByRole("dialog", { name: "Settings" }),
+    ).toBeInTheDocument();
+  });
+
   it("B4: a failed open surfaces the error on the library surface", async () => {
     loadDocument.mockRejectedValue(
       new Error("PDF_INVALID: The file is not a valid PDF"),

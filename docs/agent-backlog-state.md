@@ -2,6 +2,16 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #61 — 10/08/2026 (112-close-dataloss: work survives the window closing + B3 first-launch + the Toolbar collapse)
+
+- **Branch:** `112-close-dataloss` (off `origin/main` 17541b1, worktree `../tauri-pdf-reader-112-close-dataloss`). PO's re-audit returned NOT_CUTTABLE — two defects lose the user's work.
+- **DL-1/DL-2 — highlights and reading position are discarded on close, after telling the user they were saved:** the 500ms debounces (highlights + autosave) have no close handling — a write pending at window close is dropped. Fix: the backend's `CloseRequested` handler prevents the close, emits `app-close-requested`, waits for `app-close-ack` (3s timeout — a hung renderer never strands the user), then destroys. The frontend (ReaderView) listens, flushes both debounced writers (`flushImmediately` from the highlight persistence hook; a new `flushProgress` exposed from `useAutoSave` — `checkUnsavedProgress` was dead code written for this and its localStorage fallback is unrelated), then acks. No locks (AtomicBool only) — the deadlock gate's timeout guard is the shipped tokio::time::timeout.
+- **Packaged proof:** highlight-journey's create phase now closes the window immediately after the Yellow click (inside the debounce window) and verify asserts survival — lane exit 0 with the fix. Honest timing note in the PR body: the pre-fix loss is a sub-500ms race that the driver-mediated close cannot deterministically reproduce (the debounce fires during wdio teardown — observed pre-fix persistence), so the jsdom protocol test (RED pre-fix: the ack is never emitted) + the packaged survival are the evidence pair.
+- **B3 — reachability was PARTIAL:** on a genuinely fresh install (no in-flight books → ResumeSection null; no document → no playback bar; native menu hidden on packaged Linux) there was no path to Settings. Fix: the empty-library EmptyState gains an "Open Settings" action (the first-launch surface).
+- **Toolbar collapse (the two corrections):** Toolbar's own copy of the open logic (which had already diverged from useOpenPdf) is gone — the toolbar now calls the shared `useOpenPdf().openPdf()` + `onOpen`. Also corrected my own B1 evidence habit per the dispatch.
+- **GREEN:** full suite 1045/1045 (93 files); cargo build e2e-tts-fixture + default clippy `-D warnings` clean; fmt clean; lint 0/94 baseline; typecheck clean; diff clean; alignment gate PASS on the committed diff.
+- **Revert:** `git revert <squash>` — two Rust/hook files, the close API, three component files, the lane, two test files, one backlog entry.
+
 ## Iteration #60 — 10/08/2026 (111-shortcuts-scale: the shortcuts panel derives from reality; rem finally scales)
 
 - **Branch:** `111-shortcuts-scale` (off `origin/main` 3a4ebdc, worktree `../tauri-pdf-reader-111-shortcuts-scale`). Two pre-tag "the app lies about itself" items (the #105 class).

@@ -245,6 +245,18 @@ export function LibraryView({
                   ? "Open a PDF to add it to your library"
                   : "Right-click a book to file it here"
               }
+              // Slice 112 B3: on a genuinely fresh install (no in-flight
+              // books, no document open, native menu hidden on packaged
+              // Linux) this empty state is the ONLY surface — it must carry
+              // the path to Settings, where the AI-TTS setup lives.
+              action={
+                selectedShelfId === null
+                  ? {
+                      label: "Open Settings",
+                      onClick: onOpenSettings,
+                    }
+                  : undefined
+              }
               icon={<DocumentIcon />}
             />
           )
