@@ -147,38 +147,12 @@ describe("Packaged highlight journey (create → persist → survive restart)", 
           ?.click(),
       );
 
-      // 6. The overlay mark renders with the selected text as its name.
-      try {
-        await browser.waitUntil(
-          async () =>
-            browser.execute(
-              () =>
-                !!document.querySelector(
-                  '[aria-label*="Highlight: "][aria-label*="lectrice fixture page two"]',
-                ),
-            ),
-          {
-            timeout: 15000,
-            timeoutMsg: "highlight overlay never rendered after creating",
-          },
-        );
-      } catch (err) {
-        console.log(
-          "DIAG hl-create:",
-          JSON.stringify(
-            await browser.execute(() => ({
-              toolbarExists: !!document.querySelector('[role="toolbar"]'),
-              overlayCount: document.querySelectorAll('[aria-label^="Highlight: "]').length,
-              logs: window.__E2E_READ__.logs().slice(-30),
-            })),
-          ),
-        );
-        throw err;
-      }
-      const mark = await browser.execute(() =>
-        document.querySelector('[aria-label*="Highlight: "]')?.getAttribute("aria-label"),
-      );
-      expect(mark).toContain(SELECTED_TEXT);
+      // 6. Slice 112 DL-1: close the window IMMEDIATELY after the Yellow
+      // click — inside the 500ms save debounce. The CloseRequested flush
+      // must persist the write anyway; without it, the verify phase finds
+      // nothing. No overlay wait here: waiting would let the debounce fire
+      // and mask the very race this phase exists to expose.
+      await browser.execute(() => window.close());
     } else {
       // VERIFY phase: the app relaunched on the SAME profile. The overlay must
       // be present WITHOUT any creation action — loaded from real SQLite.

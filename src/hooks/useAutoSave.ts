@@ -100,6 +100,18 @@ export function useAutoSave({
     }
   }, [lastTtsChunkId, documentId, enabled, scheduleSave]);
 
+  /**
+   * Slice 112 DL-2: flush any pending (debounced) progress write immediately —
+   * the window-close protocol calls this before the app goes away.
+   */
+  const flushProgress = useCallback(async () => {
+    if (saveTimeoutRef.current) {
+      window.clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+    await saveProgress();
+  }, [saveProgress]);
+
   // Periodic save interval
   useEffect(() => {
     if (!enabled || !documentId) return;
@@ -150,6 +162,7 @@ export function useAutoSave({
   return {
     saveNow: saveProgress,
     lastSaved: lastSavedRef.current.timestamp,
+    flushProgress,
   };
 }
 

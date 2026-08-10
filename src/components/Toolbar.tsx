@@ -1,8 +1,6 @@
 import { useState, useRef } from "react";
-import { useFileDialog, FILE_FILTERS } from "../hooks/useFileDialog";
 import { useDocumentStore } from "../stores/document-store";
-import { pdfService } from "../services/pdf-service";
-import { commands } from "../lib/bindings";
+import { useOpenPdf } from "../hooks/useOpenPdf";
 import { useRovingTabindex } from "../hooks/useRovingTabindex";
 import { PageNavigation } from "./PageNavigation";
 import { ZoomControls } from "./ZoomControls";
@@ -27,7 +25,7 @@ interface ToolbarProps {
 
 export function Toolbar({ onSessionRestored, onOpen }: ToolbarProps) {
   const [isSessionMenuOpen, setIsSessionMenuOpen] = useState(false);
-  const { openFile } = useFileDialog();
+  const { openPdf } = useOpenPdf();
   const toolbarRef = useRef<HTMLDivElement>(null);
 
   // Roving tabindex for keyboard navigation within the toolbar
@@ -38,85 +36,13 @@ export function Toolbar({ onSessionRestored, onOpen }: ToolbarProps) {
     loop: true,
   });
 
-  const {
-    currentDocument,
-    pdfDocument,
-    isLoading,
-    setDocument,
-    setPdfDocument,
-    setLoading,
-    setError,
-    setCurrentPage,
-  } = useDocumentStore();
+  const { currentDocument, pdfDocument, isLoading } = useDocumentStore();
 
   const handleOpenFile = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Open file dialog for PDF selection
-      const selected = await openFile({
-        multiple: false,
-        filters: [FILE_FILTERS.PDF],
-      });
-
-      if (!selected) {
-        setLoading(false);
-        return;
-      }
-
-      const filePath = selected as string;
-
-      // Load the PDF document
-      const pdf = await pdfService.loadDocument(filePath);
-      setPdfDocument(pdf);
-
-      // Check if document exists in library (using tauri-specta generated bindings)
-      const existingResult = await commands.libraryGetDocumentByPath(filePath);
-      let document =
-        existingResult.status === "ok" ? existingResult.data : null;
-
-      if (document) {
-        // Document exists, mark as opened and restore progress
-        const openResult = await commands.libraryOpenDocument(document.id);
-        if (openResult.status === "ok") {
-          document = openResult.data;
-          setCurrentPage(document.currentPage);
-        }
-      } else {
-        // New document, add to library
-        const addResult = await commands.libraryAddDocument(
-          filePath,
-          null,
-          pdf.numPages,
-        );
-        if (addResult.status === "error") {
-          throw new Error(addResult.error);
-        }
-        document = addResult.data;
-      }
-
-      // Update page count if it wasn't set
-      if (!document.pageCount) {
-        await commands.libraryUpdateDocument(
-          document.id,
-          null,
-          pdf.numPages,
-          null,
-        );
-        document = { ...document, pageCount: pdf.numPages };
-      }
-
-      setDocument(document);
-      onOpen?.();
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to open PDF";
-      setError(message);
-      console.error("Error opening PDF:", error);
-    } finally {
-      setLoading(false);
-    }
+    // Slice 112: collapse onto the shared useOpenPdf flow — Toolbar kept its
+    // own copy of the open logic (dialog -> load -> library upsert -> store)
+    // which had already diverged once. One copy now.
+    if (await openPdf()) onOpen?.();
   };
 
   const handleSessionRestored = (sessionId: string) => {
