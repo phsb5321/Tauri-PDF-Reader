@@ -15,8 +15,10 @@ use sqlx::Row;
 use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
-use tauri::State;
+use tauri::{AppHandle, State};
 use tauri_plugin_sql::DbInstances;
+
+use crate::commands::audio_cache::create_service as create_audio_cache_service;
 
 /// Add a new document to the library
 /// Uses SHA-256 content hash as ID for duplicate detection
@@ -265,7 +267,32 @@ pub async fn library_list_documents(
 /// Remove a document from the library
 #[tauri::command]
 #[specta::specta]
-pub async fn library_remove_document(db: State<'_, DbInstances>, id: String) -> Result<(), String> {
+pub async fn library_remove_document(
+    app: AppHandle,
+    db: State<'_, DbInstances>,
+    id: String,
+) -> Result<(), String> {
+    // Slice 104: deleting a book must not strand its cached audio on disk
+    // (SECURITY.md retention section). Clear the document's cache FIRST —
+    // files + metadata — so the delete cannot leak .mp3s. Best-effort: a
+    // cache failure must not block the delete the user asked for, so it is
+    // logged and the row is still removed.
+    match create_audio_cache_service(&app, &db).await {
+        Ok(service) => {
+            if let Err(e) = service.clear_document(&id).await {
+                tracing::warn!(
+                    "Failed to clear audio cache for deleted document {}: {:?}",
+                    id,
+                    e
+                );
+            }
+        }
+        Err(e) => tracing::warn!(
+            "Failed to construct audio cache service during document delete: {:?}",
+            e
+        ),
+    }
+
     let pool = get_pool(&db).await?;
 
     sqlx::query("DELETE FROM documents WHERE id = ?")

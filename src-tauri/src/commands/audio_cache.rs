@@ -282,7 +282,7 @@ pub async fn audio_cache_get_limit(
 }
 
 // Helper to create the service with proper dependencies
-async fn create_service(
+pub(crate) async fn create_service(
     app: &AppHandle,
     db: &State<'_, DbInstances>,
 ) -> Result<AudioCacheService<SqliteAudioCacheRepo>, String> {
