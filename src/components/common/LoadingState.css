@@ -55,7 +55,7 @@
 
 .loading-message {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--text-secondary, #666);
 }
 
@@ -140,14 +140,14 @@
 
 .error-title {
   margin: 0 0 var(--space-2);
-  font-size: 18px;
+  font-size: var(--text-lg);
   font-weight: 600;
   color: var(--text-primary, #1a1a1a);
 }
 
 .error-message {
   margin: 0 0 var(--space-4);
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--text-secondary, #666);
   max-width: 300px;
 }
@@ -158,7 +158,7 @@
   color: var(--color-on-accent);
   border: none;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: 500;
   cursor: pointer;
   transition: background-color 0.2s;
@@ -192,14 +192,14 @@
 
 .empty-title {
   margin: 0 0 var(--space-2);
-  font-size: 18px;
+  font-size: var(--text-lg);
   font-weight: 600;
   color: var(--text-primary, #1a1a1a);
 }
 
 .empty-description {
   margin: 0 0 var(--space-5);
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--text-secondary, #666);
   max-width: 300px;
 }
@@ -210,7 +210,7 @@
   color: var(--color-on-accent);
   border: none;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: 500;
   cursor: pointer;
   transition: background-color 0.2s;

@@ -2,6 +2,16 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #58 — 09/08/2026 (105-rem-oracle: the rem guarantee grows from the front door to every stylesheet)
+
+- **Branch:** `105-rem-oracle` (off `origin/main` c7dcbcf, worktree `../tauri-pdf-reader-105-rem-oracle`). Wave-6 queue item 3.
+- **Gap:** `GUARDED_REM_STYLESHEETS` covered only the reading home (5 files) while the same test file's own scanner saw 69 bare-px `font-size` literals across 14 more files — SettingsPanel.css alone had 20, and that is the shell's settings surface. The oracle's guard and its own full-tree scan disagreed.
+- **Decision: EXTEND (argued in the PR body).** The narrow option would leave the configuration UI not tracking OS text size — the same WCAG rationale that drove #83 applies to every surface, and the scanner already exists to police it. The conversions and the guard list move together (the #83 trap): the diff shows the list growing to all 19 files AND the 69 literals converting in the same commit.
+- **Conversion (mechanical, zero visual change):** 12px→`var(--text-xs)`, 14px→`var(--text-sm)`, 16px→`var(--text-base)`, 18px→`var(--text-lg)`, 20px→`var(--text-xl)`, 24px→`var(--text-2xl)`, 13px→`0.8125rem` (no 13px token; the established pattern from #83's ContinueReading heading). Token values are exactly the old pixel values, so appearance is identical at the default root; text now tracks OS text size.
+- **RED first:** extended guard list alone failed 1 test with all 69 violations listed; GREEN after the conversions (0 literals remain).
+- **GREEN:** full suite 1034/1034; design-tokens 65/65; lint 0/94 baseline; typecheck clean; diff clean (15 files: 14 css + the oracle); alignment gate PASS on the committed diff.
+- **Revert:** `git revert <squash>` — 14 css files, the oracle test, one backlog entry.
+
 ## Iteration #57 — 09/08/2026 (104-cache-gc: deleting a book no longer leaks its cached audio)
 
 - **Branch:** `104-cache-gc` (off `origin/main` c7dcbcf post-#105-telemetry, worktree `../tauri-pdf-reader-104-cache-gc`). Wave-6 queue item 2 (M2.5 second half).
@@ -11,6 +21,7 @@
 - **GREEN:** full suite 1035/1035; cargo audio_cache_repo 7/7; `cargo build --features test-mocks` clean; fmt clean; clippy `-D warnings` clean; lint 0/94 baseline; typecheck clean; diff clean; alignment gate PASS on the committed diff.
 - **Revert:** `git revert <squash>` — two Rust files, two test files, one backlog entry.
 
+ (fix(a11y): the rem oracle grows from the front door to every stylesheet)
 ## Iteration #56 — 09/08/2026 (103-telemetry-deletion: the Privacy & Data fiction is deleted)
 
 - **Branch:** `103-telemetry-deletion` (off `origin/main` 6bd6675, worktree `../tauri-pdf-reader-103-telemetry`). Wave-6 queue item 1.

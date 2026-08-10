@@ -17,7 +17,7 @@
 }
 
 .debug-overlay-header {
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 600;
   color: var(--color-on-dark);
   margin-bottom: var(--space-2);

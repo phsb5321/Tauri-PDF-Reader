@@ -36,7 +36,7 @@
 
 .toc-title {
   margin: 0;
-  font-size: 18px;
+  font-size: var(--text-lg);
   font-weight: 600;
   color: var(--text-primary, #1a1a1a);
 }
@@ -112,13 +112,13 @@
 
 .toc-empty p {
   margin: 0 0 var(--space-2);
-  font-size: 16px;
+  font-size: var(--text-base);
   font-weight: 500;
   color: var(--text-primary, #1a1a1a);
 }
 
 .toc-empty span {
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 
 .toc-nav {
@@ -189,7 +189,7 @@
   background: transparent;
   cursor: pointer;
   text-align: left;
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--text-primary, #1a1a1a);
   border-radius: 6px;
   min-width: 0;
@@ -213,7 +213,7 @@
   padding: 2px var(--space-2);
   background: var(--bg-secondary, #f0f0f0);
   border-radius: 4px;
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-secondary, #666);
 }
 

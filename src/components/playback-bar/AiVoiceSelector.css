@@ -5,7 +5,7 @@
 }
 
 .ai-voice-selector-label {
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 500;
   color: var(--text-secondary, #888);
   white-space: nowrap;
@@ -17,7 +17,7 @@
   border-radius: 6px;
   background: var(--background-secondary, #1e1e1e);
   color: var(--text-primary, #fff);
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-family: inherit;
   cursor: pointer;
   appearance: none;
