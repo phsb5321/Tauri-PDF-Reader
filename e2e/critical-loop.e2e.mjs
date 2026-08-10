@@ -174,3 +174,22 @@ describe("Critical loop (load → render → synced karaoke → menu dispatch)",
       document.querySelector('[role="alert"] button')?.click(),
     );
   });
+
+  it("111: rem text scales with the root font size (OS text-size preference)", async () => {
+    // #108 converted every stylesheet to rem; the root must not be pinned.
+    // Grow the root to 24px and assert a rem-sized element actually grows.
+    const before = await browser.execute(() => {
+      const el = document.querySelector(".resume-line-title");
+      return el ? getComputedStyle(el).fontSize : null;
+    });
+    await browser.execute(async () => window.__E2E__.setRootFontSize(24));
+    const after = await browser.execute(() => {
+      const el = document.querySelector(".resume-line-title");
+      return el ? getComputedStyle(el).fontSize : null;
+    });
+    console.log(
+      "DIAG root-scale:",
+      JSON.stringify({ before, after, expected: "36px" }),
+    );
+    expect(after).toBe("36px"); // 1.5rem × 24px
+  });

@@ -764,7 +764,11 @@ function focusVisibleViolations(
     for (let i = 0; i < css.length; i++) {
       const ch = css[i];
       if (ch === "{") {
-        if (depth === 0 && bareFocus.test(selector) && !textEntry.test(selector)) {
+        if (
+          depth === 0 &&
+          bareFocus.test(selector) &&
+          !textEntry.test(selector)
+        ) {
           const line =
             source.startLine + css.slice(0, i).split("\n").length - 1;
           violations.push(
@@ -1279,6 +1283,17 @@ describe("design tokens: WCAG AA contrast floor", () => {
         typographyTokens,
       ),
     ).toEqual([]);
+  });
+
+  it("the root font size inherits the user's setting — no fixed px pin (111)", () => {
+    // #108 converted 69 literals to rem across every stylesheet; that only
+    // pays off if the ROOT can scale. A fixed :root font-size overrides the
+    // user's OS/browser text-size preference and makes the whole rem scale
+    // lie. The rem oracle guards the children; this guards the root.
+    const css = readFileSync(join(SRC, "styles/index.css"), "utf8");
+    const rootStart = css.indexOf(":root");
+    const rootBlock = css.slice(rootStart, css.indexOf("}", rootStart) + 1);
+    expect(rootBlock).not.toMatch(/font-size:\s*\d+px/);
   });
 
   it("focus rings are keyboard-only — no bare :focus on interactive controls", () => {

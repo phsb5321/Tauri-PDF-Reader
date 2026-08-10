@@ -2,6 +2,15 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #60 — 10/08/2026 (111-shortcuts-scale: the shortcuts panel derives from reality; rem finally scales)
+
+- **Branch:** `111-shortcuts-scale` (off `origin/main` 3a4ebdc, worktree `../tauri-pdf-reader-111-shortcuts-scale`). Two pre-tag "the app lies about itself" items (the #105 class).
+- **1 — the shortcuts panel advertised chords that do not exist:** 20 hand-maintained entries vs 8 real bindings. Actively wrong: Space was documented as play/pause while the real binding is next-page (a reader trusting the panel would lose their place). Ctrl+F, Ctrl+,, Ctrl+H, Ctrl+B, F11, zoom and chunk chords had no binding anywhere (verified by grep). Fix: the panel now DERIVES — `COMMAND_CHORDS` (the same table `useCommandKeys` matches) plus a new exported `COMPONENT_CHORDS` supplement (Ctrl+Space play/pause in AiPlaybackBar, Escape dismiss/stop, Ctrl+Shift+H highlight, Home/End — each with its binding location documented in the module). Fabricated chords deleted. `shortcut-consistency.test.tsx` pins the derivation (no literal list in the panel source, every supplement entry greps its named component for the key, row count == union). RED 3/3 on the pre-fix panel.
+- **2 — OS font size did nothing:** `:root { font-size: 16px }` overrode the user's OS/browser text-size preference, making #108's 69 rem conversions fixed-size. Fix: the declaration is REMOVED — the browser default IS the user's preference, so rem tracks it. The #108 oracle gained a root guard (no fixed px pin in `:root`); RED on the old pin.
+- **Packaged measure (the dispatch's "be careful and measure"):** the critical-loop lane gained a scaling it-block via a new `__E2E__.setRootFontSize` bridge method: `DIAG root-scale: {"before":"24px","after":"36px"}` — 1.5rem text scales with the root (24px at 16px root → 36px at 24px root) in the real WebKit. Lane 4/4 passing (B1, B4, scaling, existing flow), exit 0. jsdom cannot resolve rem (returns the literal), so the measure lives in the packaged lane — noted honestly.
+- **GREEN:** full suite 1043/1043 (92 files); lint 0/94 baseline; typecheck clean; diff clean; alignment gate PASS on the committed diff.
+- **Revert:** `git revert <squash>` — two component/hook files, index.css, the bridge + lane, two test files, one backlog entry.
+
 ## Iteration #59 — 10/08/2026 (109-release-blockers: the four FIX_FIRST defects, one slice)
 
 - **Branch:** `109-release-blockers` (off `origin/main` 1aabfd1, worktree `../tauri-pdf-reader-109-release-blockers`). PO's packaged-app audit returned FIX_FIRST — do not cut v0.2.0 yet. Four defects, one slice, then the tag.
