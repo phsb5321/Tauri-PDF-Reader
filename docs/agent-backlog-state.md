@@ -2,6 +2,17 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #59 — 10/08/2026 (109-release-blockers: the four FIX_FIRST defects, one slice)
+
+- **Branch:** `109-release-blockers` (off `origin/main` 1aabfd1, worktree `../tauri-pdf-reader-109-release-blockers`). PO's packaged-app audit returned FIX_FIRST — do not cut v0.2.0 yet. Four defects, one slice, then the tag.
+- **B1 — Toolbar Open loads the book but never shows the reader (worst):** the toolbar button was the ONLY visible open path (the native File→Open menu is hidden on packaged Linux) and the shell never left the library — `ToolbarProps` had no `onOpen`, so nothing cleared `showLibrary`. Fix: `onOpen` prop wired the same shape as #82's `onSettings`; Toolbar calls it after a successful open; ReaderView flips the surface. No useOpenPdf duplication.
+- **B2 — a wrong ElevenLabs key fails silently:** `initError` had zero UI consumers and `handleSubmit` closed the dialog unconditionally. Fix: `useAiTts` exposes `initError`; the settings form renders `error ?? initError` in the existing error surface; the dialog closes only on actual success (store `initialized` check).
+- **B3 — Settings → TTS is a dead legacy panel:** `TtsSettings.tsx` could only ever say "not available" (ttsAvailable false, no setters, native-tts not compiled). Decision: **delete-plus-reachable** (the #105 telemetry precedent) — `TtsSettings.tsx` deleted, and the Settings tts section now mounts `AiTtsSettings` directly, so the AI-TTS setup is reachable from Settings WITHOUT a document (closing the B3-with-B1 discoverability gap: before, the AI-TTS settings lived only in the playback bar that mounts only with a document).
+- **B4 — a failed open is silent:** PdfViewer's error UI only mounts with a document. Fix: the shell renders a dismissible error banner (role=alert) on the library surface from the store's error field.
+- **Packaged proof (B1 + B4, the dispatch's demand):** extended `e2e/critical-loop.e2e.mjs` with two it-blocks + the bridge gained `installDialogFixture`/`installCorruptOpenFixture`. Two VITE_E2E-only test seams (tree-shaken out of production): the dialog adapter returns a fixture path and pdf-service's fs read serves the fixture bytes — the ONLY boundaries WebDriver cannot reach (the user's dialog choice and the file transport); the PDF parse, IPC, backend hash of the real file, store and surface flip are all real. Lane EXIT=0, 3/3: B1 DIAG `{"title":"e2e-fixture","h1":null,"pageInput":true}` (reader shown, library gone); B4 DIAG `{"library":"Library","alert":"PDF_INVALID: …Dismiss"}`. RED first: jsdom 4/4 failed on the pre-fix tree (B1 pdf-viewer never appears, B2 no error, B3 "not available", B4 no alert).
+- **GREEN:** full suite 1039/1039 (91 files); lint 0/94 baseline; typecheck clean; diff clean; alignment gate PASS on the committed diff. The dataflow gate gained the e2e harness modules to its exclusion list (they're tree-shaken, never shipped — their fetch is the bundled fixture, not egress), with a comment.
+- **Revert:** `git revert <squash>` — six component/hook files, one deleted panel, the bridge + lane, three test files, one backlog entry.
+
 ## Iteration #58 — 09/08/2026 (105-rem-oracle: the rem guarantee grows from the front door to every stylesheet)
 
 - **Branch:** `105-rem-oracle` (off `origin/main` c7dcbcf, worktree `../tauri-pdf-reader-105-rem-oracle`). Wave-6 queue item 3.
@@ -21,7 +32,8 @@
 - **GREEN:** full suite 1035/1035; cargo audio_cache_repo 7/7; `cargo build --features test-mocks` clean; fmt clean; clippy `-D warnings` clean; lint 0/94 baseline; typecheck clean; diff clean; alignment gate PASS on the committed diff.
 - **Revert:** `git revert <squash>` — two Rust files, two test files, one backlog entry.
 
- (fix(a11y): the rem oracle grows from the front door to every stylesheet)
+(fix(a11y): the rem oracle grows from the front door to every stylesheet)
+
 ## Iteration #56 — 09/08/2026 (103-telemetry-deletion: the Privacy & Data fiction is deleted)
 
 - **Branch:** `103-telemetry-deletion` (off `origin/main` 6bd6675, worktree `../tauri-pdf-reader-103-telemetry`). Wave-6 queue item 1.

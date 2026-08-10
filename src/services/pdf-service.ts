@@ -1,18 +1,39 @@
-import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy, type PDFPageProxy } from 'pdfjs-dist';
+import {
+  getDocument,
+  GlobalWorkerOptions,
+  type PDFDocumentProxy,
+  type PDFPageProxy,
+} from "pdfjs-dist";
 
 // Check if running in Tauri environment
 function isTauriAvailable(): boolean {
-  return typeof window !== 'undefined' &&
-         '__TAURI_INTERNALS__' in window &&
-         window.__TAURI_INTERNALS__ !== undefined;
+  return (
+    typeof window !== "undefined" &&
+    "__TAURI_INTERNALS__" in window &&
+    window.__TAURI_INTERNALS__ !== undefined
+  );
 }
 
 // Dynamic import for Tauri fs plugin (only in Tauri context)
 async function readFileFromTauri(filePath: string): Promise<Uint8Array> {
-  if (!isTauriAvailable()) {
-    throw new Error('Not running in Tauri environment. Please use the desktop app to open local files.');
+  // Slice 109 B1 test seam (VITE_E2E build only, tree-shaken out): the
+  // packaged lane cannot drive the native file dialog, so the bridge also
+  // serves the fixture bytes for the fs read. The PDF PARSE that follows is
+  // the real pdf.js path; only the file-bytes transport is faked.
+  const fixtureBytes = (globalThis as Record<string, unknown>)
+    .__E2E_FS_FIXTURE_BYTES__;
+  if (
+    import.meta.env.VITE_E2E === "true" &&
+    fixtureBytes instanceof Uint8Array
+  ) {
+    return fixtureBytes;
   }
-  const { readFile } = await import('@tauri-apps/plugin-fs');
+  if (!isTauriAvailable()) {
+    throw new Error(
+      "Not running in Tauri environment. Please use the desktop app to open local files.",
+    );
+  }
+  const { readFile } = await import("@tauri-apps/plugin-fs");
   return readFile(filePath);
 }
 
@@ -33,8 +54,8 @@ interface PdfTextItem {
 
 // Configure PDF.js worker
 GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url
+  "pdfjs-dist/build/pdf.worker.min.mjs",
+  import.meta.url,
 ).toString();
 
 // CMaps are bundled into the app at build time (vite copies
@@ -44,9 +65,9 @@ GlobalWorkerOptions.workerSrc = new URL(
 // (http-served Windows builds), and against the document in the tauri://
 // main-thread path — an absolute URL is identical in both.
 const CMAP_URL =
-  typeof document !== 'undefined'
-    ? new URL('cmaps/', document.baseURI).toString()
-    : 'cmaps/';
+  typeof document !== "undefined"
+    ? new URL("cmaps/", document.baseURI).toString()
+    : "cmaps/";
 
 export interface PageRenderOptions {
   canvas: HTMLCanvasElement;
@@ -58,7 +79,12 @@ export interface PageRenderOptions {
 
 // Type guard for TextItem
 function isTextItem(item: unknown): item is PdfTextItem {
-  return typeof item === 'object' && item !== null && 'str' in item && 'transform' in item;
+  return (
+    typeof item === "object" &&
+    item !== null &&
+    "str" in item &&
+    "transform" in item
+  );
 }
 
 export interface TextContent {
@@ -80,16 +106,20 @@ export const pdfService = {
    * Uses Tauri's fs plugin to read the file as binary data
    */
   async loadDocument(filePath: string): Promise<PDFDocumentProxy> {
-    console.log('[PDF Service] Loading document:', filePath);
+    console.log("[PDF Service] Loading document:", filePath);
 
     try {
       // Read the file as binary data using Tauri's fs plugin
-      console.log('[PDF Service] Reading file with fs plugin...');
-      console.log('[PDF Service] Tauri available:', isTauriAvailable());
+      console.log("[PDF Service] Reading file with fs plugin...");
+      console.log("[PDF Service] Tauri available:", isTauriAvailable());
       const fileData = await readFileFromTauri(filePath);
-      console.log('[PDF Service] File read successfully, size:', fileData.byteLength, 'bytes');
+      console.log(
+        "[PDF Service] File read successfully, size:",
+        fileData.byteLength,
+        "bytes",
+      );
 
-      console.log('[PDF Service] Creating PDF document...');
+      console.log("[PDF Service] Creating PDF document...");
       const loadingTask = getDocument({
         data: fileData,
         // Enable built-in CMap support for better character rendering
@@ -99,21 +129,33 @@ export const pdfService = {
       });
 
       const pdf = await loadingTask.promise;
-      console.log('[PDF Service] PDF loaded successfully, pages:', pdf.numPages);
+      console.log(
+        "[PDF Service] PDF loaded successfully, pages:",
+        pdf.numPages,
+      );
       return pdf;
     } catch (error) {
-      console.error('[PDF Service] Error loading PDF:', error);
+      console.error("[PDF Service] Error loading PDF:", error);
       // Handle common PDF errors
       if (error instanceof Error) {
-        console.error('[PDF Service] Error message:', error.message);
-        if (error.message.includes('password')) {
-          throw new Error('PDF_PASSWORD_REQUIRED: This PDF is password protected');
+        console.error("[PDF Service] Error message:", error.message);
+        if (error.message.includes("password")) {
+          throw new Error(
+            "PDF_PASSWORD_REQUIRED: This PDF is password protected",
+          );
         }
-        if (error.message.includes('Invalid PDF')) {
-          throw new Error('PDF_INVALID: The file is not a valid PDF or is corrupted');
+        if (error.message.includes("Invalid PDF")) {
+          throw new Error(
+            "PDF_INVALID: The file is not a valid PDF or is corrupted",
+          );
         }
-        if (error.message.includes('denied') || error.message.includes('permission')) {
-          throw new Error('PDF_ACCESS_DENIED: Cannot access the file. Check file permissions.');
+        if (
+          error.message.includes("denied") ||
+          error.message.includes("permission")
+        ) {
+          throw new Error(
+            "PDF_ACCESS_DENIED: Cannot access the file. Check file permissions.",
+          );
         }
       }
       throw error;
@@ -126,9 +168,9 @@ export const pdfService = {
   async loadDocumentFromUrl(url: string): Promise<PDFDocumentProxy> {
     const loadingTask = getDocument({
       url,
-    // Bundled locally at build time — see CMAP_URL above.
-    cMapUrl: CMAP_URL,
-    cMapPacked: true,
+      // Bundled locally at build time — see CMAP_URL above.
+      cMapUrl: CMAP_URL,
+      cMapPacked: true,
     });
 
     return loadingTask.promise;
@@ -137,9 +179,14 @@ export const pdfService = {
   /**
    * Get a specific page from a PDF document
    */
-  async getPage(pdf: PDFDocumentProxy, pageNumber: number): Promise<PDFPageProxy> {
+  async getPage(
+    pdf: PDFDocumentProxy,
+    pageNumber: number,
+  ): Promise<PDFPageProxy> {
     if (pageNumber < 1 || pageNumber > pdf.numPages) {
-      throw new Error(`Invalid page number: ${pageNumber}. Document has ${pdf.numPages} pages.`);
+      throw new Error(
+        `Invalid page number: ${pageNumber}. Document has ${pdf.numPages} pages.`,
+      );
     }
     return pdf.getPage(pageNumber);
   },
@@ -155,7 +202,10 @@ export const pdfService = {
    * @param options.outputScale - Optional output scale override (for quality modes)
    * @returns RenderTask that can be cancelled
    */
-  renderPage(options: PageRenderOptions): { promise: Promise<void>; cancel: () => void } {
+  renderPage(options: PageRenderOptions): {
+    promise: Promise<void>;
+    cancel: () => void;
+  } {
     const { canvas, scale, page, outputScale: providedOutputScale } = options;
 
     // Get viewport at the desired scale
@@ -175,21 +225,23 @@ export const pdfService = {
     canvas.style.height = `${Math.floor(viewport.height)}px`;
 
     // Get hardware-accelerated 2D context with optimal settings
-    const context = canvas.getContext('2d', {
-      alpha: false,           // Opaque canvas - faster rendering (PDF.js uses opaque background)
-      desynchronized: true,   // Direct GPU→display path (critical for Tauri WebView performance)
+    const context = canvas.getContext("2d", {
+      alpha: false, // Opaque canvas - faster rendering (PDF.js uses opaque background)
+      desynchronized: true, // Direct GPU→display path (critical for Tauri WebView performance)
       willReadFrequently: false, // Keep GPU acceleration enabled
     });
     if (!context) {
-      throw new Error('Could not get canvas 2D context');
+      throw new Error("Could not get canvas 2D context");
     }
 
     // Enable high-quality image rendering
     context.imageSmoothingEnabled = true;
-    context.imageSmoothingQuality = 'high';
+    context.imageSmoothingQuality = "high";
 
     // Create transform matrix for HiDPI rendering
-    const transform: [number, number, number, number, number, number] | undefined =
+    const transform:
+      | [number, number, number, number, number, number]
+      | undefined =
       outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : undefined;
 
     const renderContext = {
@@ -236,7 +288,7 @@ export const pdfService = {
       }
     }
 
-    const text = items.map((item) => item.str).join(' ');
+    const text = items.map((item) => item.str).join(" ");
 
     return { text, items };
   },
@@ -259,7 +311,11 @@ export const pdfService = {
   /**
    * Calculate scale to fit entire page within a container
    */
-  calculateFitPageScale(page: PDFPageProxy, containerWidth: number, containerHeight: number): number {
+  calculateFitPageScale(
+    page: PDFPageProxy,
+    containerWidth: number,
+    containerHeight: number,
+  ): number {
     const viewport = page.getViewport({ scale: 1 });
     const scaleX = containerWidth / viewport.width;
     const scaleY = containerHeight / viewport.height;
@@ -302,7 +358,7 @@ export const pdfService = {
 
       return processOutlineItems(outline, pdf);
     } catch (error) {
-      console.error('Error getting PDF outline:', error);
+      console.error("Error getting PDF outline:", error);
       return [];
     }
   },
@@ -322,12 +378,12 @@ export interface OutlineItem {
  */
 async function processOutlineItems(
   items: unknown[],
-  pdf: PDFDocumentProxy
+  pdf: PDFDocumentProxy,
 ): Promise<OutlineItem[]> {
   const result: OutlineItem[] = [];
 
   for (const item of items) {
-    if (!item || typeof item !== 'object') continue;
+    if (!item || typeof item !== "object") continue;
 
     const outlineItem = item as {
       title?: string;
@@ -343,20 +399,20 @@ async function processOutlineItems(
         let dest: unknown = outlineItem.dest;
 
         // Handle string destinations (named destinations)
-        if (typeof dest === 'string') {
+        if (typeof dest === "string") {
           const resolvedDest = await pdf.getDestination(dest);
           dest = resolvedDest;
         }
 
         if (Array.isArray(dest) && dest.length > 0) {
           const ref = dest[0];
-          if (ref && typeof ref === 'object' && 'num' in ref) {
+          if (ref && typeof ref === "object" && "num" in ref) {
             const pageIndex = await pdf.getPageIndex(ref);
             pageNumber = pageIndex + 1; // Convert 0-indexed to 1-indexed
           }
         }
       } catch (e) {
-        console.warn('Could not resolve outline destination:', e);
+        console.warn("Could not resolve outline destination:", e);
       }
     }
 
@@ -365,7 +421,7 @@ async function processOutlineItems(
       : [];
 
     result.push({
-      title: outlineItem.title || 'Untitled',
+      title: outlineItem.title || "Untitled",
       pageNumber,
       children,
     });

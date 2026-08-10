@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useAiTts } from "../../hooks/useAiTts";
+import { useAiTtsStore } from "../../stores/ai-tts-store";
 import {
   aiTtsCacheInfo,
   aiTtsCacheClear,
@@ -26,7 +27,8 @@ function getSubmitLabel(isSubmitting: boolean, initialized: boolean): string {
 }
 
 export function AiTtsSettings({ onClose }: AiTtsSettingsProps) {
-  const { initialized, apiKey, needsApiKey, initialize, error } = useAiTts();
+  const { initialized, apiKey, needsApiKey, initialize, error, initError } =
+    useAiTts();
   const [inputKey, setInputKey] = useState(apiKey || "");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showKey, setShowKey] = useState(false);
@@ -70,7 +72,10 @@ export function AiTtsSettings({ onClose }: AiTtsSettingsProps) {
       setIsSubmitting(true);
       try {
         await initialize(inputKey.trim());
-        onClose?.();
+        // Slice 109 B2: a wrong key must not close the dialog as if it
+        // succeeded — the user is still looking at the form where the error
+        // now shows. Close only on actual success.
+        if (useAiTtsStore.getState().initialized) onClose?.();
       } finally {
         submittingRef.current = false;
         setIsSubmitting(false);
@@ -187,7 +192,9 @@ export function AiTtsSettings({ onClose }: AiTtsSettingsProps) {
           </p>
         </div>
 
-        {error && <div className="ai-tts-settings-error">{error}</div>}
+        {(error || initError) && (
+          <div className="ai-tts-settings-error">{error ?? initError}</div>
+        )}
 
         <div className="ai-tts-settings-status">
           {initialized ? (

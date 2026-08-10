@@ -46,9 +46,7 @@ const BACKEND_MARKERS = [/reqwest::/];
 
 /** The egress modules SECURITY.md names, relative to the repo root. */
 const DOCUMENTED_FRONTEND = new Set([]);
-const DOCUMENTED_BACKEND = new Set([
-  "src-tauri/src/ai_tts/elevenlabs.rs",
-]);
+const DOCUMENTED_BACKEND = new Set(["src-tauri/src/ai_tts/elevenlabs.rs"]);
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -71,10 +69,7 @@ function productionFiles(
   });
 }
 
-function egressFiles(
-  files: string[],
-  markers: RegExp[],
-): string[] {
+function egressFiles(files: string[], markers: RegExp[]): string[] {
   return files.filter((file) =>
     markers.some((marker) => marker.test(readFileSync(file, "utf8"))),
   );
@@ -87,6 +82,11 @@ describe("SECURITY.md dataflow map", () => {
       /\.test\./,
       /\.spec\./,
       /(^|\/)tests\//,
+      // E2E harness modules — tree-shaken out of every production build by
+      // the VITE_E2E/VITE_E2E_NATIVE flags (never shipped; their fetch is
+      // the bundled fixture, not an egress).
+      /src\/e2e-bridge\.ts$/,
+      /src\/e2e-native-bootstrap\.ts$/,
     ]);
     const backend = productionFiles(SRC_TAURI, /\.rs$/, [
       /(^|\/)tests?\//,
