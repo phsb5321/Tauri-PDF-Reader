@@ -669,12 +669,31 @@ function fontSizeViolations(
   return violations;
 }
 
+// Slice 105: the guard grew from the reading home (5 files) to EVERY
+// stylesheet with a bare-px font-size literal — the settings surface is the
+// shell's configuration UI and must track OS text size like the front door
+// does. The list is the scanner's own full-tree output; the conversions and
+// this list move together (the #83 trap).
 const GUARDED_REM_STYLESHEETS = [
   "components/library/LibraryView.css",
   "components/library/ResumeSection.css",
   "components/library/DocumentCard.css",
   "components/library/ShelfSidebar.css",
   "components/library/SearchBar.css",
+  "components/settings/SettingsPanel.css",
+  "components/settings/DebugOverlay.css",
+  "components/playback-bar/AiTtsSettings.css",
+  "components/playback-bar/AiPlaybackBar.css",
+  "components/playback-bar/AiVoiceSelector.css",
+  "components/playback-bar/AiSpeedSlider.css",
+  "components/common/LoadingState.css",
+  "components/highlights/HighlightsPanel.css",
+  "components/highlights/NoteEditor.css",
+  "components/dialogs/ExportDialog.css",
+  "components/sidebar/TableOfContents.css",
+  "components/pdf-viewer/PdfPage.css",
+  "components/pdf-viewer/TtsWordHighlight.css",
+  "components/pdf-viewer/HighlightContextMenu.css",
 ];
 
 function nonRemFontSizeViolations(

@@ -5,7 +5,7 @@
 }
 
 .ai-speed-slider-label {
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 500;
   color: var(--text-secondary, #888);
   white-space: nowrap;
@@ -53,7 +53,7 @@
 }
 
 .ai-speed-slider-value {
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 500;
   color: var(--text-primary, #fff);
   min-width: 32px;

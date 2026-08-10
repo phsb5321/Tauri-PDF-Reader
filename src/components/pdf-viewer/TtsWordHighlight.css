@@ -39,7 +39,7 @@
   color: var(--color-on-dark);
   padding: 6px 14px;
   border-radius: 16px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-family: system-ui, -apple-system, sans-serif;
   font-weight: 500;
   z-index: var(--z-extreme);

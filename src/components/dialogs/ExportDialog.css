@@ -41,7 +41,7 @@
 
 .export-dialog-header h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: var(--text-lg);
   font-weight: 600;
   color: var(--text-primary, #1a1a1a);
 }
@@ -82,7 +82,7 @@
 
 .export-dialog-info {
   margin: 0 0 var(--space-5);
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--text-secondary, #666);
   line-height: 1.5;
 }
@@ -130,13 +130,13 @@
 }
 
 .format-name {
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: 500;
   color: var(--text-primary, #1a1a1a);
 }
 
 .format-description {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-secondary, #666);
 }
 
@@ -150,7 +150,7 @@
   border: 1px solid var(--error-border, #ffcdd2);
   border-radius: 8px;
   color: var(--color-error-text);
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 
 .export-dialog-error .error-icon {
@@ -171,7 +171,7 @@
   padding: 10px var(--space-5);
   border: none;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: 500;
   cursor: pointer;
   transition:
