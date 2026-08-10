@@ -26,7 +26,13 @@ concurrency:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
-    runs-on: ubuntu-latest
+    # Self-hosted, like every other job in this repo. GitHub-hosted runners are
+    # unavailable on this account — a GitHub-hosted job never starts and the
+    # check reports "The job was not started because your account is locked due
+    # to a billing issue." three seconds in, with no step logs to explain it.
+    # This was the last workflow still on ubuntu-latest, so CodeQL had never
+    # completed a single run while the rest of CI stayed green.
+    runs-on: [self-hosted, Linux, X64, vm103]
     timeout-minutes: 30
     permissions:
       contents: read # checkout
