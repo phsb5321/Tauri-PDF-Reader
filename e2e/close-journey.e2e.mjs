@@ -72,7 +72,29 @@ describe("Packaged close journey (DL-1 highlight loss, DL-2 position loss)", () 
     );
     await browser.setWindowSize(1200, 800);
 
-    // Every phase starts the same: resume the seeded fixture.
+    // PRE-RESUME probe (dl2-verify only): the row's page BEFORE any actor
+    // action, plus the app's boot logs — pins whether the 3→2 revert happens
+    // in the app's boot or in the resume.
+    if (PHASE === "dl2-verify") {
+      console.log(
+        "DIAG dl2-pre-resume:",
+        JSON.stringify(
+          await browser.execute(async () => ({
+            rowPage: await window.__E2E_READ__.ipcDocumentPage(),
+            storePage: window.__E2E_READ__.currentPage(),
+            logs: window.__E2E_READ__.logs().slice(-15),
+          })),
+        ),
+      );
+    }
+
+    // Every phase starts the same: resume the seeded fixture, landing on the
+    // row's ACTUAL page (the seed default is 2, but after dl2-create the row
+    // is 3 — a hardcoded 2 would fail the post-fix world).
+    const rowPage =
+      (await browser.execute(async () =>
+        window.__E2E_READ__.ipcDocumentPage(),
+      )) ?? 2;
     const resume = await $(
       'button[aria-label^="Resume E2E Resume Fixture A, page"]',
     );
@@ -85,8 +107,12 @@ describe("Packaged close journey (DL-1 highlight loss, DL-2 position loss)", () 
     );
     await browser.waitUntil(
       async () =>
-        (await $('input[aria-label="Current page"]').getValue()) === "2",
-      { timeout: 15000, timeoutMsg: "resume did not land on page 2" },
+        (await $('input[aria-label="Current page"]').getValue()) ===
+        String(rowPage),
+      {
+        timeout: 15000,
+        timeoutMsg: `resume did not land on the row page ${rowPage}`,
+      },
     );
 
     if (PHASE === "dl1-create") {
@@ -147,6 +173,13 @@ describe("Packaged close journey (DL-1 highlight loss, DL-2 position loss)", () 
       await browser.releaseActions();
       const yellow = await $('button[aria-label="Highlight with Yellow"]');
       await yellow.waitForClickable({ timeout: 10000 });
+
+      // ── TIMING INSTRUMENTATION (the decisive number for the DL-1 re-check):
+      //    the interval between the Yellow click (the debounce enqueue) and
+      //    the window close. Written to a file the runner can join with the
+      //    app-death timestamp to also get close→death (the teardown latency)
+      //    and click→death (whether the 500 ms timer could have fired).
+      const tClick = Date.now();
       await browser.execute(() =>
         document
           .querySelector('button[aria-label="Highlight with Yellow"]')
@@ -164,8 +197,62 @@ describe("Packaged close journey (DL-1 highlight loss, DL-2 position loss)", () 
           .find((t) => t && /highlight/i.test(t));
         return t ?? null;
       });
+      const tToastDone = Date.now();
+      const tClose = Date.now();
       console.log("DIAG dl1-create:", JSON.stringify({ toastText }));
       closeWindow();
+
+      // ── Node-side death poll: the WebDriver session is dead with the
+      //    window, but plain Node still runs. Poll the app process AND the X
+      //    window to get close→death (the teardown latency) and click→death
+      //    (>= 500 ms names the debounce timer as the persistence mechanism).
+      //    Also answers the prior question: does the WINDOW even close?
+      const { execSync } = await import("node:child_process");
+      const appPattern =
+        "^" + process.cwd() + "/src-tauri/target/debug/tauri-pdf-reader";
+      let tDeath = null;
+      let windowClosedAt = null;
+      let windowStillThere = null;
+      for (let i = 0; i < 200; i++) {
+        let appAlive = true;
+        try {
+          execSync(`pgrep -f '${appPattern}'`, { stdio: "ignore" });
+        } catch {
+          appAlive = false;
+        }
+        let winAlive = true;
+        try {
+          execSync("xdotool search --name Lectrice", { stdio: "ignore" });
+        } catch {
+          winAlive = false;
+        }
+        if (windowClosedAt === null && !winAlive) {
+          windowClosedAt = Date.now();
+        }
+        if (!appAlive) {
+          tDeath = Date.now();
+          break;
+        }
+        if (i === 199) windowStillThere = winAlive;
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      const fs = await import("node:fs");
+      fs.writeFileSync(
+        "/tmp/lectrice-dl1-timing.json",
+        JSON.stringify({
+          tClick,
+          tToastDone,
+          tClose,
+          tDeath,
+          windowClosedAt,
+          windowStillThere,
+          clickToToastMs: tToastDone - tClick,
+          clickToCloseMs: tClose - tClick,
+          closeToDeathMs: tDeath ? tDeath - tClose : null,
+          clickToDeathMs: tDeath ? tDeath - tClick : null,
+          closeToWindowCloseMs: windowClosedAt ? windowClosedAt - tClose : null,
+        }),
+      );
     } else if (PHASE === "dl1-verify") {
       // ── THE CLAIM: the highlight survived — the app said it saved. ───────
       await browser.waitUntil(
@@ -196,10 +283,24 @@ describe("Packaged close journey (DL-1 highlight loss, DL-2 position loss)", () 
           (await $('input[aria-label="Current page"]').getValue()) === "3",
         { timeout: 10000, timeoutMsg: "Next did not move to page 3" },
       );
+      // Single fast probe for the record (the close-flush makes the debounce
+      // moot, but the pre-close row state is evidence).
+      const rowAtClose = await browser.execute(async () => ({
+        rowPage: await window.__E2E_READ__.ipcDocumentPage(),
+      }));
+      console.log("DIAG dl2-create:", JSON.stringify(rowAtClose));
       closeWindow();
     } else {
       // ── THE CLAIM: the position survived — the reader must return to the
       //    page the user was on (3), not revert to the last flushed value. ──
+      // At-launch probe: what does the row say BEFORE any resume action, and
+      // what does the home's resume line show?
+      const launchProbe = await browser.execute(async () => ({
+        rowPage: await window.__E2E_READ__.ipcDocumentPage(),
+        homeMeta: document.querySelector(".resume-line-meta")?.textContent ?? null,
+        storePage: window.__E2E_READ__.currentPage(),
+      }));
+      console.log("DIAG dl2-verify-launch:", JSON.stringify(launchProbe));
       try {
         await browser.waitUntil(
           async () =>
