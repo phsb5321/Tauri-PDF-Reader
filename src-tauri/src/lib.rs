@@ -486,7 +486,47 @@ pub fn run() {
         // effective scope is unchanged across restarts (no whole-disk exposure).
         .plugin(tauri_plugin_persisted_scope::init())
         .plugin(tauri_plugin_shell::init())
-        .manage(ExportState::new());
+        .manage(ExportState::new())
+        // Slice 112 DL-1/DL-2: debounced writes (highlights at 500ms,
+        // reading position at 500ms) can be lost when the window closes —
+        // the user was told they were saved. Handle the close request:
+        // prevent it, tell the frontend to flush, wait for the ack with a
+        // timeout (a hung renderer must not strand the user), then destroy.
+        .on_window_event(|window, event| {
+            use std::sync::atomic::{AtomicBool, Ordering};
+            use tauri::{Emitter, Manager};
+            static CLOSE_FLUSH_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
+
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                // A second close request while the first flush is still
+                // pending: let the in-flight spawn finish destroying.
+                if CLOSE_FLUSH_IN_PROGRESS.swap(true, Ordering::SeqCst) {
+                    return;
+                }
+                api.prevent_close();
+
+                let app_handle = window.app_handle().clone();
+                let win = window.clone();
+                // app-scoped emit: the frontend's listen() subscribes at the app
+                // level (matching every other event in this codebase); a
+                // window-scoped emit would never reach it.
+                let _ = app_handle.emit("app-close-requested", ());
+                tauri::async_runtime::spawn(async move {
+                    use tauri::Listener;
+                    // watch::Sender::send is &self, so the listen callback
+                    // (Fn, not FnOnce) can signal it; oneshot's Sender would
+                    // be moved out of the closure.
+                    let (tx, mut rx) = tokio::sync::watch::channel(false);
+                    let _unlisten = app_handle.listen("app-close-ack", move |_| {
+                        let _ = tx.send(true);
+                    });
+                    // Timeout guard: if the renderer never acks, close anyway.
+                    let _ =
+                        tokio::time::timeout(std::time::Duration::from_secs(3), rx.changed()).await;
+                    let _ = win.destroy();
+                });
+            }
+        });
 
     // Register TTS state if feature enabled
     #[cfg(feature = "native-tts")]
