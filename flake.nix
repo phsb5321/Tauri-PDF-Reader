@@ -45,6 +45,10 @@
           perl
           speechd
           xvfb
+          # Close-journey lane (113): drives a GENUINE WM_DELETE_WINDOW close
+          # through the X server (xdotool windowclose) — a process kill would
+          # prove nothing about CloseRequested.
+          xdotool
         ];
       in
       {
