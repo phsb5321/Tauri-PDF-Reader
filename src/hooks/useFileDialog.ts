@@ -47,6 +47,18 @@ export function useFileDialog() {
    */
   const openFile = useCallback(
     async (options?: OpenDialogOptions): Promise<string | string[] | null> => {
+      // E2E native builds only (VITE_E2E_NATIVE=true, tree-shaken otherwise):
+      // the native GTK file dialog is not reachable by WebDriver — the same
+      // WebDriver-impossible step the e2e-native bootstrap handles for TTS
+      // init and the fixture load. The OBSERVER supplies the chosen path at
+      // build time (VITE_E2E_OPEN_PATH); the ACTOR still clicks the real
+      // Open control and the real open flow (loadDocument → library →
+      // setDocument) runs below the dialog. This is a seam, not a bridge:
+      // nothing in the flow is stubbed except the dialog itself.
+      if (import.meta.env.VITE_E2E_NATIVE === "true") {
+        const e2eOpenPath = import.meta.env.VITE_E2E_OPEN_PATH;
+        if (e2eOpenPath) return e2eOpenPath;
+      }
       return fileDialog.open(options);
     },
     [],
