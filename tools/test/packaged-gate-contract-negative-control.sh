@@ -65,4 +65,9 @@ cp "$WF" "$WORK/tampered.yml"
 sed 's|^run_lane reader|# run_lane reader|' "$REPO_ROOT/scripts/e2e-matrix.sh" >"$WORK/matrix-tampered.sh"
 PACKAGED_GATE_MATRIX="$WORK/matrix-tampered.sh" expect_violation "matrix lane dropped" "matrix does not include the reader lane"
 
-echo "NEGATIVE CONTROL PASS: contract catches all six drop attempts for the intended reasons"
+# Tamper 7: shell-comment the lane invocation inside the run block
+# (the comment-blind substring-grep bypass class).
+sed 's|^          bash e2e/run-critical-loop.sh|          # bash e2e/run-critical-loop.sh (disabled)|' "$WF" >"$WORK/tampered.yml"
+expect_violation "lane invocation shell-commented" "pr-fast job does not run e2e/run-critical-loop.sh"
+
+echo "NEGATIVE CONTROL PASS: contract catches all seven drop attempts for the intended reasons"

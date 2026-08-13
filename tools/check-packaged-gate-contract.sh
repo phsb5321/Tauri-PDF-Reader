@@ -46,11 +46,11 @@ awk '/^  pull_request:$/ { in_pull=1; next }
 # 2. PR-fast lane → the repo's critical-loop runner → the spec.
 awk '/^  pr-fast:$/ { in_job=1; next }
      in_job && /^  [a-z0-9_-]+:$/ { exit }
-     in_job { print }' "$WF" | grep -q 'bash e2e/run-critical-loop.sh' \
+     in_job { print }' "$WF" | grep -vE '^[[:space:]]*#' | grep -q 'bash e2e/run-critical-loop.sh' \
   || fail "pr-fast job does not run e2e/run-critical-loop.sh"
 RUNNER="$REPO_ROOT/e2e/run-critical-loop.sh"
 [ -s "$RUNNER" ] || fail "e2e/run-critical-loop.sh missing or empty"
-grep -q 'E2E_SPEC=./e2e/critical-loop.e2e.mjs' "$RUNNER" \
+grep -vE '^[[:space:]]*#' "$RUNNER" | grep -q 'E2E_SPEC=./e2e/critical-loop.e2e.mjs' \
   || fail "critical-loop runner does not drive the critical-loop spec"
 [ -s "$REPO_ROOT/e2e/critical-loop.e2e.mjs" ] || fail "critical-loop spec missing or empty"
 
@@ -74,7 +74,7 @@ grep -q '^  schedule:$' "$WF" || fail "no nightly schedule for the full matrix"
 grep -q '^  workflow_dispatch:$' "$WF" || fail "no manual dispatch for the full matrix"
 awk '/^  full-matrix:$/ { in_job=1; next }
      in_job && /^  [a-z0-9_-]+:$/ { exit }
-     in_job { print }' "$WF" | grep -q 'bash scripts/e2e-matrix.sh' \
+     in_job { print }' "$WF" | grep -vE '^[[:space:]]*#' | grep -q 'bash scripts/e2e-matrix.sh' \
   || fail "full-matrix job does not run scripts/e2e-matrix.sh"
 MATRIX="${PACKAGED_GATE_MATRIX:-$REPO_ROOT/scripts/e2e-matrix.sh}"
 [ -s "$MATRIX" ] || fail "scripts/e2e-matrix.sh missing or empty"
