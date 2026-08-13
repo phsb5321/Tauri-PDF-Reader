@@ -346,7 +346,10 @@ describe(`Packaged corpus journey — ${BASENAME}`, () => {
     const observerClean = await browser.execute(() => {
       const b = window.__E2E_READ__;
       return {
-        docCount: b?.libraryRowCount ? b.libraryRowCount() : "n/a",
+        // Read-only observer probes that exist on this base: the deleted
+        // document's IPC row should be gone, and no error should be pending.
+        ipcProbe: b?.ipcDocumentPage ? "row-probe-available" : "n/a",
+        storeError: b?.storeError ? b.storeError() : null,
       };
     });
     console.log(
