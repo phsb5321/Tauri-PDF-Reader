@@ -40,6 +40,10 @@ mkdir -p "$OUT"
 
 source ./scripts/e2e-profile.sh
 source ./scripts/e2e-toolchain.sh
+# The sourced helpers enable errexit for THEIR internal safety; this script
+# manages per-phase failures explicitly (RC capture, summary append, keep
+# going through the remaining books/phases). Disable errexit again here.
+set +e
 APP_DIR="$E2E_PROFILE_DIR/com.lectrice.reader"
 mkdir -p "$APP_DIR"
 # The staged corpus copy + app profile are TRANSIENT: always deleted, on
@@ -60,9 +64,30 @@ echo "==> Building frontend (VITE_E2E bridge, one build for all books)"
 VITE_E2E=true pnpm build
 touch src-tauri/src/lib.rs
 
+# The packaged lane launches src-tauri/target/debug/tauri-pdf-reader — the
+# binary MUST be built from THIS head before any phase runs (a stale binary
+# would pass the journey against old code). One build, shared by all books.
+echo "==> Building the debug binary (one build for all books)"
+toolchain_run 'set -euo pipefail; ( cd src-tauri && cargo build )' >/tmp/lectrice-corpus-cargo-build.log 2>&1
+BUILD_RC=$?
+if [ $BUILD_RC -ne 0 ]; then
+  echo "BLOCKED: cargo build failed (rc=$BUILD_RC) — log: /tmp/lectrice-corpus-cargo-build.log"
+  printf '{"blocked":"cargo build failed","phase":"build","exit_code":%d}\n' "$BUILD_RC" >"$OUT/summary.json"
+  exit 1
+fi
+
+# Optional per-book expected page counts, hosted NEXT TO the corpus (never in
+# git, never uploaded): { "<filename>": 337, ... }. When present, the lane
+# asserts the real totalPages against it (a generated 11-page PDF would fail
+# the expected-count oracle).
+MANIFEST="$CORPUS/manifest.json"
+if [ ! -f "$MANIFEST" ]; then MANIFEST=""; fi
+
 # Machine-readable summary; per-book phase results appended as they land.
+# The corpus field is the BASENAME only — the absolute host path is never
+# uploaded.
 SUMMARY="$OUT/summary.json"
-echo '{"corpus":"'"$CORPUS"'","books":[],"exit":0}' >"$SUMMARY"
+echo '{"corpus":"'"$(basename "$CORPUS")"'","books":[],"exit":0}' >"$SUMMARY"
 
 STATUS=0
 for BOOK in "${BOOKS[@]}"; do
@@ -76,10 +101,15 @@ for BOOK in "${BOOKS[@]}"; do
   SHA256=$(sha256sum "$BOOK" | cut -d' ' -f1)
   echo "===== BOOK $NAME ($SHA256) ====="
 
+  EXPECTED=""
+  if [ -n "$MANIFEST" ]; then
+    EXPECTED=$(python3 -c "import json;print(json.load(open('$MANIFEST')).get('$(basename "$BOOK")',''))" 2>/dev/null)
+  fi
+
   for PHASE in open close verify; do
     LOG="$BOUT/$PHASE.log"
     echo "  -- phase $PHASE"
-    E2E_CORPUS_PHASE="$PHASE" E2E_CORPUS_BOOK="$STAGED" \
+    if E2E_CORPUS_PHASE="$PHASE" E2E_CORPUS_BOOK="$STAGED" E2E_CORPUS_EXPECTED_PAGES="$EXPECTED" \
       toolchain_run "
         set -euo pipefail
         export WEBKIT_WEBDRIVER=\"\$(command -v WebKitWebDriver)\"
@@ -92,8 +122,11 @@ for BOOK in "${BOOKS[@]}"; do
         for _ in \$(seq 1 100); do [ -s \$DISPNUM_FILE ] && break; sleep 0.1; done
         export DISPLAY=:\$(cat \$DISPNUM_FILE)
         E2E_SPEC=./e2e/real-corpus.e2e.mjs pnpm test:e2e
-      " >"$LOG" 2>&1
-    RC=$?
+      " >"$LOG" 2>&1; then
+      RC=0
+    else
+      RC=$?
+    fi
     if [ $RC -eq 0 ]; then
       echo "  -- phase $PHASE PASS"
       RESULT=pass

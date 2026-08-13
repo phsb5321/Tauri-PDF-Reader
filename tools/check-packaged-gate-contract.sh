@@ -91,7 +91,24 @@ done
 grep -qE 'xargs(\s+-P|\s+--max-procs)|\s&\s*$|parallel\s' "$MATRIX" \
   && fail "matrix script contains a parallel fan-out pattern"
 
-# 6. Failure evidence must be uploaded.
+# 6. The real-corpus job must exist, run ONLY on manual dispatch, invoke the
+#    corpus runner on an active line, and always upload its evidence (the
+#    default success() condition would skip the upload after a prerequisite
+#    BLOCKED, leaving the receipt stranded).
+CORPUS_BLOCK="$(awk '/^  real-corpus:$/ {f=1;next} f && /^  [a-z0-9_-]+:$/ {exit} f' "$WF")"
+[ -n "$CORPUS_BLOCK" ] || fail "real-corpus job missing from the workflow"
+CORPUS_JOB_IF="$(printf '%s\n' "$CORPUS_BLOCK" | sed -n 's/^    if: //p')"
+printf '%s\n' "$CORPUS_JOB_IF" | grep -qx 'github.event_name == '\''workflow_dispatch'\''' \
+  || fail "real-corpus job-level if: is not exactly the workflow_dispatch trigger"
+printf '%s\n' "$CORPUS_BLOCK" | sed 's/#.*//' | grep -q 'bash scripts/e2e-real-corpus.sh' \
+  || fail "real-corpus job does not run scripts/e2e-real-corpus.sh"
+[ -s "$REPO_ROOT/scripts/e2e-real-corpus.sh" ] || fail "scripts/e2e-real-corpus.sh missing or empty"
+grep -q 'LECTRICE_REAL_PDF_CORPUS' "$REPO_ROOT/scripts/e2e-real-corpus.sh" \
+  || fail "corpus runner does not consume LECTRICE_REAL_PDF_CORPUS"
+printf '%s\n' "$CORPUS_BLOCK" | grep -q 'if: always()' \
+  || fail "real-corpus evidence upload is not if: always() — a BLOCKED receipt would never upload"
+
+# 7. Failure evidence must be uploaded.
 grep -q 'actions/upload-artifact@v4' "$WF" || fail "no failure-artifact upload"
 grep -q 'if: failure()' "$WF" || fail "artifact upload not gated on failure"
 

@@ -80,4 +80,14 @@ expect_violation "lane invocation reduced to inline-comment no-op" "pr-fast job 
 sed 's|^          bash e2e/run-critical-loop.sh|          : bash e2e/run-critical-loop.sh|' "$WF" >"$WORK/tampered.yml"
 expect_violation "lane invocation reduced to colon no-op" "pr-fast job does not run e2e/run-critical-loop.sh"
 
-echo "NEGATIVE CONTROL PASS: contract catches all nine drop attempts for the intended reasons"
+# Tamper 10: falsify the real-corpus job condition (the manual lane must not
+# be skippable without the contract noticing).
+sed "s|^    if: github.event_name == 'workflow_dispatch'$|    if: \${{ false }}|" "$WF" >"$WORK/tampered.yml"
+expect_violation "real-corpus job condition falsified" "real-corpus job-level if: is not exactly the workflow_dispatch trigger"
+
+# Tamper 11: remove the corpus evidence upload's always-run guard.
+cp "$WF" "$WORK/tampered.yml"
+sed 's|if: always()|if: success()|' "$WORK/tampered.yml" >"$WORK/tampered2.yml" && mv "$WORK/tampered2.yml" "$WORK/tampered.yml"
+expect_violation "real-corpus upload loses always()" "real-corpus evidence upload is not if: always()"
+
+echo "NEGATIVE CONTROL PASS: contract catches all eleven drop attempts for the intended reasons"

@@ -20,9 +20,13 @@ const TAURI_DRIVER =
   process.env.TAURI_DRIVER ||
   (() => {
     try {
-      return execSync("command -v tauri-driver", { stdio: ["ignore", "pipe", "ignore"] })
+      const found = execSync("command -v tauri-driver", {
+        stdio: ["ignore", "pipe", "ignore"],
+      })
         .toString()
         .trim();
+      // A successful-but-empty lookup must fall back, not spawn "".
+      return found || path.resolve(process.env.HOME, ".cargo/bin/tauri-driver");
     } catch {
       return path.resolve(process.env.HOME, ".cargo/bin/tauri-driver");
     }

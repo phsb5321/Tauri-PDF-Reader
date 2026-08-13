@@ -43,6 +43,11 @@ import { spawn } from "node:child_process";
 
 const PHASE = process.env.E2E_CORPUS_PHASE || "open";
 const BOOK = process.env.E2E_CORPUS_BOOK || "";
+// Optional expected totalPages for this book (from the host-side manifest
+// next to the corpus, never in git). When set, the open phase asserts the
+// REAL totalPages equals it — a generated stand-in PDF cannot impersonate
+// the corpus book.
+const EXPECTED_PAGES = Number(process.env.E2E_CORPUS_EXPECTED_PAGES || "");
 
 if (!BOOK) {
   throw new Error(
@@ -169,6 +174,22 @@ describe(`Real-corpus (${PHASE})`, () => {
       );
       const opened = await browser.execute(() => window.__E2E__.getState());
       expect(opened.totalPages).toBeGreaterThan(10);
+      if (Number.isFinite(EXPECTED_PAGES) && EXPECTED_PAGES > 0) {
+        expect(opened.totalPages).toBe(EXPECTED_PAGES);
+      }
+      // Public UI assertion: the reader's page input must be visible and
+      // show the current page — proves the rendered surface, not just the
+      // private store.
+      await browser.waitUntil(
+        async () =>
+          browser.execute(() => {
+            const el = document.querySelector(
+              'input.page-input[aria-label="Current page"]',
+            );
+            return el && el.value === "1";
+          }),
+        { timeout: 15000, timeoutMsg: "reader page input never showed page 1" },
+      );
       // Navigate: next → 2 → 3, then assert the store's currentPage.
       await browser.execute(() => window.__E2E__.emitMenu("next-page"));
       await browser.execute(() => window.__E2E__.emitMenu("next-page"));
@@ -212,15 +233,23 @@ describe(`Real-corpus (${PHASE})`, () => {
         { timeout: 30000, timeoutMsg: "resume did not land on page 3" },
       );
       // The write to protect: another page change, then a GENUINE close
-      // inside the debounce.
+      // inside the debounce. The timing must start only AFTER the page
+      // change is CONFIRMED in the store — starting it at the event dispatch
+      // would under-estimate the user-action→close interval and let a
+      // no-op handler pass the phase (close races nothing then).
       await browser.execute(() => window.__E2E__.emitMenu("next-page"));
+      await browser.waitUntil(
+        async () =>
+          browser.execute(() => window.__E2E__.getState().currentPage) === 4,
+        { timeout: 15000, timeoutMsg: "page did not advance to 4 before close" },
+      );
       const tAction = Date.now();
       await closeAndObserve(tAction);
     });
   }
 
   if (PHASE === "verify") {
-    it("the library row and the reopened book are on page 3", async () => {
+    it("the library row and the reopened book are on page 4", async () => {
       await bridgeReady();
       await browser.waitUntil(
         async () =>
@@ -234,10 +263,10 @@ describe(`Real-corpus (${PHASE})`, () => {
         const el = document.querySelector(".resume-line, .document-row");
         return el ? el.textContent ?? null : null;
       });
-      // The row must reflect page 3 of the real book (the resume line
-      // formats "Page 3 of N").
-      expect(row ?? "").toContain("Page 3");
-      // Reopen from the row and confirm the RENDERED page is 3.
+      // The close phase wrote page 4 inside the debounce; the flush must
+      // have survived — the row reflects "Page 4 of N".
+      expect(row ?? "").toContain("Page 4");
+      // Reopen from the row and confirm the RENDERED page is 4.
       await browser.execute(() => {
         const el = document.querySelector(
           '.resume-line button, .resume-line [role="button"], .document-row button',
@@ -246,15 +275,15 @@ describe(`Real-corpus (${PHASE})`, () => {
       });
       await browser.waitUntil(
         async () =>
-          browser.execute(() => window.__E2E__.getState().currentPage) === 3,
-        { timeout: 30000, timeoutMsg: "reopened book did not render page 3" },
+          browser.execute(() => window.__E2E__.getState().currentPage) === 4,
+        { timeout: 30000, timeoutMsg: "reopened book did not render page 4" },
       );
       const state = await browser.execute(() => window.__E2E__.getState());
       console.log(
         "DIAG corpus-verify:",
         JSON.stringify({ book: BOOK, row: row ?? null, currentPage: state.currentPage }),
       );
-      expect(state.currentPage).toBe(3);
+      expect(state.currentPage).toBe(4);
     });
   }
 });

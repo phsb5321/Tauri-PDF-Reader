@@ -73,7 +73,12 @@ jobs:
             echo "BLOCKED: tauri-driver not provisioned at $DRIVER — see ci-evidence/prerequisite-failure.json"
             exit 1
           fi
-          "$DRIVER" --help >/dev/null 2>&1
+          if ! "$DRIVER" --help >/dev/null 2>&1; then
+            mkdir -p ci-evidence
+            printf '{"blocked":"tauri-driver broken (--help failed)","path":"%s","time":"%s"}\n' "$DRIVER" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ci-evidence/prerequisite-failure.json
+            echo "BLOCKED: tauri-driver broken at $DRIVER — see ci-evidence/prerequisite-failure.json"
+            exit 1
+          fi
 
       - name: Packaged PR-fast lane — hermetic profile, X11 pin, Xvfb
         # The repo's own runner: shared profile (#99 fail-closed) + flake
@@ -136,7 +141,12 @@ jobs:
             echo "BLOCKED: tauri-driver not provisioned at $DRIVER — see ci-evidence/prerequisite-failure.json"
             exit 1
           fi
-          "$DRIVER" --help >/dev/null 2>&1
+          if ! "$DRIVER" --help >/dev/null 2>&1; then
+            mkdir -p ci-evidence
+            printf '{"blocked":"tauri-driver broken (--help failed)","path":"%s","time":"%s"}\n' "$DRIVER" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ci-evidence/prerequisite-failure.json
+            echo "BLOCKED: tauri-driver broken at $DRIVER — see ci-evidence/prerequisite-failure.json"
+            exit 1
+          fi
 
       - name: Run all packaged lanes — one at a time
         # Serial by construction: one job loops the eight self-contained lane
@@ -203,7 +213,12 @@ jobs:
             echo "BLOCKED: tauri-driver not provisioned at $DRIVER — see ci-evidence/prerequisite-failure.json"
             exit 1
           fi
-          "$DRIVER" --help >/dev/null 2>&1
+          if ! "$DRIVER" --help >/dev/null 2>&1; then
+            mkdir -p ci-evidence
+            printf '{"blocked":"tauri-driver broken (--help failed)","path":"%s","time":"%s"}\n' "$DRIVER" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ci-evidence/prerequisite-failure.json
+            echo "BLOCKED: tauri-driver broken at $DRIVER — see ci-evidence/prerequisite-failure.json"
+            exit 1
+          fi
 
       - name: Assert the real corpus is provisioned locally (BLOCKED if missing)
         # The corpus lives on the host (never a URL); the hook never stores
@@ -217,7 +232,10 @@ jobs:
             echo "BLOCKED: LECTRICE_REAL_PDF_CORPUS unset — see ci-evidence/prerequisite-failure.json"
             exit 1
           fi
-          [ -d "$LECTRICE_REAL_PDF_CORPUS" ] || { echo "BLOCKED: LECTRICE_REAL_PDF_CORPUS=$LECTRICE_REAL_PDF_CORPUS is not a directory"; exit 1; }
+          [ -d "$LECTRICE_REAL_PDF_CORPUS" ] || {
+            mkdir -p ci-evidence
+            printf '{"blocked":"LECTRICE_REAL_PDF_CORPUS is not a directory","path":"%s","time":"%s"}\n' "$LECTRICE_REAL_PDF_CORPUS" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ci-evidence/prerequisite-failure.json
+            echo "BLOCKED: LECTRICE_REAL_PDF_CORPUS=$LECTRICE_REAL_PDF_CORPUS is not a directory — see ci-evidence/prerequisite-failure.json"; exit 1; }
 
       - name: Run the real-corpus soak (per-book phases, machine-readable summary)
         run: |
@@ -225,16 +243,20 @@ jobs:
           bash scripts/e2e-real-corpus.sh
 
       - name: Copy evidence into the workspace (logs + summary ONLY — never the corpus)
+        # ALWAYS runs: after a prerequisite BLOCKED the receipt in ci-evidence
+        # must still reach the artifact upload (default success() would skip it).
+        if: always()
         run: |
           mkdir -p ci-evidence/corpus
           cp -r /tmp/lectrice-corpus/* ci-evidence/corpus/ 2>/dev/null || true
 
       - name: Upload corpus soak evidence (logs + summary; PDFs never leave the host)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: real-corpus-evidence
           path: |
             ci-evidence/corpus/
             ci-evidence/prerequisite-failure.json
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 7
