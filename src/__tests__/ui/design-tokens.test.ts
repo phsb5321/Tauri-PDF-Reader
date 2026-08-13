@@ -995,10 +995,13 @@ describe("design tokens: WCAG AA contrast floor", () => {
     expect(violations).toEqual([]);
   });
 
-  it("fixed dark-mode rules ship both theme forms: attribute twin + media fallback", () => {
+  it("fixed dark-mode rules ship both theme forms as separate, valid rules", () => {
     // Explicit dark (data-theme="dark" on a light system) matches the
     // attribute form; system dark before React mounts matches the media
-    // fallback. Losing either form drops the intended dark styles.
+    // fallback. Losing either form drops the intended dark styles. The
+    // assertion is PARSE-level, not substring: each form must exist as its
+    // own complete rule (the pre-fix comma-@media prelude parses as ONE
+    // broken selector and matches neither).
     const pairs = [
       ["components/pdf-viewer/HighlightContextMenu.css", ".highlight-context-menu"],
       ["components/pdf-viewer/HighlightToolbar.css", ".highlight-toolbar"],
@@ -1009,26 +1012,39 @@ describe("design tokens: WCAG AA contrast floor", () => {
       ["components/TextLayer.css", ".highlight-rect"],
     ] as const;
     for (const [rel, selector] of pairs) {
-      const css = readFileSync(join(SRC, rel), "utf8");
+      const rules = styleRules(
+        stripCssComments(readFileSync(join(SRC, rel), "utf8")),
+      );
+      const attribute = rules.find(
+        (rule) => rule.selector.trim() === `[data-theme="dark"] ${selector}`,
+      );
       expect(
-        css,
-        `${rel}: missing [data-theme="dark"] twin for ${selector}`,
-      ).toContain(`[data-theme="dark"] ${selector}`);
+        attribute,
+        `${rel}: [data-theme="dark"] ${selector} must be its own rule`,
+      ).toBeDefined();
+      const media = rules.find(
+        (rule) =>
+          rule.selector.trim() ===
+            `:root:not([data-theme="light"]) ${selector}` &&
+          rule.atRules.includes("@media (prefers-color-scheme: dark)"),
+      );
       expect(
-        css,
-        `${rel}: missing :root:not([data-theme="light"]) media fallback for ${selector}`,
-      ).toContain(`:root:not([data-theme="light"]) ${selector}`);
+        media,
+        `${rel}: :root:not([data-theme="light"]) ${selector} media fallback missing`,
+      ).toBeDefined();
     }
   });
 
   it("App.css legacy accent alias keeps the fill role; text uses the -text cut", () => {
-    // Negative control: `--accent-color` has mixed-role consumers — accent
-    // BACKGROUNDS (HighlightOverlay, NoteEditor, AiPlaybackBar,
+    // Negative control, frozen decision (not regression evidence for the
+    // dropped-dark-rules fix): `--accent-color` has mixed-role consumers —
+    // accent BACKGROUNDS (HighlightOverlay, NoteEditor, AiPlaybackBar,
     // AiSpeedSlider, AiTtsSettings, HighlightsPanel) as well as borders.
-    // Re-pointing the alias at the darker text cut would recolor primary
-    // fills globally, so the alias must STAY the fill token. Text through
-    // the alias is already banned by the fill-only-token scan above, and
-    // on-accent text must keep clearing AA on that fill.
+    // This slice deliberately does NOT re-point the alias at the darker text
+    // cut (which would recolor primary fills globally), so the alias must
+    // STAY the fill token. Text through the alias is already banned by the
+    // fill-only-token scan above, and on-accent text must keep clearing AA
+    // on that fill.
     const environments: readonly [string, ThemeEnvironment][] = [
       ["light", { colorScheme: "light", contrastMore: false }],
       ["system dark", { colorScheme: "dark", contrastMore: false }],
