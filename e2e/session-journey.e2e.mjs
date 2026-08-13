@@ -14,9 +14,11 @@
  *   SESSION_PHASE=create — seed dual (doc A page 2/5, doc B page 2/3), open
  *     the Sessions panel, create "E2E Session" with A+B, restore it, and
  *     assert the last-read document (highest position = B) opens at its
- *     saved page (2), NOT page 1. Then navigate to page 2 while the session
- *     is active and restore again — the session's own record must have
- *     advanced.
+ *     saved page (2), NOT page 1. Then navigate forward while the session
+ *     is active and restore again — since #114, restore lands on the
+ *     LIBRARY ROW's page (the autosave target), so after Next the row
+ *     advances to 3 and the second restore must land on the row's 3, not
+ *     the add-time snapshot.
  *   SESSION_PHASE=verify — the app RELAUNCHES on the same profile; the
  *     session must still exist, restore must behave identically, and delete
  *     (public 2-click confirm) must remove it from the list.
@@ -157,12 +159,14 @@ describe("Packaged session journey (create → restore → survive restart → d
       const pageAfterRestore = await $('input[aria-label="Current page"]').getValue();
 
       // ── 6. Tracking check: navigate forward while the session is active,
-      //       then restore again. The session record is a SNAPSHOT (slice
-      //       107: the page is captured from the library row at add time),
-      //       so it must NOT chase the reader: from the restored page 2,
-      //       Next goes to 3, and the second restore lands back on the
-      //       snapshot's 2. The step's original "navigate 1→2" premise only
-      //       held while restore wrongly landed at 1. ──
+      //       then restore again. Since #114, restore lands on the LIBRARY
+      //       ROW's page (the autosave target — the session snapshot can
+      //       only lag it), not on the add-time snapshot: from the restored
+      //       page 2, Next goes to 3, autosave writes the row to 3, and the
+      //       second restore must land on the ROW's 3. The pre-#114 premise
+      //       ("the snapshot does not chase the reader, restore lands back
+      //       on the snapshot's 2") was superseded by #114 and is kept here
+      //       only as history. ──
       const next = await $('button[title="Next page (Right Arrow)"]');
       await next.waitForClickable({ timeout: 10000 });
       await browser.execute(() =>
@@ -172,6 +176,27 @@ describe("Packaged session journey (create → restore → survive restart → d
         async () =>
           (await $('input[aria-label="Current page"]').getValue()) === "3",
         { timeout: 10000, timeoutMsg: "next-page navigation failed" },
+      );
+
+      // ── The #114 precondition, asserted not assumed: the library row must
+      //    catch up with the reader (autosave flush, 500 ms debounce + IPC)
+      //    BEFORE the second restore — if autosave regresses, the lane fails
+      //    HERE with a named timeout instead of a confusing landing mismatch.
+      //    Read-only observer poll over the public row. ──
+      await browser.waitUntil(
+        async () => {
+          const shown = await $('input[aria-label="Current page"]').getValue();
+          const row = await browser.execute(
+            (t) => window.__E2E_READ__.ipcDocumentRowPageByTitle(t),
+            LAST_READ_TITLE,
+          );
+          return row !== null && shown === String(row);
+        },
+        {
+          timeout: 5000,
+          timeoutMsg:
+            "library row never caught up with the reader after Next (autosave flush)",
+        },
       );
 
       await browser.execute(() =>
@@ -206,6 +231,15 @@ describe("Packaged session journey (create → restore → survive restart → d
       await browser.pause(800);
       const pageAfterNavRestore = await $('input[aria-label="Current page"]').getValue();
 
+      // The #114 oracle: the second restore lands on the LIBRARY ROW's page
+      // (the autosave target). The row is read through the read-only observer
+      // at assertion time — never hardcoded — so this pins the row-wins
+      // contract against whichever page the row actually holds.
+      const rowAfterNav = await browser.execute(
+        (t) => window.__E2E_READ__.ipcDocumentRowPageByTitle(t),
+        LAST_READ_TITLE,
+      );
+
       console.log(
         "DIAG session-create:",
         JSON.stringify({
@@ -213,11 +247,13 @@ describe("Packaged session journey (create → restore → survive restart → d
           lastReadTitle: LAST_READ_TITLE,
           pageAfterRestore,
           pageAfterNavRestore,
-          claim: "restore lands the last-read document at its saved page (2)",
+          rowAfterNav,
+          claim:
+            "first restore lands on the saved page; second restore lands on the library row's page",
         }),
       );
       expect(pageAfterRestore).toBe(LAST_READ_SAVED_PAGE);
-      expect(pageAfterNavRestore).toBe("2");
+      expect(pageAfterNavRestore).toBe(String(rowAfterNav));
     } else {
       // ── VERIFY phase: the session must SURVIVE the restart. ─────────────
       await browser.waitUntil(
@@ -230,6 +266,23 @@ describe("Packaged session journey (create → restore → survive restart → d
             SESSION_NAME,
           ),
         { timeout: 15000, timeoutMsg: "session did not survive the restart (list empty)" },
+      );
+
+      // ── The #114 precondition: the row persisted across the relaunch at
+      //    the page the create phase ended on (saved page 2 + one Next = 3,
+      //    deterministic from the seeds). If the row write did not survive,
+      //    the lane fails HERE, before any restore can mask it. ──
+      const EXPECTED_ROW_AFTER_NEXT = String(Number(LAST_READ_SAVED_PAGE) + 1);
+      await browser.waitUntil(
+        async () =>
+          (await browser.execute(
+            (t) => window.__E2E_READ__.ipcDocumentRowPageByTitle(t),
+            LAST_READ_TITLE,
+          )) === Number(EXPECTED_ROW_AFTER_NEXT),
+        {
+          timeout: 5000,
+          timeoutMsg: "persisted library row is not page 3 after relaunch",
+        },
       );
 
       // Restore behaves identically after restart.
@@ -250,6 +303,14 @@ describe("Packaged session journey (create → restore → survive restart → d
       );
       await browser.pause(800);
       const pageAfterRestart = await $('input[aria-label="Current page"]').getValue();
+
+      // The #114 oracle after a genuine relaunch: restore lands on the
+      // LIBRARY ROW's page, read through the read-only observer. Probed
+      // BEFORE the delete below so the delete cannot influence the oracle.
+      const rowAfterRestart = await browser.execute(
+        (t) => window.__E2E_READ__.ipcDocumentRowPageByTitle(t),
+        LAST_READ_TITLE,
+      );
 
       // ── Delete (public 2-click confirm) and assert it leaves the list. ──
       await browser.execute(() =>
@@ -293,10 +354,11 @@ describe("Packaged session journey (create → restore → survive restart → d
           phase: "verify",
           survivedRestart: true,
           pageAfterRestart,
-          claim: "restore lands the last-read document at its saved page (2)",
+          rowAfterRestart,
+          claim: "restore lands the last-read document at the library row's page",
         }),
       );
-      expect(pageAfterRestart).toBe(LAST_READ_SAVED_PAGE);
+      expect(pageAfterRestart).toBe(String(rowAfterRestart));
     }
   });
 });
