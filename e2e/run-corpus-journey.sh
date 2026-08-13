@@ -204,13 +204,14 @@ toolchain_exec '
         echo "    cover-tie OK: $BASENAME rendered==cached (${COVER_FILE_SHA:0:12}…)"
       fi
     elif [ -n "$BLOBSHA" ]; then
-      # NC5 guard: rendered blob with no cache file is a FAIL (not BLOCKED).
-      guard_missing_oracle cover-cache "$BASENAME" "$SHA" \
-        "rendered cover blob but no cached file at covers/${SHA}-*" "$RESULTS_DIR/$BASENAME.card-open.log" \
-        "    cover-cache FAIL: spec rendered a cover (contentSha256=$BLOBSHA) but no covers/{SHA}-* cache file exists"
-      FAILED=1
+      # NC5 one-sided evidence: rendered blob with no cache file is a FAIL
+      # (guard_cover_hash_match blob-present/file-empty arm).
+      if ! guard_cover_hash_match "$BLOBSHA" "" "$BASENAME" "$SHA" \
+        "rendered cover blob but no cached file at covers/${SHA}-*" "$RESULTS_DIR/$BASENAME.card-open.log"; then
+        FAILED=1
+      fi
     else
-      # No cover surface on this base — BLOCKED-not-green (NC6 guard).
+      # No cover surface on this base — both-empty, BLOCKED-not-green (NC6).
       guard_missing_oracle cover-proof-blocked "$BASENAME" "$SHA" \
         "no covers/{SHA}-* cache file recorded (pre-121 base)" "$RESULTS_DIR/$BASENAME.card-open.log" \
         "    cover-cache BLOCKED: no covers/{SHA}-* file on this base (pre-121); owner 121-cover-pipeline"
