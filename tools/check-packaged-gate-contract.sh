@@ -74,6 +74,15 @@ grep -qE '^[[:space:]]*continue-on-error:' "$WF" && fail "continue-on-error foun
 #    PR execute on the self-hosted runner. EVERY job whose condition can be
 #    true on a pull_request must carry the same-repo guard.
 JOBS_SECTION="$(awk '/^jobs:$/{f=1;next} f && /^[^ ]/{exit} f' "$WF")"
+# The self-hosted job set is CLOSED: only the four canonical jobs are
+# permitted. Any other job (uppercase, new, renamed, or condition-gamed) is
+# a violation — adding a self-hosted job requires a reviewed contract change.
+# A condition game like `!= 'pull_request' || == 'pull_request'` on a new job
+# cannot slip through because the job itself is rejected.
+EXPECTED_JOBS="contract full-matrix pr-fast real-corpus"
+ACTUAL_JOBS="$(printf '%s\n' "$JOBS_SECTION" | awk '/^  [A-Za-z0-9_-]+:$/ { gsub(":$", ""); print $1 }' | sort | tr '\n' ' ' | sed 's/ $//')"
+[ "$ACTUAL_JOBS" = "$EXPECTED_JOBS" ] \
+  || fail "unexpected self-hosted job set ($ACTUAL_JOBS) — only contract pr-fast full-matrix real-corpus are permitted"
 for job in $(printf '%s\n' "$JOBS_SECTION" | awk '/^  [A-Za-z0-9_-]+:$/ { gsub(":$", ""); print $1 }'); do
   [ "$job" = "pr-fast" ] && continue  # the exact pr-fast check below owns it
   JOB_BLOCK="$(awk -v j="$job" '$0 ~ "^  " j ":$" {f=1;next} f && /^  [A-Za-z0-9_-]+:$/ {exit} f' "$WF")"
@@ -145,12 +154,14 @@ printf '%s\n' "$CONTRACT_BLOCK" | grep -q 'BOOTSTRAP-INERT' \
 # /tmp paths, so no two runs may ever execute.
 grep -qE '^  group: packaged-user-gate$' "$WF" || fail "concurrency group is not the fixed runner-wide packaged-user-gate"
 grep -q 'github.ref' <(sed 's/#.*//' "$WF") && fail "concurrency group uses github.ref — fixed group required"
-# Self-hosted execution trust: every mutable action ref is forbidden (SHA pins
-# only) — quoted refs included (`uses: "actions/checkout@v4"` must not slip
-# through); the repo's own flake pins the toolchain, so no dtolnay@stable either.
-grep -E '^[[:space:]]*uses: ' "$WF" | tr -d "\"'" | grep -qE 'uses: [^ ]+@(v[0-9]+|stable|main|master|latest)([[:space:]]|$)' \
-  && fail "mutable action ref found — actions must be SHA-pinned"
-grep -q 'dtolnay/rust-toolchain' "$WF" && fail "dtolnay rust-toolchain found — the flake pins rust"
+# SHA-only enforcement: every uses: ref must be a 40-hex commit SHA.
+# Tag/branch/version refs — quoted or not, in any form (@v4, @v4.0.0,
+# @refs/heads/release) — are mutable third-party code on the self-hosted
+# runner and are rejected outright.
+grep -E '^[[:space:]]*uses: ' "$WF" | tr -d "\"'" \
+  | sed -n 's/^[[:space:]]*uses: [^@ ]*@\([^ ]*\)$/\1/p' \
+  | grep -vqE '^[0-9a-f]{40}$' \
+  && fail "mutable action ref found — every uses: ref must be a 40-hex SHA"
 # The driver prerequisite is the PINNED devShell: no host provisioning, no
 # ~/.cargo/bin hardcode.
 grep -q 'cargo/bin/tauri-driver' "$WF" && fail "driver assert hardcodes ~/.cargo/bin — the pinned devShell is the toolchain"

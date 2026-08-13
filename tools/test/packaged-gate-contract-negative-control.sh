@@ -179,12 +179,23 @@ sed '/^    if: github.event_name != '\''pull_request'\''$/d' "$WF" >"$WORK/tampe
 # missing-if one for full-matrix.
 expect_violation "full-matrix job-level if deleted (exact)" "full-matrix job has no job-level if"
 
-# Tamper 31: an uppercase job ID without any condition (job-scan class).
+# Tamper 31: an uppercase job ID without any condition (job-scan class —
+# now caught by the CLOSED job set).
 sed 's|^jobs:$|jobs:\n  EVIL_JOB:\n    runs-on: [self-hosted, Linux, X64, vm103]\n    steps:\n      - run: echo exposed|' "$WF" >"$WORK/tampered.yml"
-expect_violation "uppercase unguarded job injected" "EVIL_JOB job has no job-level if"
+expect_violation "uppercase unguarded job injected" "unexpected self-hosted job set"
+
+# Tamper 33: a new job with a condition game that is true on pull requests
+# (`!= pull_request || == pull_request`) — the closed job set rejects the
+# job itself, not the condition.
+sed 's|^jobs:$|jobs:\n  EVIL_JOB:\n    if: github.event_name != '\''pull_request'\'' \|\| github.event_name == '\''pull_request'\''\n    runs-on: [self-hosted, Linux, X64, vm103]\n    steps:\n      - run: echo exposed|' "$WF" >"$WORK/tampered.yml"
+expect_violation "condition-gamed job injected" "unexpected self-hosted job set"
+
+# Tamper 34: a mutable ref in a form the old tag list missed (@v4.0.0).
+sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|uses: actions/checkout@v4.0.0|' "$WF" >"$WORK/tampered.yml"
+expect_violation "semver-tag mutable action ref" "mutable action ref found"
 
 # Tamper 32: single-quoted mutable action ref (the quote-bypass class).
 sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|uses: '\''actions/checkout@v4'\''|' "$WF" >"$WORK/tampered.yml"
 expect_violation "single-quoted mutable action ref" "mutable action ref found"
 
-echo "NEGATIVE CONTROL PASS: contract catches all thirty-two drop attempts for the intended reasons"
+echo "NEGATIVE CONTROL PASS: contract catches all thirty-four drop attempts for the intended reasons"
