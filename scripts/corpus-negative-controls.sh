@@ -86,6 +86,7 @@ guard_init
 guard_cover_count 4 5 "$TMP/nc3b.tsv"                # negative leg: missing row
 NC3_GOT=$?
 check "NC3 missing row (nonzero)" "$NC3_GOT" 1
+grep -q $'\tcover-coverage\t' "$TMP/nc3b.tsv" && check "NC3 missing-row recorded" 0 0 || check "NC3 missing-row recorded" 1 0
 guard_cover_count 6 5 "$TMP/nc3b.tsv"                # negative leg: stale row
 NC3B_GOT=$?
 check "NC3 stale row (nonzero)" "$NC3B_GOT" 1
@@ -100,6 +101,7 @@ guard_init
 guard_cache_leftover "$TMP/stale/covers/sha-1.png" "book.pdf" "sha" "cmd" "log"
 NC4_GOT=$?
 check "NC4 stale cache (nonzero)" "$NC4_GOT" 1
+grep -q $'\tcache-cleanup\t' "$TMP/nc4b.tsv" && check "NC4 stale-cache recorded" 0 0 || check "NC4 stale-cache recorded" 1 0
 
 echo
 echo "==> RESULT: $PASS passed, $FAIL failed"
