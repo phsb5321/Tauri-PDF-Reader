@@ -242,12 +242,21 @@ async function assertRepairedDarkRules(expectations) {
       sels.map((sel) => [sel, { attribute: false, media: false }]),
     );
     const dump = [];
+    // Every repaired DECLARATION must be present, not just one: a media
+    // fallback that regressed to multiply (or a light 0.15 shadow) must
+    // fail even if the other declaration survived.
     const EXPECTED = {
-      ".highlight-rect": /opacity:\s*0?\.5\b/,
-      // WebKit serializes box-shadow colour-first: "rgba(0, 0, 0, 0.4) 0px
-      // 4px 12px". Match the lengths anywhere after the property name.
-      ".highlight-toolbar": /box-shadow:[^;]*0px 4px 12px/,
+      ".highlight-rect": [
+        /opacity:\s*0?\.5\b/,
+        /mix-blend-mode:\s*screen/,
+      ],
+      ".highlight-toolbar": [
+        // WebKit serializes box-shadow colour-first.
+        /rgba\(0, 0, 0, 0\.4\) 0px 4px 12px/,
+      ],
     };
+    const declsMatch = (sel, cssText) =>
+      EXPECTED[sel].every((regex) => regex.test(cssText));
     const attributePrefix = '[data-theme="dark"] ';
     const mediaPrefix = ':root:not([data-theme="light"]) ';
     // WebKit serializes `[data-theme=dark]` with or without quotes
@@ -283,13 +292,13 @@ async function assertRepairedDarkRules(expectations) {
           for (const sel of sels) {
             if (
               normalized === attributePrefixNorm + " " + sel &&
-              EXPECTED[sel].test(rule.cssText)
+              declsMatch(sel, rule.cssText)
             )
               result[sel].attribute = true;
             if (
               inDarkMedia &&
               normalized === mediaPrefixNorm + " " + sel &&
-              EXPECTED[sel].test(rule.cssText)
+              declsMatch(sel, rule.cssText)
             )
               result[sel].media = true;
           }

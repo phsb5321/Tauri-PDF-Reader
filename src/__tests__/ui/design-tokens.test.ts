@@ -1032,6 +1032,47 @@ describe("design tokens: WCAG AA contrast floor", () => {
         media,
         `${rel}: :root:not([data-theme="light"]) ${selector} media fallback missing`,
       ).toBeDefined();
+
+      // Declaration-aware: each repaired form must carry the FULL semantic
+      // declaration set for ITS file — a form that lost its
+      // mix-blend-mode (or kept the light shadow) would fail here even
+      // though the selector survived. Keyed by file+selector because
+      // TextLayer's .highlight-rect dark form legitimately uses opacity
+      // 0.25 while HighlightOverlay's uses 0.5.
+      const REQUIRED_DECLS: Readonly<Record<string, RegExp[]>> = {
+        "components/pdf-viewer/HighlightOverlay.css|.highlight-rect": [
+          /mix-blend-mode:\s*screen/,
+          /opacity:\s*0?\.5\b/,
+        ],
+        "components/TextLayer.css|.highlight-rect": [
+          /mix-blend-mode:\s*screen/,
+          /opacity:\s*0?\.25\b/,
+        ],
+        "components/pdf-viewer/HighlightToolbar.css|.highlight-toolbar": [
+          /box-shadow:[^;]*(?:0 4px 12px rgba\(0, 0, 0, 0\.4\)|rgba\(0, 0, 0, 0\.4\) 0 4px 12px)/,
+        ],
+        "components/pdf-viewer/TtsHighlight.css|.tts-highlight-rect": [
+          /background-color:\s*rgba\(255, 193, 7, 0\.3\)/,
+        ],
+        "components/pdf-viewer/HighlightContextMenu.css|.highlight-context-menu": [
+          /box-shadow:[^;]*(?:0 4px 16px rgba\(0, 0, 0, 0\.4\)|rgba\(0, 0, 0, 0\.4\) 0 4px 16px)/,
+        ],
+        "components/highlights/NoteEditor.css|.note-editor-backdrop": [
+          /background:\s*rgba\(0, 0, 0, 0\.7\)/,
+        ],
+        "components/highlights/NoteEditor.css|.note-editor-modal": [
+          /box-shadow:[^;]*(?:0 8px 32px rgba\(0, 0, 0, 0\.5\)|rgba\(0, 0, 0, 0\.5\) 0 8px 32px)/,
+        ],
+      };
+      for (const form of [attribute, media]) {
+        const body = (form as StyleRule).body;
+        for (const regex of REQUIRED_DECLS[`${rel}|${selector}`] ?? []) {
+          expect(
+            body,
+            `${rel}: ${selector} form ${(form as StyleRule).selector} lost declaration ${regex}`,
+          ).toMatch(regex);
+        }
+      }
     }
   });
 
