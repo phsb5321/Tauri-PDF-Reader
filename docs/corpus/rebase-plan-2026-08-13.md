@@ -5,12 +5,12 @@ Authoritative date: 13/08/2026 (BRT), 17:24. Branch: `125-corpus-runner` @ `b439
 
 ## Prerequisite state (live)
 
-| Gate     | PR                                                        | Head               | Files that intersect this branch                                                                                                                                  |
-| -------- | --------------------------------------------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| open     | #122 `124-macos-open`                                     | `7a9464e`          | `src/hooks/useOpenPdf.ts`, `src/services/pdf-service.ts` — **no file overlap** with branch                                                                        |
-| contrast | #123 `125-contrast-aa`                                    | `fd76850`          | `src/components/library/DocumentCard.css`, `wdio.conf.mjs` — **no file overlap** (branch touches neither)                                                         |
-| covers   | (PR not yet open) `121-cover-pipeline` pushed @ `2593df1` | ahead 3 / behind 2 | **`src/e2e-native-bootstrap.ts` (both touch)**; `DocumentCard.tsx/css` (my selectors' home); `pdf-service.ts` (shared with #122); new `e2e/cover-journey.e2e.mjs` |
-| ci       | #119 `123-packaged-ci-owned`                              | `7729988`          | `.github/**` + runner ops — no overlap                                                                                                                            |
+| Gate     | PR                                                                                                                   | Head      | Files that intersect this branch                                                                                                                                  |
+| -------- | -------------------------------------------------------------------------------------------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| open     | #122 `124-macos-open`                                                                                                | `7a9464e` | `src/hooks/useOpenPdf.ts`, `src/services/pdf-service.ts` — **no file overlap** with branch                                                                        |
+| contrast | #123 `125-contrast-aa`                                                                                               | `fd76850` | `src/components/library/DocumentCard.css`, `wdio.conf.mjs` — **no file overlap** (branch touches neither)                                                         |
+| covers   | (PR not yet open) `121-cover-pipeline` pushed @ `6e8dbd6` (rebased onto 4fe30e3; feat `1c8cc1d` + backlog `6e8dbd6`) | —         | **`src/e2e-native-bootstrap.ts` (both touch)**; `DocumentCard.tsx/css` (my selectors' home); `pdf-service.ts` (shared with #122); new `e2e/cover-journey.e2e.mjs` |
+| ci       | #119 `123-packaged-ci-owned`                                                                                         | `7729988` | `.github/**` + runner ops — no overlap                                                                                                                            |
 
 ## Verified compatibility (live diffs, 17:21)
 
