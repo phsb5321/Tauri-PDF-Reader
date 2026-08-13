@@ -262,23 +262,22 @@ describe(`Packaged corpus journey — ${BASENAME}`, () => {
     // CLAIM 5: delete the book through the public card control; the library
     // must be empty afterwards (this book was the only row), and the
     // observer confirms no cached cover/audio file remains for its id.
-    // Deleting from the READER is not a public path — return to the library
-    // via the public surface, then delete the card.
-    const libBtn = await $("button[aria-label*='Library'], button[aria-label*='Back']");
-    if (await libBtn.isExisting()) {
-      await libBtn.waitForClickable({ timeout: 10000 });
-      await browser.execute(() =>
-        document
-          .querySelector("button[aria-label*='Library'], button[aria-label*='Back']")
-          ?.click(),
-      );
-    }
+    // Return to the library via the public Ctrl+L shortcut
+    // (useCommandKeys toggle-library — the ONLY public return path on this
+    // base; no toolbar Back button exists, see issue #120 corpus notes).
+    await browser.keys(["Control", "l"]);
     const del = await $(".document-card-delete");
     await del.waitForExist({ timeout: 15000 });
     await del.waitForClickable({ timeout: 15000 });
     await browser.execute(() =>
       document.querySelector(".document-card-delete")?.click(),
     );
+    // The delete flow shows window.confirm — accept it (public dialog).
+    try {
+      await browser.acceptAlert();
+    } catch {
+      /* alert may already be gone; the empty-library wait is the verdict */
+    }
     await browser.waitUntil(
       async () =>
         browser.execute(() => {
