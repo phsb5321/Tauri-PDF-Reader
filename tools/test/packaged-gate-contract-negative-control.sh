@@ -283,10 +283,10 @@ import sys
 s = open(sys.argv[1]).read()
 s = s.replace(
     '      - name: Install dependencies\n        run: pnpm install --frozen-lockfile',
-    '      - name: Install dependencies\n        run: pnpm install --frozen-lockfile\n\n      - name: no-false-positive probe\n        run: |-\n          echo \'{"uses": "actions/checkout@v4"}\'',
+    '      - name: Install dependencies\n        run: pnpm install --frozen-lockfile\n\n      - name: no-false-positive probe\n        run: |-\n          echo \'{"uses": "actions/checkout@v4"}\'\n\n      - name: indentation-indicator probe\n        run: |2-\n          echo \'{"uses": "actions/checkout@v4"}\'',
 )
 open(sys.argv[2], 'w').write(s)
 PY
-expect_clean "run:|- body with quoted keys"
+expect_clean "run:|- and run:|2- bodies with quoted keys"
 
 echo "NEGATIVE CONTROL PASS: contract catches all fifty-one drop attempts + one positive control, for the intended reasons"
