@@ -14,7 +14,11 @@ function isTauriAvailable(): boolean {
   );
 }
 
-// Dynamic import for Tauri fs plugin (only in Tauri context)
+// Read the PDF bytes for the reader via the frontend fs plugin. The
+// capability scope covers `$APPLOCALDATA/**` plus dialog-granted paths; the
+// card/resume path depends on the grant persisting (persisted-scope), and
+// `useOpenPdf` runs the reauthorization rung when a stored book's grant is
+// gone (issue #120).
 async function readFileFromTauri(filePath: string): Promise<Uint8Array> {
   // Slice 109 B1 test seam (VITE_E2E build only, tree-shaken out): the
   // packaged lane cannot drive the native file dialog, so the bridge also
@@ -109,9 +113,6 @@ export const pdfService = {
     console.log("[PDF Service] Loading document:", filePath);
 
     try {
-      // Read the file as binary data using Tauri's fs plugin
-      console.log("[PDF Service] Reading file with fs plugin...");
-      console.log("[PDF Service] Tauri available:", isTauriAvailable());
       const fileData = await readFileFromTauri(filePath);
       console.log(
         "[PDF Service] File read successfully, size:",

@@ -24,8 +24,19 @@ import {
   libraryAddDocument,
   libraryGetDocumentByPath,
   libraryOpenDocument,
+  libraryRelocateDocument,
 } from "../lib/tauri-invoke";
 import type { Document } from "../lib/schemas";
+
+/**
+ * plugin-fs v2 rejects reads outside the capability scope with this message.
+ * A library book whose dialog grant never existed (pre-persisted-scope
+ * sessions) or lapsed fails exactly here — the reauthorization trigger.
+ */
+function isScopeDenial(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /not allowed on the configured scope/i.test(message);
+}
 
 /** Provides the shared open-a-document actions. */
 export function useOpenPdf() {
@@ -49,6 +60,62 @@ export function useOpenPdf() {
       setCurrentPage(document.currentPage);
     },
     [setDocument, setPdfDocument, setCurrentPage],
+  );
+
+  /**
+   * Reauthorize a library book whose stored path lost its fs grant.
+   *
+   * Issue #120 (macOS): the reader reads bytes through `plugin-fs`, whose
+   * capability scope only ever covers dialog-granted paths. A book picked in
+   * a session before persisted grants existed (or whose grant lapsed) fails
+   * the read with a scope denial and used to fail silently. This rung asks
+   * the user to re-pick the book, then lets the backend verify the selection:
+   * `library_relocate_document` re-hashes the picked file and compares it to
+   * the row id (the id IS the content hash) — a different file is refused and
+   * the row is left untouched. On a match the row is relocated to the picked
+   * path and the read retries under the dialog's fresh grant, which the
+   * persisted-scope plugin then keeps, so future opens need no dialog.
+   *
+   * @returns the loaded document pair, or `null` with the store error set
+   * (cancel or wrong file).
+   */
+  const reauthorizeAccess = useCallback(
+    async (
+      document: Document,
+    ): Promise<{ pdf: PDFDocumentProxy; document: Document } | null> => {
+      const picked = await openFile({
+        multiple: false,
+        filters: [FILE_FILTERS.PDF],
+        title: `Reauthorize access to "${document.title || document.filePath}"`,
+      });
+
+      if (!picked) {
+        setError(
+          "OPEN_CANCELLED: Access reauthorization was cancelled — the book was not opened.",
+        );
+        return null;
+      }
+
+      const path = picked as string;
+      const relocated = await libraryRelocateDocument(document.id, path).catch(
+        (error) => {
+          const message = error instanceof Error ? error.message : String(error);
+          if (message.includes("HASH_MISMATCH")) {
+            setError(
+              "WRONG_DOCUMENT: The selected file is not this book — the library was not changed.",
+            );
+          } else {
+            setError(`Reauthorization failed: ${message}`);
+          }
+          return null;
+        },
+      );
+      if (!relocated) return null;
+
+      const pdf = await pdfService.loadDocument(relocated.filePath);
+      return { pdf, document: relocated };
+    },
+    [openFile, setError],
   );
 
   /**
@@ -101,6 +168,9 @@ export function useOpenPdf() {
    * from the library (already relinked by `healDocument` if its file moved),
    * and the reader lands on that row's `currentPage`.
    *
+   * When the stored path's fs grant is gone, the open falls through to the
+   * reauthorization rung instead of failing silently.
+   *
    * @returns `true` once the document is showing in the reader.
    */
   const resumeDocument = useCallback(
@@ -109,16 +179,39 @@ export function useOpenPdf() {
         setLoading(true);
         setError(null);
 
-        const pdf = await pdfService.loadDocument(document.filePath);
+        let pdf: PDFDocumentProxy;
+        let opened: Document;
+        try {
+          pdf = await pdfService.loadDocument(document.filePath);
 
-        // `last_opened_at` is bookkeeping for the home's ordering, and the row
-        // we were handed already carries everything the reader needs. Stamp it,
-        // but do not let a failed stamp stand between the reader and a book
-        // whose file has already loaded.
-        const opened = await libraryOpenDocument(document.id).catch((error) => {
-          console.warn("Failed to stamp last-opened time:", error);
-          return document;
-        });
+          // `last_opened_at` is bookkeeping for the home's ordering, and the row
+          // we were handed already carries everything the reader needs. Stamp it,
+          // but do not let a failed stamp stand between the reader and a book
+          // whose file has already loaded.
+          opened = await libraryOpenDocument(document.id).catch((error) => {
+            console.warn("Failed to stamp last-opened time:", error);
+            return document;
+          });
+        } catch (error) {
+          if (!isScopeDenial(error)) throw error;
+
+          // The stored path lost its fs grant (issue #120): reauthorize via
+          // the native dialog, verify content, relocate, retry.
+          const reauthorized = await reauthorizeAccess(document);
+          if (!reauthorized) return false; // cancel/wrong file — error is set
+          pdf = reauthorized.pdf;
+          // Stamp the re-opened row like the ordinary path does; a failed
+          // stamp must not strand a book that already reauthorized.
+          opened = await libraryOpenDocument(reauthorized.document.id).catch(
+            (error) => {
+              console.warn(
+                "Failed to stamp last-opened time after reauthorization:",
+                error,
+              );
+              return reauthorized.document;
+            },
+          );
+        }
 
         showInReader(pdf, opened);
         return true;
@@ -132,7 +225,7 @@ export function useOpenPdf() {
         setLoading(false);
       }
     },
-    [setLoading, setError, showInReader],
+    [setLoading, setError, showInReader, reauthorizeAccess],
   );
 
   return { openPdf, resumeDocument };

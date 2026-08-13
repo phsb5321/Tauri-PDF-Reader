@@ -202,3 +202,127 @@ describe("openPdf", () => {
     expect(loadDocument).not.toHaveBeenCalled();
   });
 });
+
+describe("resumeDocument reauthorization rung (issue #120)", () => {
+  const scopeDenial = new Error(
+    "path not allowed on the configured scope: /books/one.pdf",
+  );
+
+  it("scope-denied book reauthorizes through the dialog and lands in the reader", async () => {
+    const stored = doc({ currentPage: 42 });
+    const relocated = doc({
+      filePath: "/books/moved/one.pdf",
+      currentPage: 42,
+    });
+
+    loadDocument
+      .mockRejectedValueOnce(scopeDenial) // stored path: grant gone
+      .mockResolvedValueOnce(pdf(300)); // picked path: fresh dialog grant
+    openDialog.mockResolvedValue("/books/moved/one.pdf");
+    mockInvoke.mockImplementation((command: string) => {
+      switch (command) {
+        case "library_relocate_document":
+          return Promise.resolve(relocated);
+        case "library_open_document":
+          return Promise.resolve(relocated);
+        default:
+          return Promise.resolve(null);
+      }
+    });
+
+    const { result } = renderHook(() => useOpenPdf());
+    let resumed: boolean | undefined;
+    await act(async () => {
+      resumed = await result.current.resumeDocument(stored);
+    });
+
+    expect(resumed).toBe(true);
+    // The dialog explains the reauthorization, not a bare file picker.
+    expect(openDialog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: expect.stringContaining("Reauthorize"),
+      }),
+    );
+    // The row is relocated only after the backend verified the hash.
+    expect(mockInvoke).toHaveBeenCalledWith("library_relocate_document", {
+      id: "doc-1",
+      newFilePath: "/books/moved/one.pdf",
+    });
+    expect(loadDocument).toHaveBeenNthCalledWith(1, "/books/one.pdf");
+    expect(loadDocument).toHaveBeenNthCalledWith(2, "/books/moved/one.pdf");
+    const state = useDocumentStore.getState();
+    expect(state.currentDocument?.filePath).toBe("/books/moved/one.pdf");
+    expect(state.currentPage).toBe(42);
+    expect(state.pdfDocument).not.toBeNull();
+  });
+
+  it("a wrong file cannot substitute or be read — the row stays untouched", async () => {
+    const stored = doc({ currentPage: 42 });
+
+    loadDocument.mockRejectedValue(scopeDenial);
+    openDialog.mockResolvedValue("/books/evil-impostor.pdf");
+    mockInvoke.mockImplementation((command: string) => {
+      if (command === "library_relocate_document") {
+        return Promise.reject(
+          "HASH_MISMATCH: File at new path has different content",
+        );
+      }
+      return Promise.resolve(stored);
+    });
+
+    const { result } = renderHook(() => useOpenPdf());
+    let resumed: boolean | undefined;
+    await act(async () => {
+      resumed = await result.current.resumeDocument(stored);
+    });
+
+    expect(resumed).toBe(false);
+    const state = useDocumentStore.getState();
+    expect(state.error).toContain("WRONG_DOCUMENT");
+    expect(state.pdfDocument).toBeNull();
+    // The impostor's bytes were never read.
+    expect(loadDocument).toHaveBeenCalledTimes(1);
+    expect(loadDocument).not.toHaveBeenCalledWith("/books/evil-impostor.pdf");
+  });
+
+  it("cancelling the reauthorization leaves the library with an actionable error", async () => {
+    const stored = doc({ currentPage: 42 });
+
+    loadDocument.mockRejectedValue(scopeDenial);
+    openDialog.mockResolvedValue(null);
+
+    const { result } = renderHook(() => useOpenPdf());
+    let resumed: boolean | undefined;
+    await act(async () => {
+      resumed = await result.current.resumeDocument(stored);
+    });
+
+    expect(resumed).toBe(false);
+    const state = useDocumentStore.getState();
+    expect(state.error).toContain("OPEN_CANCELLED");
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "library_relocate_document",
+      expect.anything(),
+    );
+    expect(state.pdfDocument).toBeNull();
+  });
+
+  it("a granted path opens without any dialog", async () => {
+    const stored = doc({ currentPage: 12 });
+    loadDocument.mockResolvedValue(pdf(300));
+    mockInvoke.mockResolvedValue(stored);
+
+    const { result } = renderHook(() => useOpenPdf());
+    let resumed: boolean | undefined;
+    await act(async () => {
+      resumed = await result.current.resumeDocument(stored);
+    });
+
+    expect(resumed).toBe(true);
+    expect(openDialog).not.toHaveBeenCalled();
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "library_relocate_document",
+      expect.anything(),
+    );
+  });
+});
