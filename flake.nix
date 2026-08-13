@@ -81,13 +81,14 @@
           # pnpm is NOT pulled from nixpkgs (it ships pnpm 11 which clashes with
           # the project's pnpm 10 lockfile). The devshell inherits the host PATH,
           # which has Pedro's pnpm 10 at ~/.local/bin/pnpm.
-          # rustPlatform.rust pins the toolchain (rustc+cargo) to the flake's
-          # nixpkgs rev — lanes build with the SAME pinned rust the tauri-driver
-          # package uses, never an unpinned host toolchain.
+          # rustc + cargo pin the toolchain to the flake's nixpkgs rev —
+          # lanes build with the SAME pinned rust the tauri-driver package
+          # uses, never an unpinned host toolchain.
           packages = [
             pkgs.nodejs_22
             tauri-driver
-            pkgs.rustPlatform.rust
+            pkgs.rustc
+            pkgs.cargo
           ] ++ tauriLinuxDeps;
 
           # bindgen (used transitively by several -sys crates) needs libclang.
