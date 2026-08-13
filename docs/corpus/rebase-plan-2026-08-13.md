@@ -73,3 +73,60 @@ rebase; the packaged run is only eligible once all three gates land and the
 PR-head monitor: `scripts/corpus-pr-monitor.sh` (background poll, logs head
 changes to /tmp/lectrice-corpus-pr-heads.log). Rebase triggers: any of
 #122/#123/covers-PR head changes OR merge events.
+
+## Conflict map — 13/08/2026 17:52 BRT (exact heads, verified live)
+
+Heads reviewed: contrast `a47d6ba` (+WIP contrast-capture), cover `7b4e76f` (+WIP:
+cover-journey lane, cover.rs, cover-runner-contract, useCover), open local `980db38`
+(PR head `7a9464e`). Corpus branch: `125-corpus-runner` (22 commits).
+
+### File-overlap matrix (vs corpus branch files)
+
+| Prereq   | Overlapping files                                     | Verdict                                 |
+| -------- | ----------------------------------------------------- | --------------------------------------- |
+| contrast | **none** (CSS, contrast lane, wdio.conf.mjs)          | no textual conflict                     |
+| open     | **none** (useOpenPdf, ReaderView, pdf-service, tests) | no textual conflict                     |
+| cover    | **`src/e2e-native-bootstrap.ts` ONLY**                | **textual conflict expected on rebase** |
+
+### Bootstrap conflict (the one textual surface)
+
+- Corpus hunk: `@@ -177,7 +177,13 @@` — the `ipcDocumentRowPageByTitle`
+  throw (lines 174–186 of the corpus file).
+- Cover hunks: `@@ -79,6 +79,12 @@` (interface cover-probe), `@@ -102,36`,
+  `@@ -143,12`, `@@ -181,6 +205,17 @@` (installE2ENativeBootstrap).
+- Old-line ranges overlap at 181–183 → **git will raise a conflict**.
+- **Resolution (trivial, known)**: keep BOTH — the cover-probe additions in
+  the interface + installE2ENativeBootstrap, AND the corpus IPC throw in
+  `ipcDocumentRowPageByTitle`. Re-verify with `git diff` that the throw
+  (`res.status !== "ok"` → throw) survives; then re-run 23/23 controls.
+
+### Semantic integration points (no textual conflict, behavior-affecting)
+
+1. **contrast wdio.conf.mjs = the cwd/bindings fix the corpus run NEEDS.**
+   tauri-driver now spawns from `src-tauri` cwd (BINDINGS_PATH), fixing the
+   "Failed to export TypeScript bindings" panic in packaged debug runs. The
+   corpus packaged run is effectively BLOCKED until #123 merges (pre-#123 the
+   lane would panic on launch). This is the "fix cwd by rebasing #123" item.
+2. **cover e2e-profile.sh adds `XDG_CACHE_HOME="$E2E_PROFILE_DIR/cache"`.**
+   The corpus runner sets its own per-book `XDG_CACHE_HOME="$BOOK_PROFILE"`
+   AFTER sourcing e2e-profile.sh, so the corpus value wins and the post-verify
+   cache checks (`$BOOK_PROFILE/com.lectrice.reader`) keep working — but only
+   while the per-book override stays. Do NOT remove it on rebase.
+3. **cover cache filename `{doc_id}-v{FORMAT_VERSION}.png`** (domain/cover.rs
+   file_name) matches the corpus NC5 glob `covers/${SHA}-*` (doc_id == content
+   SHA) → no naming break; the corpus cover phase flips BLOCKED→live on merge.
+4. **open ReaderView.tsx changes** (reauth surface + session-restore test) do
+   not touch any corpus-asserted element (Toolbar .document-title,
+   PageNavigation input/.total-pages, library card classes). Post-merge
+   code-grounded re-verify only.
+5. **open + cover BOTH touch src/services/pdf-service.ts** — a two-way merge
+   surface between THEM (not the corpus branch); whichever lands second must
+   rebase against the other. Corpus is unaffected (does not touch that file).
+
+### Rebase execution order (per merge, then controls 23/23 after EVERY rebase)
+
+1. #123 contrast → brings the wdio cwd fix (corpus run unblocked).
+2. #122 open → clean rebase; re-verify PDF_INVALID still emitted.
+3. covers PR → the ONE expected textual conflict (bootstrap) with the known
+   resolution above; cover phase flips live; re-verify cache naming + e2e-profile
+   XDG_CACHE_HOME override retention.
