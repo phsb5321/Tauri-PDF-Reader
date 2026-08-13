@@ -146,3 +146,66 @@ jobs:
           path: ci-evidence/
           if-no-files-found: warn
           retention-days: 7
+
+  real-corpus:
+    # Post-merge/manual REAL-corpus soak (docs/packaged-lanes.md). NEVER on
+    # pull_request — PR-fast stays deterministic fixtures. Consumes
+    # LECTRICE_REAL_PDF_CORPUS (a LOCAL dir on the runner; the five-book Data
+    # Engineering corpus). Copyright boundary: the hook stages a TRANSIENT
+    # copy inside the hermetic profile (fs scope) and the artifact upload
+    # below carries ONLY logs + summary — never PDFs or derived renders.
+    name: Real-corpus soak (real PDFs, post-merge/manual)
+    if: github.event_name == 'workflow_dispatch'
+    needs: contract
+    runs-on: [self-hosted, Linux, X64, vm103]
+    timeout-minutes: 240
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Assert tauri-driver provisioned (BLOCKED if missing — never runtime-install)
+        run: |
+          DRIVER="$HOME/.cargo/bin/tauri-driver"
+          [ -x "$DRIVER" ] || { echo "BLOCKED: tauri-driver not provisioned on the runner at $DRIVER (provision once: cargo install tauri-driver --locked)"; exit 1; }
+          "$DRIVER" --help >/dev/null 2>&1
+
+      - name: Assert the real corpus is provisioned locally (BLOCKED if missing)
+        # The corpus lives on the host (never a URL); the hook never stores
+        # or uploads the PDFs.
+        run: |
+          [ -n "$LECTRICE_REAL_PDF_CORPUS" ] || { echo "BLOCKED: LECTRICE_REAL_PDF_CORPUS unset — set it in the runner .env (local dir, e.g. /home/notroot/corpus-de)"; exit 1; }
+          [ -d "$LECTRICE_REAL_PDF_CORPUS" ] || { echo "BLOCKED: LECTRICE_REAL_PDF_CORPUS=$LECTRICE_REAL_PDF_CORPUS is not a directory"; exit 1; }
+
+      - name: Run the real-corpus soak (per-book phases, machine-readable summary)
+        run: |
+          rm -rf /tmp/lectrice-corpus
+          bash scripts/e2e-real-corpus.sh
+
+      - name: Copy evidence into the workspace (logs + summary ONLY — never the corpus)
+        run: |
+          mkdir -p ci-evidence/corpus
+          cp -r /tmp/lectrice-corpus/* ci-evidence/corpus/ 2>/dev/null || true
+
+      - name: Upload corpus soak evidence (logs + summary; PDFs never leave the host)
+        uses: actions/upload-artifact@v4
+        with:
+          name: real-corpus-evidence
+          path: ci-evidence/corpus/
+          if-no-files-found: error
+          retention-days: 7

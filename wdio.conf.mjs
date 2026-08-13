@@ -6,13 +6,27 @@
  * WebKitGTK webview. Run under Xvfb on a headless/Wayland host so it never
  * touches the live session. See package.json `test:e2e`.
  */
-import { spawn } from "node:child_process";
+import { spawn, execSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const APP = path.resolve(__dirname, "src-tauri/target/debug/tauri-pdf-reader");
-const TAURI_DRIVER = path.resolve(process.env.HOME, ".cargo/bin/tauri-driver");
+// tauri-driver lookup: PATH first (the flake devShell now ships the pinned
+// build, and a `nix profile install` on the CI runner lands in
+// ~/.nix-profile/bin), then the legacy hardcoded path as fallback. An
+// explicit TAURI_DRIVER env override wins over both.
+const TAURI_DRIVER =
+  process.env.TAURI_DRIVER ||
+  (() => {
+    try {
+      return execSync("command -v tauri-driver", { stdio: ["ignore", "pipe", "ignore"] })
+        .toString()
+        .trim();
+    } catch {
+      return path.resolve(process.env.HOME, ".cargo/bin/tauri-driver");
+    }
+  })();
 const NATIVE_DRIVER = process.env.WEBKIT_WEBDRIVER || "WebKitWebDriver";
 
 let tauriDriver;
