@@ -230,4 +230,9 @@ expect_violation "local action ref" "mutable action ref found"
 sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|uses: docker://alpine:latest|' "$WF" >"$WORK/tampered.yml"
 expect_violation "docker action ref" "mutable action ref found"
 
-echo "NEGATIVE CONTROL PASS: contract catches all forty-two drop attempts for the intended reasons"
+# Tamper 43: a VALID SHA pin with a trailing YAML comment (the structural
+# exact-match class — comments are never stripped).
+sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # comment|' "$WF" >"$WORK/tampered.yml"
+expect_violation "SHA pin with trailing comment" "mutable action ref found"
+
+echo "NEGATIVE CONTROL PASS: contract catches all forty-three drop attempts for the intended reasons"
