@@ -2,24 +2,56 @@
 
 > Every page, read aloud.
 
-**Lectrice** is a local-first desktop PDF reader that reads documents aloud — highlight a passage, press play, and let it turn the page for you. Built with Tauri 2.x (React/TypeScript + Rust), with text highlighting and native text-to-speech.
+**Lectrice** is a local-first desktop PDF reader that reads documents aloud —
+highlight a passage, press play, and let it continue across pages. Built with
+Tauri 2.x (React/TypeScript + Rust).
 
-The name is French for _a person employed to read aloud to someone_ — the app is your lectrice. See [`docs/brand/`](docs/brand/) for the full brand system.
+The name is French for _a person employed to read aloud to someone_ — the app
+is your lectrice. See [`docs/brand/`](docs/brand/) for the full brand system.
+
+> **Status:** v0.1.0 shipped for **Linux (AppImage + deb)**. The current tree
+> (84 commits past the tag) is the v0.2.0 candidate; see
+> [CHANGELOG.md](CHANGELOG.md) and
+> [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md). macOS and Windows are
+> **not yet covered by packaged builds or packaged tests** — see Platform
+> support below.
 
 ## Features
 
-- Open and view local PDF files
-- Navigate pages with keyboard shortcuts
-- Zoom controls (fit width, fit page, percentage)
-- Text selection and highlighting
-- Persistent highlights stored locally
-- Native text-to-speech for highlighted text
-- Read entire pages aloud
-- Document library with reading progress
+What is in the tree today, with the receipt that proved it:
 
-## Prerequisites
+- Open and view local PDF files — offline; PDF resources (CMaps) are bundled
+  locally, no CDN egress ([#97]).
+- Text selection and highlighting, **persisted locally** and restored on
+  reopen, and **surviving a quick window close** ([#102], [#113]).
+  (Reading position on fast close is an open defect — see
+  [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).)
+- Read a highlighted passage aloud with **AI text-to-speech (ElevenLabs)**
+  ([#89], [#92]); requires an ElevenLabs API key (session-only, [#73]).
+- Resume reading: the library shows where each book left off and one action
+  lands on the right page ([#91], [#104], [#114]); narration starts when an
+  ElevenLabs key is configured ([#89], [#92]) — otherwise the reader resumes
+  silently and the home explains the setup ([SECURITY.md](SECURITY.md)).
+- Library of local documents with reading progress ([#89]).
+- Keyboard shortcuts that **derive from the real bindings** ([#111]).
+- The interface adapts to the OS text size (rem, no fixed pixel font sizes;
+  [#83], [#108], [#111]).
 
-### All Platforms
+## Platform support
+
+| Platform               | Packaged build         | Packaged E2E                               | Status                    |
+| ---------------------- | ---------------------- | ------------------------------------------ | ------------------------- |
+| Linux (AppImage + deb) | ✓ ([release workflow]) | ✓ (8 packaged E2E specs, WebKitGTK + Xvfb) | **only supported target** |
+| macOS                  | ✗ not produced         | ✗ not run                                  | not yet covered           |
+| Windows                | ✗ not produced         | ✗ not run                                  | not yet covered           |
+
+There is **no packaged evidence for macOS or Windows** in this repository —
+do not assume the app builds or runs there until a packaged artifact and a
+packaged E2E pass exist for it. The self-hosted release runner is Linux-only.
+The macOS and Windows prerequisites below are the upstream Tauri prerequisites,
+documented for future work, not claims about this app.
+
+### All Platforms (upstream Tauri prerequisites)
 
 - **Node.js**: 18+ (LTS recommended)
 - **pnpm**: 8+
@@ -40,15 +72,12 @@ sudo apt install -y \
   libssl-dev \
   libayatana-appindicator3-dev \
   librsvg2-dev
-
-# TTS (Speech Dispatcher)
-sudo apt install -y speech-dispatcher libspeechd-dev
 ```
 
 ### macOS
 
 ```bash
-# Xcode Command Line Tools
+# Xcode Command Line Tools (upstream prerequisite; no packaged build yet)
 xcode-select --install
 ```
 
@@ -56,6 +85,18 @@ xcode-select --install
 
 1. Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with "Desktop development with C++"
 2. WebView2 is typically pre-installed on Windows 10+
+
+## AI text-to-speech
+
+Lectrice speaks through **ElevenLabs** (the `elevenlabs-tts` feature is the
+default build). The page text you ask to be read aloud is sent to
+`api.elevenlabs.io` — see [SECURITY.md](SECURITY.md) for the exact egress
+contract. The API key is session-only ([#73]).
+
+There is also a `native-tts` Cargo feature (Speech Dispatcher), **not enabled
+by default** and not part of any shipped build yet. The packaged E2E suites use
+a deterministic fixture engine ([#101]); the live ElevenLabs path is not
+exercised in CI.
 
 ## Development
 
@@ -66,11 +107,33 @@ pnpm install
 # Start development server
 pnpm tauri dev
 
-# Build production
+# Build production (Linux)
 pnpm tauri build
 ```
 
-## Project Structure
+Verification (in this order, to keep this machine responsive):
+
+```bash
+pnpm lint            # ESLint
+pnpm typecheck       # tsc --noEmit
+pnpm test:run        # vitest unit/integration (jsdom, CI)
+cd src-tauri && cargo test --features test-mocks -j 1   # Rust, single-threaded
+./scripts/verify.sh  # full gate (CI parity) — heavy, only before final commit
+```
+
+Packaged E2E (Linux, needs the `nix` devShell + Xvfb; **not** run in CI):
+
+```bash
+pnpm test:e2e:all    # critical-loop + native-play
+bash e2e/run-close-journey.sh   # close-and-relaunch data-loss lanes
+bash e2e/run-highlight-journey.sh
+bash e2e/run-open-journey.sh
+bash e2e/run-reader-journey.sh
+bash e2e/run-session-journey.sh
+pnpm test:user-gate  # fuzz + packaged lanes
+```
+
+## Project structure
 
 ```
 tauri-pdf-reader/
@@ -79,16 +142,35 @@ tauri-pdf-reader/
 │   ├── services/             # API services
 │   ├── stores/               # Zustand stores
 │   ├── lib/                  # Utilities
+│   ├── ports/                # Hexagonal ports
 │   └── styles/               # CSS
 ├── src-tauri/                # Rust backend
 │   ├── src/
 │   │   ├── commands/         # Tauri commands
-│   │   ├── db/               # Database models
-│   │   └── tts/              # TTS engine
+│   │   ├── ai_tts/           # ElevenLabs TTS engine + player
+│   │   ├── db/               # SQLite models/migrations
+│   │   └── tts/              # Native TTS engine (feature-gated)
 │   └── capabilities/         # Permission capabilities
-└── tests/                    # Test files
+├── e2e/                      # Packaged E2E lanes (WebdriverIO, Linux)
+├── docs/                     # Architecture, brand, UI, ops, backlog
+└── SECURITY.md               # Egress + data contract
 ```
 
 ## License
 
 Private - All rights reserved.
+
+[#97]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/97
+[#73]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/73
+[#89]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/89
+[#91]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/91
+[#92]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/92
+[#101]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/101
+[#102]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/102
+[#104]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/104
+[#111]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/111
+[#113]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/113
+[#114]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/114
+[#83]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/83
+[#108]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/108
+[release workflow]: .github/workflows/release.yml
