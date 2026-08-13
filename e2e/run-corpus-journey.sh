@@ -84,10 +84,16 @@ toolchain_exec '
   }
 
   record_failure() {
-    local basename="$1" sha="$2" phase="$3" cmd="$4" log="$5"
-    printf "%s\t%s\t%s\t%s\t%s\n" "$basename" "$sha" "$phase" "$cmd" "$log" >> "$FAILURES"
-    echo "FAILED: $basename sha=$sha phase=$phase (logged to $FAILURES)"
+    # Delegates to the shared guards library — the negative controls test
+    # EXACTLY this record path (scripts/corpus-guards.sh).
+    guard_record "$1" "$2" "$3" "$4" "$5"
+    echo "FAILED: $1 sha=$2 phase=$3 (logged to $GUARDS_FAILURES)"
   }
+
+  # Shared guards: same logic the lightweight negative controls exercise.
+  source "$E2E_REPO_ROOT/scripts/corpus-guards.sh"
+  GUARDS_FAILURES="$FAILURES"
+  guard_init
 
   build_book() {
     local basename="$1" path="$2" phase="$3" log="$4"
@@ -147,10 +153,12 @@ toolchain_exec '
     echo "==> BOOK: $BASENAME (sha ${SHA:0:12}… pages=$PAGES) profile=$BOOK_PROFILE"
 
     # Codex gate #1: a build failure is a FAILED + recorded, not a silent skip.
+    # Delegates to the shared guard (NC1 tests this exact path).
     BUILD_LOG="$RESULTS_DIR/$BASENAME.build.log"
-    if ! build_book "$BASENAME" "$PATH_" open "$BUILD_LOG"; then
-      record_failure "$BASENAME" "$SHA" build \
-        "VITE_E2E_OPEN_PATH=$PATH_ pnpm build" "$BUILD_LOG"
+    BUILD_STATUS=0
+    build_book "$BASENAME" "$PATH_" open "$BUILD_LOG" || BUILD_STATUS=$?
+    if ! guard_build_status "$BUILD_STATUS" "$BASENAME" "$SHA" \
+      "VITE_E2E_OPEN_PATH=$PATH_ pnpm build" "$BUILD_LOG"; then
       FAILED=1
       continue
     fi
@@ -272,10 +280,8 @@ toolchain_exec '
       # covers/{SHA}-* file (recorded after card-open) and it must be GONE
       # after delete. A base with no cover surface is BLOCKED-not-green.
       COVER_LEFT=$(find "$CACHE_ROOT" -path "*covers*" -name "${SHA}-*" 2>/dev/null | head -5)
-      if [ -n "$COVER_LEFT" ]; then
-        echo "    cache-cleanup FAIL: leftover cover cache for ${SHA:0:12}: $COVER_LEFT"
-        record_failure "$BASENAME" "$SHA" cache-cleanup \
-          "find $CACHE_ROOT -path *covers* -name ${SHA}-* (post-verify)" "$RESULTS_DIR/$BASENAME.verify.log"
+      if ! guard_cache_leftover "$COVER_LEFT" "$BASENAME" "$SHA" \
+        "find $CACHE_ROOT -path *covers* -name ${SHA}-* (post-verify)" "$RESULTS_DIR/$BASENAME.verify.log"; then
         FAILED=1
       elif [ -d "$CACHE_ROOT/covers" ] || [ -d "$CACHE_ROOT/app_cache" ]; then
         echo "    cache-cleanup OK: no ${SHA:0:12}-keyed cover files remain"
@@ -323,15 +329,9 @@ toolchain_exec '
     EPUB_NAME=$(basename "$EPUB_PATH")
     # Codex gate: the enumerated EPUB must match the manifest (same basename
     # AND sha256) — a swapped/edited EPUB must refuse to run the control.
+    # Delegates to the shared guard (NC2 tests this exact path).
     EPUB_MANIFEST_SHA=$(jq -r --arg b "$EPUB_NAME" ".epub[] | select(.basename == \$b) | .sha256" "$META_MANIFEST")
-    if [ -z "$EPUB_MANIFEST_SHA" ] || [ "$EPUB_MANIFEST_SHA" = "null" ]; then
-      echo "FATAL: no manifest sha256 for $EPUB_NAME — unmanifested negative control, refusing" >&2
-      exit 3
-    fi
-    if [ "$EPUB_SHA" != "$EPUB_MANIFEST_SHA" ]; then
-      echo "FATAL: enumerated EPUB sha256 ($EPUB_SHA) != manifest ($EPUB_MANIFEST_SHA) — refusing" >&2
-      exit 3
-    fi
+    guard_epub_manifest "$EPUB_SHA" "$EPUB_MANIFEST_SHA" "$EPUB_NAME" || exit 3
     echo "==> EPUB negative control: $EPUB_NAME (manifest sha verified)"
     BUILD_LOG="$RESULTS_DIR/epub-control.build.log"
     if ! build_book "$EPUB_NAME" "$EPUB_PATH" epub-control "$BUILD_LOG"; then
@@ -365,10 +365,8 @@ toolchain_exec '
   # not a shared placeholder).
   if [ -s "$RESULTS_DIR/cover-hashes.tsv" ]; then
     COVER_ROW_COUNT=$(wc -l < "$RESULTS_DIR/cover-hashes.tsv")
-    if [ "$COVER_ROW_COUNT" -ne "$PDF_COUNT" ]; then
-      echo "==> Cover-coverage FAIL: $COVER_ROW_COUNT/$PDF_COUNT books have cover hashes — exact-count invariant violated (stale rows in a reused results dir must not false-green)"
-      record_failure "(all books)" "(multiple)" cover-coverage \
-        "cover-hashes.tsv has $COVER_ROW_COUNT rows, expected exactly $PDF_COUNT" "$RESULTS_DIR/cover-hashes.tsv"
+    # Delegates to the shared guard (NC3 tests this exact path).
+    if ! guard_cover_count "$COVER_ROW_COUNT" "$PDF_COUNT" "$RESULTS_DIR/cover-hashes.tsv"; then
       FAILED=1
     else
       echo "==> Cover-hash cross-checks (all $COVER_ROW_COUNT/$PDF_COUNT books)"
@@ -391,5 +389,5 @@ toolchain_exec '
 
   echo "==> ALL DONE. failures:"
   cat "$FAILURES"
-  exit "$FAILED"
+  exit $(( FAILED || GUARDS_FAILED ))
 '

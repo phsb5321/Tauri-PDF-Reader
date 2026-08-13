@@ -596,13 +596,33 @@ describe(`Packaged corpus journey — ${BASENAME}`, () => {
       { timeout: 15000, timeoutMsg: "target book row still present after delete" },
     );
 
-    const observerClean = await browser.execute(() => {
+    const observerClean = await browser.execute(async () => {
       const b = window.__E2E_READ__;
+      // #121 added ipcDocumentRowPageByTitle — a REAL read-only IPC probe:
+      // after delete the target row must be GONE at the backend, not just
+      // hidden in the DOM.
+      let rowAfterDelete = "probe-unavailable";
+      if (b?.ipcDocumentRowPageByTitle) {
+        try {
+          rowAfterDelete = await b.ipcDocumentRowPageByTitle(TITLE);
+        } catch (e) {
+          rowAfterDelete = `probe-error: ${String(e)}`;
+        }
+      }
       return {
-        // Read-only observer probes that exist on this base.
+        rowAfterDelete,
         storeError: b?.storeError ? b.storeError() : null,
       };
     });
+    if (observerClean.rowAfterDelete !== null) {
+      console.log(
+        "DIAG verify-row-gone:",
+        JSON.stringify({ ...BOOK, phase: "verify", rowAfterDelete: observerClean.rowAfterDelete }),
+      );
+      throw new Error(
+        `deleted row still reachable via IPC: ${JSON.stringify(observerClean.rowAfterDelete)}`,
+      );
+    }
     console.log(
       "DIAG verify-ok:",
       JSON.stringify({
