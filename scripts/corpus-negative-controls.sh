@@ -20,10 +20,17 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 GUARDS="$PWD/scripts/corpus-guards.sh"
-# CORPUS_CONTROLS_TMP: allow running where /tmp/mktemp is blocked (read-only
-# review sandboxes); defaults to mktemp -d.
-TMP="${CORPUS_CONTROLS_TMP:-$(mktemp -d)}"
-mkdir -p "$TMP"
+# CORPUS_CONTROLS_TMP: writable PARENT for the controls' scratch dir, for
+# review sandboxes where /tmp/mktemp is blocked. The actual scratch dir is a
+# script-owned mktemp CHILD under it, so cleanup never touches a caller-
+# supplied path. Default: mktemp -d under the system temp.
+TMP_PARENT="${CORPUS_CONTROLS_TMP:-}"
+if [ -n "$TMP_PARENT" ]; then
+  mkdir -p "$TMP_PARENT"
+  TMP="$(mktemp -d "$TMP_PARENT/corpus-controls.XXXXXX")"
+else
+  TMP="$(mktemp -d)"
+fi
 trap 'rm -rf "$TMP"' EXIT
 
 PASS=0
