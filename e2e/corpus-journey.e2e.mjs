@@ -49,6 +49,105 @@ const BOOK = { basename: BASENAME, sha: SHA, pages: PAGES };
 // is "Resume {title}, page …". The runner passes the full basename, so the
 // stem is derived here — same rule the backend applies.
 const TITLE = BASENAME.replace(/\.pdf$/i, "");
+async function renderedTextLayerCount(pageNum) {
+  // Codex gate #4: scope the render check to the RENDERED page's root
+  // ([data-page-number]), not a global "any text spans exist" — the native
+  // bootstrap may leave fixture spans around.
+  return browser.execute(
+    (n) => {
+      const scope = n
+        ? document.querySelector(`[data-page-number="${n}"]`)
+        : document;
+      return (scope?.querySelectorAll(".textLayer span, [class*='textLayer'] span") ?? [])
+        .length;
+    },
+    pageNum ?? null,
+  );
+}
+
+async function pageInputValue() {
+  const input = await $('input[aria-label="Current page"]');
+  return input.getValue();
+}
+
+async function documentTitleText() {
+  return browser.execute(
+    () => document.querySelector(".document-title")?.textContent ?? null,
+  );
+}
+
+async function totalPagesText() {
+  return browser.execute(
+    () => document.querySelector(".total-pages")?.textContent ?? null,
+  );
+}
+
+async function cardPagesText() {
+  // Library card page-count oracle, both view modes:
+  //  - grid:  .document-card-meta span:first-child = "{N} pages"
+  //  - list:  .document-card-pages = "{cur}/{N} pages"
+  return browser.execute(() => {
+    const grid = document.querySelector(
+      ".document-card-meta span:first-child",
+    );
+    if (grid) return grid.textContent;
+    const list = document.querySelector(".document-card-pages");
+    return list ? list.textContent : null;
+  });
+}
+
+async function cardPagesTotal() {
+  // Normalize either card format to the TOTAL page count ("N" from "{N}
+  // pages" or "{cur}/{N} pages").
+  const text = (await cardPagesText()) ?? "";
+  const m = text.match(/(?:\d+\/)?(\d+)\s+pages?/i);
+  return m ? m[1] : null;
+}
+
+async function coverContentHash() {
+  // Codex gate #5: real cover proof = the DISPLAYED raster's content hash,
+  // distinct from any fallback. The observer fetches the rendered img's
+  // blob/data URL (same-origin — CSP allows blob: for img-src) and SHA-256s
+  // the bytes. Returns null when no cover img exists.
+  return browser.execute(async () => {
+    const cover = document.querySelector(
+      "[class*='DocumentCover'], [class*='document-cover'], img[class*='cover']",
+    );
+    const img = cover?.querySelector("img") ?? cover;
+    if (!img || img.tagName !== "IMG" || !img.src) return null;
+    if (!img.src.startsWith("blob:") && !img.src.startsWith("data:")) {
+      return { error: "cover src is not blob:/data: (egress risk)", src: img.src.slice(0, 40) };
+    }
+    const resp = await fetch(img.src);
+    const buf = new Uint8Array(await resp.arrayBuffer());
+    const digest = await crypto.subtle.digest("SHA-256", buf);
+    const hex = Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    return {
+      sha256: hex,
+      bytes: buf.byteLength,
+      naturalWidth: img.naturalWidth,
+      naturalHeight: img.naturalHeight,
+    };
+  });
+}
+
+async function bookCoverDiagnostic() {
+  return browser.execute(() => {
+    const cover = document.querySelector(
+      "[class*='DocumentCover'], [class*='document-cover'], img[class*='cover']",
+    );
+    const img = cover?.querySelector("img") ?? cover;
+    return {
+      surfaceExists: !!cover,
+      isImg: !!img && img.tagName === "IMG",
+      naturalWidth: img && img.tagName === "IMG" ? img.naturalWidth : 0,
+      srcPrefix: img && img.src ? img.src.slice(0, 30) : null,
+    };
+  });
+}
+
 
 if (PHASE === "corrupt-control") {
   // NEGATIVE CONTROL #2: a corrupt .pdf (garbage bytes) must surface an
@@ -90,13 +189,16 @@ if (PHASE === "corrupt-control") {
         if (verdict) break;
         await browser.pause(500);
       }
-      if (!verdict || !verdict.ok) {
+      // Codex gate: the surfaced error must be the stable PDF_INVALID code
+      // (pdf-service), NOT any visible error — a stale/unrelated banner
+      // must not pass the control.
+      if (!verdict || !verdict.ok || !/PDF_INVALID/i.test(verdict.reason || "")) {
         console.log(
           "DIAG corrupt-control:",
           JSON.stringify({ ...BOOK, phase: "corrupt-control", verdict }),
         );
         throw new Error(
-          `corrupt open did not surface an explicit error: ${JSON.stringify(verdict)}`,
+          `corrupt open did not surface PDF_INVALID: ${JSON.stringify(verdict)}`,
         );
       }
       console.log(
@@ -291,105 +393,6 @@ if (PHASE === "corrupt-control") {
     });
   });
 } else {
-
-async function renderedTextLayerCount(pageNum) {
-  // Codex gate #4: scope the render check to the RENDERED page's root
-  // ([data-page-number]), not a global "any text spans exist" — the native
-  // bootstrap may leave fixture spans around.
-  return browser.execute(
-    (n) => {
-      const scope = n
-        ? document.querySelector(`[data-page-number="${n}"]`)
-        : document;
-      return (scope?.querySelectorAll(".textLayer span, [class*='textLayer'] span") ?? [])
-        .length;
-    },
-    pageNum ?? null,
-  );
-}
-
-async function pageInputValue() {
-  const input = await $('input[aria-label="Current page"]');
-  return input.getValue();
-}
-
-async function documentTitleText() {
-  return browser.execute(
-    () => document.querySelector(".document-title")?.textContent ?? null,
-  );
-}
-
-async function totalPagesText() {
-  return browser.execute(
-    () => document.querySelector(".total-pages")?.textContent ?? null,
-  );
-}
-
-async function cardPagesText() {
-  // Library card page-count oracle, both view modes:
-  //  - grid:  .document-card-meta span:first-child = "{N} pages"
-  //  - list:  .document-card-pages = "{cur}/{N} pages"
-  return browser.execute(() => {
-    const grid = document.querySelector(
-      ".document-card-meta span:first-child",
-    );
-    if (grid) return grid.textContent;
-    const list = document.querySelector(".document-card-pages");
-    return list ? list.textContent : null;
-  });
-}
-
-async function cardPagesTotal() {
-  // Normalize either card format to the TOTAL page count ("N" from "{N}
-  // pages" or "{cur}/{N} pages").
-  const text = (await cardPagesText()) ?? "";
-  const m = text.match(/(?:\d+\/)?(\d+)\s+pages?/i);
-  return m ? m[1] : null;
-}
-
-async function coverContentHash() {
-  // Codex gate #5: real cover proof = the DISPLAYED raster's content hash,
-  // distinct from any fallback. The observer fetches the rendered img's
-  // blob/data URL (same-origin — CSP allows blob: for img-src) and SHA-256s
-  // the bytes. Returns null when no cover img exists.
-  return browser.execute(async () => {
-    const cover = document.querySelector(
-      "[class*='DocumentCover'], [class*='document-cover'], img[class*='cover']",
-    );
-    const img = cover?.querySelector("img") ?? cover;
-    if (!img || img.tagName !== "IMG" || !img.src) return null;
-    if (!img.src.startsWith("blob:") && !img.src.startsWith("data:")) {
-      return { error: "cover src is not blob:/data: (egress risk)", src: img.src.slice(0, 40) };
-    }
-    const resp = await fetch(img.src);
-    const buf = new Uint8Array(await resp.arrayBuffer());
-    const digest = await crypto.subtle.digest("SHA-256", buf);
-    const hex = Array.from(new Uint8Array(digest))
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
-    return {
-      sha256: hex,
-      bytes: buf.byteLength,
-      naturalWidth: img.naturalWidth,
-      naturalHeight: img.naturalHeight,
-    };
-  });
-}
-
-async function bookCoverDiagnostic() {
-  return browser.execute(() => {
-    const cover = document.querySelector(
-      "[class*='DocumentCover'], [class*='document-cover'], img[class*='cover']",
-    );
-    const img = cover?.querySelector("img") ?? cover;
-    return {
-      surfaceExists: !!cover,
-      isImg: !!img && img.tagName === "IMG",
-      naturalWidth: img && img.tagName === "IMG" ? img.naturalWidth : 0,
-      srcPrefix: img && img.src ? img.src.slice(0, 30) : null,
-    };
-  });
-}
 
 describe(`Packaged corpus journey — ${BASENAME}`, () => {
   it(`${PHASE}: ${PHASE === "open"
