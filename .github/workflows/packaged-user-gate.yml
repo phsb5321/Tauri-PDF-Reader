@@ -1,0 +1,141 @@
+name: Packaged User Gate
+
+on:
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+  schedule:
+    - cron: "23 4 * * *" # nightly full matrix
+
+concurrency:
+  group: packaged-user-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+  CI: "true"
+
+jobs:
+  contract:
+    name: Gate contract (workflow cannot silently drop the gate)
+    runs-on: [self-hosted, Linux, X64, vm103]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Contract — the workflow must always run the packaged gate
+        run: ./tools/check-packaged-gate-contract.sh .github/workflows/packaged-user-gate.yml
+      - name: Contract negative-control — the check must CATCH a dropped gate
+        run: ./tools/test/packaged-gate-contract-negative-control.sh
+
+  pr-fast:
+    name: Packaged PR-fast lane (critical-loop)
+    if: github.event_name == 'pull_request'
+    needs: contract
+    runs-on: [self-hosted, Linux, X64, vm103]
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Assert tauri-driver provisioned (BLOCKED if missing — never runtime-install)
+        # wdio.conf.mjs hardcodes ~/.cargo/bin/tauri-driver. Runtime
+        # `cargo install` is rejected by review: unpinned supply chain +
+        # cold-compile time on the single-slot runner. Missing tooling is
+        # BLOCKED per the gate contract — fail loudly and provision the host
+        # once, deliberately (cargo install tauri-driver --locked, Tauri 2.x).
+        run: |
+          DRIVER="$HOME/.cargo/bin/tauri-driver"
+          [ -x "$DRIVER" ] || { echo "BLOCKED: tauri-driver not provisioned on the runner at $DRIVER (provision once: cargo install tauri-driver --locked)"; exit 1; }
+          "$DRIVER" --help >/dev/null 2>&1
+
+      - name: Packaged PR-fast lane — hermetic profile, X11 pin, Xvfb
+        # The repo's own runner: shared profile (#99 fail-closed) + flake
+        # devShell toolchain (#101 single source) + GDK_BACKEND=x11 (the
+        # negative-devicePixelRatio class) + Xvfb via -displayfd.
+        run: bash e2e/run-critical-loop.sh
+
+      - name: Copy failure evidence into the workspace (upload-artifact cannot read /tmp)
+        if: failure()
+        run: |
+          mkdir -p ci-evidence
+          cp /tmp/lectrice-e2e-critical-loop-xvfb.log ci-evidence/ 2>/dev/null || true
+          cp /tmp/lectrice-matrix-critical-loop.log ci-evidence/ 2>/dev/null || true
+
+      - name: Upload failure artifacts (honest evidence, never skipped-green)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-fast-failure-evidence
+          path: ci-evidence/
+          if-no-files-found: warn
+          retention-days: 7
+
+  full-matrix:
+    name: Full packaged matrix (all lanes, strictly serial)
+    if: github.event_name != 'pull_request'
+    needs: contract
+    runs-on: [self-hosted, Linux, X64, vm103]
+    timeout-minutes: 240
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Assert tauri-driver provisioned (BLOCKED if missing — never runtime-install)
+        run: |
+          DRIVER="$HOME/.cargo/bin/tauri-driver"
+          [ -x "$DRIVER" ] || { echo "BLOCKED: tauri-driver not provisioned on the runner at $DRIVER (provision once: cargo install tauri-driver --locked)"; exit 1; }
+          "$DRIVER" --help >/dev/null 2>&1
+
+      - name: Run all packaged lanes — one at a time
+        # Serial by construction: one job loops the eight self-contained lane
+        # runners. The single-slot runner must never be stampeded.
+        run: bash scripts/e2e-matrix.sh
+
+      - name: Copy failure evidence into the workspace (upload-artifact cannot read /tmp)
+        if: failure()
+        run: |
+          mkdir -p ci-evidence
+          cp /tmp/lectrice-matrix-*.log ci-evidence/ 2>/dev/null || true
+          cp /tmp/lectrice-e2e-*-xvfb.log ci-evidence/ 2>/dev/null || true
+
+      - name: Upload failure artifacts (per-lane evidence)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-matrix-failure-evidence
+          path: ci-evidence/
+          if-no-files-found: warn
+          retention-days: 7

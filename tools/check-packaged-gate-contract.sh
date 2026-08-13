@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+#
+# check-packaged-gate-contract.sh — proves the packaged-user-gate workflow
+# cannot silently drop the packaged Tauri user gate (the CI1/#123 trust
+# contract). Zero-dependency (bash + grep + awk), same discipline as
+# tools/alignment-gate.sh.
+#
+# What "silently drop" means, made mechanical:
+#   1. the workflow must trigger on EVERY pull request (no path filter that
+#      lets product changes dodge the lane);
+#   2. the PR-fast lane must exist and call the repo's own critical-loop
+#      runner, which must drive the critical-loop spec;
+#   3. no step may be marked continue-on-error (skip-green);
+#   4. the full tier (all lanes) must exist behind schedule + manual
+#      dispatch, wired through the serial matrix runner;
+#   5. failure evidence must be uploaded (a red lane without artifacts is a
+#      lane that can be re-labelled green without proof).
+#
+# Usage:  tools/check-packaged-gate-contract.sh [path-to-workflow.yml]
+#         default: .github/workflows/packaged-user-gate.yml
+#
+# Exit: 0 = contract holds · 1 = contract violated · 2 = usage error
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+WF="${1:-$REPO_ROOT/.github/workflows/packaged-user-gate.yml}"
+
+STATUS=0
+fail() {
+  echo "CONTRACT VIOLATION: $1" >&2
+  STATUS=1
+}
+
+[ -f "$WF" ] || { echo "CONTRACT VIOLATION: workflow not found: $WF" >&2; exit 1; }
+
+# 1. Gate on every PR.
+grep -q '^  pull_request:$' "$WF" || fail "no pull_request trigger"
+awk '/^  pull_request:$/ { in_pull=1; next }
+     in_pull && /^  [a-z0-9_-]+:$/ { exit }
+     in_pull && /^[ \t]+paths(-ignore)?:/ { print }' "$WF" | grep -q . \
+  && fail "pull_request is path-filtered — the gate can be silently skipped"
+
+# 2. PR-fast lane → the repo's critical-loop runner → the spec.
+awk '/^  pr-fast:$/ { in_job=1; next }
+     in_job && /^  [a-z0-9_-]+:$/ { exit }
+     in_job { print }' "$WF" | grep -q 'run: bash e2e/run-critical-loop.sh' \
+  || fail "pr-fast job does not run e2e/run-critical-loop.sh"
+RUNNER="$REPO_ROOT/e2e/run-critical-loop.sh"
+[ -s "$RUNNER" ] || fail "e2e/run-critical-loop.sh missing or empty"
+grep -q 'E2E_SPEC=./e2e/critical-loop.e2e.mjs' "$RUNNER" \
+  || fail "critical-loop runner does not drive the critical-loop spec"
+[ -s "$REPO_ROOT/e2e/critical-loop.e2e.mjs" ] || fail "critical-loop spec missing or empty"
+
+# 3. No skip-green anywhere.
+grep -qE '^[[:space:]]*continue-on-error:[[:space:]]*true' "$WF" && fail "continue-on-error found (skip-green)"
+
+# 4. The full tier exists behind schedule + manual dispatch, serial matrix.
+grep -q '^  schedule:$' "$WF" || fail "no nightly schedule for the full matrix"
+grep -q '^  workflow_dispatch:$' "$WF" || fail "no manual dispatch for the full matrix"
+awk '/^  full-matrix:$/ { in_job=1; next }
+     in_job && /^  [a-z0-9_-]+:$/ { exit }
+     in_job { print }' "$WF" | grep -q 'run: bash scripts/e2e-matrix.sh' \
+  || fail "full-matrix job does not run scripts/e2e-matrix.sh"
+MATRIX="$REPO_ROOT/scripts/e2e-matrix.sh"
+[ -s "$MATRIX" ] || fail "scripts/e2e-matrix.sh missing or empty"
+grep -q 'run_lane critical-loop' "$MATRIX" || fail "matrix does not include the critical-loop lane"
+grep -q 'run_lane close' "$MATRIX" || fail "matrix does not include the close lane"
+# The matrix must be serial by construction: a single loop, never a parallel
+# fan-out. Reject xargs -P / & fan-out patterns that would stampede vm103.
+grep -qE 'xargs(\s+-P|\s+--max-procs)|\s&\s*$|parallel\s' "$MATRIX" \
+  && fail "matrix script contains a parallel fan-out pattern"
+
+# 5. Failure evidence must be uploaded.
+grep -q 'actions/upload-artifact@v4' "$WF" || fail "no failure-artifact upload"
+grep -q 'if: failure()' "$WF" || fail "artifact upload not gated on failure"
+
+exit "$STATUS"
