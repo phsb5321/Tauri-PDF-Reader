@@ -13,7 +13,7 @@ CONTRACT="$(dirname "$0")/../check-packaged-gate-contract.sh"
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 # Baseline workflow file: env-overridable so the CI contract job can point it
 # at the fetched head file; default = the repo's own file.
-WF="${PACKAGED_GATE_WF:-$REPO_ROOT/.github/workflows/packaged-user-gate.yml}"
+WF="${PACKAGED_GATE_WF:-$REPO_ROOT/tools/test/fixtures/packaged-user-gate.yml}"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
@@ -117,4 +117,26 @@ expect_violation "real-corpus upload loses always()" "real-corpus evidence uploa
 sed 's|\(LECTRICE_CORPUS_OUT="[^"]*" \)bash scripts/e2e-real-corpus.sh|\1: bash scripts/e2e-real-corpus.sh|' "$WF" >"$WORK/tampered.yml"
 expect_violation "real-corpus invocation reduced to colon no-op" "real-corpus job does not run scripts/e2e-real-corpus.sh"
 
-echo "NEGATIVE CONTROL PASS: contract catches all seventeen drop attempts for the intended reasons"
+# Tamper 18: concurrency group back to per-ref (global /tmp collision class).
+sed 's|^  group: packaged-user-gate$|  group: packaged-user-gate-${{ github.ref }}|' "$WF" >"$WORK/tampered.yml"
+expect_violation "concurrency group per-ref reintroduced" "concurrency group uses github.ref"
+
+# Tamper 19: a non-guarded job allowed to run on pull_request (the reviewer's
+# full-matrix falsifier).
+sed "s|^    if: github.event_name != 'pull_request'$|    if: github.event_name == 'pull_request'|" "$WF" >"$WORK/tampered.yml"
+expect_violation "unguarded job can run on pull_request" "full-matrix job can run on pull_request without the same-repo guard"
+
+# Tamper 20: base.sha reduced to a comment (checkout loads head tools).
+sed 's|github.event.pull_request.base.sha|github.event.pull_request.head.sha # base.sha|' "$WF" >"$WORK/tampered.yml"
+expect_violation "base-sha checkout reduced to a comment" "contract job does not pin its checkout to the base sha"
+
+# Tamper 21: the enforcement step body stops testing the receipt.
+sed 's|\[ -f ci-evidence/prerequisite-failure.json \]|true|' "$WF" >"$WORK/tampered.yml"
+expect_violation "enforcement step body vacuous" "enforcement step does not test the receipt's presence"
+
+# Tamper 22: the bootstrap-inert anchor is removed (first-introduction PR
+# could self-certify).
+sed '/BOOTSTRAP-INERT/d' "$WF" >"$WORK/tampered.yml"
+expect_violation "bootstrap-inert anchor removed" "contract job lacks the bootstrap-inert anchor check"
+
+echo "NEGATIVE CONTROL PASS: contract catches all twenty-two drop attempts for the intended reasons"

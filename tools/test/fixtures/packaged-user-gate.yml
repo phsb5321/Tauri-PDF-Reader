@@ -11,7 +11,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: packaged-user-gate-${{ github.ref }}
+  # ONE fixed runner-wide group (never github.ref): the lane scripts write
+  # global /tmp evidence paths, so only one packaged-user-gate run may ever
+  # execute at a time. The single-slot runner serializes anyway; the group
+  # makes it structural and cancels superseded heads.
+  group: packaged-user-gate
   cancel-in-progress: true
 
 env:
@@ -36,6 +40,20 @@ jobs:
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.sha }}
 
+      - name: Bootstrap anchor check — base must own the gate tools
+        # Trusted-base architecture: the checker that runs here must come
+        # from BASE. This PR is the FIRST introduction of the workflow and
+        # checker — base does not own them yet, so PR-controlled self-hosted
+        # execution is INERT on this bootstrap PR: the contract job fails
+        # with this exact message, pr-fast is needs-gated off it, and no
+        # head-controlled lane runs. The merge anchors base; every later PR
+        # is enforced by the base-owned copy.
+        run: |
+          if [ ! -x tools/check-packaged-gate-contract.sh ]; then
+            echo "BOOTSTRAP-INERT: base ${{ github.event.pull_request.base.sha || github.sha }} does not yet own tools/check-packaged-gate-contract.sh — this PR only lands the infrastructure; pr-fast is needs-gated off this failure. A follow-up PR after the base anchor can enable base-owned enforcement."
+            exit 1
+          fi
+
       - name: Fetch the HEAD workflow file and run the BASE contract against it
         env:
           GH_TOKEN: ${{ github.token }}
@@ -48,14 +66,6 @@ jobs:
           fi
           gh api "repos/${{ github.repository }}/contents/.github/workflows/packaged-user-gate.yml?ref=$FILE_REF" \
             --jq '.content' | base64 -d > /tmp/head-workflow.yml
-          if [ ! -x tools/check-packaged-gate-contract.sh ]; then
-            # Bootstrap: the trust architecture lands with this PR's merge.
-            # Until then, base has no contract tool — use the head's copy for
-            # this PR only; afterwards the base copy is authoritative.
-            echo "BOOTSTRAP: base lacks tools/check-packaged-gate-contract.sh — using the head copy for this PR"
-            git fetch origin "$FILE_REF" --depth 1
-            git checkout FETCH_HEAD -- tools/check-packaged-gate-contract.sh tools/test/
-          fi
           ./tools/check-packaged-gate-contract.sh /tmp/head-workflow.yml
 
       - name: Contract negative-control (base tools, head file)

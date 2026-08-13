@@ -26,7 +26,7 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-WF="${1:-$REPO_ROOT/.github/workflows/packaged-user-gate.yml}"
+WF="${1:-$REPO_ROOT/tools/test/fixtures/packaged-user-gate.yml}"
 
 STATUS=0
 fail() {
@@ -65,7 +65,27 @@ grep -qE '^[[:space:]]*continue-on-error:' "$WF" && fail "continue-on-error foun
 #    allowed job-level condition is the PR trigger AND the same-repo guard.
 #    `if: ${{ false }}` (or any other condition, or a missing same-repo
 #    guard) makes the contract pass while GitHub skips the job or lets a fork
-#    PR execute on the self-hosted runner.
+#    PR execute on the self-hosted runner. EVERY job whose condition can be
+#    true on a pull_request must carry the same-repo guard.
+for job in $(awk '/^  [a-z0-9_-]+:$/ { gsub(":$", ""); print $1 }' "$WF"); do
+  JOB_BLOCK="$(awk -v j="$job" '$0 ~ "^  " j ":$" {f=1;next} f && /^  [a-z0-9_-]+:$/ {exit} f' "$WF")"
+  JOB_IF="$(printf '%s\n' "$JOB_BLOCK" | sed -n 's/^    if: //p')"
+  case "$JOB_IF" in
+    *pull_request*)
+      # A condition that EXCLUDES pull_request (e.g. `!= 'pull_request'`)
+      # cannot run on a PR — no guard needed. Anything else that mentions
+      # pull_request must carry the same-repo guard.
+      case "$JOB_IF" in
+        *"github.event_name != 'pull_request'"*) ;;
+        *)
+          printf '%s\n' "$JOB_IF" | grep -q 'github.event.pull_request.head.repo.full_name == github.repository' \
+            || fail "$job job can run on pull_request without the same-repo guard (fork execution)"
+          ;;
+      esac
+      ;;
+  esac
+done
+# The pr-fast condition must be EXACTLY the PR trigger + same-repo guard.
 PRFAST_BLOCK="$(awk '/^  pr-fast:$/ {f=1;next} f && /^  [a-z0-9_-]+:$/ {exit} f' "$WF")"
 JOB_IF="$(printf '%s\n' "$PRFAST_BLOCK" | sed -n 's/^    if: //p')"
 if [ -n "$JOB_IF" ]; then
@@ -78,13 +98,22 @@ printf '%s\n' "$CONTRACT_BLOCK" | sed -n 's/^    if: //p' | grep -q 'github.even
   || fail "contract job lacks the same-repo guard"
 # Trusted-base architecture: the contract job must check out the BASE tools
 # and fetch the HEAD workflow file via the API (the contract cannot be
-# head-controlled).
-printf '%s\n' "$CONTRACT_BLOCK" | grep -q 'contents/.github/workflows/packaged-user-gate.yml' \
+# head-controlled). Comment-stripped — a comment mentioning base.sha must not
+# satisfy the check.
+printf '%s\n' "$CONTRACT_BLOCK" | sed 's/#.*//' | grep -q 'contents/.github/workflows/packaged-user-gate.yml' \
   || fail "contract job does not fetch the head workflow file via the API"
-printf '%s\n' "$CONTRACT_BLOCK" | grep -q 'pull_request.base.sha' \
+printf '%s\n' "$CONTRACT_BLOCK" | sed 's/#.*//' | grep -q 'pull_request.base.sha' \
   || fail "contract job does not pin its checkout to the base sha"
-printf '%s\n' "$CONTRACT_BLOCK" | grep -q 'gh api "repos/' \
+printf '%s\n' "$CONTRACT_BLOCK" | sed 's/#.*//' | grep -q 'gh api "repos/' \
   || fail "contract job does not use gh api to fetch the head file"
+# Bootstrap-inert anchor: the contract job must fail when the base does not
+# yet own the checker (first-introduction PRs must not self-certify).
+printf '%s\n' "$CONTRACT_BLOCK" | grep -q 'BOOTSTRAP-INERT' \
+  || fail "contract job lacks the bootstrap-inert anchor check"
+# One fixed runner-wide concurrency group — the lane scripts share global
+# /tmp paths, so no two runs may ever execute.
+grep -qE '^  group: packaged-user-gate$' "$WF" || fail "concurrency group is not the fixed runner-wide packaged-user-gate"
+grep -q 'github.ref' <(sed 's/#.*//' "$WF") && fail "concurrency group uses github.ref — fixed group required"
 # Self-hosted execution trust: every mutable action ref is forbidden (SHA pins
 # only); the repo's own flake pins the toolchain, so no dtolnay@stable either.
 grep -qE 'uses: [^ ]+@(v[0-9]+|stable|main|master|latest)([[:space:]]|$)' "$WF" \
@@ -99,8 +128,15 @@ grep -q "nix develop -c bash -c 'command -v tauri-driver'" "$WF" \
 # prerequisite assert must carry the enforcement step.
 for job in pr-fast full-matrix real-corpus; do
   BLOCK="$(awk -v j="$job" '$0 ~ "^  " j ":$" {f=1;next} f && /^  [a-z0-9_-]+:$/ {exit} f' "$WF")"
+  # The enforcement step must exist, be failure-gated, and actually test the
+  # receipt's presence (a name-only or vacuous body does not enforce).
   printf '%s\n' "$BLOCK" | grep -q 'Prerequisite receipt enforced' \
     || fail "$job job lacks the prerequisite-receipt enforcement step"
+  ENF="$(printf '%s\n' "$BLOCK" | awk '/- name: Prerequisite receipt enforced/{f=1;next} f && /^      - name:/{exit} f')"
+  printf '%s\n' "$ENF" | grep -q 'if: failure()' \
+    || fail "$job enforcement step is not failure-gated"
+  printf '%s\n' "$ENF" | grep -q 'ci-evidence/prerequisite-failure.json' \
+    || fail "$job enforcement step does not test the receipt's presence"
 done
 
 # 5. The full tier exists behind schedule + manual dispatch, serial matrix.
