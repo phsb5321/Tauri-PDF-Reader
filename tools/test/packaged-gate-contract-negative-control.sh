@@ -243,4 +243,8 @@ expect_violation "quoted-key flow form with mutable value" "mutable action ref f
 sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|uses: "actions/checkout@11d5960a326750d5838078e36cf38b85af677262"|' "$WF" >"$WORK/tampered.yml"
 expect_violation "quoted SHA value" "mutable action ref found"
 
-echo "NEGATIVE CONTROL PASS: contract catches all forty-five drop attempts for the intended reasons"
+# Tamper 46: YAML-escaped uses key spelling (`\u0075ses` = `uses`).
+sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|- "\\u0075ses": actions/checkout@v4|' "$WF" >"$WORK/tampered.yml"
+expect_violation "escaped uses key spelling" "mutable action ref found"
+
+echo "NEGATIVE CONTROL PASS: contract catches all forty-six drop attempts for the intended reasons"

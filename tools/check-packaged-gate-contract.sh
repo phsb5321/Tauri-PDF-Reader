@@ -133,19 +133,19 @@ printf '%s\n' "$CONTRACT_BLOCK" | grep -q 'BOOTSTRAP-INERT' \
 # /tmp paths, so no two runs may ever execute.
 grep -qE '^  group: packaged-user-gate$' "$WF" || fail "concurrency group is not the fixed runner-wide packaged-user-gate"
 grep -q 'github.ref' <(sed 's/#.*//' "$WF") && fail "concurrency group uses github.ref — fixed group required"
-# STRUCTURAL SHA-only: every uses: value must be EXACTLY
-# `owner/repo@<40 lowercase hex>` on the raw line — no comment stripping, no
-# quote stripping, no normalization. The KEY may appear in any valid YAML
-# form (unquoted, quoted, flow `- "uses":`); the VALUE is compared raw
-# (trailing whitespace only trimmed). A trailing comment, a quoted value, a
-# no-@ form (local ./actions, docker://), a block scalar, a tag, or a branch
-# all fail the exact match.
-grep -E '^[[:space:]]*(-[[:space:]]*)?["\'']?uses["\'']?:[[:space:]]*[>|][>-]?[[:space:]]*$' "$WF" \
+# STRUCTURAL SHA-only: quoted step-level keys are REJECTED outright — YAML
+# escape spellings (`"\\u0075ses":`) cannot be trusted by a text checker,
+# so only the bare literal `uses` key is permitted. The VALUE is compared
+# RAW (no quote/comment stripping, trailing whitespace only) and must be
+# exactly `owner/repo@<40 lowercase hex>`.
+grep -E '^[[:space:]]*(-[[:space:]]*)?["'"'"'][^"'"'"']*["'"'"']:' "$WF" \
+  && fail "mutable action ref found — quoted step-level keys are rejected (escaped uses spellings); uses must be the bare literal"
+grep -E '^[[:space:]]*(-[[:space:]]*)?uses:[[:space:]]*[>|][>-]?[[:space:]]*$' "$WF" \
   && fail "mutable action ref found — block scalar uses: rejected; every uses: must be owner/repo@<40 lowercase hex>"
-grep -E '^[[:space:]]*(-[[:space:]]*)?["\'']?uses["\'']?:' "$WF" \
-  | sed -E "s/^[[:space:]]*(-[[:space:]]*)?[\"']?uses[\"']?:[[:space:]]*//; s/[[:space:]]*$//" \
+grep -E '^[[:space:]]*(-[[:space:]]*)?uses:' "$WF" \
+  | sed -E 's/^[[:space:]]*(-[[:space:]]*)?uses:[[:space:]]*//; s/[[:space:]]*$//' \
   | grep -vqE '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@[0-9a-f]{40}$' \
-  && fail "mutable action ref found — every uses: must be exactly owner/repo@<40 lowercase hex> (comments and other forms rejected)"
+  && fail "mutable action ref found — every uses: must be exactly owner/repo@<40 lowercase hex> (comments, quotes and other forms rejected)"
 # The driver prerequisite is the PINNED devShell: no host provisioning, no
 # ~/.cargo/bin hardcode.
 grep -q 'cargo/bin/tauri-driver' "$WF" && fail "driver assert hardcodes ~/.cargo/bin — the pinned devShell is the toolchain"
