@@ -365,10 +365,10 @@ toolchain_exec '
   # not a shared placeholder).
   if [ -s "$RESULTS_DIR/cover-hashes.tsv" ]; then
     COVER_ROW_COUNT=$(wc -l < "$RESULTS_DIR/cover-hashes.tsv")
-    if [ "$COVER_ROW_COUNT" -lt "$PDF_COUNT" ]; then
-      echo "==> Cover-coverage FAIL: $COVER_ROW_COUNT/$PDF_COUNT books have cover hashes — subset passing is false-green"
+    if [ "$COVER_ROW_COUNT" -ne "$PDF_COUNT" ]; then
+      echo "==> Cover-coverage FAIL: $COVER_ROW_COUNT/$PDF_COUNT books have cover hashes — exact-count invariant violated (stale rows in a reused results dir must not false-green)"
       record_failure "(all books)" "(multiple)" cover-coverage \
-        "cover-hashes.tsv has $COVER_ROW_COUNT rows, expected $PDF_COUNT" "$RESULTS_DIR/cover-hashes.tsv"
+        "cover-hashes.tsv has $COVER_ROW_COUNT rows, expected exactly $PDF_COUNT" "$RESULTS_DIR/cover-hashes.tsv"
       FAILED=1
     else
       echo "==> Cover-hash cross-checks (all $COVER_ROW_COUNT/$PDF_COUNT books)"
