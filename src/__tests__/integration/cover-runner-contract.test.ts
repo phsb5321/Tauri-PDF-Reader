@@ -16,8 +16,10 @@ import { describe, expect, it } from "vitest";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const RUNNER = join(HERE, "../../../e2e/run-cover-journey.sh");
+const SPEC = join(HERE, "../../../e2e/cover-journey.e2e.mjs");
 
 const runner = readFileSync(RUNNER, "utf8");
+const spec = readFileSync(SPEC, "utf8");
 
 describe("cover journey runner contract (121)", () => {
   it("exits with the first-phase status BEFORE any cache mutation on failure", () => {
@@ -41,10 +43,23 @@ describe("cover journey runner contract (121)", () => {
     expect(runner).not.toMatch(/toolchain_exec/);
   });
 
-  it("gates cache corruption on exactly two cached covers", () => {
+  it("the spec opens cards through a REAL WebDriver double-click, never injected events", () => {
+    // The actor contract: no dispatchEvent/MouseEvent synthesis, no element
+    // enumeration via $$ — the open button is located by its accessible text.
+    expect(spec).not.toMatch(/dispatchEvent\(new MouseEvent/);
+    expect(spec).not.toMatch(/\$\$\(/);
+    expect(spec).toMatch(/contains\(@class, 'document-card-open'\)/);
+    expect(spec).toMatch(/\.doubleClick\(\)/);
+    // wdio's expect takes exactly one argument — no chai-style messages.
+    expect(spec).not.toMatch(/expect\([^)]*,[^)]*\)/);
+  });
+
+  it("cache corruption is a REQUIRED negative control, never a silent skip", () => {
     expect(runner).toMatch(/COVER_COUNT=\$\(ls "\$COVERS_DIR" 2>\/dev\/null \| grep -c -- "-v1\.png" \|\| true\)/);
-    expect(runner).toMatch(/if \[ "\$COVER_COUNT" -eq 2 \]/);
-    // The skipped-corruption path must be visible to the verify spec.
-    expect(runner).toMatch(/echo "==> observer: WARNING expected 2 cached covers/);
+    // A count other than exactly two fails the runner — a false green must
+    // be impossible (Codex gate 121).
+    expect(runner).toMatch(/if \[ "\$COVER_COUNT" -ne 2 \]/);
+    expect(runner).toMatch(/exit 3/);
+    expect(runner).not.toMatch(/corruption skipped/);
   });
 });

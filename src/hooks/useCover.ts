@@ -26,6 +26,13 @@ const BLOB_CACHE_LIMIT = 64;
  * eviction, never on card unmount (a second card may hold the same URL).
  */
 const coverBlobCache = new Map<string, string>();
+/** Mounted-consumer count per cache key — an evicted URL is only revoked
+ *  when its LAST mounted card unmounts (Codex gate 121: the grid keeps cards
+ *  mounted while scrolling, so revoking on eviction would break a still-
+ *  visible <img> that can never regenerate — its observer is gone). */
+const coverRefs = new Map<string, number>();
+/** URLs whose key was evicted while consumers were still mounted. */
+const pendingRevokes = new Map<string, string>();
 
 let inflight = 0;
 const waiters: Array<() => void> = [];
@@ -54,10 +61,38 @@ function rememberUrl(key: string, url: string): void {
     if (oldest !== undefined) {
       const oldUrl = coverBlobCache.get(oldest);
       coverBlobCache.delete(oldest);
-      if (oldUrl) URL.revokeObjectURL(oldUrl);
+      if (oldUrl) {
+        if ((coverRefs.get(oldest) ?? 0) > 0) {
+          // Consumers still mounted — defer the revoke to their last unmount.
+          pendingRevokes.set(oldest, oldUrl);
+        } else {
+          URL.revokeObjectURL(oldUrl);
+        }
+      }
     }
   }
   coverBlobCache.set(key, url);
+}
+
+/** One mounted card per key. Returns the URL to revoke, if this was the last
+ *  consumer of a pending (evicted) URL. */
+function acquireCoverRef(key: string): void {
+  coverRefs.set(key, (coverRefs.get(key) ?? 0) + 1);
+}
+
+function releaseCoverRef(key: string): string | null {
+  const count = (coverRefs.get(key) ?? 0) - 1;
+  if (count <= 0) {
+    coverRefs.delete(key);
+    const pending = pendingRevokes.get(key);
+    if (pending) {
+      pendingRevokes.delete(key);
+      return pending;
+    }
+  } else {
+    coverRefs.set(key, count);
+  }
+  return null;
 }
 
 export type CoverState = "loading" | "ready" | "fallback";
@@ -97,6 +132,7 @@ export function useCover({
     if (!enabled || startedRef.current) return;
     startedRef.current = true;
     const key = cacheKey(documentId);
+    acquireCoverRef(key);
 
     // 1. In-memory hit — the common case for a second mount in one session.
     const cachedUrl = coverBlobCache.get(key);
@@ -200,8 +236,12 @@ export function useCover({
       { rootMargin: "200px" },
     );
     observer.observe(el);
-    return () => observer.disconnect();
-  }, [generate]);
+    return () => {
+      observer.disconnect();
+      const revoke = releaseCoverRef(cacheKey(documentId));
+      if (revoke) URL.revokeObjectURL(revoke);
+    };
+  }, [generate, documentId]);
 
   return { ref, state, url };
 }

@@ -92,21 +92,26 @@ toolchain_run '
   # half-written cache (the shell NC forces this path and proves non-zero).
   # NOTE: no sqlite3 here — the spec self-determines which card fell back
   # (exactly one of the two covers is corrupted, whichever sorts first).
+  # The corruption is a REQUIRED negative control, not best-effort: a
+  # phase-1 run that did not produce exactly two cached covers is a broken
+  # lane, and continuing would produce a false green (Codex gate 121).
   COVERS_DIR="$XDG_CACHE_HOME/com.lectrice.reader/covers"
   COVER_COUNT=$(ls "$COVERS_DIR" 2>/dev/null | grep -c -- "-v1.png" || true)
-  if [ "$COVER_COUNT" -eq 2 ]; then
-    FIRST_COVER=$(ls "$COVERS_DIR" | sort | head -1)
-    printf "%s" "truncated cover bytes" > "$COVERS_DIR/$FIRST_COVER"
-    echo "==> observer: corrupted cached cover $FIRST_COVER (negative control)"
-  else
-    echo "==> observer: WARNING expected 2 cached covers, got $COVER_COUNT — corruption skipped"
+  if [ "$COVER_COUNT" -ne 2 ]; then
+    echo "==> FATAL: expected exactly 2 cached covers, got $COVER_COUNT — refusing to continue"
+    exit 3
   fi
+  FIRST_COVER=$(ls "$COVERS_DIR" | sort | head -1)
+  printf "%s" "truncated cover bytes" > "$COVERS_DIR/$FIRST_COVER"
+  echo "==> observer: corrupted cached cover $FIRST_COVER (negative control)"
 
   echo "==> checkpoint: covers dir contents: $(ls "$COVERS_DIR" 2>/dev/null | wc -l) files"
   echo "==> PHASE verify (fresh app process, same profile, sources deleted)"
   VERIFY_STATUS=0
   EXPECT_COVER_A_HASH="$(grep -oP "COVER_A_HASH=\K[0-9a-f]+" "$PHASE1_LOG" | head -1 || true)"
+  EXPECT_COVER_B_HASH="$(grep -oP "COVER_B_HASH=\K[0-9a-f]+" "$PHASE1_LOG" | head -1 || true)"
   COVER_PHASE=verify EXPECT_COVER_A_HASH="$EXPECT_COVER_A_HASH" \
+    EXPECT_COVER_B_HASH="$EXPECT_COVER_B_HASH" \
     E2E_SPEC=./e2e/cover-journey.e2e.mjs pnpm test:e2e || VERIFY_STATUS=$?
   echo "==> PHASE verify exit: $VERIFY_STATUS"
 

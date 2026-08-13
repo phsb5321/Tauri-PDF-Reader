@@ -118,9 +118,11 @@ describe("Packaged cover journey (slice 121: real first-page covers)", () => {
       expect(hashB.naturalWidth).toBeGreaterThan(0);
       // Distinct first pages → distinct pixels. The fixtures differ in text.
       expect(hashA.hash).not.toBe(hashB.hash);
-      // The runner captures this for the verify phase's warm-cache oracle.
+      // The runner captures these for the verify phase's warm-cache oracle.
       // eslint-disable-next-line no-console
       console.log(`COVER_A_HASH=${hashA.hash}`);
+      // eslint-disable-next-line no-console
+      console.log(`COVER_B_HASH=${hashB.hash}`);
 
       // 3. Deterministic fallback: the corrupt file never generates, and its
       //    seed is derived from its (content-hash) id — stable per content.
@@ -150,16 +152,17 @@ describe("Packaged cover journey (slice 121: real first-page covers)", () => {
       );
       expect(probe).toContain("NOT_FOUND");
 
-      // 6. Opening the cover card still works: DOUBLE-click A's open button —
-      //    a single click only selects the card (LibraryView.tsx:271-272) —
-      //    and the reader lands on the stored page (2).
-      await browser.execute(() => {
-        const card = Array.from(document.querySelectorAll(".document-card--grid")).find(
-          (el) => el.textContent?.includes("E2E Resume Fixture A"),
-        );
-        const open = card?.querySelector(".document-card-open");
-        open?.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
-      });
+      // 6. Opening the cover card still works: a REAL WebDriver double-click
+      //    on A's visible open button (a single click only selects the card,
+      //    LibraryView.tsx:271-272) — the reader lands on the stored page (2).
+      // The card's open button, located by its ACCESSIBLE TEXT via XPath —
+      // no element enumeration, no injected DOM events: a real WebDriver
+      // double-click on the visible control (Codex gate 121).
+      const openButton = await $(
+        "//button[contains(@class, 'document-card-open')][contains(., 'E2E Resume Fixture A')]",
+      );
+      await openButton.waitForClickable({ timeout: 10000 });
+      await openButton.doubleClick();
       await browser.waitUntil(
         async () =>
           (await $('input[aria-label="Current page"]').getValue()) === "2",
@@ -180,6 +183,22 @@ describe("Packaged cover journey (slice 121: real first-page covers)", () => {
       // card fell back: exactly one fallback + the other ready from cache.
       // When the runner skipped the corruption (its two-covers gate), both
       // cards must be ready from cache with the phase-1 hash.
+      // Both cards must reach a TERMINAL state (the corruption targets
+      // exactly one cache file — the lexicographically first — so exactly one
+      // card falls back and the other serves its real raster from the intact
+      // cache, matching its phase-1 hash).
+      await browser.waitUntil(
+        async () => {
+          const a = await coverState("E2E Resume Fixture A");
+          const b = await coverState("E2E Resume Fixture B");
+          return (
+            a?.state === "ready" || a?.state === "fallback"
+          ) && (
+            b?.state === "ready" || b?.state === "fallback"
+          );
+        },
+        { timeout: 30000, timeoutMsg: "covers did not reach terminal states" },
+      );
       const stateA = await coverState("E2E Resume Fixture A");
       const stateB = await coverState("E2E Resume Fixture B");
       const fallbackCount = [stateA, stateB].filter(
@@ -188,22 +207,23 @@ describe("Packaged cover journey (slice 121: real first-page covers)", () => {
       const readyCount = [stateA, stateB].filter(
         (s) => s?.state === "ready",
       ).length;
-      if (fallbackCount + readyCount === 2 && fallbackCount === 1) {
-        // Corruption path: one fell back (quarantine + missing source), the
-        // other served its real raster from the intact cache.
-        const cachedState = stateA.state === "ready" ? stateA : stateB;
-        const cachedHash = await coverHash(
-          cachedState === stateA ? "E2E Resume Fixture A" : "E2E Resume Fixture B",
+      if (fallbackCount !== 1 || readyCount !== 1) {
+        throw new Error(
+          `corrupt-cache oracle: expected exactly one fallback + one ready, ` +
+            `got fallback=${fallbackCount} ready=${readyCount} ` +
+            `(A=${stateA?.state}, B=${stateB?.state})`,
         );
-        expect(cachedHash.naturalWidth).toBeGreaterThan(0);
-      } else {
-        // Skipped-corruption path: both served from cache.
-        expect(stateA.state).toBe("ready");
-        expect(stateB.state).toBe("ready");
-        const hashA = await coverHash("E2E Resume Fixture A");
-        const expected = process.env.EXPECT_COVER_A_HASH;
-        if (expected) expect(hashA.hash).toBe(expected);
       }
+      const readyCard = stateA.state === "ready" ? "A" : "B";
+      const readyHash = await coverHash(
+        readyCard === "A" ? "E2E Resume Fixture A" : "E2E Resume Fixture B",
+      );
+      expect(readyHash.naturalWidth).toBeGreaterThan(0);
+      const expectedReadyHash =
+        readyCard === "A"
+          ? process.env.EXPECT_COVER_A_HASH
+          : process.env.EXPECT_COVER_B_HASH;
+      if (expectedReadyHash) expect(readyHash.hash).toBe(expectedReadyHash);
       const stateC = await coverState("E2E Coverless");
       expect(stateC.state).toBe("fallback");
     }

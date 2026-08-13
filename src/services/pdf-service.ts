@@ -220,6 +220,10 @@ export const pdfService = {
         throw error;
       }
     } catch (error) {
+      // NOTE (Codex MINOR): the size preflight (backend stat) and this
+      // post-read byteLength belt bound the PARSE amplification; a file
+      // replaced between the stat and this read costs exactly one transient
+      // read — the belt still stops it being handed to pdf.js.
       console.warn("[PDF Service] Cover load failed:", error);
       return null;
     }

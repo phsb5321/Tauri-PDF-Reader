@@ -129,15 +129,27 @@ fn write_once(dir: &Path, name: &str, bytes: &[u8]) -> Result<(), String> {
         let mut f = fs::File::create(&tmp).map_err(|e| format!("IO_ERROR: {e}"))?;
         f.write_all(bytes).map_err(|e| format!("IO_ERROR: {e}"))?;
     }
-    match fs::rename(&tmp, &target) {
-        Ok(()) => Ok(()),
+    // Atomic NO-REPLACE publish (Codex gate 121): a rename would clobber a
+    // concurrent winner on Unix. hard_link fails with AlreadyExists if the
+    // target appeared between the exists() check and here — that is the
+    // winner's file, and ours (identical immutable content by key) is
+    // discarded. Filesystems without hard links fall back to rename with the
+    // documented last-writer-wins race.
+    match fs::hard_link(&tmp, &target) {
+        Ok(()) => {
+            let _ = fs::remove_file(&tmp);
+            Ok(())
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            let _ = fs::remove_file(&tmp);
+            Ok(()) // another writer won; same immutable content
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::Unsupported => {
+            fs::rename(&tmp, &target).map_err(|e| format!("IO_ERROR: {e}"))
+        }
         Err(e) => {
             let _ = fs::remove_file(&tmp);
-            if target.exists() {
-                Ok(()) // concurrent writer won; same immutable content
-            } else {
-                Err(format!("IO_ERROR: {e}"))
-            }
+            Err(format!("IO_ERROR: {e}"))
         }
     }
 }
