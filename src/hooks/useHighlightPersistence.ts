@@ -123,7 +123,10 @@ async function flushPendingUpdates(opts?: {
           // create); the stale retry must not clobber it (codex review,
           // MAJOR).
           const current = pendingUpdates.get(id);
-          if (current === undefined || current.timestamp === pending.timestamp) {
+          if (
+            current === undefined ||
+            current.timestamp === pending.timestamp
+          ) {
             pendingUpdates.set(id, pending);
           }
         }
