@@ -235,4 +235,12 @@ expect_violation "docker action ref" "mutable action ref found"
 sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # comment|' "$WF" >"$WORK/tampered.yml"
 expect_violation "SHA pin with trailing comment" "mutable action ref found"
 
-echo "NEGATIVE CONTROL PASS: contract catches all forty-three drop attempts for the intended reasons"
+# Tamper 44: quoted-key flow form with a mutable value (`- "uses": …`).
+sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|- "uses": actions/checkout@v4|' "$WF" >"$WORK/tampered.yml"
+expect_violation "quoted-key flow form with mutable value" "mutable action ref found"
+
+# Tamper 45: a quoted VALID SHA value (quoted values are rejected raw).
+sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|uses: "actions/checkout@11d5960a326750d5838078e36cf38b85af677262"|' "$WF" >"$WORK/tampered.yml"
+expect_violation "quoted SHA value" "mutable action ref found"
+
+echo "NEGATIVE CONTROL PASS: contract catches all forty-five drop attempts for the intended reasons"
