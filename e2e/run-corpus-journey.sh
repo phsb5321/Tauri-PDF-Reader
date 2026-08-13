@@ -128,6 +128,18 @@ toolchain_exec '
       echo "FATAL: no pages entry for $BASENAME in $META_MANIFEST" >&2
       exit 3
     fi
+    # Codex gate (sha validation): the enumerated file must BE the manifest
+    # file — same basename AND same sha256. A same-name different-binary
+    # swap must fail, not silently test an unmanifested book.
+    MANIFEST_SHA=$(jq -r --arg b "$BASENAME" ".pdfs[] | select(.basename == \$b) | .sha256" "$META_MANIFEST")
+    if [ -z "$MANIFEST_SHA" ] || [ "$MANIFEST_SHA" = "null" ]; then
+      echo "FATAL: no sha256 entry for $BASENAME in $META_MANIFEST" >&2
+      exit 3
+    fi
+    if [ "$SHA" != "$MANIFEST_SHA" ]; then
+      echo "FATAL: enumerated sha256 for $BASENAME ($SHA) != manifest ($MANIFEST_SHA) — unmanifested binary, refusing to test" >&2
+      exit 3
+    fi
     # Fix 4: per-book FRESH hermetic profile (no residue from a failed book).
     BOOK_PROFILE="$XDG_DATA_HOME/book-$i"
     mkdir -p "$BOOK_PROFILE/com.lectrice.reader"
@@ -185,12 +197,37 @@ toolchain_exec '
     else
       # Fix 3 (Codex gate): cache-cleanup checks after delete. TWO surfaces:
       # (a) cover cache files keyed by document SHA in app_cache_dir/covers;
-      # (b) SQLite tts_cache_metadata rows whose document_id = SHA (tts files
-      # are keyed by a content/voice hash, NOT the doc SHA — the DB row is the
-      # authority, per Codex gate). The cover-cache check is BLOCKED-not-green
-      # on bases without the cover surface (pre-121); the tts check runs
-      # against the hermetic profile DB.
+      # (b) SQLite tts_cache_metadata rows whose document_id = SHA. Codex
+      # gate: an unavailable oracle is BLOCKED-not-green (sets FAILED); a
+      # zero post-delete count with no PRE-delete row proves nothing.
       CACHE_ROOT="$BOOK_PROFILE/com.lectrice.reader"
+      DB="$BOOK_PROFILE/com.lectrice.reader/pdf-reader.db"
+
+      # (b) tts: only a PRE-delete row makes the post-delete zero meaningful.
+      # Check the DB first for whether the base ever created a tts cache row
+      # for this document (TTS=none creates none — that is a BLOCKED oracle,
+      # not a green).
+      TTS_PRE=0
+      if [ -f "$DB" ]; then
+        TTS_PRE=$(sqlite3 -readonly "$DB" "SELECT COUNT(*) FROM tts_cache_metadata WHERE document_id = \"$SHA\";" 2>/dev/null || echo "query-failed")
+      else
+        TTS_PRE="no-db"
+      fi
+      if [ "$TTS_PRE" = "query-failed" ] || [ -z "$TTS_PRE" ] || [ "$TTS_PRE" = "no-db" ]; then
+        echo "    cache-cleanup BLOCKED (FAILED): tts oracle unavailable (pre=$TTS_PRE) — audio-cleanup not provable on this base"
+        record_failure "$BASENAME" "$SHA" cache-cleanup-blocked \
+          "sqlite3 tts_cache_metadata query unavailable (pre-delete count)" "$RESULTS_DIR/$BASENAME.verify.log"
+        FAILED=1
+      elif [ "$TTS_PRE" -eq 0 ]; then
+        echo "    cache-cleanup BLOCKED (FAILED): no pre-delete tts_cache_metadata row — post-delete zero would be vacuous (TTS=none base)"
+        record_failure "$BASENAME" "$SHA" cache-cleanup-blocked \
+          "tts_cache_metadata pre-delete count = 0 — cleanup unprovable without a created row" "$RESULTS_DIR/$BASENAME.verify.log"
+        FAILED=1
+      fi
+
+      # (a) cover-cache fs check: a cover-capable build must have had a
+      # covers/{SHA}-* file (recorded after card-open) and it must be GONE
+      # after delete. A base with no cover surface is BLOCKED-not-green.
       COVER_LEFT=$(find "$CACHE_ROOT" -path "*covers*" -name "${SHA}-*" 2>/dev/null | head -5)
       if [ -n "$COVER_LEFT" ]; then
         echo "    cache-cleanup FAIL: leftover cover cache for ${SHA:0:12}: $COVER_LEFT"
@@ -200,33 +237,42 @@ toolchain_exec '
       elif [ -d "$CACHE_ROOT/covers" ] || [ -d "$CACHE_ROOT/app_cache" ]; then
         echo "    cache-cleanup OK: no ${SHA:0:12}-keyed cover files remain"
       else
-        echo "    cache-cleanup BLOCKED: no cover-cache dir on this base (pre-121); surface owner 121-cover-pipeline"
-      fi
-      # (b) SQLite tts metadata rows for this document — the authoritative
-      # audio-cache oracle (Codex gate). Read-only query.
-      DB="$BOOK_PROFILE/com.lectrice.reader/pdf-reader.db"
-      if [ -f "$DB" ]; then
-        TTS_ROWS=$(sqlite3 -readonly "$DB" "SELECT COUNT(*) FROM tts_cache_metadata WHERE document_id = \"$SHA\";" 2>/dev/null || echo "query-failed")
-        if [ "$TTS_ROWS" = "query-failed" ] || [ -z "$TTS_ROWS" ]; then
-          echo "    cache-cleanup WARN: tts_cache_metadata query unavailable ($TTS_ROWS) — audio-cache claim not proven on this base"
-        elif [ "$TTS_ROWS" -gt 0 ]; then
-          echo "    cache-cleanup FAIL: $TTS_ROWS tts_cache_metadata row(s) remain for ${SHA:0:12}"
-          record_failure "$BASENAME" "$SHA" cache-cleanup \
-            "sqlite3 -readonly $DB \"SELECT COUNT(*) FROM tts_cache_metadata WHERE document_id=\"$SHA\"\" (post-verify)" "$RESULTS_DIR/$BASENAME.verify.log"
-          FAILED=1
-        else
-          echo "    cache-cleanup OK: 0 tts_cache_metadata rows for ${SHA:0:12}"
-        fi
-      else
-        echo "    cache-cleanup BLOCKED: no profile DB — nothing to assert"
+        echo "    cache-cleanup BLOCKED (FAILED): no cover-cache dir on this base (pre-121)"
+        record_failure "$BASENAME" "$SHA" cache-cleanup-blocked \
+          "no covers/ dir in $CACHE_ROOT — cover-cleanup unprovable pre-121" "$RESULTS_DIR/$BASENAME.verify.log"
+        FAILED=1
       fi
     fi
   done
 
-  # EPUB negative control: the open flow must refuse it (filter is .pdf).
-  # Codex gate #2: the spec now exits 0 ONLY when an explicit
-  # unsupported-format refusal is surfaced (bounded settle); any other
-  # outcome exits non-zero. Assert + record the status — no grep||true.
+  # ── NEGATIVE CONTROLS (Codex gate: always exercised, never skipped). ──
+  # (1) corrupt-control: a hermetic garbage .pdf (generated here, never a
+  # corpus file) must surface PDF_INVALID after a bounded settle.
+  echo "==> corrupt negative control"
+  CORRUPT_PATH="$XDG_DATA_HOME/corrupt-control.pdf"
+  printf "%%PDF-1.7 this is not a real pdf %s\n" "$(date +%s)" > "$CORRUPT_PATH"
+  BUILD_LOG="$RESULTS_DIR/corrupt-control.build.log"
+  if ! build_book "corrupt-control.pdf" "$CORRUPT_PATH" corrupt-control "$BUILD_LOG"; then
+    record_failure "corrupt-control.pdf" "generated" build \
+      "VITE_E2E_OPEN_PATH=$CORRUPT_PATH pnpm build" "$BUILD_LOG"
+    FAILED=1
+  else
+    LOG="$RESULTS_DIR/corrupt-control.log"
+    CORRUPT_STATUS=0
+    E2E_SPEC=./e2e/corpus-journey.e2e.mjs CORPUS_PHASE=corrupt-control \
+      CORPUS_BASENAME="corrupt-control.pdf" CORPUS_SHA="generated" CORPUS_PAGES=0 \
+      pnpm test:e2e >"$LOG" 2>&1 || CORRUPT_STATUS=$?
+    echo "    corrupt-control exit: $CORRUPT_STATUS (0 = PDF_INVALID surfaced)"
+    if [ "$CORRUPT_STATUS" -ne 0 ]; then
+      record_failure "corrupt-control.pdf" "generated" corrupt-control \
+        "E2E_SPEC=./e2e/corpus-journey.e2e.mjs CORPUS_PHASE=corrupt-control pnpm test:e2e" "$LOG"
+      FAILED=1
+    fi
+  fi
+
+  # (2) EPUB negative control: the open flow must refuse it with PDF_INVALID.
+  # A corpus WITHOUT an epub is a MISSING control — recorded as a failure
+  # (Codex gate: absence of a negative control is not green).
   EPUB_COUNT=$(echo "$CORPUS_JSON" | jq ".epub | length")
   if [ "$EPUB_COUNT" -gt 0 ]; then
     EPUB_PATH=$(echo "$CORPUS_JSON" | jq -r ".epub[0].path")
@@ -252,7 +298,45 @@ toolchain_exec '
       fi
     fi
   else
-    echo "==> WARN: no EPUB in corpus — negative control not exercised"
+    echo "==> FAIL: no EPUB in corpus — negative control missing (Codex gate: not green)"
+    record_failure "(missing epub)" "(none)" epub-control \
+      "corpus has no .epub file to exercise the unsupported-format refusal" "(none)"
+    FAILED=1
+  fi
+
+  # Codex gate #7: tie the cover evidence together — (a) each book
+  # rendered blob hash (DIAG contentSha256 in the card-open log) must equal
+  # rendered blob hash (DIAG contentSha256 in the card-open log) must equal
+  # its cached covers/{SHA}-* file hash (rendered == cached); (b) all cached
+  # cover hashes must be mutually distinct (real per-book first pages, not a
+  # shared placeholder). Only evaluated when cover-hashes.tsv has entries.
+  if [ -s "$RESULTS_DIR/cover-hashes.tsv" ]; then
+    echo "==> Cover-hash cross-checks"
+    while IFS=$(printf "\t") read -r cbasename csha cfilehash; do
+      BLOBSHA=$(grep -o "\"contentSha256\":\"[0-9a-f]*" "$RESULTS_DIR/$cbasename.card-open.log" 2>/dev/null | head -1 | sed "s/.*:\"//")
+      if [ -n "$BLOBSHA" ] && [ "$BLOBSHA" != "$cfilehash" ]; then
+        echo "    cover-tie FAIL: $cbasename rendered=$BLOBSHA cache=$cfilehash"
+        record_failure "$cbasename" "$csha" cover-tie \
+          "rendered blob sha256 != cached file sha256" "$RESULTS_DIR/$cbasename.card-open.log"
+        FAILED=1
+      elif [ -n "$BLOBSHA" ]; then
+        echo "    cover-tie OK: $cbasename rendered==cached (${cfilehash:0:12}…)"
+      fi
+    done < "$RESULTS_DIR/cover-hashes.tsv"
+    DUPES=$(cut -f3 "$RESULTS_DIR/cover-hashes.tsv" | sort | uniq -d)
+    if [ -n "$DUPES" ]; then
+      echo "    cover-distinct FAIL: identical cover hashes across books: $DUPES"
+      record_failure "(cross-book)" "(multiple)" cover-distinct \
+        "duplicate cover content hashes in cover-hashes.tsv" "$RESULTS_DIR/cover-hashes.tsv"
+      FAILED=1
+    else
+      echo "    cover-distinct OK: all $(wc -l < "$RESULTS_DIR/cover-hashes.tsv") covers distinct"
+    fi
+  else
+    echo "==> Cover-hash cross-checks BLOCKED (FAILED): no cover-hashes.tsv — no cover cache proof on this base"
+    record_failure "(all books)" "(none)" cover-proof-blocked \
+      "no covers/{SHA}-* cache files recorded (pre-121 base)" "$RESULTS_DIR"
+    FAILED=1
   fi
 
   echo "==> ALL DONE. failures:"

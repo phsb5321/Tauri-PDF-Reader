@@ -5,8 +5,11 @@
  * Reads the corpus root from LECTRICE_REAL_PDF_CORPUS (a directory). Lists
  * PDFs deterministically (sorted, no hidden files, no symlinks escaping the
  * root, size-capped) and flags EPUB files as the unsupported-format negative
- * control. Prints a JSON document: { root, pdfs: [{basename,path,size}],
- * epub: [...] }. NEVER reads book bytes beyond stat metadata.
+ * control. Streams each file once for its SHA-256 (the runner validates it
+ * against the committed metadata manifest — an unmanifested binary is
+ * refused). Prints a JSON document: { root, pdfs: [{basename,path,size,
+ * sha256}], epub: [...], skipped: [...] }. NEVER writes or copies book bytes
+ * anywhere — digest-only streaming.
  *
  * Usage:
  *   LECTRICE_REAL_PDF_CORPUS="/path/to/books" node scripts/corpus-enumerate.mjs

@@ -160,10 +160,10 @@ if (PHASE === "corrupt-control") {
       }
 
       // ── Codex gate #4: the card's public meta must show the manifest page
-      //    count ("{cur}/{total} pages").
+      //    count (grid "{N} pages" or list "{cur}/{N} pages").
       const cardPages = await cardPagesText();
-      const cardTotal = cardPages ? cardPages.match(/\/(\d+)\s+pages/) : null;
-      if (!cardTotal || String(cardTotal[1]) !== String(PAGES)) {
+      const cardTotal = await cardPagesTotal();
+      if (!cardTotal || String(cardTotal) !== String(PAGES)) {
         console.log(
           "DIAG card-total-fail:",
           JSON.stringify({ ...BOOK, phase: "card-open", step: "card-total", expected: PAGES, got: cardPages }),
@@ -265,12 +265,11 @@ if (PHASE === "corrupt-control") {
         );
         throw new Error("epub open flow did not settle: no refusal surfaced");
       }
-      // Codex gate (epub): require BOTH a format term AND a document-type
-      // term — a generic "invalid api key" or "request rejected" must not
-      // pass as an unsupported-format refusal.
-      const explicit =
-        /(invalid|unsupported|not\s+supported|reject|error)/i.test(verdict.reason || "") &&
-        /(pdf|epub|document|file|format)/i.test(verdict.reason || "");
+      // Codex gate (epub): the surfaced error must be the app's stable
+      // open-failure code — pdf-service throws "PDF_INVALID: The file is not
+      // a valid PDF or is corrupted" for any file pdf.js rejects. Requiring
+      // this code excludes generic "Error loading file" false passes.
+      const explicit = /PDF_INVALID/i.test(verdict.reason || "");
       if (!verdict.refused || !explicit) {
         console.log(
           "DIAG epub-control:",
@@ -327,11 +326,25 @@ async function totalPagesText() {
 }
 
 async function cardPagesText() {
-  // Library card meta: "{current}/{total} pages" — the public total-pages
-  // oracle on the library surface.
-  return browser.execute(
-    () => document.querySelector(".document-card-pages")?.textContent ?? null,
-  );
+  // Library card page-count oracle, both view modes:
+  //  - grid:  .document-card-meta span:first-child = "{N} pages"
+  //  - list:  .document-card-pages = "{cur}/{N} pages"
+  return browser.execute(() => {
+    const grid = document.querySelector(
+      ".document-card-meta span:first-child",
+    );
+    if (grid) return grid.textContent;
+    const list = document.querySelector(".document-card-pages");
+    return list ? list.textContent : null;
+  });
+}
+
+async function cardPagesTotal() {
+  // Normalize either card format to the TOTAL page count ("N" from "{N}
+  // pages" or "{cur}/{N} pages").
+  const text = (await cardPagesText()) ?? "";
+  const m = text.match(/(?:\d+\/)?(\d+)\s+pages?/i);
+  return m ? m[1] : null;
 }
 
 async function coverContentHash() {
