@@ -20,7 +20,10 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 GUARDS="$PWD/scripts/corpus-guards.sh"
-TMP="$(mktemp -d)"
+# CORPUS_CONTROLS_TMP: allow running where /tmp/mktemp is blocked (read-only
+# review sandboxes); defaults to mktemp -d.
+TMP="${CORPUS_CONTROLS_TMP:-$(mktemp -d)}"
+mkdir -p "$TMP"
 trap 'rm -rf "$TMP"' EXIT
 
 PASS=0
