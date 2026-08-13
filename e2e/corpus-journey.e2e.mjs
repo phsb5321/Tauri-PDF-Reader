@@ -44,6 +44,12 @@ const PAGES = Number(process.env.CORPUS_PAGES || "0");
 
 const BOOK = { basename: BASENAME, sha: SHA, pages: PAGES };
 
+// The library row title is the file stem (backend derives it via
+// Path::file_stem in library_add_document); the resume button's aria-label
+// is "Resume {title}, page …". The runner passes the full basename, so the
+// stem is derived here — same rule the backend applies.
+const TITLE = BASENAME.replace(/\.pdf$/i, "");
+
 if (PHASE === "card-open") {
   // Re-check of the Mac card-open failure (issue #120 corpus finding):
   // AXPress on the library card left the UI at Library after 8s. This phase
@@ -280,7 +286,7 @@ describe(`Packaged corpus journey — ${BASENAME}`, () => {
     // CLAIM 4: the library row persisted page 2 of N (the autosave), and
     // resuming lands on the RENDERED page 2.
     const resume = await $(
-      `button[aria-label^="Resume ${BASENAME.replace(/"/g, '\\"')}"]`,
+      `button[aria-label^="Resume ${TITLE.replace(/"/g, '\\"')}"]`,
     );
     await resume.waitForExist({ timeout: 30000 });
     const resumeLabel = await resume.getAttribute("aria-label");
@@ -295,7 +301,7 @@ describe(`Packaged corpus journey — ${BASENAME}`, () => {
     await resume.waitForClickable({ timeout: 15000 });
     await browser.execute(() =>
       document
-        .querySelector(`button[aria-label^="Resume ${BASENAME.replace(/"/g, '\\"')}"]`)
+        .querySelector(`button[aria-label^="Resume ${TITLE.replace(/"/g, '\\"')}"]`)
         ?.click(),
     );
     await browser.waitUntil(
