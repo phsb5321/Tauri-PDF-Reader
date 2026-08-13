@@ -55,14 +55,24 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Assert tauri-driver provisioned (BLOCKED if missing — never runtime-install)
-        # wdio.conf.mjs hardcodes ~/.cargo/bin/tauri-driver. Runtime
-        # `cargo install` is rejected by review: unpinned supply chain +
-        # cold-compile time on the single-slot runner. Missing tooling is
-        # BLOCKED per the gate contract — fail loudly and provision the host
-        # once, deliberately (cargo install tauri-driver --locked, Tauri 2.x).
+        # wdio.conf.mjs looks up the driver PATH-first with a ~/.cargo/bin
+        # fallback. Runtime `cargo install` is rejected by review: unpinned
+        # supply chain + cold-compile time on the single-slot runner. Missing
+        # tooling is BLOCKED per the gate contract — and on BLOCKED a
+        # machine-readable prerequisite-failure receipt is written into the
+        # workspace BEFORE exiting, because at this point no /tmp lane log
+        # exists yet and every red must upload evidence (never a bare
+        # no-files-found warning). Provision the host once, deliberately:
+        # nix profile install github:phsb5321/Tauri-PDF-Reader/main#tauri-driver
+        # && ln -s ~/.nix-profile/bin/tauri-driver ~/.cargo/bin/tauri-driver.
         run: |
           DRIVER="$HOME/.cargo/bin/tauri-driver"
-          [ -x "$DRIVER" ] || { echo "BLOCKED: tauri-driver not provisioned on the runner at $DRIVER (provision once: cargo install tauri-driver --locked)"; exit 1; }
+          if [ ! -x "$DRIVER" ]; then
+            mkdir -p ci-evidence
+            printf '{"blocked":"tauri-driver not provisioned","path":"%s","remedy":"nix profile install github:phsb5321/Tauri-PDF-Reader/main#tauri-driver && ln -s ~/.nix-profile/bin/tauri-driver ~/.cargo/bin/tauri-driver","time":"%s"}\n' "$DRIVER" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ci-evidence/prerequisite-failure.json
+            echo "BLOCKED: tauri-driver not provisioned at $DRIVER — see ci-evidence/prerequisite-failure.json"
+            exit 1
+          fi
           "$DRIVER" --help >/dev/null 2>&1
 
       - name: Packaged PR-fast lane — hermetic profile, X11 pin, Xvfb
@@ -120,7 +130,12 @@ jobs:
       - name: Assert tauri-driver provisioned (BLOCKED if missing — never runtime-install)
         run: |
           DRIVER="$HOME/.cargo/bin/tauri-driver"
-          [ -x "$DRIVER" ] || { echo "BLOCKED: tauri-driver not provisioned on the runner at $DRIVER (provision once: cargo install tauri-driver --locked)"; exit 1; }
+          if [ ! -x "$DRIVER" ]; then
+            mkdir -p ci-evidence
+            printf '{"blocked":"tauri-driver not provisioned","path":"%s","remedy":"nix profile install github:phsb5321/Tauri-PDF-Reader/main#tauri-driver && ln -s ~/.nix-profile/bin/tauri-driver ~/.cargo/bin/tauri-driver","time":"%s"}\n' "$DRIVER" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ci-evidence/prerequisite-failure.json
+            echo "BLOCKED: tauri-driver not provisioned at $DRIVER — see ci-evidence/prerequisite-failure.json"
+            exit 1
+          fi
           "$DRIVER" --help >/dev/null 2>&1
 
       - name: Run all packaged lanes — one at a time
@@ -182,14 +197,26 @@ jobs:
       - name: Assert tauri-driver provisioned (BLOCKED if missing — never runtime-install)
         run: |
           DRIVER="$HOME/.cargo/bin/tauri-driver"
-          [ -x "$DRIVER" ] || { echo "BLOCKED: tauri-driver not provisioned on the runner at $DRIVER (provision once: cargo install tauri-driver --locked)"; exit 1; }
+          if [ ! -x "$DRIVER" ]; then
+            mkdir -p ci-evidence
+            printf '{"blocked":"tauri-driver not provisioned","path":"%s","remedy":"nix profile install github:phsb5321/Tauri-PDF-Reader/main#tauri-driver && ln -s ~/.nix-profile/bin/tauri-driver ~/.cargo/bin/tauri-driver","time":"%s"}\n' "$DRIVER" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ci-evidence/prerequisite-failure.json
+            echo "BLOCKED: tauri-driver not provisioned at $DRIVER — see ci-evidence/prerequisite-failure.json"
+            exit 1
+          fi
           "$DRIVER" --help >/dev/null 2>&1
 
       - name: Assert the real corpus is provisioned locally (BLOCKED if missing)
         # The corpus lives on the host (never a URL); the hook never stores
-        # or uploads the PDFs.
+        # or uploads the PDFs. Same receipt discipline as the driver assert:
+        # a machine-readable prerequisite-failure.json is written before exit
+        # so this red always carries evidence.
         run: |
-          [ -n "$LECTRICE_REAL_PDF_CORPUS" ] || { echo "BLOCKED: LECTRICE_REAL_PDF_CORPUS unset — set it in the runner .env (local dir, e.g. /home/notroot/corpus-de)"; exit 1; }
+          if [ -z "$LECTRICE_REAL_PDF_CORPUS" ]; then
+            mkdir -p ci-evidence
+            printf '{"blocked":"LECTRICE_REAL_PDF_CORPUS unset","remedy":"set it in the runner .env (local dir, e.g. /home/notroot/corpus-de)","time":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ci-evidence/prerequisite-failure.json
+            echo "BLOCKED: LECTRICE_REAL_PDF_CORPUS unset — see ci-evidence/prerequisite-failure.json"
+            exit 1
+          fi
           [ -d "$LECTRICE_REAL_PDF_CORPUS" ] || { echo "BLOCKED: LECTRICE_REAL_PDF_CORPUS=$LECTRICE_REAL_PDF_CORPUS is not a directory"; exit 1; }
 
       - name: Run the real-corpus soak (per-book phases, machine-readable summary)
@@ -206,6 +233,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: real-corpus-evidence
-          path: ci-evidence/corpus/
+          path: |
+            ci-evidence/corpus/
+            ci-evidence/prerequisite-failure.json
           if-no-files-found: error
           retention-days: 7

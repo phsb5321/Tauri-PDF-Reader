@@ -9,7 +9,7 @@
 - **Name:** `tauri-pdf-reader-runner-vm103` (labels: `self-hosted, Linux, X64, vm103, tauri-pdf-reader`)
 - **Host:** vm103 / hostname `githu-runner` / LAN `192.168.1.113` (reach via `ProxyJump` — NOT on Tailscale directly)
 - **Topology:** Proxmox guest on node `home302server` (cluster: home301/302/303). The "GithubNode" guest.
-- **Concurrency:** **single-slot** — drains the queue *serially*. This is the load-bearing fact.
+- **Concurrency:** **single-slot** — drains the queue _serially_. This is the load-bearing fact.
 
 ## What "busy:true / 0 in-progress" actually means
 
@@ -74,13 +74,13 @@ genuinely referenced by the dependency tree, so the tarball stays in the
 hundreds of megabytes and the stall stays possible.
 
 **Fixed on `main` by PR #52 (`3bcbf3d`, 31/07/2026): the pnpm cache step is
-gone.** The runner is *persistent* and its store lives at
+gone.** The runner is _persistent_ and its store lives at
 `~/.local/share/pnpm/store`, outside the workspace — so it survives
 `actions/checkout`'s clean and is already warm on the next run. The GitHub cache
 round-trip was uploading a directory that never needed restoring. Frontend
 Checks takes **1m17s** with the step removed.
 
-**Do not assume the class is closed.** #52 removed the *pnpm* cache; the two
+**Do not assume the class is closed.** #52 removed the _pnpm_ cache; the two
 Rust jobs still cache — `ci.yml:125` (Backend) and `:186` (Contract Tests) — and
 what they cache is `~/.cargo/registry`, `~/.cargo/git` **and `src-tauri/target`**,
 a multi-gigabyte directory, so their upload is considerably larger than the pnpm
@@ -88,7 +88,7 @@ store's ever was. Their walls are `timeout-minutes: 15` and `10`. A red Backend
 Checks that dies at almost exactly 15 minutes with every substantive step green
 in the log is this same failure wearing a different job name: re-run it, do not
 read the diff. The "a persistent runner already has it on disk" argument applies
-to the cargo caches at least as strongly — but `src-tauri/target` *is* inside
+to the cargo caches at least as strongly — but `src-tauri/target` _is_ inside
 the workspace, so unlike the pnpm store it does not survive `actions/checkout`,
 and removing that cache is a real trade against cold Rust rebuilds rather than
 the free deletion #52 was. Measure before copying the fix across.
@@ -96,6 +96,7 @@ the free deletion #52 was. Measure before copying the fix across.
 ## Why the queue stacks (and why that's fine)
 
 Each push to `main` (merge) triggers multiple workflows:
+
 - `CI` (Frontend + Backend + Contract Tests + Alignment Gate + Knip + type-coverage + Coverage)
 - `sonar` (single scan job)
 - `CodeQL` (runs on GitHub-hosted, not vm103 — finishes fast, doesn't count)
@@ -114,4 +115,14 @@ vm103 processes them **serially** (1 slot). A merge that triggers 2 CI runs + 1 
 2. **The 5-min falsifier test catches transient job-transition windows.** Apply before escalating.
 3. **Single-concurrency serial draining is normal** — the queue length is proportional to recent merges, not a wedge indicator.
 4. **`##[error]The operation was canceled.` in Frontend Checks means the job timed out, not that a human cancelled it.** Read the last timestamp before the error and compare it to when the tests finished; an eight-minute gap of identical `Sent …` lines is the cache upload, not your diff.
-5. **Cancel superseded runs by hand.** `ci.yml` has no `concurrency` group, so pushing to a branch queues a *second* run rather than replacing the first, and on a one-slot runner the stale one is charged real minutes ahead of the live one. `gh run cancel <id>` on the run whose `headSha` no longer matches the PR head.
+5. **Cancel superseded runs by hand.** `ci.yml` has no `concurrency` group, so pushing to a branch queues a _second_ run rather than replacing the first, and on a one-slot runner the stale one is charged real minutes ahead of the live one. `gh run cancel <id>` on the run whose `headSha` no longer matches the PR head.
+
+## Known infra debt — catalogue only, do not patch from this repo (13/08/2026)
+
+- **`runner-cleanup-hook.sh` line 192 logs
+  `/var/log/runner-cleanup.log.tmp: Permission denied`** on every job
+  completion (observed on the packaged-user-gate PR #119 runs, 13/08). The
+  hook runs as the runner user but the log path needs root; the hook's OWN
+  logging fails — job results and the cleanup itself are unaffected. The fix
+  belongs to the runner host admin (writable log path or chown), never to a
+  repo/workflow file. Same class as the earlier `/var/log` quirk family.
