@@ -90,4 +90,8 @@ cp "$WF" "$WORK/tampered.yml"
 sed 's|if: always()|if: success()|' "$WORK/tampered.yml" >"$WORK/tampered2.yml" && mv "$WORK/tampered2.yml" "$WORK/tampered.yml"
 expect_violation "real-corpus upload loses always()" "real-corpus evidence upload is not if: always()"
 
-echo "NEGATIVE CONTROL PASS: contract catches all eleven drop attempts for the intended reasons"
+# Tamper 12: colon no-op on the corpus invocation (the anchored-runner class).
+sed 's|^          bash scripts/e2e-real-corpus.sh|          : bash scripts/e2e-real-corpus.sh|' "$WF" >"$WORK/tampered.yml"
+expect_violation "real-corpus invocation reduced to colon no-op" "real-corpus job does not run scripts/e2e-real-corpus.sh"
+
+echo "NEGATIVE CONTROL PASS: contract catches all twelve drop attempts for the intended reasons"

@@ -100,12 +100,17 @@ CORPUS_BLOCK="$(awk '/^  real-corpus:$/ {f=1;next} f && /^  [a-z0-9_-]+:$/ {exit
 CORPUS_JOB_IF="$(printf '%s\n' "$CORPUS_BLOCK" | sed -n 's/^    if: //p')"
 printf '%s\n' "$CORPUS_JOB_IF" | grep -qx 'github.event_name == '\''workflow_dispatch'\''' \
   || fail "real-corpus job-level if: is not exactly the workflow_dispatch trigger"
-printf '%s\n' "$CORPUS_BLOCK" | sed 's/#.*//' | grep -q 'bash scripts/e2e-real-corpus.sh' \
+printf '%s\n' "$CORPUS_BLOCK" | sed 's/#.*//' \
+  | grep -qE '^[[:space:]]*bash scripts/e2e-real-corpus.sh([[:space:]]|$)' \
   || fail "real-corpus job does not run scripts/e2e-real-corpus.sh"
 [ -s "$REPO_ROOT/scripts/e2e-real-corpus.sh" ] || fail "scripts/e2e-real-corpus.sh missing or empty"
 grep -q 'LECTRICE_REAL_PDF_CORPUS' "$REPO_ROOT/scripts/e2e-real-corpus.sh" \
   || fail "corpus runner does not consume LECTRICE_REAL_PDF_CORPUS"
-printf '%s\n' "$CORPUS_BLOCK" | grep -q 'if: always()' \
+# The always() guard must be ON THE UPLOAD STEP itself, not merely somewhere
+# in the job (a copy-step always() with a success()-guarded upload would
+# strand the receipt).
+UPLOAD_BLOCK="$(printf '%s\n' "$CORPUS_BLOCK" | awk '/- name: Upload corpus soak evidence/{f=1;next} f && /^      - name:/{exit} f')"
+printf '%s\n' "$UPLOAD_BLOCK" | grep -q 'if: always()' \
   || fail "real-corpus evidence upload is not if: always() — a BLOCKED receipt would never upload"
 
 # 7. Failure evidence must be uploaded.

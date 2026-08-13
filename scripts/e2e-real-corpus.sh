@@ -61,7 +61,13 @@ echo "corpus: ${#BOOKS[@]} books from $CORPUS"
 for b in "${BOOKS[@]}"; do echo "  - $(basename "$b") ($(du -h "$b" | cut -f1))"; done
 
 echo "==> Building frontend (VITE_E2E bridge, one build for all books)"
-VITE_E2E=true pnpm build
+VITE_E2E=true pnpm build >/tmp/lectrice-corpus-frontend-build.log 2>&1
+BUILD_RC=$?
+if [ $BUILD_RC -ne 0 ]; then
+  echo "BLOCKED: frontend build failed (rc=$BUILD_RC) — log: /tmp/lectrice-corpus-frontend-build.log"
+  printf '{"blocked":"frontend build failed","phase":"build","exit_code":%d}\n' "$BUILD_RC" >"$OUT/summary.json"
+  exit 1
+fi
 touch src-tauri/src/lib.rs
 
 # The packaged lane launches src-tauri/target/debug/tauri-pdf-reader — the
