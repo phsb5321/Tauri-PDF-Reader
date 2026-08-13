@@ -249,7 +249,10 @@ describe("resumeDocument reauthorization rung (issue #120)", () => {
       newFilePath: "/books/moved/one.pdf",
     });
     expect(loadDocument).toHaveBeenNthCalledWith(1, "/books/one.pdf");
-    expect(loadDocument).toHaveBeenNthCalledWith(2, "/books/moved/one.pdf");
+    // The retry binds the opened bytes to the row id (the verified SHA-256).
+    expect(loadDocument).toHaveBeenNthCalledWith(2, "/books/moved/one.pdf", {
+      expectedSha256: "doc-1",
+    });
     const state = useDocumentStore.getState();
     expect(state.currentDocument?.filePath).toBe("/books/moved/one.pdf");
     expect(state.currentPage).toBe(42);

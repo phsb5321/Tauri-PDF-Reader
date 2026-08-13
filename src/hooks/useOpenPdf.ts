@@ -98,8 +98,9 @@ export function useOpenPdf() {
 
       const path = picked as string;
       const relocated = await libraryRelocateDocument(document.id, path).catch(
-        (error) => {
-          const message = error instanceof Error ? error.message : String(error);
+        (error: unknown) => {
+          const message =
+            error instanceof Error ? error.message : String(error);
           if (message.includes("HASH_MISMATCH")) {
             setError(
               "WRONG_DOCUMENT: The selected file is not this book — the library was not changed.",
@@ -112,7 +113,12 @@ export function useOpenPdf() {
       );
       if (!relocated) return null;
 
-      const pdf = await pdfService.loadDocument(relocated.filePath);
+      // Bind the opened bytes to the verified fingerprint: the row id is the
+      // file's SHA-256 (relocate re-verified it above), so the read is
+      // refused if the path's content was swapped in between.
+      const pdf = await pdfService.loadDocument(relocated.filePath, {
+        expectedSha256: document.id,
+      });
       return { pdf, document: relocated };
     },
     [openFile, setError],
@@ -150,7 +156,7 @@ export function useOpenPdf() {
 
       showInReader(pdf, document);
       return true;
-    } catch (error) {
+    } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : "Failed to open PDF";
       setError(message);
@@ -188,11 +194,13 @@ export function useOpenPdf() {
           // we were handed already carries everything the reader needs. Stamp it,
           // but do not let a failed stamp stand between the reader and a book
           // whose file has already loaded.
-          opened = await libraryOpenDocument(document.id).catch((error) => {
-            console.warn("Failed to stamp last-opened time:", error);
-            return document;
-          });
-        } catch (error) {
+          opened = await libraryOpenDocument(document.id).catch(
+            (error: unknown) => {
+              console.warn("Failed to stamp last-opened time:", error);
+              return document;
+            },
+          );
+        } catch (error: unknown) {
           if (!isScopeDenial(error)) throw error;
 
           // The stored path lost its fs grant (issue #120): reauthorize via
@@ -203,7 +211,7 @@ export function useOpenPdf() {
           // Stamp the re-opened row like the ordinary path does; a failed
           // stamp must not strand a book that already reauthorized.
           opened = await libraryOpenDocument(reauthorized.document.id).catch(
-            (error) => {
+            (error: unknown) => {
               console.warn(
                 "Failed to stamp last-opened time after reauthorization:",
                 error,
@@ -215,7 +223,7 @@ export function useOpenPdf() {
 
         showInReader(pdf, opened);
         return true;
-      } catch (error) {
+      } catch (error: unknown) {
         const message =
           error instanceof Error ? error.message : "Failed to open document";
         setError(message);

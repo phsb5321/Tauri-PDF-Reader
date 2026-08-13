@@ -41,6 +41,31 @@ async function readFileFromTauri(filePath: string): Promise<Uint8Array> {
   return readFile(filePath);
 }
 
+/**
+ * Fail-closed fingerprint check: the buffer that is about to be opened must
+ * hash to the verified SHA-256, or the open is refused.
+ */
+async function verifyBytesHash(
+  bytes: Uint8Array,
+  expectedSha256: string,
+): Promise<void> {
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) {
+    throw new Error(
+      "PDF_VERIFY_UNAVAILABLE: Cannot verify the file content in this environment — the book was not opened.",
+    );
+  }
+  const digest = await subtle.digest("SHA-256", bytes);
+  const hex = Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  if (hex !== expectedSha256.toLowerCase()) {
+    throw new Error(
+      "PDF_HASH_MISMATCH: File content changed after verification — the book was not opened.",
+    );
+  }
+}
+
 // Extend Window interface for Tauri
 declare global {
   interface Window {
@@ -106,14 +131,27 @@ export interface TextContent {
  */
 export const pdfService = {
   /**
-   * Load a PDF document from a local file path
-   * Uses Tauri's fs plugin to read the file as binary data
+   * Load a PDF document from a local file path.
+   *
+   * `options.expectedSha256` binds the BYTES THAT ARE OPENED to a verified
+   * fingerprint: the read buffer is hashed (SHA-256, WebCrypto) and compared
+   * before pdf.js ever sees it. The reauthorization rung passes the row id
+   * (which IS the file's SHA-256, verified by `library_relocate_document`) —
+   * so a file swapped between the backend's verification and this read is
+   * refused instead of being rendered. Fails closed when WebCrypto is
+   * unavailable.
    */
-  async loadDocument(filePath: string): Promise<PDFDocumentProxy> {
+  async loadDocument(
+    filePath: string,
+    options?: { expectedSha256?: string },
+  ): Promise<PDFDocumentProxy> {
     console.log("[PDF Service] Loading document:", filePath);
 
     try {
       const fileData = await readFileFromTauri(filePath);
+      if (options?.expectedSha256) {
+        await verifyBytesHash(fileData, options.expectedSha256);
+      }
       console.log(
         "[PDF Service] File read successfully, size:",
         fileData.byteLength,
