@@ -278,7 +278,14 @@ export function useAutoSave({
         // with every document the session visited.
         latestByDoc.delete(documentId);
         void enqueue(async () => {
-          await sendSnapshot(leaving);
+          try {
+            await sendSnapshot(leaving);
+          } catch (error) {
+            // Background semantics: a failed leave-flush is logged (never an
+            // unhandled rejection) — the close protocol's flushProgress is
+            // the authority for a landing write, and it rejects on failure.
+            console.error("Failed to flush leaving document progress:", error);
+          }
         });
       }
     };

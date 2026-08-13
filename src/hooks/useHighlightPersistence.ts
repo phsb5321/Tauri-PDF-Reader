@@ -64,9 +64,11 @@ async function flushPendingUpdates(opts?: {
     await flushInFlight.catch(() => undefined);
   }
   if (pendingUpdates.size === 0) {
-    if (opts?.propagateFailure && lastFlushFailed) {
-      throw lastFlushFailure ?? new Error("highlight flush failed");
-    }
+    // Nothing to land. The failure record is NOT consulted here — a stale
+    // failure from a PREVIOUS flush (e.g. a dropped delete) must not make an
+    // unrelated later close flush reject; the join-failure semantics live in
+    // flushImmediately, which knows whether THIS call actually joined a
+    // failing in-flight flush.
     return;
   }
   const propagate = opts?.propagateFailure === true;
@@ -233,15 +235,42 @@ export function useHighlightPersistence({
   // Flush immediately (before navigation and on the close protocol).
   // Drains until quiescent: every pass either clears the queue or throws —
   // an update enqueued while a pass awaits IPC is caught by the next pass,
-  // so a success resolution means the queue really is empty.
+  // so a success resolution means the queue really is empty. The loop never
+  // hot-spins on a failing item: a background pass that failed (re-queued)
+  // breaks the loop and the re-queued entry retries through the debounced
+  // timer.
   const flushImmediately = useCallback(
     async (opts?: { propagateFailure?: boolean }) => {
       if (flushTimer !== null) {
         window.clearTimeout(flushTimer);
         flushTimer = null;
       }
+      // Join an in-flight flush FIRST — a close flush must not resolve (and
+      // let the protocol ack) while a write is still mid-IPC; the empty-
+      // queue check below must never run past a live flush.
+      const joinedFlush = flushInFlight;
+      if (joinedFlush) {
+        await joinedFlush.catch(() => undefined);
+      }
+      if (opts?.propagateFailure && lastFlushFailed && joinedFlush !== null) {
+        // The flush we JOINED failed and left nothing pending for us to
+        // drain (e.g. a dropped delete): surface its outcome exactly once,
+        // then consume it — an unrelated LATER flush must not be poisoned by
+        // this failure (the stale-flag contamination the unit suite caught).
+        const failure = lastFlushFailure ?? new Error("highlight flush failed");
+        lastFlushFailed = false;
+        lastFlushFailure = null;
+        throw failure;
+      }
+      // Fresh failure record for THIS call's own attempts.
+      lastFlushFailed = false;
+      lastFlushFailure = null;
       while (pendingUpdates.size > 0) {
+        const before = pendingUpdates.size;
         await flushPendingUpdates(opts);
+        // Background path re-queues failures: never busy-loop on a failing
+        // item — the re-queued entry retries through the debounced timer.
+        if (pendingUpdates.size >= before && lastFlushFailed) break;
       }
       if (opts?.propagateFailure && lastFlushFailed) {
         throw lastFlushFailure ?? new Error("highlight flush failed");
