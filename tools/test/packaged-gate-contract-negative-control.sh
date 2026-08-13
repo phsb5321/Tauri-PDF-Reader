@@ -70,4 +70,9 @@ PACKAGED_GATE_MATRIX="$WORK/matrix-tampered.sh" expect_violation "matrix lane dr
 sed 's|^          bash e2e/run-critical-loop.sh|          # bash e2e/run-critical-loop.sh (disabled)|' "$WF" >"$WORK/tampered.yml"
 expect_violation "lane invocation shell-commented" "pr-fast job does not run e2e/run-critical-loop.sh"
 
-echo "NEGATIVE CONTROL PASS: contract catches all seven drop attempts for the intended reasons"
+# Tamper 8: inline-comment no-op carrying the invocation substring
+# (`: # bash …` is a successful shell no-op).
+sed 's|^          bash e2e/run-critical-loop.sh|          : # bash e2e/run-critical-loop.sh|' "$WF" >"$WORK/tampered.yml"
+expect_violation "lane invocation reduced to inline-comment no-op" "pr-fast job does not run e2e/run-critical-loop.sh"
+
+echo "NEGATIVE CONTROL PASS: contract catches all eight drop attempts for the intended reasons"
