@@ -44,7 +44,55 @@ const PAGES = Number(process.env.CORPUS_PAGES || "0");
 
 const BOOK = { basename: BASENAME, sha: SHA, pages: PAGES };
 
-if (PHASE === "epub-control") {
+if (PHASE === "card-open") {
+  // Re-check of the Mac card-open failure (issue #120 corpus finding):
+  // AXPress on the library card left the UI at Library after 8s. This phase
+  // clicks the SAME public control (.document-card-open) on Linux and
+  // requires the reader to mount — the Linux-vs-macOS discriminator.
+  describe(`Packaged corpus journey — ${BASENAME} (card-open)`, () => {
+    it("card-open: clicking the library card mounts the reader", async () => {
+      await browser.waitUntil(
+        async () =>
+          browser.execute(
+            () => !!(window.__E2E_READ__ && window.__E2E_READ__.ready),
+          ),
+        { timeout: 60000, timeoutMsg: "bootstrap never became ready" },
+      );
+      await browser.setWindowSize(1200, 800);
+
+      const card = await $(".document-card-open");
+      await card.waitForExist({ timeout: 15000 });
+      await card.waitForClickable({ timeout: 15000 });
+      await browser.execute(() =>
+        document.querySelector(".document-card-open")?.click(),
+      );
+
+      try {
+        await browser.waitUntil(
+          async () => (await renderedTextLayerCount()) > 0,
+          { timeout: 90000, timeoutMsg: "reader never mounted after card click" },
+        );
+      } catch (err) {
+        console.log(
+          "DIAG card-open-fail:",
+          JSON.stringify({
+            ...BOOK,
+            phase: "card-open",
+            textLayerCount: await renderedTextLayerCount(),
+            libraryStillShowing: await browser.execute(
+              () => !!document.querySelector(".library-view, .library-body, .resume-section"),
+            ),
+          }),
+        );
+        throw err;
+      }
+      console.log(
+        "DIAG card-open-ok:",
+        JSON.stringify({ ...BOOK, phase: "card-open", readerMounted: true }),
+      );
+    });
+  });
+} else if (PHASE === "epub-control") {
   // NEGATIVE CONTROL: the open flow must REFUSE an unsupported format.
   // The seam returns the .epub path; the open flow's PDF filter must not
   // accept it. Expected: the reader never mounts and the open is refused

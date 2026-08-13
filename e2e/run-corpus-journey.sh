@@ -85,6 +85,11 @@ toolchain_exec '
 
   FAILED=0
   PDF_COUNT=$(echo "$CORPUS_JSON" | jq ".pdfs | length")
+  # LECTRICE_CORPUS_MAX: run only the first N books (smoke / CI slices).
+  if [ -n "${LECTRICE_CORPUS_MAX:-}" ]; then
+    PDF_COUNT=$(( PDF_COUNT < LECTRICE_CORPUS_MAX ? PDF_COUNT : LECTRICE_CORPUS_MAX ))
+    echo "==> LECTRICE_CORPUS_MAX=$LECTRICE_CORPUS_MAX — running first $PDF_COUNT book(s)"
+  fi
   for i in $(seq 0 $((PDF_COUNT - 1))); do
     BASENAME=$(echo "$CORPUS_JSON" | jq -r ".pdfs[$i].basename")
     SHA=$(echo "$CORPUS_JSON" | jq -r ".pdfs[$i].sha256")
@@ -108,7 +113,17 @@ toolchain_exec '
       continue
     fi
 
-    # verify phase (same build, fresh app process)
+    # card-open phase (same profile — the book is now a library row; re-checks
+    # the Mac AXPress card-open failure on Linux)
+    LOG="$RESULTS_DIR/$BASENAME.card-open.log"
+    if ! run_phase card-open "$BASENAME" "$SHA" "$PAGES" "$LOG"; then
+      record_failure "$BASENAME" "$SHA" card-open \
+        "E2E_SPEC=./e2e/corpus-journey.e2e.mjs CORPUS_PHASE=card-open CORPUS_BASENAME=$BASENAME CORPUS_SHA=$SHA pnpm test:e2e" "$LOG"
+      FAILED=1
+      continue
+    fi
+
+    # verify phase (same build, fresh app process; restore + delete)
     LOG="$RESULTS_DIR/$BASENAME.verify.log"
     if ! run_phase verify "$BASENAME" "$SHA" "$PAGES" "$LOG"; then
       record_failure "$BASENAME" "$SHA" verify \
