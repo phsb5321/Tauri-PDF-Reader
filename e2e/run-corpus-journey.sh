@@ -77,7 +77,7 @@ toolchain_exec '
   build_book() {
     local basename="$1" path="$2" phase="$3"
     echo "==> BUILD ($phase): $basename"
-    CI=true VITE_E2E_NATIVE=true VITE_E2E_NATIVE_TTS=none VITE_E2E_NATIVE_SEED=none \
+    CI=true VITE_E2E_NATIVE=true VITE_E2E_NATIVE_TTS=none \
       VITE_E2E_PROFILE_DIR="$XDG_DATA_HOME/com.lectrice.reader" \
       VITE_E2E_OPEN_PATH="$path" pnpm build >/dev/null
     touch src-tauri/src/lib.rs
