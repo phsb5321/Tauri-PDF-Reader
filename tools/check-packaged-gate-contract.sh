@@ -138,12 +138,12 @@ grep -q 'github.ref' <(sed 's/#.*//' "$WF") && fail "concurrency group uses gith
 # so only the bare literal `uses` key is permitted. The VALUE is compared
 # RAW (no quote/comment stripping, trailing whitespace only) and must be
 # exactly `owner/repo@<40 lowercase hex>`.
-grep -E '^[[:space:]]*(-[[:space:]]*)?["'"'"'][^"'"'"']*["'"'"']:' "$WF" \
+grep -E '^[[:space:]]*(-[[:space:]]*)?["'"'"'][^"'"'"']*["'"'"'][[:space:]]*:' "$WF" \
   && fail "mutable action ref found — quoted step-level keys are rejected (escaped uses spellings); uses must be the bare literal"
-grep -E '^[[:space:]]*(-[[:space:]]*)?uses:[[:space:]]*[>|][>-]?[[:space:]]*$' "$WF" \
+grep -E '^[[:space:]]*(-[[:space:]]*)?uses[[:space:]]*:[[:space:]]*[>|][>-]?[[:space:]]*$' "$WF" \
   && fail "mutable action ref found — block scalar uses: rejected; every uses: must be owner/repo@<40 lowercase hex>"
-grep -E '^[[:space:]]*(-[[:space:]]*)?uses:' "$WF" \
-  | sed -E 's/^[[:space:]]*(-[[:space:]]*)?uses:[[:space:]]*//; s/[[:space:]]*$//' \
+grep -E '^[[:space:]]*(-[[:space:]]*)?uses[[:space:]]*:' "$WF" \
+  | sed -E 's/^[[:space:]]*(-[[:space:]]*)?uses[[:space:]]*:[[:space:]]*//; s/[[:space:]]*$//' \
   | grep -vqE '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@[0-9a-f]{40}$' \
   && fail "mutable action ref found — every uses: must be exactly owner/repo@<40 lowercase hex> (comments, quotes and other forms rejected)"
 # The driver prerequisite is the PINNED devShell: no host provisioning, no
