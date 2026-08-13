@@ -33,6 +33,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, "../../..");
 const SRC = join(REPO_ROOT, "src");
 const TOKENS_CSS = join(SRC, "ui/tokens/colors.css");
+const APP_CSS = join(SRC, "styles/App.css");
 
 /** WCAG 2.1 AA: normal-size text. */
 const AA_TEXT = 4.5;
@@ -404,6 +405,7 @@ function resolve(
 }
 
 const tokensCss = readFileSync(TOKENS_CSS, "utf8");
+const appCss = readFileSync(APP_CSS, "utf8");
 
 const LIGHT = themeDeclarations(tokensCss, {
   colorScheme: "light",
@@ -973,6 +975,104 @@ describe("design tokens: WCAG AA contrast floor", () => {
         ),
       );
     }
+  });
+
+  it("no stylesheet prelude mixes selectors with an @media rule", () => {
+    // The `[data-theme="dark"] .sel, @media (...) { ... }` shape is invalid
+    // CSS: esbuild drops the whole rule with a `Unexpected "@media"`
+    // css-syntax-error build warning, so the intended dark styles silently
+    // never apply. This is the build-warning contract for that failure class:
+    // a rule prelude must never contain an @media token.
+    const violations: string[] = [];
+    for (const source of stylesheetSources(SRC)) {
+      for (const rule of styleRules(stripCssComments(source.css))) {
+        if (!rule.selector.includes("@media")) continue;
+        violations.push(
+          `${source.file.slice(REPO_ROOT.length + 1)}  prelude mixes an @media rule: ${rule.selector.trim().slice(0, 120)}`,
+        );
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
+  it("fixed dark-mode rules ship both theme forms: attribute twin + media fallback", () => {
+    // Explicit dark (data-theme="dark" on a light system) matches the
+    // attribute form; system dark before React mounts matches the media
+    // fallback. Losing either form drops the intended dark styles.
+    const pairs = [
+      ["components/pdf-viewer/HighlightContextMenu.css", ".highlight-context-menu"],
+      ["components/pdf-viewer/HighlightToolbar.css", ".highlight-toolbar"],
+      ["components/pdf-viewer/TtsHighlight.css", ".tts-highlight-rect"],
+      ["components/pdf-viewer/HighlightOverlay.css", ".highlight-rect"],
+      ["components/highlights/NoteEditor.css", ".note-editor-backdrop"],
+      ["components/highlights/NoteEditor.css", ".note-editor-modal"],
+      ["components/TextLayer.css", ".highlight-rect"],
+    ] as const;
+    for (const [rel, selector] of pairs) {
+      const css = readFileSync(join(SRC, rel), "utf8");
+      expect(
+        css,
+        `${rel}: missing [data-theme="dark"] twin for ${selector}`,
+      ).toContain(`[data-theme="dark"] ${selector}`);
+      expect(
+        css,
+        `${rel}: missing :root:not([data-theme="light"]) media fallback for ${selector}`,
+      ).toContain(`:root:not([data-theme="light"]) ${selector}`);
+    }
+  });
+
+  it("App.css legacy accent alias keeps the fill role; text uses the -text cut", () => {
+    // Negative control: `--accent-color` has mixed-role consumers — accent
+    // BACKGROUNDS (HighlightOverlay, NoteEditor, AiPlaybackBar,
+    // AiSpeedSlider, AiTtsSettings, HighlightsPanel) as well as borders.
+    // Re-pointing the alias at the darker text cut would recolor primary
+    // fills globally, so the alias must STAY the fill token. Text through
+    // the alias is already banned by the fill-only-token scan above, and
+    // on-accent text must keep clearing AA on that fill.
+    const environments: readonly [string, ThemeEnvironment][] = [
+      ["light", { colorScheme: "light", contrastMore: false }],
+      ["system dark", { colorScheme: "dark", contrastMore: false }],
+      [
+        "explicit dark",
+        { colorScheme: "light", contrastMore: false, dataTheme: "dark" },
+      ],
+      [
+        "explicit dark on a dark system",
+        { colorScheme: "dark", contrastMore: false, dataTheme: "dark" },
+      ],
+    ];
+    for (const [name, environment] of environments) {
+      const tokens = new Map([
+        ...themeDeclarations(tokensCss, environment),
+        ...themeDeclarations(appCss, environment),
+      ]);
+      const alias = resolve(tokens.get("--accent-color") as string, tokens);
+      const fill = resolve(tokens.get("--color-accent") as string, tokens);
+      expect(alias, `${name}: --accent-color must remain the fill`).toEqual(
+        fill,
+      );
+      const onAccent = resolve(
+        tokens.get("--color-on-accent") as string,
+        tokens,
+      );
+      expect(
+        contrastRatio(onAccent as Rgb, fill as Rgb),
+        `${name}: on-accent text clears 4.5:1 on the accent fill`,
+      ).toBeGreaterThanOrEqual(AA_TEXT);
+    }
+  });
+
+  it("binds the grid delete button to the semantic surface (no white blob in dark)", () => {
+    const css = stripCssComments(
+      readFileSync(
+        join(SRC, "components/library/DocumentCard.css"),
+        "utf8",
+      ),
+    );
+    const rule = styleRules(css).find(
+      ({ selector }) => selector === ".document-card--grid .document-card-delete",
+    );
+    expect(rule?.body).toMatch(/background:\s*var\(--color-bg-surface\)/);
   });
 
   it("binds the playback error banner to the tested semantic error surface", () => {

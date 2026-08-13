@@ -61,7 +61,11 @@
 }
 
 /* Dark mode: use screen blend mode instead */
-[data-theme="dark"] .highlight-rect,
+[data-theme="dark"] .highlight-rect {
+  mix-blend-mode: screen;
+  opacity: 0.5;
+}
+
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .highlight-rect {
     mix-blend-mode: screen;
@@ -69,7 +73,10 @@
   }
 }
 
-[data-theme="dark"] .highlight-rect:hover,
+[data-theme="dark"] .highlight-rect:hover {
+  opacity: 0.6;
+}
+
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .highlight-rect:hover {
     opacity: 0.6;

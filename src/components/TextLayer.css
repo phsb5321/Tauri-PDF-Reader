@@ -54,21 +54,6 @@
 }
 
 /* Dark mode adjustments */
-@media (prefers-color-scheme: dark) {
-  .highlight-rect {
-    mix-blend-mode: screen;
-    opacity: 0.25;
-  }
-
-  .highlight-group:hover .highlight-rect {
-    opacity: 0.4;
-  }
-
-  .highlight-group.selected .highlight-rect {
-    opacity: 0.4;
-  }
-}
-
 [data-theme="dark"] .highlight-rect {
   mix-blend-mode: screen;
   opacity: 0.25;
@@ -80,4 +65,19 @@
 
 [data-theme="dark"] .highlight-group.selected .highlight-rect {
   opacity: 0.4;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .highlight-rect {
+    mix-blend-mode: screen;
+    opacity: 0.25;
+  }
+
+  :root:not([data-theme="light"]) .highlight-group:hover .highlight-rect {
+    opacity: 0.4;
+  }
+
+  :root:not([data-theme="light"]) .highlight-group.selected .highlight-rect {
+    opacity: 0.4;
+  }
 }

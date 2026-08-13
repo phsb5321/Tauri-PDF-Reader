@@ -110,7 +110,10 @@
 }
 
 /* Dark mode */
-[data-theme="dark"] .highlight-context-menu,
+[data-theme="dark"] .highlight-context-menu {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .highlight-context-menu {
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
