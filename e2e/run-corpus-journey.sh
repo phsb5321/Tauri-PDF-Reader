@@ -195,29 +195,25 @@ toolchain_exec '
       COVER_FILE_SHA=$(sha256sum "$COVER_CACHE_FILE" | cut -d" " -f1)
       echo "    cover-cache proof: $COVER_CACHE_FILE sha256=${COVER_FILE_SHA:0:16}…"
       echo -e "$BASENAME\t$SHA\t$COVER_FILE_SHA" >> "$RESULTS_DIR/cover-hashes.tsv"
-      # Rendered blob hash must exist AND match the cached file hash.
-      if [ -z "$BLOBSHA" ]; then
-        echo "    cover-tie FAIL: cache file exists but spec logged no rendered contentSha256"
-        record_failure "$BASENAME" "$SHA" cover-tie \
-          "no rendered contentSha256 in card-open log" "$RESULTS_DIR/$BASENAME.card-open.log"
-        FAILED=1
-      elif [ "$BLOBSHA" != "$COVER_FILE_SHA" ]; then
-        echo "    cover-tie FAIL: $BASENAME rendered=$BLOBSHA cache=$COVER_FILE_SHA"
-        record_failure "$BASENAME" "$SHA" cover-tie \
-          "rendered blob sha256 != cached file sha256" "$RESULTS_DIR/$BASENAME.card-open.log"
+      # Rendered blob hash must exist AND match the cached file hash (NC5
+      # guard — the deterministic control tests this exact path).
+      if ! guard_cover_hash_match "$BLOBSHA" "$COVER_FILE_SHA" "$BASENAME" "$SHA" \
+        "rendered blob vs cached covers/${SHA}-*" "$RESULTS_DIR/$BASENAME.card-open.log"; then
         FAILED=1
       else
         echo "    cover-tie OK: $BASENAME rendered==cached (${COVER_FILE_SHA:0:12}…)"
       fi
     elif [ -n "$BLOBSHA" ]; then
-      echo "    cover-cache FAIL: spec rendered a cover (contentSha256=$BLOBSHA) but no covers/{SHA}-* cache file exists"
-      record_failure "$BASENAME" "$SHA" cover-cache \
-        "rendered cover blob but no cached file at covers/${SHA}-*" "$RESULTS_DIR/$BASENAME.card-open.log"
+      # NC5 guard: rendered blob with no cache file is a FAIL (not BLOCKED).
+      guard_missing_oracle cover-cache "$BASENAME" "$SHA" \
+        "rendered cover blob but no cached file at covers/${SHA}-*" "$RESULTS_DIR/$BASENAME.card-open.log" \
+        "    cover-cache FAIL: spec rendered a cover (contentSha256=$BLOBSHA) but no covers/{SHA}-* cache file exists"
       FAILED=1
     else
-      echo "    cover-cache BLOCKED: no covers/{SHA}-* file on this base (pre-121); owner 121-cover-pipeline"
-      record_failure "$BASENAME" "$SHA" cover-proof-blocked \
-        "no covers/{SHA}-* cache file recorded (pre-121 base)" "$RESULTS_DIR/$BASENAME.card-open.log"
+      # No cover surface on this base — BLOCKED-not-green (NC6 guard).
+      guard_missing_oracle cover-proof-blocked "$BASENAME" "$SHA" \
+        "no covers/{SHA}-* cache file recorded (pre-121 base)" "$RESULTS_DIR/$BASENAME.card-open.log" \
+        "    cover-cache BLOCKED: no covers/{SHA}-* file on this base (pre-121); owner 121-cover-pipeline"
       FAILED=1
     fi
 
@@ -250,21 +246,21 @@ toolchain_exec '
 
       # (b) tts: post-delete count vs the captured pre-delete count.
       if [ "$TTS_PRE" = "query-failed" ] || [ -z "$TTS_PRE" ] || [ "$TTS_PRE" = "no-db" ]; then
-        echo "    cache-cleanup BLOCKED (FAILED): tts oracle unavailable (pre=$TTS_PRE) — audio-cleanup not provable on this base"
-        record_failure "$BASENAME" "$SHA" cache-cleanup-blocked \
-          "sqlite3 tts_cache_metadata query unavailable (pre-delete count)" "$RESULTS_DIR/$BASENAME.verify.log"
+        guard_missing_oracle cache-cleanup-blocked "$BASENAME" "$SHA" \
+          "sqlite3 tts_cache_metadata query unavailable (pre-delete count)" "$RESULTS_DIR/$BASENAME.verify.log" \
+          "    cache-cleanup BLOCKED (FAILED): tts oracle unavailable (pre=$TTS_PRE) — audio-cleanup not provable on this base"
         FAILED=1
       elif [ "$TTS_PRE" -eq 0 ]; then
-        echo "    cache-cleanup BLOCKED (FAILED): no pre-delete tts_cache_metadata row — post-delete zero would be vacuous (TTS=none base)"
-        record_failure "$BASENAME" "$SHA" cache-cleanup-blocked \
-          "tts_cache_metadata pre-delete count = 0 — cleanup unprovable without a created row" "$RESULTS_DIR/$BASENAME.verify.log"
+        guard_missing_oracle cache-cleanup-blocked "$BASENAME" "$SHA" \
+          "tts_cache_metadata pre-delete count = 0 — cleanup unprovable without a created row" "$RESULTS_DIR/$BASENAME.verify.log" \
+          "    cache-cleanup BLOCKED (FAILED): no pre-delete tts_cache_metadata row — post-delete zero would be vacuous (TTS=none base)"
         FAILED=1
       else
         TTS_POST=$(sqlite3 -readonly "$DB" "SELECT COUNT(*) FROM tts_cache_metadata WHERE document_id = \"$SHA\";" 2>/dev/null || echo "query-failed")
         if [ "$TTS_POST" = "query-failed" ]; then
-          echo "    cache-cleanup BLOCKED (FAILED): post-delete tts query failed"
-          record_failure "$BASENAME" "$SHA" cache-cleanup-blocked \
-            "sqlite3 tts_cache_metadata post-delete query failed" "$RESULTS_DIR/$BASENAME.verify.log"
+          guard_missing_oracle cache-cleanup-blocked "$BASENAME" "$SHA" \
+            "sqlite3 tts_cache_metadata post-delete query failed" "$RESULTS_DIR/$BASENAME.verify.log" \
+            "    cache-cleanup BLOCKED (FAILED): post-delete tts query failed"
           FAILED=1
         elif [ "$TTS_POST" -gt 0 ]; then
           echo "    cache-cleanup FAIL: $TTS_POST tts_cache_metadata row(s) remain for ${SHA:0:12} (pre=$TTS_PRE)"
@@ -286,9 +282,9 @@ toolchain_exec '
       elif [ -d "$CACHE_ROOT/covers" ] || [ -d "$CACHE_ROOT/app_cache" ]; then
         echo "    cache-cleanup OK: no ${SHA:0:12}-keyed cover files remain"
       else
-        echo "    cache-cleanup BLOCKED (FAILED): no cover-cache dir on this base (pre-121)"
-        record_failure "$BASENAME" "$SHA" cache-cleanup-blocked \
-          "no covers/ dir in $CACHE_ROOT — cover-cleanup unprovable pre-121" "$RESULTS_DIR/$BASENAME.verify.log"
+        guard_missing_oracle cache-cleanup-blocked "$BASENAME" "$SHA" \
+          "no covers/ dir in $CACHE_ROOT — cover-cleanup unprovable pre-121" "$RESULTS_DIR/$BASENAME.verify.log" \
+          "    cache-cleanup BLOCKED (FAILED): no cover-cache dir on this base (pre-121)"
         FAILED=1
       fi
     fi
@@ -382,8 +378,9 @@ toolchain_exec '
     fi
   else
     echo "==> Cover-hash cross-checks BLOCKED (FAILED): no cover-hashes.tsv — no cover cache proof on this base"
-    record_failure "(all books)" "(none)" cover-proof-blocked \
-      "no covers/{SHA}-* cache files recorded (pre-121 base)" "$RESULTS_DIR"
+    guard_missing_oracle cover-proof-blocked "(all books)" "(none)" \
+      "no covers/{SHA}-* cache files recorded (pre-121 base)" "$RESULTS_DIR" \
+      "==> Cover-hash cross-checks BLOCKED (FAILED): no cover-hashes.tsv — no cover cache proof on this base"
     FAILED=1
   fi
 

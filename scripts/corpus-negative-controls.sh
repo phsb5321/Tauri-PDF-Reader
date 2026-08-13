@@ -43,8 +43,10 @@ if grep -q 'source "$E2E_REPO_ROOT/scripts/corpus-guards.sh"' e2e/run-corpus-jou
   && grep -q 'guard_build_status' e2e/run-corpus-journey.sh \
   && grep -q 'guard_epub_manifest' e2e/run-corpus-journey.sh \
   && grep -q 'guard_cover_count' e2e/run-corpus-journey.sh \
-  && grep -q 'guard_cache_leftover' e2e/run-corpus-journey.sh; then
-  echo "  ✓ NC0 wiring (runner sources guards, all four used)"
+  && grep -q 'guard_cache_leftover' e2e/run-corpus-journey.sh \
+  && grep -q 'guard_cover_hash_match' e2e/run-corpus-journey.sh \
+  && grep -q 'guard_missing_oracle' e2e/run-corpus-journey.sh; then
+  echo "  ✓ NC0 wiring (runner sources guards, all six used)"
   PASS=$((PASS + 1))
 else
   echo "  ✗ NC0 wiring — runner does not use the tested guards"
@@ -105,6 +107,38 @@ guard_cache_leftover "$TMP/stale/covers/sha-1.png" "book.pdf" "sha" "cmd" "log"
 NC4_GOT=$?
 check "NC4 stale cache (nonzero)" "$NC4_GOT" 1
 grep -q $'\tcache-cleanup\t' "$TMP/nc4b.tsv" && check "NC4 stale-cache recorded" 0 0 || check "NC4 stale-cache recorded" 1 0
+
+echo "==> NC5: cover hash mismatch => nonzero"
+GUARDS_FAILURES="$TMP/nc5.tsv"
+guard_init
+guard_cover_hash_match "abc123" "abc123" "book.pdf" "sha" "cmd" "log"  # positive leg (match)
+check "NC5 hash match (exit 0)" $? 0
+GUARDS_FAILURES="$TMP/nc5b.tsv"
+guard_init
+guard_cover_hash_match "abc123" "def456" "book.pdf" "sha" "cmd" "log"  # mismatch
+NC5_GOT=$?
+check "NC5 hash mismatch (nonzero)" "$NC5_GOT" 1
+grep -q $'\tcover-tie\t' "$TMP/nc5b.tsv" && check "NC5 mismatch recorded" 0 0 || check "NC5 mismatch recorded" 1 0
+GUARDS_FAILURES="$TMP/nc5c.tsv"
+guard_init
+guard_cover_hash_match "" "def456" "book.pdf" "sha" "cmd" "log"       # cache file, no blob
+NC5C_GOT=$?
+check "NC5 no-blob (nonzero)" "$NC5C_GOT" 1
+GUARDS_FAILURES="$TMP/nc5d.tsv"
+guard_init
+guard_cover_hash_match "abc123" "" "book.pdf" "sha" "cmd" "log"       # blob, no cache file
+NC5D_GOT=$?
+check "NC5 no-cache-file (nonzero)" "$NC5D_GOT" 1
+grep -q $'\tcover-cache\t' "$TMP/nc5d.tsv" && check "NC5 no-cache-file recorded" 0 0 || check "NC5 no-cache-file recorded" 1 0
+
+echo "==> NC6: missing oracle/selector => nonzero"
+GUARDS_FAILURES="$TMP/nc6.tsv"
+guard_init
+guard_missing_oracle cache-cleanup-blocked "book.pdf" "sha" "cmd" "log" \
+  "    cache-cleanup BLOCKED (FAILED): tts oracle unavailable"
+NC6_GOT=$?
+check "NC6 missing oracle (nonzero)" "$NC6_GOT" 1
+grep -q $'\tcache-cleanup-blocked\t' "$TMP/nc6.tsv" && check "NC6 missing-oracle recorded" 0 0 || check "NC6 missing-oracle recorded" 1 0
 
 echo
 echo "==> RESULT: $PASS passed, $FAIL failed"

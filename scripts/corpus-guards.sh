@@ -77,3 +77,41 @@ guard_cache_leftover() {
   fi
   return 0
 }
+
+# NC5: cover evidence must be consistent — a rendered blob hash and a cached
+# covers/{SHA}-* file hash must BOTH exist and MATCH. One-sided evidence
+# (blob without cache file, or cache file without blob) and mismatched
+# hashes all fail. Both-empty returns 0 (the caller decides the BLOCKED
+# record for bases without a cover surface).
+# Usage: guard_cover_hash_match <blob_sha> <file_sha> <basename> <sha> <cmd> <log>
+guard_cover_hash_match() {
+  local blob="$1" file="$2" basename="$3" sha="$4" cmd="$5" log="$6"
+  if [ -n "$file" ] && [ -z "$blob" ]; then
+    echo "    cover-tie FAIL: cache file exists but spec logged no rendered contentSha256"
+    guard_record "$basename" "$sha" cover-tie "$cmd" "$log"
+    return 1
+  fi
+  if [ -n "$file" ] && [ -n "$blob" ] && [ "$blob" != "$file" ]; then
+    echo "    cover-tie FAIL: $basename rendered=$blob cache=$file"
+    guard_record "$basename" "$sha" cover-tie "$cmd" "$log"
+    return 1
+  fi
+  if [ -n "$blob" ] && [ -z "$file" ]; then
+    echo "    cover-cache FAIL: spec rendered a cover (contentSha256=$blob) but no covers/{SHA}-* cache file exists"
+    guard_record "$basename" "$sha" cover-cache "$cmd" "$log"
+    return 1
+  fi
+  return 0
+}
+
+# NC6: a missing/blocked oracle (no cover-cache dir, unavailable tts query,
+# no pre-delete tts row, missing cover-hashes.tsv, missing probe) must fail
+# the run — BLOCKED is not green. The caller passes the EXACT message to
+# preserve runner output.
+# Usage: guard_missing_oracle <kind> <basename> <sha> <cmd> <log> <message>
+guard_missing_oracle() {
+  local kind="$1" basename="$2" sha="$3" cmd="$4" log="$5" message="$6"
+  echo "$message"
+  guard_record "$basename" "$sha" "$kind" "$cmd" "$log"
+  return 1
+}
