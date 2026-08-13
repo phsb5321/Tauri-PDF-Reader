@@ -116,8 +116,16 @@ async function flushPendingUpdates(opts?: {
         );
 
         if (!propagate && pending.type !== "delete") {
-          // Background path: re-queue failed updates for retry.
-          pendingUpdates.set(id, pending);
+          // Background path: re-queue failed updates for retry — but never
+          // over a NEWER entry for the same id. The queue is cleared at pass
+          // start, so an entry enqueued WHILE this write was in flight is the
+          // user's latest intent (e.g. a delete superseding a failing
+          // create); the stale retry must not clobber it (codex review,
+          // MAJOR).
+          const current = pendingUpdates.get(id);
+          if (current === undefined || current.timestamp === pending.timestamp) {
+            pendingUpdates.set(id, pending);
+          }
         }
         // The close path (propagate) never re-queues — the window is going
         // away and the failure must surface, not retry.
@@ -262,9 +270,17 @@ export function useHighlightPersistence({
         lastFlushFailure = null;
         throw failure;
       }
-      // Fresh failure record for THIS call's own attempts.
-      lastFlushFailed = false;
-      lastFlushFailure = null;
+      // A call that JOINED a flush must NOT reset the record: an earlier
+      // background join of the SAME failing flush may have run first, and
+      // the close flush that also joined it still needs to see the failure
+      // (codex review, MAJOR — the pre-fix unconditional reset let an
+      // interleaved background join consume it). A call that joined
+      // NOTHING may clear: a completed failed background flush must not
+      // poison its own drain.
+      if (joinedFlush === null) {
+        lastFlushFailed = false;
+        lastFlushFailure = null;
+      }
       while (pendingUpdates.size > 0) {
         const before = pendingUpdates.size;
         await flushPendingUpdates(opts);

@@ -216,4 +216,133 @@ describe("useHighlightPersistence — the shared-queue close contract", () => {
 
     expect(highlightsCreate).toHaveBeenCalledTimes(2);
   });
+
+  it("an interleaved BACKGROUND flush cannot consume the failure a close flush joined", async () => {
+    // Three callers converge on ONE failing in-flight flush: a background
+    // flushImmediately (non-propagating) joins it, THEN the close flush
+    // joins the same flush. The background join must not clear the failure
+    // record before the close flush reads it — a close flush that joined a
+    // failing flush must still reject, whatever interleaved joins happened.
+    // (Codex adversarial review, MAJOR: the pre-fix unconditional record
+    // reset let the earlier-attached background join consume the failure.)
+    const d = deferred();
+    highlightsDelete.mockImplementationOnce(() => d.promise);
+
+    const a = renderHook(() =>
+      useHighlightPersistence({ documentId: "doc-1" }),
+    );
+    act(() => {
+      a.result.current.deleteHighlight(fakeHighlight("h-1"));
+    });
+    const bg = a.result.current.flushImmediately(); // starts the failing flush
+    await waitFor(() => expect(highlightsDelete).toHaveBeenCalledTimes(1));
+
+    // A non-propagating join (e.g. a navigation flush) attaches FIRST.
+    const backgroundJoin = a.result.current.flushImmediately();
+    let rejected = false;
+    const closeFlush = a.result.current
+      .flushImmediately({ propagateFailure: true })
+      .then(
+        () => undefined,
+        () => {
+          rejected = true;
+        },
+      );
+
+    // Nothing has settled while the delete is in flight.
+    await Promise.resolve();
+    expect(rejected).toBe(false);
+
+    d.reject(new Error("backend down"));
+    await act(async () => {
+      await Promise.allSettled([bg, backgroundJoin, closeFlush]);
+    });
+    // The close flush joined the SAME failing flush — it must reject even
+    // though the background join ran first.
+    expect(rejected).toBe(true);
+  });
+
+  it("a failed create's requeue does not overwrite a delete enqueued while it was in flight", async () => {
+    // The create is IN FLIGHT (deferred); the user deletes the same
+    // highlight before it resolves. When the create fails, the background
+    // requeue must NOT clobber the newer delete — the delete is the user's
+    // latest intent and must land. (Codex adversarial review, MAJOR.)
+    const d = deferred();
+    highlightsCreate.mockImplementationOnce(() => d.promise);
+
+    const a = renderHook(() =>
+      useHighlightPersistence({ documentId: "doc-1" }),
+    );
+    act(() => {
+      a.result.current.createHighlight(fakeHighlight("h-1"));
+    });
+    const bg = a.result.current.flushImmediately();
+    await waitFor(() => expect(highlightsCreate).toHaveBeenCalledTimes(1));
+
+    // While the create is in flight the queue was cleared at pass start, so
+    // this lands as a fresh delete entry — the user's newest intent.
+    act(() => {
+      a.result.current.deleteHighlight(fakeHighlight("h-1"));
+    });
+    expect(a.result.current.hasPendingUpdates()).toBe(true);
+
+    d.reject(new Error("backend down"));
+    await act(async () => {
+      await bg.catch(() => undefined);
+    });
+    // The delete was NOT clobbered by the stale create's requeue — it
+    // survived and LANDED (bg's own drain flushed it after the join). The
+    // stale create was never retried over it (asserted below).
+    expect(highlightsDelete).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await a.result.current.flushImmediately({ propagateFailure: true });
+    });
+    // The delete landed; the stale create was NOT retried over it.
+    expect(highlightsDelete).toHaveBeenCalledTimes(1);
+    expect(highlightsCreate).toHaveBeenCalledTimes(1);
+    expect(a.result.current.hasPendingUpdates()).toBe(false);
+  });
+
+  it("one instance's close flush JOINS the other instance's in-flight write, not just its queue", async () => {
+    // Instance A's un-debounced create is mid-IPC (deferred). Instance B's
+    // close flush must JOIN that flush — it must stay unsettled until A's
+    // write lands, so the ack can never precede the write (the call-count
+    // test above proves the drain, this proves the join).
+    const d = deferred();
+    highlightsCreate.mockImplementationOnce(() => d.promise);
+
+    const a = renderHook(() =>
+      useHighlightPersistence({ documentId: "doc-1" }),
+    );
+    const b = renderHook(() =>
+      useHighlightPersistence({ documentId: "doc-1" }),
+    );
+    act(() => {
+      a.result.current.createHighlight(fakeHighlight("h-1"));
+    });
+    await waitFor(() => expect(highlightsCreate).toHaveBeenCalledTimes(1));
+
+    let settled = false;
+    const closeFlush = b.result.current
+      .flushImmediately({ propagateFailure: true })
+      .then(
+        () => {
+          settled = true;
+        },
+        () => {
+          settled = true;
+        },
+      );
+    // B joined A's in-flight write — it must not settle while A's is up.
+    await Promise.resolve();
+    expect(settled).toBe(false);
+
+    d.resolve();
+    await act(async () => {
+      await closeFlush;
+    });
+    expect(settled).toBe(true);
+    expect(highlightsCreate).toHaveBeenCalledTimes(1);
+  });
 });
