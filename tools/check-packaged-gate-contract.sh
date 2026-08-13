@@ -74,14 +74,34 @@ grep -qE '^[[:space:]]*continue-on-error:' "$WF" && fail "continue-on-error foun
 #    PR execute on the self-hosted runner. EVERY job whose condition can be
 #    true on a pull_request must carry the same-repo guard.
 JOBS_SECTION="$(awk '/^jobs:$/{f=1;next} f && /^[^ ]/{exit} f' "$WF")"
-for job in $(printf '%s\n' "$JOBS_SECTION" | awk '/^  [a-z0-9_-]+:$/ { gsub(":$", ""); print $1 }'); do
+for job in $(printf '%s\n' "$JOBS_SECTION" | awk '/^  [A-Za-z0-9_-]+:$/ { gsub(":$", ""); print $1 }'); do
   [ "$job" = "pr-fast" ] && continue  # the exact pr-fast check below owns it
-  JOB_BLOCK="$(awk -v j="$job" '$0 ~ "^  " j ":$" {f=1;next} f && /^  [a-z0-9_-]+:$/ {exit} f' "$WF")"
+  JOB_BLOCK="$(awk -v j="$job" '$0 ~ "^  " j ":$" {f=1;next} f && /^  [A-Za-z0-9_-]+:$/ {exit} f' "$WF")"
   JOB_IF="$(printf '%s\n' "$JOB_BLOCK" | sed -n 's/^    if: //p')"
   if [ -z "$JOB_IF" ]; then
     fail "$job job has no job-level if — it runs on every event including fork PRs"
     continue
   fi
+  # Exact canonical conditions for the fixed jobs: a skip-capable variant
+  # (false, schedule-only, bare != pull_request without the OR-guard) must
+  # fail — substring acceptance is a bypass.
+  case "$job" in
+    contract)
+      printf '%s\n' "$JOB_IF" | grep -qx 'github.event_name != '\''pull_request'\'' || github.event.pull_request.head.repo.full_name == github.repository' \
+        || fail "contract job-level if: is not the exact canonical guard"
+      continue
+      ;;
+    full-matrix)
+      printf '%s\n' "$JOB_IF" | grep -qx 'github.event_name != '\''pull_request'\''' \
+        || fail "full-matrix job-level if: is not the exact canonical condition"
+      continue
+      ;;
+    real-corpus)
+      printf '%s\n' "$JOB_IF" | grep -qx 'github.event_name == '\''workflow_dispatch'\''' \
+        || fail "real-corpus job-level if: is not exactly the workflow_dispatch trigger"
+      continue
+      ;;
+  esac
   case "$JOB_IF" in
     *pull_request*)
       # A condition that EXCLUDES pull_request (e.g. `!= 'pull_request'`)
@@ -128,7 +148,7 @@ grep -q 'github.ref' <(sed 's/#.*//' "$WF") && fail "concurrency group uses gith
 # Self-hosted execution trust: every mutable action ref is forbidden (SHA pins
 # only) — quoted refs included (`uses: "actions/checkout@v4"` must not slip
 # through); the repo's own flake pins the toolchain, so no dtolnay@stable either.
-grep -E '^[[:space:]]*uses: ' "$WF" | tr -d '"' | grep -qE 'uses: [^ ]+@(v[0-9]+|stable|main|master|latest)([[:space:]]|$)' \
+grep -E '^[[:space:]]*uses: ' "$WF" | tr -d "\"'" | grep -qE 'uses: [^ ]+@(v[0-9]+|stable|main|master|latest)([[:space:]]|$)' \
   && fail "mutable action ref found — actions must be SHA-pinned"
 grep -q 'dtolnay/rust-toolchain' "$WF" && fail "dtolnay rust-toolchain found — the flake pins rust"
 # The driver prerequisite is the PINNED devShell: no host provisioning, no

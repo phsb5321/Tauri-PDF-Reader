@@ -122,9 +122,9 @@ sed 's|^  group: packaged-user-gate$|  group: packaged-user-gate-${{ github.ref 
 expect_violation "concurrency group per-ref reintroduced" "concurrency group uses github.ref"
 
 # Tamper 19: a non-guarded job allowed to run on pull_request (the reviewer's
-# full-matrix falsifier).
+# full-matrix falsifier — now caught by the exact-canonical-condition rule).
 sed "s|^    if: github.event_name != 'pull_request'$|    if: github.event_name == 'pull_request'|" "$WF" >"$WORK/tampered.yml"
-expect_violation "unguarded job can run on pull_request" "full-matrix job can run on pull_request without the same-repo guard"
+expect_violation "unguarded job can run on pull_request" "full-matrix job-level if: is not the exact canonical condition"
 
 # Tamper 20: base.sha reduced to a comment (checkout loads head tools).
 sed 's|github.event.pull_request.base.sha|github.event.pull_request.head.sha # base.sha|' "$WF" >"$WORK/tampered.yml"
@@ -160,4 +160,31 @@ expect_violation "pr-fast job-level if deleted" "pr-fast job-level if: is not th
 sed '/^    if: github.event_name != '\''pull_request'\''$/d' "$WF" >"$WORK/tampered.yml"
 expect_violation "full-matrix job-level if deleted" "full-matrix job has no job-level if"
 
-echo "NEGATIVE CONTROL PASS: contract catches all twenty-six drop attempts for the intended reasons"
+# Tamper 27: contract if replaced with a bare pull_request exclusion (the
+# skip-capable variant — the exact-canonical-guard class).
+sed "s@^    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository\$@    if: github.event_name != 'pull_request'@" "$WF" >"$WORK/tampered.yml"
+expect_violation "contract if replaced with bare exclusion" "contract job-level if: is not the exact canonical guard"
+
+# Tamper 28: contract if deleted entirely (the missing-if branch fires first).
+sed "/^    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository\$/d" "$WF" >"$WORK/tampered.yml"
+expect_violation "contract job-level if deleted" "contract job has no job-level if"
+
+# Tamper 29: full-matrix if replaced with false (matrix silently never runs).
+sed "s|^    if: github.event_name != 'pull_request'$|    if: \${{ false }}|" "$WF" >"$WORK/tampered.yml"
+expect_violation "full-matrix if falsified" "full-matrix job-level if: is not the exact canonical condition"
+
+# Tamper 30: full-matrix if deleted (deletion NC for the exact-condition rule).
+sed '/^    if: github.event_name != '\''pull_request'\''$/d' "$WF" >"$WORK/tampered.yml"
+# The deletion trips the missing-if branch first; ensure the message is the
+# missing-if one for full-matrix.
+expect_violation "full-matrix job-level if deleted (exact)" "full-matrix job has no job-level if"
+
+# Tamper 31: an uppercase job ID without any condition (job-scan class).
+sed 's|^jobs:$|jobs:\n  EVIL_JOB:\n    runs-on: [self-hosted, Linux, X64, vm103]\n    steps:\n      - run: echo exposed|' "$WF" >"$WORK/tampered.yml"
+expect_violation "uppercase unguarded job injected" "EVIL_JOB job has no job-level if"
+
+# Tamper 32: single-quoted mutable action ref (the quote-bypass class).
+sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|uses: '\''actions/checkout@v4'\''|' "$WF" >"$WORK/tampered.yml"
+expect_violation "single-quoted mutable action ref" "mutable action ref found"
+
+echo "NEGATIVE CONTROL PASS: contract catches all thirty-two drop attempts for the intended reasons"
