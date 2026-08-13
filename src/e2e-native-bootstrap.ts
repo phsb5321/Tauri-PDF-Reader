@@ -75,6 +75,8 @@ export interface E2ENativeRead {
   storeError: () => string | null;
   /** Library row page for the seeded document (read-only IPC probe). */
   ipcDocumentPage: () => Promise<number | null>;
+  /** Library row page for any library document, by title (read-only IPC probe). */
+  ipcDocumentRowPageByTitle: (title: string) => Promise<number | null>;
   /** Read IPC result for the seeded document (read-only; data-presence oracle). */
   ipcHighlights: () => Promise<unknown>;
   /** Observer log buffer: console messages since bootstrap (diagnostics). */
@@ -168,6 +170,16 @@ export async function installE2ENativeBootstrap(): Promise<void> {
       if (!seededDocId) return null;
       const res = await commands.libraryGetDocument(seededDocId);
       return res.status === "ok" ? (res.data?.currentPage ?? null) : null;
+    },
+    ipcDocumentRowPageByTitle: async (title) => {
+      const res = await commands.libraryListDocuments(
+        "last_opened",
+        null,
+        null,
+      );
+      if (res.status !== "ok") return null;
+      const doc = res.data.find((d) => d.title === title);
+      return doc ? (doc.currentPage ?? null) : null;
     },
     ipcHighlights: async () => {
       if (!seededDocId) return { status: "error", error: "no seeded doc" };
