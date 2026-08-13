@@ -43,7 +43,7 @@ awk '/^  pull_request:$/ { in_pull=1; next }
      in_pull && /^[ \t]+paths(-ignore)?:/ { print }' "$WF" | grep -q . \
   && fail "pull_request is path-filtered — the gate can be silently skipped"
 
-RUN_AWK='/^[[:space:]]*run:[[:space:]]*\|?[[:space:]]*$/ {in_run=1;next}
+RUN_AWK='/^[[:space:]]*run:[[:space:]]*[>|][+-]?[[:space:]]*$/ {in_run=1;next}
         in_run && /^[[:space:]]*- / {in_run=0}
         /^[[:space:]]*run:[[:space:]]*[^|]/ {sub(/^[[:space:]]*run:[[:space:]]*/, ""); print; next}
         in_run {print}'
@@ -144,7 +144,7 @@ ACTIVE="$(grep -vE '^[[:space:]]*#' "$WF")"
 # strings) must never be scanned as YAML — the structural rules apply to the
 # YAML surface only.
 STRUCT="$(printf '%s\n' "$ACTIVE" | awk '
-  /^[[:space:]]*run:[[:space:]]*\|?[[:space:]]*$/ {in_run=1; next}
+  /^[[:space:]]*run:[[:space:]]*[>|][+-]?[[:space:]]*$/ {in_run=1; next}
   in_run && /^[[:space:]]*- / {in_run=0}
   !in_run {print}')"
 printf '%s\n' "$STRUCT" | grep -E '["\'\''][^"\'\'']*["\'\''][[:space:]]*:' \

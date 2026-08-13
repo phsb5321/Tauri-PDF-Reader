@@ -267,4 +267,26 @@ expect_violation "quoted-key flow mapping uses" "mutable action ref found"
 sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|- ? uses\n  : actions/checkout@v4|' "$WF" >"$WORK/tampered.yml"
 expect_violation "explicit-key uses" "mutable action ref found"
 
-echo "NEGATIVE CONTROL PASS: contract catches all fifty-one drop attempts for the intended reasons"
+# Positive control (no-false-positive class): a `run: |-` body containing
+# JSON with quoted keys must NOT be scanned as YAML.
+expect_clean() {
+  local desc="$1"
+  if "$CONTRACT" "$WORK/clean.yml" >/dev/null 2>&1; then
+    echo "clean ($desc): passes — no false positive"
+  else
+    echo "NEGATIVE CONTROL FAILED: false positive on $desc" >&2
+    exit 1
+  fi
+}
+python3 - "$WF" "$WORK/clean.yml" <<'PY'
+import sys
+s = open(sys.argv[1]).read()
+s = s.replace(
+    '      - name: Install dependencies\n        run: pnpm install --frozen-lockfile',
+    '      - name: Install dependencies\n        run: pnpm install --frozen-lockfile\n\n      - name: no-false-positive probe\n        run: |-\n          echo \'{"uses": "actions/checkout@v4"}\'',
+)
+open(sys.argv[2], 'w').write(s)
+PY
+expect_clean "run:|- body with quoted keys"
+
+echo "NEGATIVE CONTROL PASS: contract catches all fifty-one drop attempts + one positive control, for the intended reasons"
