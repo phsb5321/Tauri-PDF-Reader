@@ -65,7 +65,7 @@
           src = pkgs.fetchCrate {
             pname = "tauri-driver";
             version = "2.0.6";
-            sha256 = "sha256-JNw5vSamU2HByOBnY2u/8dndfi/Fj/h07fujOsqw5tA=";
+            sha256 = "sha256-fTCkEs4NLBW0khaHL4jpVNkrbQg22YPsRMjfJNqnCWA=";
           };
           # Pinned dependency closure (68 packages) instead of an opaque
           # cargoHash — the lockfile documents the exact versions the gate
