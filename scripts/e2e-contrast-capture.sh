@@ -9,9 +9,18 @@
 #
 # Requires on PATH: pnpm (host 10.x), node, tauri-driver (~/.cargo/bin).
 # `nix` provides the WebKitGTK/GTK toolchain + Xvfb (see scripts/e2e-toolchain.sh).
-#     bash scripts/e2e-contrast-capture.sh
+#     bash scripts/e2e-contrast-capture.sh               (no-key lane, home+reader)
+#     E2E_LANE=key bash scripts/e2e-contrast-capture.sh   (fixture TTS lane, tts phase)
 set -euo pipefail
 cd "$(dirname "$0")/.."
+
+LANE="${E2E_LANE:-no-key}"
+case "$LANE" in
+  no-key) TTS_ENV="none"; SEED_ENV="single"; CAPTURE_PHASE="home" ;;
+  key)    TTS_ENV="fixture"; SEED_ENV="dual"; CAPTURE_PHASE="tts" ;;
+  *) echo "ERROR: unknown E2E_LANE=$LANE (no-key|key)" >&2; exit 2 ;;
+esac
+export CAPTURE_PHASE
 
 # Hermetic profile via the SHARED helper. Pin the profile under /tmp
 # explicitly: mktemp -d would otherwise follow a redirected TMPDIR and the
@@ -24,10 +33,10 @@ APP_DIR="$E2E_PROFILE_DIR/com.lectrice.reader"
 mkdir -p "$APP_DIR"
 node scripts/gen-e2e-fixtures.mjs "$APP_DIR"
 
-echo "==> Building frontend (VITE_E2E_NATIVE=true, no-key lane, seed=single)"
+echo "==> Building frontend (VITE_E2E_NATIVE=true, lane=$LANE, seed=$SEED_ENV)"
 VITE_E2E_NATIVE=true \
-  VITE_E2E_NATIVE_TTS="none" \
-  VITE_E2E_NATIVE_SEED="single" \
+  VITE_E2E_NATIVE_TTS="$TTS_ENV" \
+  VITE_E2E_NATIVE_SEED="$SEED_ENV" \
   VITE_E2E_PROFILE_DIR="$APP_DIR" \
   "$HOME/.local/share/pnpm/pnpm" build
 # Force tauri::generate_context! to re-embed the freshly built dist/.
