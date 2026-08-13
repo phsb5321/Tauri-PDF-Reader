@@ -2,6 +2,16 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #63 — 13/08/2026 (122-dl2-close-owned: the fast-close page revert, root-caused and fixed at the source)
+
+- **Branch:** `122-dl2-close-owned` (off `origin/main` 260e0b4; worktree `../tauri-pdf-reader-122-dl2-close-owned`). D1: a genuine native close <500ms after page 2→3 left the row and the relaunch at page 2.
+- **Root cause (instrumented in the packaged lane, then confirmed in vivo):** the autosave's "save on unmount or document change" effect re-registered on EVERY render (saveProgress changed with currentPage), and its CLEANUP ran a "final save attempt" with the PREVIOUS render's closure — writing the OLD page back over the fresh one. The lane's buffer caught it: `entry page=2 last=1` → Next's direct write `result=ok page=3` → the cleanup's `wrote page=2` — the revert. (The close-flush protocol itself never runs in this harness: `CloseRequested` is never delivered to `on_window_event` — in-binary markers show only Focus events — so the flush could not save it either way.)
+- **Fix (useAutoSave rework, root once):** all writes read LIVE values from refs (never render closures) and go through ONE serialized FIFO chain; `lastSaved` is marked from the SNAPSHOT sent (a page change during the in-flight write stays dirty and drains next); one drain attempt per observed revision (a failed IPC never hot-retries); document switches flush the LEAVING document's own per-document snapshot; `flushProgress` (the close protocol) REJECTS on failure and ReaderView acks ONLY on success (the backend's 3s timeout destroys the window otherwise — the protocol no longer lies about success). `checkUnsavedProgress` restored to one-shot (removeItem on read).
+- **Deterministic tests (deferred promises, no sleeps):** the D1 regression + drain-during-in-flight + flush-awaits-in-flight-and-drains + document A→B isolation + flush-rejects-with-bounded-calls-and-recovers + background-save-settles-quietly — 5/5 RED pre-fix, 6/6 GREEN post-fix. The close-flush UI test gains "no ack when the position flush rejects".
+- **Packaged:** dl2 pair — close at 349ms (<500ms asserted), `rowPage:3` at the close, relaunch lands page 3, both phases exit 0. dl1 pair — highlight survives the fast close, green. Full suite 94 files / 1052 tests; lint 0/94; typecheck + type-coverage ≥99.9 clean.
+- **Western adversarial review: REQUIRED before merge** (this is a DeepSeek-generator change per the D1 dispatch; the review runs on a different family and is not yet recorded).
+- **Revert:** `git revert <squash>` — useAutoSave.ts, ReaderView.tsx, the two test files, this backlog entry.
+
 ## Iteration #62 — 10/08/2026 (113-dl2-resume: the session restore lands on the row's page — DL-2's second half, PR #114)
 
 - **Branch:** `113-dl2-resume` (off `origin/main` 2f70e6c = the #113 squash; worktree `../tauri-pdf-reader-112-close-dataloss`).
