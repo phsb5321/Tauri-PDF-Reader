@@ -12,6 +12,8 @@ interface ImportMetaEnv {
   readonly VITE_E2E_NATIVE_SEED?: "single" | "dual";
   readonly VITE_E2E_PROFILE_DIR?: string;
   readonly VITE_E2E_OPEN_PATH?: string;
+  /** Delete lane: replace the WebDriver-impossible native confirm with accept. */
+  readonly VITE_E2E_CONFIRM?: "accept";
 }
 
 /**
