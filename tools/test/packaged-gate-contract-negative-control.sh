@@ -255,4 +255,16 @@ expect_violation "whitespace-colon bare uses key" "mutable action ref found"
 sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|- "uses" : actions/checkout@v4|' "$WF" >"$WORK/tampered.yml"
 expect_violation "whitespace-colon quoted uses key" "mutable action ref found"
 
-echo "NEGATIVE CONTROL PASS: contract catches all forty-eight drop attempts for the intended reasons"
+# Tamper 49: flow mapping form (`- { uses: … }`).
+sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|- { uses: actions/checkout@v4 }|' "$WF" >"$WORK/tampered.yml"
+expect_violation "flow mapping uses" "mutable action ref found"
+
+# Tamper 50: quoted-key flow mapping form.
+sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|- { "uses": actions/checkout@v4 }|' "$WF" >"$WORK/tampered.yml"
+expect_violation "quoted-key flow mapping uses" "mutable action ref found"
+
+# Tamper 51: explicit-key form (`- ? uses`).
+sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|- ? uses\n  : actions/checkout@v4|' "$WF" >"$WORK/tampered.yml"
+expect_violation "explicit-key uses" "mutable action ref found"
+
+echo "NEGATIVE CONTROL PASS: contract catches all fifty-one drop attempts for the intended reasons"

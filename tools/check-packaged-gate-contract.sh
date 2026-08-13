@@ -133,17 +133,28 @@ printf '%s\n' "$CONTRACT_BLOCK" | grep -q 'BOOTSTRAP-INERT' \
 # /tmp paths, so no two runs may ever execute.
 grep -qE '^  group: packaged-user-gate$' "$WF" || fail "concurrency group is not the fixed runner-wide packaged-user-gate"
 grep -q 'github.ref' <(sed 's/#.*//' "$WF") && fail "concurrency group uses github.ref — fixed group required"
-# STRUCTURAL SHA-only: quoted step-level keys are REJECTED outright — YAML
-# escape spellings (`"\\u0075ses":`) cannot be trusted by a text checker,
-# so only the bare literal `uses` key is permitted. The VALUE is compared
-# RAW (no quote/comment stripping, trailing whitespace only) and must be
-# exactly `owner/repo@<40 lowercase hex>`.
-grep -E '^[[:space:]]*(-[[:space:]]*)?["'"'"'][^"'"'"']*["'"'"'][[:space:]]*:' "$WF" \
-  && fail "mutable action ref found — quoted step-level keys are rejected (escaped uses spellings); uses must be the bare literal"
-grep -E '^[[:space:]]*(-[[:space:]]*)?uses[[:space:]]*:[[:space:]]*[>|][>-]?[[:space:]]*$' "$WF" \
-  && fail "mutable action ref found — block scalar uses: rejected; every uses: must be owner/repo@<40 lowercase hex>"
-grep -E '^[[:space:]]*(-[[:space:]]*)?uses[[:space:]]*:' "$WF" \
-  | sed -E 's/^[[:space:]]*(-[[:space:]]*)?uses[[:space:]]*:[[:space:]]*//; s/[[:space:]]*$//' \
+# STRUCTURAL SHA-only, conservative: comment lines are excluded first, then
+# ANY line carrying a mapping key is scanned un-anchored — flow mappings
+# (`- { uses: … }`), quoted keys (`"uses":`, `"uses":`), explicit-key
+# forms (`- ? uses`), whitespace-before-colon, block scalars, and bare keys
+# are all caught by these rules. A quoted mapping key anywhere is rejected
+# outright; a uses-key value must be exactly `owner/repo@<40 lowercase hex>`.
+ACTIVE="$(grep -vE '^[[:space:]]*#' "$WF")"
+# Exclude run-block BODIES: their command text (JSON literals, printf
+# strings) must never be scanned as YAML — the structural rules apply to the
+# YAML surface only.
+STRUCT="$(printf '%s\n' "$ACTIVE" | awk '
+  /^[[:space:]]*run:[[:space:]]*\|?[[:space:]]*$/ {in_run=1; next}
+  in_run && /^[[:space:]]*- / {in_run=0}
+  !in_run {print}')"
+printf '%s\n' "$STRUCT" | grep -E '["\'\''][^"\'\'']*["\'\''][[:space:]]*:' \
+  && fail "mutable action ref found — quoted mapping keys are rejected (escaped uses spellings included)"
+printf '%s\n' "$STRUCT" | grep -E '\?[[:space:]]+uses([[:space:]]*:|[[:space:]]*$)' \
+  && fail "mutable action ref found — explicit-key uses forms are rejected"
+printf '%s\n' "$STRUCT" | grep -E 'uses[[:space:]]*:[[:space:]]*[>|][>-]?[[:space:]]*$' \
+  && fail "mutable action ref found — block scalar uses: rejected"
+printf '%s\n' "$STRUCT" | grep -E 'uses[[:space:]]*:' \
+  | sed -E 's/.*uses[[:space:]]*:[[:space:]]*//; s/[[:space:]]*[,}]*$//' \
   | grep -vqE '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@[0-9a-f]{40}$' \
   && fail "mutable action ref found — every uses: must be exactly owner/repo@<40 lowercase hex> (comments, quotes and other forms rejected)"
 # The driver prerequisite is the PINNED devShell: no host provisioning, no
