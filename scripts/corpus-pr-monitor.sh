@@ -5,17 +5,22 @@
 # product pane (or a future session) can rebase immediately when a gate moves.
 # Read-only: gh api queries only, no repo mutation.
 #
-# Change detection compares ONLY the JSON (no timestamp prefix), so an
-# unchanged head set is NOT re-logged; the timestamp is added when a genuine
-# change is written.
+# Self-manages its PID file (/tmp/lectrice-corpus-pr-monitor.pid) on start and
+# exit — the Kill instruction below uses the pid file, never a pkill pattern
+# that could match its own launcher.
 #
 # Usage:   nohup bash scripts/corpus-pr-monitor.sh > /tmp/lectrice-corpus-pr-monitor.out 2>&1 &
-# Kill:    pkill -f corpus-pr-monitor.sh
+# Kill:    kill "$(cat /tmp/lectrice-corpus-pr-monitor.pid)"
 
 set -uo pipefail
 LOG=/tmp/lectrice-corpus-pr-heads.log
+PIDFILE=/tmp/lectrice-corpus-pr-monitor.pid
 INTERVAL=180          # 3 min
 STATE=/tmp/lectrice-corpus-pr-heads.state
+
+echo "$$" > "$PIDFILE"
+trap 'rm -f "$PIDFILE"' EXIT
+
 : > "$LOG"
 : > "$STATE"
 echo "$(date '+%d/%m/%Y %H:%M:%S %Z') monitor start (interval ${INTERVAL}s)" >> "$LOG"
