@@ -40,7 +40,8 @@
 
 /* global browser, $, expect */
 
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
+import { writeFileSync } from "node:fs";
 
 const PHASE = process.env.CLOSE_PHASE || "dl1-create";
 
@@ -102,8 +103,16 @@ function closeWindow() {
  * so it UNDER-states the click→close interval — the wrong direction for an
  * "inside the 500 ms debounce" claim, which needs an upper bound.
  */
-async function closeAndObserve(tAction) {
-  const { execFileSync } = await import("node:child_process");
+/**
+ * Prepare the close observer BEFORE the public action. Everything the close
+ * measurement needs — the child_process import, the cwd regex, the
+ * window/process precondition CAPTURES — happens here, so the action→close
+ * interval contains NO setup work: the returned closure's first statement is
+ * the WM close itself. (The prior structure ran the import + regex + both
+ * precondition probes AFTER tAction, inflating the measured interval by
+ * process spawns — the 551-974ms self-inflicted readings.)
+ */
+function prepareCloseObserver() {
   // execFileSync (argv, no shell) so a repo path containing a quote or a
   // regex metacharacter cannot reshape the pattern.
   const cwdRe = process.cwd().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -119,81 +128,95 @@ async function closeAndObserve(tAction) {
   const windowAlive = () => alive("xdotool", ["search", "--name", "Lectrice"]);
   const appAlive = () => alive("pgrep", ["-f", appPattern]);
 
+  // Preconditions captured immediately BEFORE the action — the closure
+  // asserts them AFTER the close (their truth at capture time is what the
+  // measurement relies on).
   const windowSeenBefore = windowAlive();
   const appSeenBefore = appAlive();
-  closeWindow();
 
-  let windowClosedAt = null;
-  let tDeath = null;
-  for (let i = 0; i < 200; i++) {
-    if (windowClosedAt === null && windowSeenBefore && !windowAlive()) {
-      windowClosedAt = Date.now();
-    }
-    if (!appAlive()) {
-      tDeath = Date.now();
-      // The app can die between this iteration's window probe and its app
-      // probe. Without this last look the close would be recorded as "never
-      // happened" and reported as a false RED blaming the wrong thing.
+  return async function closeAndObserve(tAction) {
+    // FIRST statement after tAction: the WM close. Nothing else runs
+    // between the action's timestamp and the close request.
+    closeWindow();
+
+    let windowClosedAt = null;
+    let tDeath = null;
+    for (let i = 0; i < 200; i++) {
       if (windowClosedAt === null && windowSeenBefore && !windowAlive()) {
         windowClosedAt = Date.now();
       }
-      break;
+      if (!appAlive()) {
+        tDeath = Date.now();
+        // The app can die between this iteration's window probe and its app
+        // probe. Without this last look the close would be recorded as
+        // "never happened" and reported as a false RED blaming the wrong
+        // thing.
+        if (windowClosedAt === null && windowSeenBefore && !windowAlive()) {
+          windowClosedAt = Date.now();
+        }
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 50));
     }
-    await new Promise((r) => setTimeout(r, 50));
-  }
 
-  const timings = {
-    phase: PHASE,
-    tAction,
-    windowSeenBefore,
-    appSeenBefore,
-    windowClosedAt,
-    tDeath,
-    // The decisive, sound number: an UPPER bound on action→close-delivered.
-    actionToWindowCloseMs: windowClosedAt ? windowClosedAt - tAction : null,
-    actionToDeathMs: tDeath ? tDeath - tAction : null,
-    windowCloseToDeathMs:
-      windowClosedAt && tDeath ? tDeath - windowClosedAt : null,
+    const timings = {
+      phase: PHASE,
+      tAction,
+      windowSeenBefore,
+      appSeenBefore,
+      windowClosedAt,
+      tDeath,
+      // The decisive, sound number: an UPPER bound on action→close-delivered.
+      actionToWindowCloseMs: windowClosedAt ? windowClosedAt - tAction : null,
+      actionToDeathMs: tDeath ? tDeath - tAction : null,
+      windowCloseToDeathMs:
+        windowClosedAt && tDeath ? tDeath - windowClosedAt : null,
+    };
+    const record = JSON.stringify(timings);
+    if (!TIMING_PATH) {
+      throw new Error(
+        "no timing destination: set CLOSE_TIMING_PATH (the runner does) or run under a hermetic profile that exports XDG_DATA_HOME — refusing to fall back to a predictable shared /tmp path",
+      );
+    }
+    writeFileSync(TIMING_PATH, record);
+
+    // The close is the phase's product; an unobserved close is not a close.
+    if (!windowSeenBefore) {
+      throw new Error(
+        `close NOT OBSERVABLE: no window named Lectrice on DISPLAY=${process.env.DISPLAY} before the close — the lane cannot prove a genuine WM_DELETE_WINDOW. ${record}`,
+      );
+    }
+    if (!appSeenBefore) {
+      throw new Error(
+        `app process NOT MATCHED before the close (pattern ${appPattern}) — the death poll would exit immediately and every interval would be wrong. ${record}`,
+      );
+    }
+    if (windowClosedAt === null) {
+      throw new Error(
+        `window NEVER CLOSED after xdotool windowclose — the close never reached the app, so this phase proves nothing about CloseRequested. ${record}`,
+      );
+    }
+    // THE PREMISE, ASSERTED — not merely measured. Everything this lane concludes
+    // rests on the close beating the debounce; if it did not, a later green is
+    // vacuous (the debounce flushed on its own) and must not be reported as a
+    // pass. This is the fail-open link that the rest of the lane exists to close.
+    if (timings.actionToWindowCloseMs >= DEBOUNCE_MS) {
+      throw new Error(
+        `close TOO SLOW to test the race: ${timings.actionToWindowCloseMs}ms >= the ${DEBOUNCE_MS}ms debounce, so the debounce could have flushed by itself and this phase proves nothing either way. ${record}`,
+      );
+    }
+    return timings;
   };
-  const record = JSON.stringify(timings);
-  if (!TIMING_PATH) {
-    throw new Error(
-      "no timing destination: set CLOSE_TIMING_PATH (the runner does) or run under a hermetic profile that exports XDG_DATA_HOME — refusing to fall back to a predictable shared /tmp path",
-    );
-  }
-  const fs = await import("node:fs");
-  fs.writeFileSync(TIMING_PATH, record);
-
-  // The close is the phase's product; an unobserved close is not a close.
-  if (!windowSeenBefore) {
-    throw new Error(
-      `close NOT OBSERVABLE: no window named Lectrice on DISPLAY=${process.env.DISPLAY} before the close — the lane cannot prove a genuine WM_DELETE_WINDOW. ${record}`,
-    );
-  }
-  if (!appSeenBefore) {
-    throw new Error(
-      `app process NOT MATCHED before the close (pattern ${appPattern}) — the death poll would exit immediately and every interval would be wrong. ${record}`,
-    );
-  }
-  if (windowClosedAt === null) {
-    throw new Error(
-      `window NEVER CLOSED after xdotool windowclose — the close never reached the app, so this phase proves nothing about CloseRequested. ${record}`,
-    );
-  }
-  // THE PREMISE, ASSERTED — not merely measured. Everything this lane concludes
-  // rests on the close beating the debounce; if it did not, a later green is
-  // vacuous (the debounce flushed on its own) and must not be reported as a
-  // pass. This is the fail-open link that the rest of the lane exists to close.
-  if (timings.actionToWindowCloseMs >= DEBOUNCE_MS) {
-    throw new Error(
-      `close TOO SLOW to test the race: ${timings.actionToWindowCloseMs}ms >= the ${DEBOUNCE_MS}ms debounce, so the debounce could have flushed by itself and this phase proves nothing either way. ${record}`,
-    );
-  }
-  return timings;
 }
 
 describe("Packaged close journey (DL-1 highlight loss, DL-2 position loss)", () => {
-  it(`${PHASE}: ${PHASE.includes("dl1") ? "highlight survives an immediate close" : "reading position survives an immediate close"}`, async () => {
+  it(`${PHASE}: ${PHASE.includes("dl1") ? "highlight survives an immediate close" : "reading position survives an immediate close"}`, async function () {
+    // The close observer polls window+process disappearance for up to 200
+    // iterations; under host load each xdotool/pgrep spawn stretches, so the
+    // default 120s mocha budget is not enough for a truthful observation.
+    // The close still must beat the 500ms debounce — the poll length does
+    // not weaken that premise, it only makes the observation reliable.
+    this.timeout(300000);
     await browser.waitUntil(
       async () =>
         browser.execute(
@@ -233,7 +256,9 @@ describe("Packaged close journey (DL-1 highlight loss, DL-2 position loss)", () 
     await resume.waitForClickable({ timeout: 15000 });
     await browser.execute(() =>
       document
-        .querySelector('button[aria-label^="Resume E2E Resume Fixture A, page"]')
+        .querySelector(
+          'button[aria-label^="Resume E2E Resume Fixture A, page"]',
+        )
         ?.click(),
     );
     await browser.waitUntil(
@@ -305,30 +330,29 @@ describe("Packaged close journey (DL-1 highlight loss, DL-2 position loss)", () 
       const yellow = await $('button[aria-label="Highlight with Yellow"]');
       await yellow.waitForClickable({ timeout: 10000 });
 
-      // ── TIMING INSTRUMENTATION (the decisive number for the DL-1 re-check):
-      //    the interval between the Yellow click (the debounce enqueue) and
-      //    the window close. Written to a file the runner can join with the
-      //    app-death timestamp to also get close→death (the teardown latency)
-      //    and click→death (whether the 500 ms timer could have fired).
-      const tClick = Date.now();
-      await browser.execute(() =>
+      // Prepare the close observer BEFORE the action — the import, the
+      // regex and the window/process precondition captures must not run
+      // inside the measured interval.
+      const closeAndObserve = prepareCloseObserver();
+
+      // ── THE TIMED PATH (harness contract): the Yellow click (the debounce
+      //    enqueue) AND the success-toast read happen inside ONE execute —
+      //    the toast is the app's unconditional claim, read synchronously in
+      //    the same round trip as the click. `tAction` is stamped AFTER the
+      //    click; NOTHING between tAction and the close (the old separate
+      //    toast execute inflated the measured interval).
+      const result = await browser.execute(() => {
         document
           .querySelector('button[aria-label="Highlight with Yellow"]')
-          ?.click(),
-      );
-
-      // The app claims success IMMEDIATELY (the toast fires unconditionally,
-      // before the debounced persist). Capture that claim, then close FAST —
-      // inside the 500 ms debounce window. The close is the final statement.
-      const toastText = await browser.execute(() => {
-        const t = Array.from(
+          ?.click();
+        const toast = Array.from(
           document.querySelectorAll("[class*='toast'], [role='status']"),
         )
           .map((el) => el.textContent)
           .find((t) => t && /highlight/i.test(t));
-        return t ?? null;
+        return { tAction: Date.now(), toastText: toast ?? null };
       });
-      const tToastDone = Date.now();
+      const toastText = result.toastText;
       // DL-1's premise is that the app SAID it saved. If the toast never
       // appeared, the premise is absent and a later green would be vacuous.
       if (!toastText) {
@@ -336,18 +360,15 @@ describe("Packaged close journey (DL-1 highlight loss, DL-2 position loss)", () 
           "no success toast after the Yellow click — DL-1's premise (the app claimed it saved) is unproven, so the close would test nothing",
         );
       }
-      console.log(
-        "DIAG dl1-create:",
-        JSON.stringify({ toastText, clickToToastMs: tToastDone - tClick }),
-      );
-      const timings = await closeAndObserve(tClick);
+      console.log("DIAG dl1-create:", JSON.stringify({ toastText }));
+      const timings = await closeAndObserve(result.tAction);
       console.log("DIAG dl1-close:", JSON.stringify(timings));
     } else if (PHASE === "dl1-verify") {
       // ── THE CLAIM: the highlight survived — the app said it saved. ───────
       await browser.waitUntil(
         async () =>
-          browser.execute(() =>
-            !!document.querySelector('[aria-label*="Highlight: "]'),
+          browser.execute(
+            () => !!document.querySelector('[aria-label*="Highlight: "]'),
           ),
         {
           timeout: 15000,
@@ -361,28 +382,32 @@ describe("Packaged close journey (DL-1 highlight loss, DL-2 position loss)", () 
       );
     } else if (PHASE === "dl2-create") {
       // ── Turn a page (page 3), then close IMMEDIATELY — inside the 500 ms
-      //    useAutoSave debounce. The close is the final statement. ─────────
+      //    useAutoSave debounce. HARNESS CONTRACT: NOTHING between tAction
+      //    and the close — no waitUntil, no DOM read, no IPC probe. Those
+      //    round trips silently discard part of the window being raced and
+      //    inflated action→close past 500ms (the 551-571ms self-inflicted
+      //    measurements). The click AND the synchronous store read happen
+      //    inside ONE execute; `tAction` is stamped after the click, before
+      //    the 500ms debounce timer can mature.
       const next = await $('button[title="Next page (Right Arrow)"]');
       await next.waitForClickable({ timeout: 10000 });
-      // The debounce is enqueued by the page change, so the interval that
-      // matters starts HERE — not after the confirmation and probe below,
-      // which would silently discard part of the window being raced.
-      const tPageTurn = Date.now();
-      await browser.execute(() =>
-        document.querySelector('button[title="Next page (Right Arrow)"]')?.click(),
-      );
-      await browser.waitUntil(
-        async () =>
-          (await $('input[aria-label="Current page"]').getValue()) === "3",
-        { timeout: 10000, timeoutMsg: "Next did not move to page 3" },
-      );
-      // Single fast probe for the record (the close-flush makes the debounce
-      // moot, but the pre-close row state is evidence).
-      const rowAtClose = await browser.execute(async () => ({
-        rowPage: await window.__E2E_READ__.ipcDocumentPage(),
-      }));
-      console.log("DIAG dl2-create:", JSON.stringify(rowAtClose));
-      const timings = await closeAndObserve(tPageTurn);
+      // Prepare the close observer BEFORE the action (imports, regex,
+      // precondition captures — nothing of it may run inside the interval).
+      const closeAndObserve = prepareCloseObserver();
+      const result = await browser.execute(() => {
+        document
+          .querySelector('button[title="Next page (Right Arrow)"]')
+          ?.click();
+        return {
+          tAction: Date.now(),
+          storePage: window.__E2E_READ__.currentPage(),
+        };
+      });
+      // The state updated synchronously after the public click — the user's
+      // action landed. (A stale store here would be a product defect, not a
+      // harness concern.)
+      expect(result.storePage).toBe(3);
+      const timings = await closeAndObserve(result.tAction);
       console.log("DIAG dl2-close:", JSON.stringify(timings));
     } else {
       // ── THE CLAIM: the position survived — the reader must return to the
@@ -391,7 +416,8 @@ describe("Packaged close journey (DL-1 highlight loss, DL-2 position loss)", () 
       // what does the home's resume line show?
       const launchProbe = await browser.execute(async () => ({
         rowPage: await window.__E2E_READ__.ipcDocumentPage(),
-        homeMeta: document.querySelector(".resume-line-meta")?.textContent ?? null,
+        homeMeta:
+          document.querySelector(".resume-line-meta")?.textContent ?? null,
         storePage: window.__E2E_READ__.currentPage(),
       }));
       console.log("DIAG dl2-verify-launch:", JSON.stringify(launchProbe));
