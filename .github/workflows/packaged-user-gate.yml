@@ -68,8 +68,12 @@ jobs:
       - name: Packaged PR-fast lane — hermetic profile, X11 pin, Xvfb
         # The repo's own runner: shared profile (#99 fail-closed) + flake
         # devShell toolchain (#101 single source) + GDK_BACKEND=x11 (the
-        # negative-devicePixelRatio class) + Xvfb via -displayfd.
-        run: bash e2e/run-critical-loop.sh
+        # negative-devicePixelRatio class) + Xvfb via -displayfd. The fixed
+        # /tmp evidence paths are cleared first so a failure can only copy
+        # THIS run's logs (a prior job's leftovers must never ride along).
+        run: |
+          rm -f /tmp/lectrice-e2e-critical-loop-xvfb.log /tmp/lectrice-matrix-critical-loop.log
+          bash e2e/run-critical-loop.sh
 
       - name: Copy failure evidence into the workspace (upload-artifact cannot read /tmp)
         if: failure()
@@ -121,8 +125,11 @@ jobs:
 
       - name: Run all packaged lanes — one at a time
         # Serial by construction: one job loops the eight self-contained lane
-        # runners. The single-slot runner must never be stampeded.
-        run: bash scripts/e2e-matrix.sh
+        # runners. The single-slot runner must never be stampeded. Fixed /tmp
+        # evidence paths cleared first — stale artifacts must never ride along.
+        run: |
+          rm -f /tmp/lectrice-matrix-*.log /tmp/lectrice-e2e-*-xvfb.log
+          bash scripts/e2e-matrix.sh
 
       - name: Copy failure evidence into the workspace (upload-artifact cannot read /tmp)
         if: failure()

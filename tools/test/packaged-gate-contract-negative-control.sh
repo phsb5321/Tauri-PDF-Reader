@@ -40,16 +40,29 @@ expect_violation() {
 }
 echo "baseline: shipped workflow passes"
 
-# Tamper 1: remove the lane run from the PR-fast job.
-sed 's|run: bash e2e/run-critical-loop.sh|# (lane removed)|' "$WF" >"$WORK/tampered.yml"
+# Tamper 1: remove the lane invocation from the PR-fast job.
+sed 's|bash e2e/run-critical-loop.sh|# (lane removed)|' "$WF" >"$WORK/tampered.yml"
 expect_violation "PR-fast lane removed" "pr-fast job does not run e2e/run-critical-loop.sh"
 
-# Tamper 2: skip-green on the lane step.
-sed '/run: bash e2e\/run-critical-loop.sh/a\        continue-on-error: true' "$WF" >"$WORK/tampered.yml"
-expect_violation "continue-on-error added" "continue-on-error found (skip-green)"
+# Tamper 2: skip-green on the lane step (literal).
+sed '/bash e2e\/run-critical-loop.sh/a\        continue-on-error: true' "$WF" >"$WORK/tampered.yml"
+expect_violation "continue-on-error (literal true) added" "continue-on-error found (skip-green)"
 
-# Tamper 3: path-filter the pull_request trigger.
+# Tamper 3: skip-green via expression (the literal-grep bypass class).
+sed '/bash e2e\/run-critical-loop.sh/a\        continue-on-error: \${{ true }}' "$WF" >"$WORK/tampered.yml"
+expect_violation "continue-on-error (expression) added" "continue-on-error found (skip-green)"
+
+# Tamper 4: path-filter the pull_request trigger.
 sed 's|^  pull_request:$|  pull_request:\n    paths: ["src/**"]|' "$WF" >"$WORK/tampered.yml"
 expect_violation "pull_request path filter added" "pull_request is path-filtered"
 
-echo "NEGATIVE CONTROL PASS: contract catches all three drop attempts for the intended reasons"
+# Tamper 5: make the PR-fast job conditionally skipped.
+sed "s|^    if: github.event_name == 'pull_request'$|    if: \${{ false }}|" "$WF" >"$WORK/tampered.yml"
+expect_violation "pr-fast job-level if: falsified" "pr-fast job-level if: is not the PR trigger"
+
+# Tamper 6: drop a lane from the serial matrix (via the path override).
+cp "$WF" "$WORK/tampered.yml"
+sed 's|^run_lane reader|# run_lane reader|' "$REPO_ROOT/scripts/e2e-matrix.sh" >"$WORK/matrix-tampered.sh"
+PACKAGED_GATE_MATRIX="$WORK/matrix-tampered.sh" expect_violation "matrix lane dropped" "matrix does not include the reader lane"
+
+echo "NEGATIVE CONTROL PASS: contract catches all six drop attempts for the intended reasons"
