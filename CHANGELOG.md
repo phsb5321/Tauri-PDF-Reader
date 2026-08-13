@@ -7,7 +7,9 @@ that a claim about behavior is backed by a runnable assertion, not a glance.
 ## Unreleased — v0.2.0 candidate
 
 The tree between `v0.1.0` (21/06/2026) and today is the v0.2.0 candidate:
-84 commits across ~46 PRs. **No tag has been cut for v0.2.0.** Cutting the tag
+84 commits, every one the squash-merge of a merged PR (84 PRs since the tag,
+verified against `gh pr list --state merged` merge-commit SHAs). **No tag has
+been cut for v0.2.0.** Cutting the tag
 is a release decision (release.md) — this changelog documents what a release
 would say, using the receipts that exist today.
 

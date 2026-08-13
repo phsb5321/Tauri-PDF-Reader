@@ -4,7 +4,8 @@ Truthful inventory of what the current tree does **not** do, and what is not
 yet proven. Every item names its evidence. If a release note claims a
 platform or a feature, it must not contradict this page.
 
-Last reviewed: 13/08/2026 (commit `260e0b4`, the `120-release-docs` slice).
+Last reviewed: 13/08/2026, during the `120-release-docs` slice (PR #117),
+against `main` at commit `260e0b4`.
 
 ## Fast-close verification position (track A)
 
