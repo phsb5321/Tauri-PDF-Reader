@@ -102,7 +102,7 @@ function ResumeLine({
   document,
   onResume,
   onResumeAndPlay,
-}: ResumeLineProps) {
+}: Readonly<ResumeLineProps>) {
   const percent = progressPercent(document);
   const label = document.title || document.filePath;
   const relative = formatRelativeReadTime(document.lastOpenedAt);
@@ -175,7 +175,7 @@ function AlsoInProgress({
   documents,
   onResume,
   onResumeAndPlay,
-}: AlsoInProgressProps) {
+}: Readonly<AlsoInProgressProps>) {
   return (
     <div className="also-in-progress">
       <h3 className="also-in-progress-heading">Also in progress</h3>

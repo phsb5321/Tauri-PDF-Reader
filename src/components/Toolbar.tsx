@@ -23,7 +23,10 @@ interface ToolbarProps {
   onOpen?: () => void;
 }
 
-export function Toolbar({ onSessionRestored, onOpen }: ToolbarProps) {
+export function Toolbar({
+  onSessionRestored,
+  onOpen,
+}: Readonly<ToolbarProps>) {
   const [isSessionMenuOpen, setIsSessionMenuOpen] = useState(false);
   const { openPdf } = useOpenPdf();
   const toolbarRef = useRef<HTMLDivElement>(null);

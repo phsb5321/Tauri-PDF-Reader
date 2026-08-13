@@ -26,7 +26,7 @@ export function LibraryView({
   onDocumentSelect,
   onResumeAndPlay,
   onOpenSettings,
-}: LibraryViewProps) {
+}: Readonly<LibraryViewProps>) {
   const {
     documents: allDocuments,
     isLoading,
@@ -218,48 +218,12 @@ export function LibraryView({
         />
 
         {documents.length === 0 ? (
-          searchQuery.trim() !== "" ? (
-            // UX finding #1: a search that matches nothing must say so —
-            // "No recent documents" implies an empty library, not a missed
-            // query. The SearchBar also shows its own icon-only clear button
-            // while a query is set; this visible-text action clears the store
-            // query (the SearchBar's local input value is its own state).
-            <EmptyState
-              title={`No results for "${searchQuery.trim()}"`}
-              description="Try a different title, or clear the search."
-              action={{
-                label: "Clear search",
-                onClick: () => setSearchQuery(""),
-              }}
-              icon={<DocumentIcon />}
-            />
-          ) : (
-            <EmptyState
-              title={
-                selectedShelfId === null
-                  ? "No recent documents"
-                  : "Nothing on this shelf yet"
-              }
-              description={
-                selectedShelfId === null
-                  ? "Open a PDF to add it to your library"
-                  : "Right-click a book to file it here"
-              }
-              // Slice 112 B3: on a genuinely fresh install (no in-flight
-              // books, no document open, native menu hidden on packaged
-              // Linux) this empty state is the ONLY surface — it must carry
-              // the path to Settings, where the AI-TTS setup lives.
-              action={
-                selectedShelfId === null
-                  ? {
-                      label: "Open Settings",
-                      onClick: onOpenSettings,
-                    }
-                  : undefined
-              }
-              icon={<DocumentIcon />}
-            />
-          )
+          <LibraryEmptyState
+            searchQuery={searchQuery}
+            selectedShelfId={selectedShelfId}
+            onClearSearch={() => setSearchQuery("")}
+            onOpenSettings={onOpenSettings}
+          />
         ) : (
           <div className={`library-grid library-grid--${viewMode}`}>
             {documents.map((document) => (
@@ -282,6 +246,72 @@ export function LibraryView({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * The zero-document surface of the library body — it tells the truth about
+ * WHY nothing is showing, so the search-vs-empty-library distinction stays
+ * one place and the fresh-install path to Settings stays visible.
+ *
+ * - UX finding #1: a search that matches nothing must say so — "No recent
+ *   documents" implies an empty library, not a missed query. The SearchBar
+ *   also shows its own icon-only clear button while a query is set; this
+ *   visible-text action clears the store query (the SearchBar's local input
+ *   value is its own state).
+ * - Slice 112 B3: on a genuinely fresh install (no in-flight books, no
+ *   document open, native menu hidden on packaged Linux) this empty state is
+ *   the ONLY surface — it must carry the path to Settings, where the AI-TTS
+ *   setup lives.
+ */
+interface LibraryEmptyStateProps {
+  searchQuery: string;
+  selectedShelfId: string | null;
+  onClearSearch: () => void;
+  onOpenSettings: () => void;
+}
+
+function LibraryEmptyState({
+  searchQuery,
+  selectedShelfId,
+  onClearSearch,
+  onOpenSettings,
+}: Readonly<LibraryEmptyStateProps>) {
+  if (searchQuery.trim() === "") {
+    return (
+      <EmptyState
+        title={
+          selectedShelfId === null
+            ? "No recent documents"
+            : "Nothing on this shelf yet"
+        }
+        description={
+          selectedShelfId === null
+            ? "Open a PDF to add it to your library"
+            : "Right-click a book to file it here"
+        }
+        action={
+          selectedShelfId === null
+            ? {
+                label: "Open Settings",
+                onClick: onOpenSettings,
+              }
+            : undefined
+        }
+        icon={<DocumentIcon />}
+      />
+    );
+  }
+  return (
+    <EmptyState
+      title={`No results for "${searchQuery.trim()}"`}
+      description="Try a different title, or clear the search."
+      action={{
+        label: "Clear search",
+        onClick: onClearSearch,
+      }}
+      icon={<DocumentIcon />}
+    />
   );
 }
 
