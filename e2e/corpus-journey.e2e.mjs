@@ -126,24 +126,26 @@ if (PHASE === "corrupt-control") {
       );
       await browser.setWindowSize(1200, 800);
 
-      // ── COVER on the LIBRARY surface (Fix 1): the book card is showing
-      //    before any navigation; inspect the cover here. A cover-capable
-      //    build (post-121) must show a real raster; a build without the
+      // ── COVER on the LIBRARY surface (Fix 1 + Codex gate #5): the book
+      //    card is showing before any navigation; inspect the cover here.
+      //    A cover-capable build (post-121) must show a real raster with a
+      //    content hash distinct from the fallback; a build without the
       //    surface records BLOCKED — never a silent pass. ────────────────
       const cover = await bookCoverDiagnostic();
       if (cover.surfaceExists) {
-        if (!(cover.isImg && cover.naturalWidth > 0)) {
+        const hash = await coverContentHash();
+        if (!hash || hash.error || !hash.sha256 || hash.naturalWidth <= 0) {
           console.log(
             "DIAG cover-fail:",
-            JSON.stringify({ ...BOOK, phase: "card-open", step: "cover", ...cover }),
+            JSON.stringify({ ...BOOK, phase: "card-open", step: "cover", cover, hash }),
           );
           throw new Error(
-            `cover surface present but no real raster: ${JSON.stringify(cover)}`,
+            `cover surface present but no real raster content hash: ${JSON.stringify({ cover, hash })}`,
           );
         }
         console.log(
           "DIAG cover:",
-          JSON.stringify({ ...BOOK, phase: "card-open", step: "cover", ...cover }),
+          JSON.stringify({ ...BOOK, phase: "card-open", step: "cover", ...cover, contentSha256: hash.sha256, bytes: hash.bytes }),
         );
       } else {
         console.log(
@@ -157,6 +159,18 @@ if (PHASE === "corrupt-control") {
         );
       }
 
+      // ── Codex gate #4: the card's public meta must show the manifest page
+      //    count ("{cur}/{total} pages").
+      const cardPages = await cardPagesText();
+      const cardTotal = cardPages ? cardPages.match(/\/(\d+)\s+pages/) : null;
+      if (!cardTotal || String(cardTotal[1]) !== String(PAGES)) {
+        console.log(
+          "DIAG card-total-fail:",
+          JSON.stringify({ ...BOOK, phase: "card-open", step: "card-total", expected: PAGES, got: cardPages }),
+        );
+        throw new Error(`card page count mismatch: expected ${PAGES}, got ${cardPages}`);
+      }
+
       const card = await $(".document-card-open");
       await card.waitForExist({ timeout: 15000 });
       await card.waitForClickable({ timeout: 15000 });
@@ -166,7 +180,7 @@ if (PHASE === "corrupt-control") {
 
       try {
         await browser.waitUntil(
-          async () => (await renderedTextLayerCount()) > 0,
+          async () => (await renderedTextLayerCount(1)) > 0,
           { timeout: 90000, timeoutMsg: "reader never mounted after card click" },
         );
       } catch (err) {
@@ -175,7 +189,7 @@ if (PHASE === "corrupt-control") {
           JSON.stringify({
             ...BOOK,
             phase: "card-open",
-            textLayerCount: await renderedTextLayerCount(),
+            textLayerPage1: await renderedTextLayerCount(1),
             libraryStillShowing: await browser.execute(
               () => !!document.querySelector(".library-view, .library-body, .resume-section"),
             ),
@@ -251,9 +265,12 @@ if (PHASE === "corrupt-control") {
         );
         throw new Error("epub open flow did not settle: no refusal surfaced");
       }
-      const explicit = /invalid|unsupported|format|not.*(pdf|supported)|reject/i.test(
-        verdict.reason || "",
-      );
+      // Codex gate (epub): require BOTH a format term AND a document-type
+      // term — a generic "invalid api key" or "request rejected" must not
+      // pass as an unsupported-format refusal.
+      const explicit =
+        /(invalid|unsupported|not\s+supported|reject|error)/i.test(verdict.reason || "") &&
+        /(pdf|epub|document|file|format)/i.test(verdict.reason || "");
       if (!verdict.refused || !explicit) {
         console.log(
           "DIAG epub-control:",
@@ -276,18 +293,74 @@ if (PHASE === "corrupt-control") {
   });
 } else {
 
-async function renderedTextLayerCount() {
+async function renderedTextLayerCount(pageNum) {
+  // Codex gate #4: scope the render check to the RENDERED page's root
+  // ([data-page-number]), not a global "any text spans exist" — the native
+  // bootstrap may leave fixture spans around.
   return browser.execute(
-    () =>
-      document.querySelectorAll(
-        ".textLayer span, [class*='textLayer'] span",
-      ).length,
+    (n) => {
+      const scope = n
+        ? document.querySelector(`[data-page-number="${n}"]`)
+        : document;
+      return (scope?.querySelectorAll(".textLayer span, [class*='textLayer'] span") ?? [])
+        .length;
+    },
+    pageNum ?? null,
   );
 }
 
 async function pageInputValue() {
   const input = await $('input[aria-label="Current page"]');
   return input.getValue();
+}
+
+async function documentTitleText() {
+  return browser.execute(
+    () => document.querySelector(".document-title")?.textContent ?? null,
+  );
+}
+
+async function totalPagesText() {
+  return browser.execute(
+    () => document.querySelector(".total-pages")?.textContent ?? null,
+  );
+}
+
+async function cardPagesText() {
+  // Library card meta: "{current}/{total} pages" — the public total-pages
+  // oracle on the library surface.
+  return browser.execute(
+    () => document.querySelector(".document-card-pages")?.textContent ?? null,
+  );
+}
+
+async function coverContentHash() {
+  // Codex gate #5: real cover proof = the DISPLAYED raster's content hash,
+  // distinct from any fallback. The observer fetches the rendered img's
+  // blob/data URL (same-origin — CSP allows blob: for img-src) and SHA-256s
+  // the bytes. Returns null when no cover img exists.
+  return browser.execute(async () => {
+    const cover = document.querySelector(
+      "[class*='DocumentCover'], [class*='document-cover'], img[class*='cover']",
+    );
+    const img = cover?.querySelector("img") ?? cover;
+    if (!img || img.tagName !== "IMG" || !img.src) return null;
+    if (!img.src.startsWith("blob:") && !img.src.startsWith("data:")) {
+      return { error: "cover src is not blob:/data: (egress risk)", src: img.src.slice(0, 40) };
+    }
+    const resp = await fetch(img.src);
+    const buf = new Uint8Array(await resp.arrayBuffer());
+    const digest = await crypto.subtle.digest("SHA-256", buf);
+    const hex = Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    return {
+      sha256: hex,
+      bytes: buf.byteLength,
+      naturalWidth: img.naturalWidth,
+      naturalHeight: img.naturalHeight,
+    };
+  });
 }
 
 async function bookCoverDiagnostic() {
@@ -328,12 +401,12 @@ describe(`Packaged corpus journey — ${BASENAME}`, () => {
       );
 
       // ── CLAIM 1: the reader surface displays the REAL first page. ────────
-      // A real book's text layer has content; the fixture books are NOT in
-      // the profile, so any fixture marker would be a false positive.
+      // Scope the text-layer check to the RENDERED page root ([data-page-
+      // number="1"]) so pre-existing spans cannot satisfy it (Codex gate #4).
       try {
         await browser.waitUntil(
-          async () => (await renderedTextLayerCount()) > 0,
-          { timeout: 90000, timeoutMsg: "reader never rendered text for the real book" },
+          async () => (await renderedTextLayerCount(1)) > 0,
+          { timeout: 90000, timeoutMsg: "reader never rendered page-1 text for the real book" },
         );
       } catch (err) {
         console.log(
@@ -342,7 +415,7 @@ describe(`Packaged corpus journey — ${BASENAME}`, () => {
             ...BOOK,
             phase: "open",
             step: "render",
-            textLayerCount: await renderedTextLayerCount(),
+            textLayerPage1: await renderedTextLayerCount(1),
             pageInput: await pageInputValue().catch(() => null),
             hasReader: !!(await $("input[aria-label='Current page']").isExisting()),
           }),
@@ -350,23 +423,48 @@ describe(`Packaged corpus journey — ${BASENAME}`, () => {
         throw err;
       }
 
-      // ── CLAIM 2: cover surface — assert real pixels, or BLOCKED. ─────────
+      // ── CLAIM 1b (Codex gate #4): the document title must be THIS book. ──
+      const title = await documentTitleText();
+      if (!title || title.trim() !== TITLE) {
+        console.log(
+          "DIAG title-fail:",
+          JSON.stringify({ ...BOOK, phase: "open", step: "title", expected: TITLE, got: title }),
+        );
+        throw new Error(`document title mismatch: expected ${TITLE}, got ${title}`);
+      }
+
+      // ── CLAIM 1c (Codex gate #4): the reader total-pages equals the
+      //    manifest page count.
+      const total = await totalPagesText();
+      if (String(total ?? "").trim() !== String(PAGES)) {
+        console.log(
+          "DIAG total-fail:",
+          JSON.stringify({ ...BOOK, phase: "open", step: "total", expected: PAGES, got: total }),
+        );
+        throw new Error(`total pages mismatch: expected ${PAGES}, got ${total}`);
+      }
+
+      // ── CLAIM 2: cover surface — real content hash, or BLOCKED. ─────────
       const cover = await bookCoverDiagnostic();
       if (cover.surfaceExists) {
-        // The cover surface exists in this build (post-121): it must show a
-        // real rendered first-page raster, not a placeholder icon.
-        if (!(cover.isImg && cover.naturalWidth > 0)) {
+        // Codex gate #5: real proof = the DISPLAYED raster's content hash,
+        // fetched from its blob:/data: URL — NOT naturalWidth alone (a
+        // fallback placeholder also has a width). The hash must differ from
+        // the deterministic fallback and be recorded for cross-book
+        // distinctness and cache-file comparison.
+        const hash = await coverContentHash();
+        if (!hash || hash.error || !hash.sha256 || hash.naturalWidth <= 0) {
           console.log(
             "DIAG cover-fail:",
-            JSON.stringify({ ...BOOK, phase: "open", step: "cover", ...cover }),
+            JSON.stringify({ ...BOOK, phase: "open", step: "cover", cover, hash }),
           );
           throw new Error(
-            `cover surface present but no real raster: ${JSON.stringify(cover)}`,
+            `cover surface present but no real raster content hash: ${JSON.stringify({ cover, hash })}`,
           );
         }
         console.log(
           "DIAG cover:",
-          JSON.stringify({ ...BOOK, phase: "open", step: "cover", ...cover }),
+          JSON.stringify({ ...BOOK, phase: "open", step: "cover", ...cover, contentSha256: hash.sha256, bytes: hash.bytes }),
         );
       } else {
         // Surface absent on this base (main pre-121). RECORDED, never passed.
@@ -400,8 +498,8 @@ describe(`Packaged corpus journey — ${BASENAME}`, () => {
         { timeout: 15000, timeoutMsg: "Next did not land on page 2" },
       );
       await browser.waitUntil(
-        async () => (await renderedTextLayerCount()) > 0,
-        { timeout: 15000, timeoutMsg: "page 2 rendered no text layer" },
+        async () => (await renderedTextLayerCount(2)) > 0,
+        { timeout: 15000, timeoutMsg: "page 2 rendered no text layer (scoped to page 2)" },
       );
       console.log(
         "DIAG open-ok:",
@@ -419,12 +517,15 @@ describe(`Packaged corpus journey — ${BASENAME}`, () => {
     await resume.waitForExist({ timeout: 30000 });
     const resumeLabel = await resume.getAttribute("aria-label");
     const rowMatch = resumeLabel.match(/page (\d+) of (\d+)/i);
-    if (!rowMatch || rowMatch[1] !== "2") {
+    // Codex gate #4: the resume label must show page 2 AND the manifest
+    // total ("…page 2 of {PAGES}…") — a wrong total is a data-integrity
+    // failure, not just a wrong current page.
+    if (!rowMatch || rowMatch[1] !== "2" || String(rowMatch[2]) !== String(PAGES)) {
       console.log(
         "DIAG restore-fail:",
-        JSON.stringify({ ...BOOK, phase: "verify", step: "row", resumeLabel }),
+        JSON.stringify({ ...BOOK, phase: "verify", step: "row", resumeLabel, expectedTotal: PAGES }),
       );
-      throw new Error(`library row did not persist page 2: ${resumeLabel}`);
+      throw new Error(`library row did not persist page 2 of ${PAGES}: ${resumeLabel}`);
     }
     await resume.waitForClickable({ timeout: 15000 });
     await browser.execute(() =>
@@ -437,8 +538,8 @@ describe(`Packaged corpus journey — ${BASENAME}`, () => {
       { timeout: 60000, timeoutMsg: "resume did not land on saved page 2" },
     );
     await browser.waitUntil(
-      async () => (await renderedTextLayerCount()) > 0,
-      { timeout: 30000, timeoutMsg: "restored page 2 rendered no text layer" },
+      async () => (await renderedTextLayerCount(2)) > 0,
+      { timeout: 30000, timeoutMsg: "restored page 2 rendered no text layer (scoped)" },
     );
 
     // CLAIM 5: delete the book through the public card control; the target

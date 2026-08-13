@@ -62,6 +62,14 @@ toolchain_exec '
   CORPUS_JSON="$(LECTRICE_REAL_PDF_CORPUS="$LECTRICE_REAL_PDF_CORPUS" node scripts/corpus-enumerate.mjs)"
   echo "$CORPUS_JSON" | jq -r ".pdfs[] | \"pdf  \(.basename)  \(.size) B  sha \(.sha256[0:12])…\"" 2>/dev/null || echo "$CORPUS_JSON" | head -20
 
+  # Join the committed metadata manifest (basename → pages) for the page-count
+  # assertion (Codex gate #4). Fail loudly if a corpus member is unknown.
+  META_MANIFEST="docs/corpus/manifest-2026-08-13.json"
+  if [ ! -f "$META_MANIFEST" ]; then
+    echo "FATAL: metadata manifest missing: $META_MANIFEST" >&2
+    exit 3
+  fi
+
   # One fresh app process per phase; a per-book hermetic profile subdir
   # (Fix 4: a failed book must not leak residue into the next book library).
   run_phase() {
@@ -82,13 +90,26 @@ toolchain_exec '
   }
 
   build_book() {
-    local basename="$1" path="$2" phase="$3"
+    local basename="$1" path="$2" phase="$3" log="$4"
     echo "==> BUILD ($phase): $basename"
-    CI=true VITE_E2E_NATIVE=true VITE_E2E_NATIVE_TTS=none \
+    if ! CI=true VITE_E2E_NATIVE=true VITE_E2E_NATIVE_TTS=none \
       VITE_E2E_PROFILE_DIR="$XDG_DATA_HOME/com.lectrice.reader" \
-      VITE_E2E_OPEN_PATH="$path" pnpm build >/dev/null
+      VITE_E2E_OPEN_PATH="$path" pnpm build >"$log" 2>&1; then
+      echo "    BUILD FAILED for $basename (see $log)"
+      return 1
+    fi
     touch src-tauri/src/lib.rs
+    return 0
   }
+
+  # Codex gate #6: a corpus with no PDFs (or all skipped) must fail, never
+  # finish green with no real-book journey run.
+  PDF_COUNT=$(echo "$CORPUS_JSON" | jq ".pdfs | length")
+  if [ "$PDF_COUNT" -lt 1 ]; then
+    echo "FATAL: no PDFs enumerated from LECTRICE_REAL_PDF_CORPUS" >&2
+    echo "$CORPUS_JSON" | jq -r ".skipped[]? | \"  skipped: \(.basename) — \(.reason)\"" 2>/dev/null || true
+    exit 3
+  fi
 
   FAILED=0
   PDF_COUNT=$(echo "$CORPUS_JSON" | jq ".pdfs | length")
@@ -101,17 +122,26 @@ toolchain_exec '
     BASENAME=$(echo "$CORPUS_JSON" | jq -r ".pdfs[$i].basename")
     SHA=$(echo "$CORPUS_JSON" | jq -r ".pdfs[$i].sha256")
     PATH_=$(echo "$CORPUS_JSON" | jq -r ".pdfs[$i].path")
-    PAGES=0   # pages come from the manifest; the lane asserts 1→2 only
+    # Codex gate #4: expected page count from the committed metadata manifest.
+    PAGES=$(jq -r --arg b "$BASENAME" ".pdfs[] | select(.basename == \$b) | .pages" "$META_MANIFEST")
+    if [ -z "$PAGES" ] || [ "$PAGES" = "null" ]; then
+      echo "FATAL: no pages entry for $BASENAME in $META_MANIFEST" >&2
+      exit 3
+    fi
     # Fix 4: per-book FRESH hermetic profile (no residue from a failed book).
     BOOK_PROFILE="$XDG_DATA_HOME/book-$i"
     mkdir -p "$BOOK_PROFILE/com.lectrice.reader"
     export XDG_DATA_HOME="$BOOK_PROFILE" XDG_CONFIG_HOME="$BOOK_PROFILE" XDG_CACHE_HOME="$BOOK_PROFILE"
-    echo "==> BOOK: $BASENAME (sha ${SHA:0:12}…) profile=$BOOK_PROFILE"
+    echo "==> BOOK: $BASENAME (sha ${SHA:0:12}… pages=$PAGES) profile=$BOOK_PROFILE"
 
-    # Pages are manifest metadata, not enumerator output — the lane asserts
-    # only "page 1 → Next → page 2" and "restore lands on 2", so PAGES is
-    # informational (0 = not asserted).
-    build_book "$BASENAME" "$PATH_" open || { echo "BUILD FAILED for $BASENAME"; continue; }
+    # Codex gate #1: a build failure is a FAILED + recorded, not a silent skip.
+    BUILD_LOG="$RESULTS_DIR/$BASENAME.build.log"
+    if ! build_book "$BASENAME" "$PATH_" open "$BUILD_LOG"; then
+      record_failure "$BASENAME" "$SHA" build \
+        "VITE_E2E_OPEN_PATH=$PATH_ pnpm build" "$BUILD_LOG"
+      FAILED=1
+      continue
+    fi
     # cargo build once (cached across books)
     ( cd src-tauri && cargo build --features e2e-tts-fixture >/dev/null 2>&1 ) || { echo "CARGO BUILD FAILED"; exit 3; }
 
@@ -134,6 +164,18 @@ toolchain_exec '
       continue
     fi
 
+    # Codex gate #5: cover-cache proof — after card-open, a cover-capable
+    # build must have a real cached raster at covers/{SHA}-* whose sha256 is
+    # recorded for cross-book distinctness. BLOCKED-not-green pre-121.
+    COVER_CACHE_FILE=$(find "$BOOK_PROFILE" -path "*covers*" -name "${SHA}-*" -type f 2>/dev/null | head -1)
+    if [ -n "$COVER_CACHE_FILE" ]; then
+      COVER_FILE_SHA=$(sha256sum "$COVER_CACHE_FILE" | cut -d" " -f1)
+      echo "    cover-cache proof: $COVER_CACHE_FILE sha256=${COVER_FILE_SHA:0:16}…"
+      echo -e "$BASENAME\t$SHA\t$COVER_FILE_SHA" >> "$RESULTS_DIR/cover-hashes.tsv"
+    else
+      echo "    cover-cache BLOCKED: no covers/{SHA}-* file on this base (pre-121); owner 121-cover-pipeline"
+    fi
+
     # verify phase (same book profile, fresh app process; restore + delete)
     LOG="$RESULTS_DIR/$BASENAME.verify.log"
     if ! run_phase verify "$BASENAME" "$SHA" "$PAGES" "$LOG" "$BOOK_PROFILE/com.lectrice.reader"; then
@@ -141,38 +183,76 @@ toolchain_exec '
         "E2E_SPEC=./e2e/corpus-journey.e2e.mjs CORPUS_PHASE=verify CORPUS_BASENAME=$BASENAME CORPUS_SHA=$SHA pnpm test:e2e" "$LOG"
       FAILED=1
     else
-      # Fix 3: cache-cleanup fs check, keyed by the document SHA (the
-      # app_cache_dir id). After delete, no covers/{sha}-* or tts cache row
-      # may remain in the hermetic profile.
+      # Fix 3 (Codex gate): cache-cleanup checks after delete. TWO surfaces:
+      # (a) cover cache files keyed by document SHA in app_cache_dir/covers;
+      # (b) SQLite tts_cache_metadata rows whose document_id = SHA (tts files
+      # are keyed by a content/voice hash, NOT the doc SHA — the DB row is the
+      # authority, per Codex gate). The cover-cache check is BLOCKED-not-green
+      # on bases without the cover surface (pre-121); the tts check runs
+      # against the hermetic profile DB.
       CACHE_ROOT="$BOOK_PROFILE/com.lectrice.reader"
-      LEFTOVER=$(find "$CACHE_ROOT" -type f \( -name "${SHA}-*" -o -name "*${SHA}*" \) 2>/dev/null | head -5)
-      if [ -n "$LEFTOVER" ]; then
-        echo "    cache-cleanup FAIL: leftover cache files for ${SHA:0:12}: $LEFTOVER"
+      COVER_LEFT=$(find "$CACHE_ROOT" -path "*covers*" -name "${SHA}-*" 2>/dev/null | head -5)
+      if [ -n "$COVER_LEFT" ]; then
+        echo "    cache-cleanup FAIL: leftover cover cache for ${SHA:0:12}: $COVER_LEFT"
         record_failure "$BASENAME" "$SHA" cache-cleanup \
-          "find $CACHE_ROOT -name '${SHA}-*' (post-verify)" "$RESULTS_DIR/$BASENAME.verify.log"
+          "find $CACHE_ROOT -path *covers* -name ${SHA}-* (post-verify)" "$RESULTS_DIR/$BASENAME.verify.log"
         FAILED=1
+      elif [ -d "$CACHE_ROOT/covers" ] || [ -d "$CACHE_ROOT/app_cache" ]; then
+        echo "    cache-cleanup OK: no ${SHA:0:12}-keyed cover files remain"
       else
-        echo "    cache-cleanup OK: no ${SHA:0:12}-keyed files remain"
+        echo "    cache-cleanup BLOCKED: no cover-cache dir on this base (pre-121); surface owner 121-cover-pipeline"
+      fi
+      # (b) SQLite tts metadata rows for this document — the authoritative
+      # audio-cache oracle (Codex gate). Read-only query.
+      DB="$BOOK_PROFILE/com.lectrice.reader/pdf-reader.db"
+      if [ -f "$DB" ]; then
+        TTS_ROWS=$(sqlite3 -readonly "$DB" "SELECT COUNT(*) FROM tts_cache_metadata WHERE document_id = \"$SHA\";" 2>/dev/null || echo "query-failed")
+        if [ "$TTS_ROWS" = "query-failed" ] || [ -z "$TTS_ROWS" ]; then
+          echo "    cache-cleanup WARN: tts_cache_metadata query unavailable ($TTS_ROWS) — audio-cache claim not proven on this base"
+        elif [ "$TTS_ROWS" -gt 0 ]; then
+          echo "    cache-cleanup FAIL: $TTS_ROWS tts_cache_metadata row(s) remain for ${SHA:0:12}"
+          record_failure "$BASENAME" "$SHA" cache-cleanup \
+            "sqlite3 -readonly $DB \"SELECT COUNT(*) FROM tts_cache_metadata WHERE document_id=\"$SHA\"\" (post-verify)" "$RESULTS_DIR/$BASENAME.verify.log"
+          FAILED=1
+        else
+          echo "    cache-cleanup OK: 0 tts_cache_metadata rows for ${SHA:0:12}"
+        fi
+      else
+        echo "    cache-cleanup BLOCKED: no profile DB — nothing to assert"
       fi
     fi
   done
 
   # EPUB negative control: the open flow must refuse it (filter is .pdf).
+  # Codex gate #2: the spec now exits 0 ONLY when an explicit
+  # unsupported-format refusal is surfaced (bounded settle); any other
+  # outcome exits non-zero. Assert + record the status — no grep||true.
   EPUB_COUNT=$(echo "$CORPUS_JSON" | jq ".epub | length")
   if [ "$EPUB_COUNT" -gt 0 ]; then
     EPUB_PATH=$(echo "$CORPUS_JSON" | jq -r ".epub[0].path")
     EPUB_SHA=$(echo "$CORPUS_JSON" | jq -r ".epub[0].sha256")
-    echo "==> EPUB negative control: $(basename "$EPUB_PATH")"
-    build_book "$(basename "$EPUB_PATH")" "$EPUB_PATH" epub-control
-    LOG="$RESULTS_DIR/epub-control.log"
-    EPUB_STATUS=0
-    E2E_SPEC=./e2e/corpus-journey.e2e.mjs CORPUS_PHASE=epub-control \
-      CORPUS_BASENAME="$(basename "$EPUB_PATH")" CORPUS_SHA="$EPUB_SHA" CORPUS_PAGES=0 \
-      pnpm test:e2e >"$LOG" 2>&1 || EPUB_STATUS=$?
-    echo "    epub-control exit: $EPUB_STATUS (expected non-zero: refusal)"
-    # Expected refusal = the open flow rejects the epub (exit non-zero is the
-    # NEGATIVE control passing if the phase records a clean refusal).
-    grep -q "expected refusal\|epub" "$LOG" || true
+    EPUB_NAME=$(basename "$EPUB_PATH")
+    echo "==> EPUB negative control: $EPUB_NAME"
+    BUILD_LOG="$RESULTS_DIR/epub-control.build.log"
+    if ! build_book "$EPUB_NAME" "$EPUB_PATH" epub-control "$BUILD_LOG"; then
+      record_failure "$EPUB_NAME" "$EPUB_SHA" build \
+        "VITE_E2E_OPEN_PATH=$EPUB_PATH pnpm build" "$BUILD_LOG"
+      FAILED=1
+    else
+      LOG="$RESULTS_DIR/epub-control.log"
+      EPUB_STATUS=0
+      E2E_SPEC=./e2e/corpus-journey.e2e.mjs CORPUS_PHASE=epub-control \
+        CORPUS_BASENAME="$EPUB_NAME" CORPUS_SHA="$EPUB_SHA" CORPUS_PAGES=0 \
+        pnpm test:e2e >"$LOG" 2>&1 || EPUB_STATUS=$?
+      echo "    epub-control exit: $EPUB_STATUS (0 = explicit refusal surfaced; non-zero = control FAILED)"
+      if [ "$EPUB_STATUS" -ne 0 ]; then
+        record_failure "$EPUB_NAME" "$EPUB_SHA" epub-control \
+          "E2E_SPEC=./e2e/corpus-journey.e2e.mjs CORPUS_PHASE=epub-control CORPUS_BASENAME=$EPUB_NAME CORPUS_SHA=$EPUB_SHA pnpm test:e2e" "$LOG"
+        FAILED=1
+      fi
+    fi
+  else
+    echo "==> WARN: no EPUB in corpus — negative control not exercised"
   fi
 
   echo "==> ALL DONE. failures:"
