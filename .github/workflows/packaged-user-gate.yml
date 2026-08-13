@@ -7,6 +7,9 @@ on:
   schedule:
     - cron: "23 4 * * *" # nightly full matrix
 
+permissions:
+  contents: read
+
 concurrency:
   group: packaged-user-gate-${{ github.ref }}
   cancel-in-progress: true
@@ -18,74 +21,99 @@ env:
 
 jobs:
   contract:
-    name: Gate contract (workflow cannot silently drop the gate)
+    # Trusted-base architecture: this job checks out the BASE branch's tools
+    # (never the head's copy — the contract cannot be head-controlled) and
+    # validates the HEAD's workflow file fetched via the API. The self-hosted
+    # runner executes PRs ONLY from this repository (fork PRs are excluded).
+    name: Gate contract (base tools vs head file)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, Linux, X64, vm103]
-    timeout-minutes: 5
+    timeout-minutes: 10
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Contract — the workflow must always run the packaged gate
-        run: ./tools/check-packaged-gate-contract.sh .github/workflows/packaged-user-gate.yml
-      - name: Contract negative-control — the check must CATCH a dropped gate
+      - name: Checkout BASE tools (never the head's copy)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.sha }}
+
+      - name: Fetch the HEAD workflow file and run the BASE contract against it
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            FILE_REF="${{ github.event.pull_request.head.sha }}"
+          else
+            FILE_REF="${{ github.sha }}"
+          fi
+          gh api "repos/${{ github.repository }}/contents/.github/workflows/packaged-user-gate.yml?ref=$FILE_REF" \
+            --jq '.content' | base64 -d > /tmp/head-workflow.yml
+          if [ ! -x tools/check-packaged-gate-contract.sh ]; then
+            # Bootstrap: the trust architecture lands with this PR's merge.
+            # Until then, base has no contract tool — use the head's copy for
+            # this PR only; afterwards the base copy is authoritative.
+            echo "BOOTSTRAP: base lacks tools/check-packaged-gate-contract.sh — using the head copy for this PR"
+            git fetch origin "$FILE_REF" --depth 1
+            git checkout FETCH_HEAD -- tools/check-packaged-gate-contract.sh tools/test/
+          fi
+          ./tools/check-packaged-gate-contract.sh /tmp/head-workflow.yml
+
+      - name: Contract negative-control (base tools, head file)
+        env:
+          PACKAGED_GATE_WF: /tmp/head-workflow.yml
         run: ./tools/test/packaged-gate-contract-negative-control.sh
 
   pr-fast:
+    # Same-repo PRs only: the self-hosted runner never executes fork PRs.
     name: Packaged PR-fast lane (critical-loop)
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     needs: contract
     runs-on: [self-hosted, Linux, X64, vm103]
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: "20"
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
         with:
           version: 10
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Assert tauri-driver provisioned (BLOCKED if missing — never runtime-install)
-        # wdio.conf.mjs looks up the driver PATH-first with a ~/.cargo/bin
-        # fallback. Runtime `cargo install` is rejected by review: unpinned
-        # supply chain + cold-compile time on the single-slot runner. Missing
-        # tooling is BLOCKED per the gate contract — and on BLOCKED a
-        # machine-readable prerequisite-failure receipt is written into the
-        # workspace BEFORE exiting, because at this point no /tmp lane log
-        # exists yet and every red must upload evidence (never a bare
-        # no-files-found warning). Provision the host once, deliberately:
-        # nix profile install github:phsb5321/Tauri-PDF-Reader/main#tauri-driver
-        # && ln -s ~/.nix-profile/bin/tauri-driver ~/.cargo/bin/tauri-driver.
+      - name: Assert tauri-driver inside the PINNED flake devShell (BLOCKED if missing)
+        # The flake devShell is the ONE pinned toolchain place (#101): it ships
+        # tauri-driver (packages.tauri-driver, fetchCrate 2.0.6 + cargoLock) and
+        # the pinned rust (rustPlatform.rust). No host provisioning, no
+        # ~/.cargo/bin symlink, no runtime cargo install. A missing driver
+        # means the pinned flake build failed — BLOCKED with a machine-readable
+        # receipt before any lane log exists.
         run: |
-          DRIVER="$HOME/.cargo/bin/tauri-driver"
-          if [ ! -x "$DRIVER" ]; then
+          if ! nix develop -c bash -c 'command -v tauri-driver' >/dev/null 2>&1; then
             mkdir -p ci-evidence
-            printf '{"blocked":"tauri-driver not provisioned","path":"%s","remedy":"nix profile install github:phsb5321/Tauri-PDF-Reader/main#tauri-driver && ln -s ~/.nix-profile/bin/tauri-driver ~/.cargo/bin/tauri-driver","time":"%s"}\n' "$DRIVER" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ci-evidence/prerequisite-failure.json
-            echo "BLOCKED: tauri-driver not provisioned at $DRIVER — see ci-evidence/prerequisite-failure.json"
+            printf '{"blocked":"tauri-driver not provided by the pinned flake devShell","remedy":"the flake packages.tauri-driver must build (nix build .#tauri-driver); no host provisioning is required","time":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ci-evidence/prerequisite-failure.json
+            echo "BLOCKED: tauri-driver not in the pinned devShell — see ci-evidence/prerequisite-failure.json"
             exit 1
           fi
-          if ! "$DRIVER" --help >/dev/null 2>&1; then
-            mkdir -p ci-evidence
-            printf '{"blocked":"tauri-driver broken (--help failed)","path":"%s","time":"%s"}\n' "$DRIVER" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ci-evidence/prerequisite-failure.json
-            echo "BLOCKED: tauri-driver broken at $DRIVER — see ci-evidence/prerequisite-failure.json"
-            exit 1
-          fi
+
+      - name: Prerequisite receipt enforced (a blocked assert without its receipt fails)
+        if: failure()
+        run: |
+          [ -f ci-evidence/prerequisite-failure.json ] || { echo "FAIL: BLOCKED prerequisite without its machine-readable receipt — evidence discipline broken"; exit 1; }
 
       - name: Packaged PR-fast lane — hermetic profile, X11 pin, Xvfb
         # The repo's own runner: shared profile (#99 fail-closed) + flake
         # devShell toolchain (#101 single source) + GDK_BACKEND=x11 (the
-        # negative-devicePixelRatio class) + Xvfb via -displayfd. The fixed
-        # /tmp evidence paths are cleared first so a failure can only copy
-        # THIS run's logs (a prior job's leftovers must never ride along).
+        # negative-devicePixelRatio class) + Xvfb via -displayfd. Fixed /tmp
+        # evidence paths cleared first — a prior job's leftovers must never
+        # ride along (single-slot runner + per-ref concurrency = no live
+        # collision; the clear is defense in depth).
         run: |
           rm -f /tmp/lectrice-e2e-critical-loop-xvfb.log /tmp/lectrice-matrix-critical-loop.log
           bash e2e/run-critical-loop.sh
@@ -99,7 +127,7 @@ jobs:
 
       - name: Upload failure artifacts (honest evidence, never skipped-green)
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: pr-fast-failure-evidence
           path: ci-evidence/
@@ -114,44 +142,38 @@ jobs:
     timeout-minutes: 240
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: "20"
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
         with:
           version: 10
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Assert tauri-driver provisioned (BLOCKED if missing — never runtime-install)
+      - name: Assert tauri-driver inside the PINNED flake devShell (BLOCKED if missing)
         run: |
-          DRIVER="$HOME/.cargo/bin/tauri-driver"
-          if [ ! -x "$DRIVER" ]; then
+          if ! nix develop -c bash -c 'command -v tauri-driver' >/dev/null 2>&1; then
             mkdir -p ci-evidence
-            printf '{"blocked":"tauri-driver not provisioned","path":"%s","remedy":"nix profile install github:phsb5321/Tauri-PDF-Reader/main#tauri-driver && ln -s ~/.nix-profile/bin/tauri-driver ~/.cargo/bin/tauri-driver","time":"%s"}\n' "$DRIVER" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ci-evidence/prerequisite-failure.json
-            echo "BLOCKED: tauri-driver not provisioned at $DRIVER — see ci-evidence/prerequisite-failure.json"
+            printf '{"blocked":"tauri-driver not provided by the pinned flake devShell","remedy":"the flake packages.tauri-driver must build (nix build .#tauri-driver); no host provisioning is required","time":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ci-evidence/prerequisite-failure.json
+            echo "BLOCKED: tauri-driver not in the pinned devShell — see ci-evidence/prerequisite-failure.json"
             exit 1
           fi
-          if ! "$DRIVER" --help >/dev/null 2>&1; then
-            mkdir -p ci-evidence
-            printf '{"blocked":"tauri-driver broken (--help failed)","path":"%s","time":"%s"}\n' "$DRIVER" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ci-evidence/prerequisite-failure.json
-            echo "BLOCKED: tauri-driver broken at $DRIVER — see ci-evidence/prerequisite-failure.json"
-            exit 1
-          fi
+
+      - name: Prerequisite receipt enforced (a blocked assert without its receipt fails)
+        if: failure()
+        run: |
+          [ -f ci-evidence/prerequisite-failure.json ] || { echo "FAIL: BLOCKED prerequisite without its machine-readable receipt — evidence discipline broken"; exit 1; }
 
       - name: Run all packaged lanes — one at a time
         # Serial by construction: one job loops the eight self-contained lane
-        # runners. The single-slot runner must never be stampeded. Fixed /tmp
-        # evidence paths cleared first — stale artifacts must never ride along.
+        # runners. The single-slot runner must never be stampeded.
         run: |
           rm -f /tmp/lectrice-matrix-*.log /tmp/lectrice-e2e-*-xvfb.log
           bash scripts/e2e-matrix.sh
@@ -165,7 +187,7 @@ jobs:
 
       - name: Upload failure artifacts (per-lane evidence)
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: full-matrix-failure-evidence
           path: ci-evidence/
@@ -179,6 +201,8 @@ jobs:
     # Engineering corpus). Copyright boundary: the hook stages a TRANSIENT
     # copy inside the hermetic profile (fs scope) and the artifact upload
     # below carries ONLY logs + summary — never PDFs or derived renders.
+    # Run-scoped temps: LECTRICE_CORPUS_OUT lands under runner.temp (per-job),
+    # so fixed-path collisions across runs are impossible.
     name: Real-corpus soak (real PDFs, post-merge/manual)
     if: github.event_name == 'workflow_dispatch'
     needs: contract
@@ -186,45 +210,38 @@ jobs:
     timeout-minutes: 240
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: "20"
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
         with:
           version: 10
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Assert tauri-driver provisioned (BLOCKED if missing — never runtime-install)
+      - name: Assert tauri-driver inside the PINNED flake devShell (BLOCKED if missing)
         run: |
-          DRIVER="$HOME/.cargo/bin/tauri-driver"
-          if [ ! -x "$DRIVER" ]; then
+          if ! nix develop -c bash -c 'command -v tauri-driver' >/dev/null 2>&1; then
             mkdir -p ci-evidence
-            printf '{"blocked":"tauri-driver not provisioned","path":"%s","remedy":"nix profile install github:phsb5321/Tauri-PDF-Reader/main#tauri-driver && ln -s ~/.nix-profile/bin/tauri-driver ~/.cargo/bin/tauri-driver","time":"%s"}\n' "$DRIVER" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ci-evidence/prerequisite-failure.json
-            echo "BLOCKED: tauri-driver not provisioned at $DRIVER — see ci-evidence/prerequisite-failure.json"
+            printf '{"blocked":"tauri-driver not provided by the pinned flake devShell","remedy":"the flake packages.tauri-driver must build (nix build .#tauri-driver); no host provisioning is required","time":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ci-evidence/prerequisite-failure.json
+            echo "BLOCKED: tauri-driver not in the pinned devShell — see ci-evidence/prerequisite-failure.json"
             exit 1
           fi
-          if ! "$DRIVER" --help >/dev/null 2>&1; then
-            mkdir -p ci-evidence
-            printf '{"blocked":"tauri-driver broken (--help failed)","path":"%s","time":"%s"}\n' "$DRIVER" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ci-evidence/prerequisite-failure.json
-            echo "BLOCKED: tauri-driver broken at $DRIVER — see ci-evidence/prerequisite-failure.json"
-            exit 1
-          fi
+
+      - name: Prerequisite receipt enforced (a blocked assert without its receipt fails)
+        if: failure()
+        run: |
+          [ -f ci-evidence/prerequisite-failure.json ] || { echo "FAIL: BLOCKED prerequisite without its machine-readable receipt — evidence discipline broken"; exit 1; }
 
       - name: Assert the real corpus is provisioned locally (BLOCKED if missing)
         # The corpus lives on the host (never a URL); the hook never stores
-        # or uploads the PDFs. Same receipt discipline as the driver assert:
-        # a machine-readable prerequisite-failure.json is written before exit
-        # so this red always carries evidence.
+        # or uploads the PDFs. Same receipt discipline as the driver assert.
         run: |
           if [ -z "$LECTRICE_REAL_PDF_CORPUS" ]; then
             mkdir -p ci-evidence
@@ -238,9 +255,11 @@ jobs:
             echo "BLOCKED: LECTRICE_REAL_PDF_CORPUS=$LECTRICE_REAL_PDF_CORPUS is not a directory — see ci-evidence/prerequisite-failure.json"; exit 1; }
 
       - name: Run the real-corpus soak (per-book phases, machine-readable summary)
+        # Run-scoped evidence dir: $RUNNER_TEMP is per-job, so fixed-path
+        # collisions across runs are impossible.
         run: |
-          rm -rf /tmp/lectrice-corpus
-          bash scripts/e2e-real-corpus.sh
+          rm -rf "$RUNNER_TEMP/lectrice-corpus"
+          LECTRICE_CORPUS_OUT="$RUNNER_TEMP/lectrice-corpus" bash scripts/e2e-real-corpus.sh
 
       - name: Copy evidence into the workspace (logs + summary ONLY — never the corpus)
         # ALWAYS runs: after a prerequisite BLOCKED the receipt in ci-evidence
@@ -248,11 +267,11 @@ jobs:
         if: always()
         run: |
           mkdir -p ci-evidence/corpus
-          cp -r /tmp/lectrice-corpus/* ci-evidence/corpus/ 2>/dev/null || true
+          cp -r "${RUNNER_TEMP}/lectrice-corpus"/* ci-evidence/corpus/ 2>/dev/null || true
 
       - name: Upload corpus soak evidence (logs + summary; PDFs never leave the host)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: real-corpus-evidence
           path: |

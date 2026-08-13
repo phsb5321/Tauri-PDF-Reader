@@ -61,15 +61,47 @@ sed 's/#.*//' "$RUNNER" \
 #    `true`; `false` is noise that can be flipped).
 grep -qE '^[[:space:]]*continue-on-error:' "$WF" && fail "continue-on-error found (skip-green)"
 
-# 4. The gate job must be actually runnable: its only allowed job-level
-#    condition is the honest PR trigger. `if: ${{ false }}` (or any other
-#    condition) makes the contract pass while GitHub skips the job.
+# 4. The gate job must be actually runnable AND same-repo-only: its only
+#    allowed job-level condition is the PR trigger AND the same-repo guard.
+#    `if: ${{ false }}` (or any other condition, or a missing same-repo
+#    guard) makes the contract pass while GitHub skips the job or lets a fork
+#    PR execute on the self-hosted runner.
 PRFAST_BLOCK="$(awk '/^  pr-fast:$/ {f=1;next} f && /^  [a-z0-9_-]+:$/ {exit} f' "$WF")"
 JOB_IF="$(printf '%s\n' "$PRFAST_BLOCK" | sed -n 's/^    if: //p')"
 if [ -n "$JOB_IF" ]; then
-  printf '%s\n' "$JOB_IF" | grep -qx 'github.event_name == '\''pull_request'\''' \
-    || fail "pr-fast job-level if: is not the PR trigger — the gate can be skipped"
+  printf '%s\n' "$JOB_IF" | grep -qx 'github.event_name == '\''pull_request'\'' && github.event.pull_request.head.repo.full_name == github.repository' \
+    || fail "pr-fast job-level if: is not the PR trigger + same-repo guard — the gate can be skipped or fork-executed"
 fi
+# The contract job itself must carry the same-repo guard on PRs.
+CONTRACT_BLOCK="$(awk '/^  contract:$/ {f=1;next} f && /^  [a-z0-9_-]+:$/ {exit} f' "$WF")"
+printf '%s\n' "$CONTRACT_BLOCK" | sed -n 's/^    if: //p' | grep -q 'github.event.pull_request.head.repo.full_name == github.repository' \
+  || fail "contract job lacks the same-repo guard"
+# Trusted-base architecture: the contract job must check out the BASE tools
+# and fetch the HEAD workflow file via the API (the contract cannot be
+# head-controlled).
+printf '%s\n' "$CONTRACT_BLOCK" | grep -q 'contents/.github/workflows/packaged-user-gate.yml' \
+  || fail "contract job does not fetch the head workflow file via the API"
+printf '%s\n' "$CONTRACT_BLOCK" | grep -q 'pull_request.base.sha' \
+  || fail "contract job does not pin its checkout to the base sha"
+printf '%s\n' "$CONTRACT_BLOCK" | grep -q 'gh api "repos/' \
+  || fail "contract job does not use gh api to fetch the head file"
+# Self-hosted execution trust: every mutable action ref is forbidden (SHA pins
+# only); the repo's own flake pins the toolchain, so no dtolnay@stable either.
+grep -qE 'uses: [^ ]+@(v[0-9]+|stable|main|master|latest)([[:space:]]|$)' "$WF" \
+  && fail "mutable action ref found — actions must be SHA-pinned"
+grep -q 'dtolnay/rust-toolchain' "$WF" && fail "dtolnay rust-toolchain found — the flake pins rust"
+# The driver prerequisite is the PINNED devShell: no host provisioning, no
+# ~/.cargo/bin hardcode.
+grep -q 'cargo/bin/tauri-driver' "$WF" && fail "driver assert hardcodes ~/.cargo/bin — the pinned devShell is the toolchain"
+grep -q "nix develop -c bash -c 'command -v tauri-driver'" "$WF" \
+  || fail "driver assert does not check command -v tauri-driver inside nix develop"
+# A blocked prerequisite must ALWAYS leave its receipt — every job with a
+# prerequisite assert must carry the enforcement step.
+for job in pr-fast full-matrix real-corpus; do
+  BLOCK="$(awk -v j="$job" '$0 ~ "^  " j ":$" {f=1;next} f && /^  [a-z0-9_-]+:$/ {exit} f' "$WF")"
+  printf '%s\n' "$BLOCK" | grep -q 'Prerequisite receipt enforced' \
+    || fail "$job job lacks the prerequisite-receipt enforcement step"
+done
 
 # 5. The full tier exists behind schedule + manual dispatch, serial matrix.
 grep -q '^  schedule:$' "$WF" || fail "no nightly schedule for the full matrix"
@@ -101,7 +133,7 @@ CORPUS_JOB_IF="$(printf '%s\n' "$CORPUS_BLOCK" | sed -n 's/^    if: //p')"
 printf '%s\n' "$CORPUS_JOB_IF" | grep -qx 'github.event_name == '\''workflow_dispatch'\''' \
   || fail "real-corpus job-level if: is not exactly the workflow_dispatch trigger"
 printf '%s\n' "$CORPUS_BLOCK" | sed 's/#.*//' \
-  | grep -qE '^[[:space:]]*bash scripts/e2e-real-corpus.sh([[:space:]]|$)' \
+  | grep -qE '^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=("[^"]*"|[^ ]*)[[:space:]]+)*bash scripts/e2e-real-corpus\.sh([[:space:]]|$)' \
   || fail "real-corpus job does not run scripts/e2e-real-corpus.sh"
 [ -s "$REPO_ROOT/scripts/e2e-real-corpus.sh" ] || fail "scripts/e2e-real-corpus.sh missing or empty"
 grep -q 'LECTRICE_REAL_PDF_CORPUS' "$REPO_ROOT/scripts/e2e-real-corpus.sh" \
@@ -113,8 +145,8 @@ UPLOAD_BLOCK="$(printf '%s\n' "$CORPUS_BLOCK" | awk '/- name: Upload corpus soak
 printf '%s\n' "$UPLOAD_BLOCK" | grep -q 'if: always()' \
   || fail "real-corpus evidence upload is not if: always() — a BLOCKED receipt would never upload"
 
-# 7. Failure evidence must be uploaded.
-grep -q 'actions/upload-artifact@v4' "$WF" || fail "no failure-artifact upload"
+# 7. Failure evidence must be uploaded (SHA-pinned action).
+grep -q 'actions/upload-artifact@' "$WF" || fail "no failure-artifact upload"
 grep -q 'if: failure()' "$WF" || fail "artifact upload not gated on failure"
 
 exit "$STATUS"

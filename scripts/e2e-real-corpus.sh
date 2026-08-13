@@ -34,7 +34,7 @@ if [ -z "$CORPUS" ] || [ ! -d "$CORPUS" ]; then
   exit 2
 fi
 
-OUT=/tmp/lectrice-corpus
+OUT="${LECTRICE_CORPUS_OUT:-/tmp/lectrice-corpus}"
 rm -rf "$OUT"
 mkdir -p "$OUT"
 
@@ -61,10 +61,10 @@ echo "corpus: ${#BOOKS[@]} books from $CORPUS"
 for b in "${BOOKS[@]}"; do echo "  - $(basename "$b") ($(du -h "$b" | cut -f1))"; done
 
 echo "==> Building frontend (VITE_E2E bridge, one build for all books)"
-VITE_E2E=true pnpm build >/tmp/lectrice-corpus-frontend-build.log 2>&1
+VITE_E2E=true pnpm build >"$OUT/frontend-build.log" 2>&1
 BUILD_RC=$?
 if [ $BUILD_RC -ne 0 ]; then
-  echo "BLOCKED: frontend build failed (rc=$BUILD_RC) — log: /tmp/lectrice-corpus-frontend-build.log"
+  echo "BLOCKED: frontend build failed (rc=$BUILD_RC) — log: $OUT/frontend-build.log"
   printf '{"blocked":"frontend build failed","phase":"build","exit_code":%d}\n' "$BUILD_RC" >"$OUT/summary.json"
   exit 1
 fi
@@ -74,10 +74,10 @@ touch src-tauri/src/lib.rs
 # binary MUST be built from THIS head before any phase runs (a stale binary
 # would pass the journey against old code). One build, shared by all books.
 echo "==> Building the debug binary (one build for all books)"
-toolchain_run 'set -euo pipefail; ( cd src-tauri && cargo build )' >/tmp/lectrice-corpus-cargo-build.log 2>&1
+toolchain_run 'set -euo pipefail; ( cd src-tauri && cargo build )' >"$OUT/cargo-build.log" 2>&1
 BUILD_RC=$?
 if [ $BUILD_RC -ne 0 ]; then
-  echo "BLOCKED: cargo build failed (rc=$BUILD_RC) — log: /tmp/lectrice-corpus-cargo-build.log"
+  echo "BLOCKED: cargo build failed (rc=$BUILD_RC) — log: $OUT/cargo-build.log"
   printf '{"blocked":"cargo build failed","phase":"build","exit_code":%d}\n' "$BUILD_RC" >"$OUT/summary.json"
   exit 1
 fi
@@ -122,7 +122,7 @@ for BOOK in "${BOOKS[@]}"; do
         export WEBKIT_DISABLE_COMPOSITING_MODE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1 LIBGL_ALWAYS_SOFTWARE=1
         export GDK_BACKEND=x11
         DISPNUM_FILE=\$(mktemp)
-        Xvfb -displayfd 3 -screen 0 1280x1024x24 3>\$DISPNUM_FILE >/tmp/lectrice-corpus-xvfb.log 2>&1 &
+        Xvfb -displayfd 3 -screen 0 1280x1024x24 3>\$DISPNUM_FILE >$OUT/xvfb.log 2>&1 &
         XVFB_PID=\$!
         trap \"kill \$XVFB_PID 2>/dev/null || true\" EXIT
         for _ in \$(seq 1 100); do [ -s \$DISPNUM_FILE ] && break; sleep 0.1; done

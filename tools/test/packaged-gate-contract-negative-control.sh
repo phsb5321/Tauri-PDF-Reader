@@ -11,7 +11,9 @@
 set -euo pipefail
 CONTRACT="$(dirname "$0")/../check-packaged-gate-contract.sh"
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-WF="$REPO_ROOT/.github/workflows/packaged-user-gate.yml"
+# Baseline workflow file: env-overridable so the CI contract job can point it
+# at the fetched head file; default = the repo's own file.
+WF="${PACKAGED_GATE_WF:-$REPO_ROOT/.github/workflows/packaged-user-gate.yml}"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
@@ -56,9 +58,30 @@ expect_violation "continue-on-error (expression) added" "continue-on-error found
 sed 's|^  pull_request:$|  pull_request:\n    paths: ["src/**"]|' "$WF" >"$WORK/tampered.yml"
 expect_violation "pull_request path filter added" "pull_request is path-filtered"
 
-# Tamper 5: make the PR-fast job conditionally skipped.
-sed "s|^    if: github.event_name == 'pull_request'$|    if: \${{ false }}|" "$WF" >"$WORK/tampered.yml"
-expect_violation "pr-fast job-level if: falsified" "pr-fast job-level if: is not the PR trigger"
+# Tamper 5: make the PR-fast job conditionally skipped (and drop the
+# same-repo guard at the same time).
+sed "s|^    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository$|    if: \${{ false }}|" "$WF" >"$WORK/tampered.yml"
+expect_violation "pr-fast job-level if: falsified" "pr-fast job-level if: is not the PR trigger + same-repo guard"
+
+# Tamper 13: same-repo guard removed from pr-fast (fork PRs could execute).
+sed "s| && github.event.pull_request.head.repo.full_name == github.repository$||" "$WF" >"$WORK/tampered.yml"
+expect_violation "pr-fast same-repo guard removed" "pr-fast job-level if: is not the PR trigger + same-repo guard"
+
+# Tamper 14: mutable action ref reintroduced (SHA pins are the trust floor).
+sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|uses: actions/checkout@v4|' "$WF" >"$WORK/tampered.yml"
+expect_violation "mutable action ref reintroduced" "mutable action ref found"
+
+# Tamper 15: the driver assert hardcodes ~/.cargo/bin again.
+sed "s|nix develop -c bash -c 'command -v tauri-driver'|DRIVER=\"\$HOME/.cargo/bin/tauri-driver\"; [ -x \"\$DRIVER\" ]|" "$WF" >"$WORK/tampered.yml"
+expect_violation "driver assert hardcodes ~/.cargo/bin" "driver assert hardcodes ~/.cargo/bin"
+
+# Tamper 16: the prerequisite-receipt enforcement step is removed.
+sed '/Prerequisite receipt enforced/,+1d' "$WF" >"$WORK/tampered.yml"
+expect_violation "receipt enforcement step removed" "lacks the prerequisite-receipt enforcement step"
+
+# Tamper 17: the contract job stops fetching the head file (head-controlled).
+sed '/gh api "repos\//d' "$WF" >"$WORK/tampered.yml"
+expect_violation "contract head-fetch removed" "contract job does not fetch the head workflow file"
 
 # Tamper 6: drop a lane from the serial matrix (via the path override).
 cp "$WF" "$WORK/tampered.yml"
@@ -91,7 +114,7 @@ sed 's|if: always()|if: success()|' "$WORK/tampered.yml" >"$WORK/tampered2.yml" 
 expect_violation "real-corpus upload loses always()" "real-corpus evidence upload is not if: always()"
 
 # Tamper 12: colon no-op on the corpus invocation (the anchored-runner class).
-sed 's|^          bash scripts/e2e-real-corpus.sh|          : bash scripts/e2e-real-corpus.sh|' "$WF" >"$WORK/tampered.yml"
+sed 's|\(LECTRICE_CORPUS_OUT="[^"]*" \)bash scripts/e2e-real-corpus.sh|\1: bash scripts/e2e-real-corpus.sh|' "$WF" >"$WORK/tampered.yml"
 expect_violation "real-corpus invocation reduced to colon no-op" "real-corpus job does not run scripts/e2e-real-corpus.sh"
 
-echo "NEGATIVE CONTROL PASS: contract catches all twelve drop attempts for the intended reasons"
+echo "NEGATIVE CONTROL PASS: contract catches all seventeen drop attempts for the intended reasons"
