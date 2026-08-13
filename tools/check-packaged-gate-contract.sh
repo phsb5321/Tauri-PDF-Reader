@@ -43,10 +43,16 @@ awk '/^  pull_request:$/ { in_pull=1; next }
      in_pull && /^[ \t]+paths(-ignore)?:/ { print }' "$WF" | grep -q . \
   && fail "pull_request is path-filtered — the gate can be silently skipped"
 
-# 2. PR-fast lane → the repo's critical-loop runner → the spec.
-awk '/^  pr-fast:$/ { in_job=1; next }
-     in_job && /^  [a-z0-9_-]+:$/ { exit }
-     in_job { print }' "$WF" | sed 's/#.*//' \
+RUN_AWK='/^[[:space:]]*run:[[:space:]]*\|?[[:space:]]*$/ {in_run=1;next}
+        in_run && /^[[:space:]]*- / {in_run=0}
+        /^[[:space:]]*run:[[:space:]]*[^|]/ {sub(/^[[:space:]]*run:[[:space:]]*/, ""); print; next}
+        in_run {print}'
+
+# 2. PR-fast lane → the repo's critical-loop runner → the spec. The invocation
+#    must sit inside a run: BLOCK (an env-value or comment occurrence does not
+#    execute it).
+PRFAST_BLOCK="$(awk '/^  pr-fast:$/ {f=1;next} f && /^  [a-z0-9_-]+:$/ {exit} f' "$WF")"
+printf '%s\n' "$PRFAST_BLOCK" | awk "$RUN_AWK" | sed 's/#.*//' \
   | grep -qE '^[[:space:]]*bash e2e/run-critical-loop.sh([[:space:]]|$)' \
   || fail "pr-fast job does not run e2e/run-critical-loop.sh"
 RUNNER="$REPO_ROOT/e2e/run-critical-loop.sh"
@@ -67,9 +73,15 @@ grep -qE '^[[:space:]]*continue-on-error:' "$WF" && fail "continue-on-error foun
 #    guard) makes the contract pass while GitHub skips the job or lets a fork
 #    PR execute on the self-hosted runner. EVERY job whose condition can be
 #    true on a pull_request must carry the same-repo guard.
-for job in $(awk '/^  [a-z0-9_-]+:$/ { gsub(":$", ""); print $1 }' "$WF"); do
+JOBS_SECTION="$(awk '/^jobs:$/{f=1;next} f && /^[^ ]/{exit} f' "$WF")"
+for job in $(printf '%s\n' "$JOBS_SECTION" | awk '/^  [a-z0-9_-]+:$/ { gsub(":$", ""); print $1 }'); do
+  [ "$job" = "pr-fast" ] && continue  # the exact pr-fast check below owns it
   JOB_BLOCK="$(awk -v j="$job" '$0 ~ "^  " j ":$" {f=1;next} f && /^  [a-z0-9_-]+:$/ {exit} f' "$WF")"
   JOB_IF="$(printf '%s\n' "$JOB_BLOCK" | sed -n 's/^    if: //p')"
+  if [ -z "$JOB_IF" ]; then
+    fail "$job job has no job-level if — it runs on every event including fork PRs"
+    continue
+  fi
   case "$JOB_IF" in
     *pull_request*)
       # A condition that EXCLUDES pull_request (e.g. `!= 'pull_request'`)
@@ -85,13 +97,12 @@ for job in $(awk '/^  [a-z0-9_-]+:$/ { gsub(":$", ""); print $1 }' "$WF"); do
       ;;
   esac
 done
-# The pr-fast condition must be EXACTLY the PR trigger + same-repo guard.
+# The pr-fast condition must be EXACTLY the PR trigger + same-repo guard —
+# unconditionally (a missing or altered if is a violation).
 PRFAST_BLOCK="$(awk '/^  pr-fast:$/ {f=1;next} f && /^  [a-z0-9_-]+:$/ {exit} f' "$WF")"
 JOB_IF="$(printf '%s\n' "$PRFAST_BLOCK" | sed -n 's/^    if: //p')"
-if [ -n "$JOB_IF" ]; then
-  printf '%s\n' "$JOB_IF" | grep -qx 'github.event_name == '\''pull_request'\'' && github.event.pull_request.head.repo.full_name == github.repository' \
-    || fail "pr-fast job-level if: is not the PR trigger + same-repo guard — the gate can be skipped or fork-executed"
-fi
+printf '%s\n' "$JOB_IF" | grep -qx 'github.event_name == '\''pull_request'\'' && github.event.pull_request.head.repo.full_name == github.repository' \
+  || fail "pr-fast job-level if: is not the PR trigger + same-repo guard — the gate can be skipped or fork-executed"
 # The contract job itself must carry the same-repo guard on PRs.
 CONTRACT_BLOCK="$(awk '/^  contract:$/ {f=1;next} f && /^  [a-z0-9_-]+:$/ {exit} f' "$WF")"
 printf '%s\n' "$CONTRACT_BLOCK" | sed -n 's/^    if: //p' | grep -q 'github.event.pull_request.head.repo.full_name == github.repository' \
@@ -115,8 +126,9 @@ printf '%s\n' "$CONTRACT_BLOCK" | grep -q 'BOOTSTRAP-INERT' \
 grep -qE '^  group: packaged-user-gate$' "$WF" || fail "concurrency group is not the fixed runner-wide packaged-user-gate"
 grep -q 'github.ref' <(sed 's/#.*//' "$WF") && fail "concurrency group uses github.ref — fixed group required"
 # Self-hosted execution trust: every mutable action ref is forbidden (SHA pins
-# only); the repo's own flake pins the toolchain, so no dtolnay@stable either.
-grep -qE 'uses: [^ ]+@(v[0-9]+|stable|main|master|latest)([[:space:]]|$)' "$WF" \
+# only) — quoted refs included (`uses: "actions/checkout@v4"` must not slip
+# through); the repo's own flake pins the toolchain, so no dtolnay@stable either.
+grep -E '^[[:space:]]*uses: ' "$WF" | tr -d '"' | grep -qE 'uses: [^ ]+@(v[0-9]+|stable|main|master|latest)([[:space:]]|$)' \
   && fail "mutable action ref found — actions must be SHA-pinned"
 grep -q 'dtolnay/rust-toolchain' "$WF" && fail "dtolnay rust-toolchain found — the flake pins rust"
 # The driver prerequisite is the PINNED devShell: no host provisioning, no
@@ -144,7 +156,7 @@ grep -q '^  schedule:$' "$WF" || fail "no nightly schedule for the full matrix"
 grep -q '^  workflow_dispatch:$' "$WF" || fail "no manual dispatch for the full matrix"
 awk '/^  full-matrix:$/ { in_job=1; next }
      in_job && /^  [a-z0-9_-]+:$/ { exit }
-     in_job { print }' "$WF" | sed 's/#.*//' \
+     in_job { print }' "$WF" | awk "$RUN_AWK" | sed 's/#.*//' \
   | grep -qE '^[[:space:]]*bash scripts/e2e-matrix.sh([[:space:]]|$)' \
   || fail "full-matrix job does not run scripts/e2e-matrix.sh"
 MATRIX="${PACKAGED_GATE_MATRIX:-$REPO_ROOT/scripts/e2e-matrix.sh}"
@@ -168,7 +180,7 @@ CORPUS_BLOCK="$(awk '/^  real-corpus:$/ {f=1;next} f && /^  [a-z0-9_-]+:$/ {exit
 CORPUS_JOB_IF="$(printf '%s\n' "$CORPUS_BLOCK" | sed -n 's/^    if: //p')"
 printf '%s\n' "$CORPUS_JOB_IF" | grep -qx 'github.event_name == '\''workflow_dispatch'\''' \
   || fail "real-corpus job-level if: is not exactly the workflow_dispatch trigger"
-printf '%s\n' "$CORPUS_BLOCK" | sed 's/#.*//' \
+printf '%s\n' "$CORPUS_BLOCK" | awk "$RUN_AWK" | sed 's/#.*//' \
   | grep -qE '^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=("[^"]*"|[^ ]*)[[:space:]]+)*bash scripts/e2e-real-corpus\.sh([[:space:]]|$)' \
   || fail "real-corpus job does not run scripts/e2e-real-corpus.sh"
 [ -s "$REPO_ROOT/scripts/e2e-real-corpus.sh" ] || fail "scripts/e2e-real-corpus.sh missing or empty"

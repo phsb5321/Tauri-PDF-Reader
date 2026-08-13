@@ -139,4 +139,25 @@ expect_violation "enforcement step body vacuous" "enforcement step does not test
 sed '/BOOTSTRAP-INERT/d' "$WF" >"$WORK/tampered.yml"
 expect_violation "bootstrap-inert anchor removed" "contract job lacks the bootstrap-inert anchor check"
 
-echo "NEGATIVE CONTROL PASS: contract catches all twenty-two drop attempts for the intended reasons"
+# Tamper 23: quoted mutable action ref (the quote-bypass class).
+sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|uses: "actions/checkout@v4"|' "$WF" >"$WORK/tampered.yml"
+expect_violation "quoted mutable action ref" "mutable action ref found"
+
+# Tamper 24: the lane invocation moved into an env value with a no-op run
+# (the run-block-scoping class — the reviewer's exact falsifier).
+sed -e 's|^          bash e2e/run-critical-loop.sh$|          true|' \
+    -e 's|^      - name: Packaged PR-fast lane|      - name: Packaged PR-fast lane\n        env:\n          BURY: bash e2e/run-critical-loop.sh|' \
+    "$WF" >"$WORK/tampered.yml"
+expect_violation "lane invocation buried in an env value" "pr-fast job does not run e2e/run-critical-loop.sh"
+
+# Tamper 25: pr-fast loses its job-level if entirely (a missing condition
+# must fail, not pass vacuously).
+sed '/^    if: github.event_name == '\''pull_request'\'' && github.event.pull_request.head.repo.full_name == github.repository$/d' "$WF" >"$WORK/tampered.yml"
+expect_violation "pr-fast job-level if deleted" "pr-fast job-level if: is not the PR trigger + same-repo guard"
+
+# Tamper 26: full-matrix loses its job-level if (a job without a condition
+# runs on every event, including fork PRs).
+sed '/^    if: github.event_name != '\''pull_request'\''$/d' "$WF" >"$WORK/tampered.yml"
+expect_violation "full-matrix job-level if deleted" "full-matrix job has no job-level if"
+
+echo "NEGATIVE CONTROL PASS: contract catches all twenty-six drop attempts for the intended reasons"
