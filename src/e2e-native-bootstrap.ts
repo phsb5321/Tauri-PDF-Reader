@@ -79,6 +79,8 @@ export interface E2ENativeRead {
   ipcDocumentRowPageByTitle: (title: string) => Promise<number | null>;
   /** Read IPC result for the seeded document (read-only; data-presence oracle). */
   ipcHighlights: () => Promise<unknown>;
+  /** Whether the VITE_E2E_CONFIRM seam replaced the native confirm (read-only marker). */
+  confirmSeamed: () => boolean;
   /** Observer log buffer: console messages since bootstrap (diagnostics). */
   logs: () => string[];
 }
@@ -195,8 +197,19 @@ export async function installE2ENativeBootstrap(): Promise<void> {
       ((window as unknown as Record<string, unknown>).__E2E_LOG_BUFFER__ as
         | string[]
         | undefined) ?? [],
+    confirmSeamed: () => CONFIRM_SEAMED,
   };
   (window as unknown as { __E2E_READ__: E2ENativeRead }).__E2E_READ__ = read;
+
+  // Observer-placed seam (delete lane): the GTK confirm dialog behind
+  // `window.confirm` is WebDriver-impossible (same class as the GTK file
+  // dialog the open lane seams at build time). Accepting the prompt is the
+  // only thing replaced — the real handleDocumentDelete → removeDocument
+  // chain runs below it. Tree-shaken out unless VITE_E2E_NATIVE=true.
+  const CONFIRM_SEAMED = import.meta.env.VITE_E2E_CONFIRM === "accept";
+  if (CONFIRM_SEAMED) {
+    window.confirm = () => true;
+  }
 
   // Observer log buffer: capture console for deterministic failure evidence
   // (read-only — never acts on the app).

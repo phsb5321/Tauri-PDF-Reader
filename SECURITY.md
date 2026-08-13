@@ -15,8 +15,8 @@ program.
 
 ## Dataflow map — what leaves the device
 
-| What | To whom | Triggered by | Code |
-| --- | --- | --- | --- |
+| What                                                | To whom                                     | Triggered by                                                                                               | Code                                                                                                                                                          |
+| --------------------------------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | PDF-derived page text (the page you ask to be read) | ElevenLabs (`https://api.elevenlabs.io/v1`) | Any TTS speak action: the playback bar's Play, resume-and-play on the reading home, auto-page continuation | `src-tauri/src/ai_tts/elevenlabs.rs:15,149,230,286` (reqwest client; the crate is optional and gated behind the `elevenlabs-tts` feature, `Cargo.toml:50,73`) |
 
 Nothing else makes an outbound network call. PDF CMap tables were the
@@ -28,8 +28,8 @@ settings store (`telemetry.analytics` / `telemetry.errors`,
 changes nothing on the wire. There is no crash-reporting, analytics or
 update-check egress.
 
-The in-app disclosure, word for word (#73): *"Requested PDF-derived text
-leaves this device and is sent to ElevenLabs for speech generation."*
+The in-app disclosure, word for word (#73): _"Requested PDF-derived text
+leaves this device and is sent to ElevenLabs for speech generation."_
 (`src/components/playback-bar/AiTtsSettings.tsx:184-186`).
 
 **Diagnostics:** the debug-logs surface (`DebugLogs.tsx`, fed by
@@ -60,14 +60,19 @@ database, the TTS cache, or the settings store.
 
 ## Local retention
 
-| What | Where | Cleared by |
-| --- | --- | --- |
-| Library metadata, highlights, sessions, settings, TTS-cache metadata | SQLite database in the app data dir (`src-tauri/src/db/migrations.rs:86-87`) | Deleting a document removes its row (`src-tauri/src/commands/library/mod.rs:271`); there is no whole-database wipe UI |
-| Cached TTS audio (SHA256-keyed by text+voice+model) | `{app_cache_dir}/tts_cache/` (`src-tauri/src/adapters/audio_cache.rs:80`) | Settings → AI TTS Settings → **Clear Cache** (`ai_tts_cache_clear` → `AudioCacheAdapter::clear`, `src-tauri/src/adapters/audio_cache.rs:366`); per-document and per-voice invalidation exist (`audio_cache_clear_document`, `ai_tts_cache_invalidate_voice`) |
+| What                                                                 | Where                                                                        | Cleared by                                                                                                                                                                                                                                                   |
+| -------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Library metadata, highlights, sessions, settings, TTS-cache metadata | SQLite database in the app data dir (`src-tauri/src/db/migrations.rs:86-87`) | Deleting a document removes its row (`src-tauri/src/commands/library/mod.rs:271`); there is no whole-database wipe UI                                                                                                                                        |
+| Cached TTS audio (SHA256-keyed by text+voice+model)                  | `{app_cache_dir}/tts_cache/` (`src-tauri/src/adapters/audio_cache.rs:80`)    | Settings → AI TTS Settings → **Clear Cache** (`ai_tts_cache_clear` → `AudioCacheAdapter::clear`, `src-tauri/src/adapters/audio_cache.rs:366`); per-document and per-voice invalidation exist (`audio_cache_clear_document`, `ai_tts_cache_invalidate_voice`) |
 
-Known gap: deleting a library document removes its cache *metadata* row but
-the on-disk audio file is a separate artifact — orphaned files are not
-garbage-collected (ops-parity audit, gap-matrix "removal/cache recovery").
+Known gap: per-file removal failures during document delete are silently
+swallowed (`let _ = std::fs::remove_file` in
+`src-tauri/src/adapters/sqlite/audio_cache_repo.rs`, `delete_for_document`),
+so an unreadable or locked `.mp3`/`.json` could orphan on disk while its
+metadata row still drops. The happy path removes BOTH the files and the
+metadata (behavioral Rust test
+`delete_for_document_removes_files_and_drops_stats`; packaged proof:
+`e2e/delete-journey.e2e.mjs`).
 
 ## Threat model — and the gaps it names
 
@@ -77,7 +82,7 @@ entry surface (untrusted PDF content, XSS).
 
 - **Tauri's fs scope does not constrain the Rust backend.** The fs-plugin
   scope (`$APPLOCALDATA/**` plus per-file runtime grants,
-  `src-tauri/capabilities/default.json`) governs only the fs *plugin* JS
+  `src-tauri/capabilities/default.json`) governs only the fs _plugin_ JS
   API. Custom command handlers read arbitrary user-named paths with their
   own validation: `compute_file_hash` canonicalizes, checks the `.pdf`
   extension and re-stats the opened fd (`src-tauri/src/commands/library/db.rs:61-71`)
