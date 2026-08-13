@@ -614,13 +614,17 @@ describe(`Packaged corpus journey — ${BASENAME}`, () => {
         storeError: b?.storeError ? b.storeError() : null,
       };
     });
+    // BLOCKED-not-green: a missing probe oracle (probe-unavailable) or a
+    // probe that threw (probe-error, e.g. IPC failure) must FAIL the
+    // journey — only a clean null (row genuinely absent, IPC healthy)
+    // proves deletion.
     if (observerClean.rowAfterDelete !== null) {
       console.log(
         "DIAG verify-row-gone:",
         JSON.stringify({ ...BOOK, phase: "verify", rowAfterDelete: observerClean.rowAfterDelete }),
       );
       throw new Error(
-        `deleted row still reachable via IPC: ${JSON.stringify(observerClean.rowAfterDelete)}`,
+        `deleted row oracle did not prove absence: ${JSON.stringify(observerClean.rowAfterDelete)}`,
       );
     }
     console.log(

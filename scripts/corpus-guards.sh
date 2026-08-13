@@ -24,11 +24,12 @@ guard_record() {
 }
 
 # NC1: a failed build must be recorded and turn the run non-green.
+# Message output stays with build_book (which already reports the failure
+# line) — this guard only records, preserving the pre-refactor output.
 # Usage: guard_build_status <status> <basename> <sha> <cmd> <log>
 guard_build_status() {
   local status="$1" basename="$2" sha="$3" cmd="$4" log="$5"
   if [ "$status" -ne 0 ]; then
-    echo "    BUILD FAILED for $basename (exit $status, see $log)"
     guard_record "$basename" "$sha" build "$cmd" "$log"
     return 1
   fi
@@ -57,7 +58,7 @@ guard_epub_manifest() {
 guard_cover_count() {
   local actual="$1" expected="$2" logpath="$3"
   if [ "$actual" -ne "$expected" ]; then
-    echo "==> Cover-coverage FAIL: $actual/$expected books have cover hashes — exact-count invariant violated (missing rows or stale rows in a reused results dir must not false-green)"
+    echo "==> Cover-coverage FAIL: $actual/$expected books have cover hashes — exact-count invariant violated (stale rows in a reused results dir must not false-green)"
     guard_record "(all books)" "(multiple)" cover-coverage \
       "cover-hashes.tsv has $actual rows, expected exactly $expected" "$logpath"
     return 1

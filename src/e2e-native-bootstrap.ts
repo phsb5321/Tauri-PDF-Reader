@@ -222,7 +222,13 @@ export async function installE2ENativeBootstrap(): Promise<void> {
         null,
         null,
       );
-      if (res.status !== "ok") return null;
+      // Fail-closed: an IPC failure must NOT be masked as "row absent" —
+      // null means genuinely-deleted, throw means the oracle broke.
+      if (res.status !== "ok") {
+        throw new Error(
+          `ipcDocumentRowPageByTitle: libraryListDocuments failed: ${res.error}`,
+        );
+      }
       const doc = res.data.find((d) => d.title === title);
       return doc ? (doc.currentPage ?? null) : null;
     },
