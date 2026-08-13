@@ -64,7 +64,7 @@ describe("e2e toolchain provisioning (101)", () => {
     // The three packages the lanes' hand-maintained list had that the flake
     // lacked — deleting any of them here must fail this test (and, via the
     // shared entry point, every lane).
-    for (const pkg of ["perl", "speechd", "xvfb"]) {
+    for (const pkg of ["perl", "speechd", "xvfb", "pnpm_10"]) {
       expect(flake, `flake.nix devShell must declare ${pkg}`).toContain(pkg);
     }
   });

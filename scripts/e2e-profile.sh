@@ -28,3 +28,6 @@ fi
 export E2E_PROFILE_DIR
 export XDG_DATA_HOME="$E2E_PROFILE_DIR"
 export XDG_CONFIG_HOME="$E2E_PROFILE_DIR"
+# The app cache dir (app_cache_dir() — audio cache, cover rasters) defaults to
+# ~/.cache/<id> and would leak into the real user cache; keep it hermetic too.
+export XDG_CACHE_HOME="$E2E_PROFILE_DIR/cache"

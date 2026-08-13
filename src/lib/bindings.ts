@@ -329,6 +329,33 @@ async collectionsListMemberships() : Promise<Result<CollectionMembership[], stri
 }
 },
 /**
+ * One narrow cover-cache command. `store=None` reads; `Some(bytes)` writes.
+ */
+async coverCache(docId: string, store: number[] | null) : Promise<Result<number[] | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cover_cache", { docId, store }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Preflight the source file's size BEFORE the frontend reads a byte of it.
+ * The cover pipeline skips oversized PDFs, and the skip must not cost a
+ * whole-file read (Codex gate 121): the size is stat'd on the backend — no
+ * fs-plugin permission surface; a custom command like the rest of the cover
+ * API. Only library-registered paths can be stat'd (the WebView already
+ * knows them; a stray path is rejected).
+ */
+async coverSourceSize(filePath: string) : Promise<Result<number, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cover_source_size", { filePath }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Create a new reading session
  */
 async sessionCreate(name: string, documentIds: string[]) : Promise<Result<ReadingSession, string>> {
