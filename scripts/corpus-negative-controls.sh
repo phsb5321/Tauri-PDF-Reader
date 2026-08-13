@@ -87,9 +87,12 @@ guard_cover_count 4 5 "$TMP/nc3b.tsv"                # negative leg: missing row
 NC3_GOT=$?
 check "NC3 missing row (nonzero)" "$NC3_GOT" 1
 grep -q $'\tcover-coverage\t' "$TMP/nc3b.tsv" && check "NC3 missing-row recorded" 0 0 || check "NC3 missing-row recorded" 1 0
-guard_cover_count 6 5 "$TMP/nc3b.tsv"                # negative leg: stale row
+GUARDS_FAILURES="$TMP/nc3c.tsv"
+guard_init
+guard_cover_count 6 5 "$TMP/nc3c.tsv"                # negative leg: stale row (isolated file)
 NC3B_GOT=$?
 check "NC3 stale row (nonzero)" "$NC3B_GOT" 1
+grep -q $'\tcover-coverage\t' "$TMP/nc3c.tsv" && check "NC3 stale-row recorded" 0 0 || check "NC3 stale-row recorded" 1 0
 
 echo "==> NC4: cleanup stale cache => nonzero"
 GUARDS_FAILURES="$TMP/nc4.tsv"
