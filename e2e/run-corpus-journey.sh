@@ -45,6 +45,11 @@ toolchain_exec '
   export WEBKIT_WEBDRIVER="$(command -v WebKitWebDriver)"
   export WEBKIT_DISABLE_COMPOSITING_MODE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1 LIBGL_ALWAYS_SOFTWARE=1
   export GDK_BACKEND=x11
+  # Fix 3: the app cache dir (app_cache_dir) resolves against XDG_CACHE_HOME on
+  # Linux — point it INSIDE the hermetic profile so covers/tts_cache land
+  # there (never the real home cache) and the post-verify fs cleanup check
+  # can assert per-SHA absence.
+  export XDG_CACHE_HOME="$XDG_DATA_HOME"
   DISPNUM_FILE=$(mktemp)
   Xvfb -displayfd 3 -screen 0 1280x1024x24 3>$DISPNUM_FILE >/tmp/lectrice-e2e-corpus-xvfb.log 2>&1 &
   XVFB_PID=$!
@@ -57,12 +62,14 @@ toolchain_exec '
   CORPUS_JSON="$(LECTRICE_REAL_PDF_CORPUS="$LECTRICE_REAL_PDF_CORPUS" node scripts/corpus-enumerate.mjs)"
   echo "$CORPUS_JSON" | jq -r ".pdfs[] | \"pdf  \(.basename)  \(.size) B  sha \(.sha256[0:12])…\"" 2>/dev/null || echo "$CORPUS_JSON" | head -20
 
-  # One fresh app process per phase; a per-book hermetic profile subdir.
+  # One fresh app process per phase; a per-book hermetic profile subdir
+  # (Fix 4: a failed book must not leak residue into the next book library).
   run_phase() {
-    local phase="$1" basename="$2" sha="$3" pages="$4" log="$5"
+    local phase="$1" basename="$2" sha="$3" pages="$4" log="$5" profile="$6"
     local status=0
     E2E_SPEC=./e2e/corpus-journey.e2e.mjs CORPUS_PHASE="$phase" \
       CORPUS_BASENAME="$basename" CORPUS_SHA="$sha" CORPUS_PAGES="$pages" \
+      VITE_E2E_PROFILE_DIR="$profile" \
       pnpm test:e2e >"$log" 2>&1 || status=$?
     echo "    phase $phase exit: $status"
     return "$status"
@@ -95,7 +102,11 @@ toolchain_exec '
     SHA=$(echo "$CORPUS_JSON" | jq -r ".pdfs[$i].sha256")
     PATH_=$(echo "$CORPUS_JSON" | jq -r ".pdfs[$i].path")
     PAGES=0   # pages come from the manifest; the lane asserts 1→2 only
-    echo "==> BOOK: $BASENAME (sha ${SHA:0:12}…)"
+    # Fix 4: per-book FRESH hermetic profile (no residue from a failed book).
+    BOOK_PROFILE="$XDG_DATA_HOME/book-$i"
+    mkdir -p "$BOOK_PROFILE/com.lectrice.reader"
+    export XDG_DATA_HOME="$BOOK_PROFILE" XDG_CONFIG_HOME="$BOOK_PROFILE" XDG_CACHE_HOME="$BOOK_PROFILE"
+    echo "==> BOOK: $BASENAME (sha ${SHA:0:12}…) profile=$BOOK_PROFILE"
 
     # Pages are manifest metadata, not enumerator output — the lane asserts
     # only "page 1 → Next → page 2" and "restore lands on 2", so PAGES is
@@ -106,29 +117,43 @@ toolchain_exec '
 
     # open phase
     LOG="$RESULTS_DIR/$BASENAME.open.log"
-    if ! run_phase open "$BASENAME" "$SHA" "$PAGES" "$LOG"; then
+    if ! run_phase open "$BASENAME" "$SHA" "$PAGES" "$LOG" "$BOOK_PROFILE/com.lectrice.reader"; then
       record_failure "$BASENAME" "$SHA" open \
         "E2E_SPEC=./e2e/corpus-journey.e2e.mjs CORPUS_PHASE=open CORPUS_BASENAME=$BASENAME CORPUS_SHA=$SHA pnpm test:e2e" "$LOG"
       FAILED=1
       continue
     fi
 
-    # card-open phase (same profile — the book is now a library row; re-checks
-    # the Mac AXPress card-open failure on Linux)
+    # card-open phase (same book profile — the book is now a library row;
+    # re-checks the Mac AXPress card-open failure on Linux)
     LOG="$RESULTS_DIR/$BASENAME.card-open.log"
-    if ! run_phase card-open "$BASENAME" "$SHA" "$PAGES" "$LOG"; then
+    if ! run_phase card-open "$BASENAME" "$SHA" "$PAGES" "$LOG" "$BOOK_PROFILE/com.lectrice.reader"; then
       record_failure "$BASENAME" "$SHA" card-open \
         "E2E_SPEC=./e2e/corpus-journey.e2e.mjs CORPUS_PHASE=card-open CORPUS_BASENAME=$BASENAME CORPUS_SHA=$SHA pnpm test:e2e" "$LOG"
       FAILED=1
       continue
     fi
 
-    # verify phase (same build, fresh app process; restore + delete)
+    # verify phase (same book profile, fresh app process; restore + delete)
     LOG="$RESULTS_DIR/$BASENAME.verify.log"
-    if ! run_phase verify "$BASENAME" "$SHA" "$PAGES" "$LOG"; then
+    if ! run_phase verify "$BASENAME" "$SHA" "$PAGES" "$LOG" "$BOOK_PROFILE/com.lectrice.reader"; then
       record_failure "$BASENAME" "$SHA" verify \
         "E2E_SPEC=./e2e/corpus-journey.e2e.mjs CORPUS_PHASE=verify CORPUS_BASENAME=$BASENAME CORPUS_SHA=$SHA pnpm test:e2e" "$LOG"
       FAILED=1
+    else
+      # Fix 3: cache-cleanup fs check, keyed by the document SHA (the
+      # app_cache_dir id). After delete, no covers/{sha}-* or tts cache row
+      # may remain in the hermetic profile.
+      CACHE_ROOT="$BOOK_PROFILE/com.lectrice.reader"
+      LEFTOVER=$(find "$CACHE_ROOT" -type f \( -name "${SHA}-*" -o -name "*${SHA}*" \) 2>/dev/null | head -5)
+      if [ -n "$LEFTOVER" ]; then
+        echo "    cache-cleanup FAIL: leftover cache files for ${SHA:0:12}: $LEFTOVER"
+        record_failure "$BASENAME" "$SHA" cache-cleanup \
+          "find $CACHE_ROOT -name '${SHA}-*' (post-verify)" "$RESULTS_DIR/$BASENAME.verify.log"
+        FAILED=1
+      else
+        echo "    cache-cleanup OK: no ${SHA:0:12}-keyed files remain"
+      fi
     fi
   done
 

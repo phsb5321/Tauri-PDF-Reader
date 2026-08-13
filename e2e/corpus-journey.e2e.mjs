@@ -50,13 +50,12 @@ const BOOK = { basename: BASENAME, sha: SHA, pages: PAGES };
 // stem is derived here — same rule the backend applies.
 const TITLE = BASENAME.replace(/\.pdf$/i, "");
 
-if (PHASE === "card-open") {
-  // Re-check of the Mac card-open failure (issue #120 corpus finding):
-  // AXPress on the library card left the UI at Library after 8s. This phase
-  // clicks the SAME public control (.document-card-open) on Linux and
-  // requires the reader to mount — the Linux-vs-macOS discriminator.
-  describe(`Packaged corpus journey — ${BASENAME} (card-open)`, () => {
-    it("card-open: clicking the library card mounts the reader", async () => {
+if (PHASE === "corrupt-control") {
+  // NEGATIVE CONTROL #2: a corrupt .pdf (garbage bytes) must surface an
+  // explicit error after a bounded settle — the open flow must fail
+  // visibly, never silently stay on the library.
+  describe(`Packaged corpus negative control — ${BASENAME} (corrupt)`, () => {
+    it("corrupt-control: a corrupt pdf surfaces an explicit error", async () => {
       await browser.waitUntil(
         async () =>
           browser.execute(
@@ -65,6 +64,98 @@ if (PHASE === "card-open") {
         { timeout: 60000, timeoutMsg: "bootstrap never became ready" },
       );
       await browser.setWindowSize(1200, 800);
+
+      const openBtn = await $("button.open-button");
+      await openBtn.waitForExist({ timeout: 15000 });
+      await openBtn.waitForClickable({ timeout: 15000 });
+      await browser.execute(() =>
+        document.querySelector("button.open-button")?.click(),
+      );
+
+      const settleStart = Date.now();
+      let verdict = null;
+      while (Date.now() - settleStart < 10000) {
+        verdict = await browser.execute(() => {
+          const err = document.querySelector(
+            ".pdf-viewer-error, [class*='error']:not([class*='error-hidden'])",
+          );
+          const readerMounted = !!document.querySelector(
+            "input[aria-label='Current page']",
+          );
+          const errText = err && (err.textContent || "").trim();
+          if (readerMounted) return { ok: false, reason: "reader mounted on corrupt file" };
+          if (errText && errText.length > 0) return { ok: true, reason: errText.slice(0, 200) };
+          return null;
+        });
+        if (verdict) break;
+        await browser.pause(500);
+      }
+      if (!verdict || !verdict.ok) {
+        console.log(
+          "DIAG corrupt-control:",
+          JSON.stringify({ ...BOOK, phase: "corrupt-control", verdict }),
+        );
+        throw new Error(
+          `corrupt open did not surface an explicit error: ${JSON.stringify(verdict)}`,
+        );
+      }
+      console.log(
+        "DIAG corrupt-control:",
+        JSON.stringify({
+          ...BOOK,
+          phase: "corrupt-control",
+          errorSurfaced: verdict.reason.slice(0, 120),
+        }),
+      );
+    });
+  });
+} else if (PHASE === "card-open") {
+  // Re-check of the Mac card-open failure (issue #120 corpus finding):
+  // AXPress on the library card left the UI at Library after 8s. This phase
+  // inspects the cover ON THE LIBRARY (before any navigation), then clicks
+  // the SAME public control (.document-card-open) on Linux and requires the
+  // reader to mount — the Linux-vs-macOS discriminator.
+  describe(`Packaged corpus journey — ${BASENAME} (card-open)`, () => {
+    it("card-open: cover present on library; clicking the card mounts the reader", async () => {
+      await browser.waitUntil(
+        async () =>
+          browser.execute(
+            () => !!(window.__E2E_READ__ && window.__E2E_READ__.ready),
+          ),
+        { timeout: 60000, timeoutMsg: "bootstrap never became ready" },
+      );
+      await browser.setWindowSize(1200, 800);
+
+      // ── COVER on the LIBRARY surface (Fix 1): the book card is showing
+      //    before any navigation; inspect the cover here. A cover-capable
+      //    build (post-121) must show a real raster; a build without the
+      //    surface records BLOCKED — never a silent pass. ────────────────
+      const cover = await bookCoverDiagnostic();
+      if (cover.surfaceExists) {
+        if (!(cover.isImg && cover.naturalWidth > 0)) {
+          console.log(
+            "DIAG cover-fail:",
+            JSON.stringify({ ...BOOK, phase: "card-open", step: "cover", ...cover }),
+          );
+          throw new Error(
+            `cover surface present but no real raster: ${JSON.stringify(cover)}`,
+          );
+        }
+        console.log(
+          "DIAG cover:",
+          JSON.stringify({ ...BOOK, phase: "card-open", step: "cover", ...cover }),
+        );
+      } else {
+        console.log(
+          "DIAG cover:",
+          JSON.stringify({
+            ...BOOK,
+            phase: "card-open",
+            step: "cover",
+            status: "BLOCKED — DocumentCover surface absent on this base; owner 121-cover-pipeline",
+          }),
+        );
+      }
 
       const card = await $(".document-card-open");
       await card.waitForExist({ timeout: 15000 });
@@ -120,30 +211,67 @@ if (PHASE === "card-open") {
         document.querySelector("button.open-button")?.click(),
       );
 
-      // Two acceptable refusals: the reader never shows, OR an error is
-      // surfaced. The forbidden outcome is a mounted reader.
-      const refused = await browser.waitUntil(
-        async () =>
-          browser.execute(() => {
-            const err = document.querySelector(
-              ".pdf-viewer-error, [class*='error']:not([class*='error-hidden'])",
-            );
-            const readerMounted = !!document.querySelector(
-              "input[aria-label='Current page']",
-            );
-            if (readerMounted) return { refused: false, reason: "reader mounted" };
-            if (err && (err.textContent || "").trim().length > 0) {
-              return { refused: true, reason: err.textContent.slice(0, 120) };
-            }
-            // Library still showing and no reader = dialog refused the file.
-            return { refused: true, reason: "no reader mounted; library retained" };
-          }),
-        { timeout: 30000, timeoutMsg: "open did not settle on the epub" },
-      );
-      console.log("DIAG epub-control:", JSON.stringify({ ...BOOK, phase: "epub-control", ...refused }));
-      if (!refused.refused) {
-        throw new Error(`unsupported format was accepted: ${refused.reason}`);
+      // ── BOUNDED SETTLE (Fix 2): the open is async — a refusal must be
+      //    observed after the open flow settles, never at t≈0. Wait up to
+      //    8s for one of: reader mounted (FAIL), explicit error surfaced
+      //    (PASS with the message), or settle timeout (FAIL — no verdict).
+      const settleStart = Date.now();
+      let verdict = null;
+      while (Date.now() - settleStart < 8000) {
+        verdict = await browser.execute(() => {
+          const err = document.querySelector(
+            ".pdf-viewer-error, [class*='error']:not([class*='error-hidden'])",
+          );
+          const readerMounted = !!document.querySelector(
+            "input[aria-label='Current page']",
+          );
+          const errText = err && (err.textContent || "").trim();
+          if (readerMounted) return { refused: false, reason: "reader mounted" };
+          if (errText && errText.length > 0) {
+            return { refused: true, reason: errText.slice(0, 200) };
+          }
+          return null;
+        });
+        if (verdict) break;
+        await browser.pause(500);
       }
+
+      // ── EXPLICIT UNSUPPORTED-FORMAT CHECK: a generic error is a refusal,
+      //    but an unsupported-format error is the specific contract. The
+      //    surfaced message must indicate the file/format was rejected —
+      //    PDF_INVALID or an equivalent unsupported/format text.
+      if (!verdict) {
+        console.log(
+          "DIAG epub-control:",
+          JSON.stringify({
+            ...BOOK,
+            phase: "epub-control",
+            status: "FAIL — no verdict after 8s settle; open flow neither mounted nor errored",
+          }),
+        );
+        throw new Error("epub open flow did not settle: no refusal surfaced");
+      }
+      const explicit = /invalid|unsupported|format|not.*(pdf|supported)|reject/i.test(
+        verdict.reason || "",
+      );
+      if (!verdict.refused || !explicit) {
+        console.log(
+          "DIAG epub-control:",
+          JSON.stringify({ ...BOOK, phase: "epub-control", verdict }),
+        );
+        throw new Error(
+          `epub refused without explicit unsupported-format signal: ${JSON.stringify(verdict)}`,
+        );
+      }
+      console.log(
+        "DIAG epub-control:",
+        JSON.stringify({
+          ...BOOK,
+          phase: "epub-control",
+          refused: true,
+          reason: verdict.reason.slice(0, 120),
+        }),
+      );
     });
   });
 } else {
@@ -313,12 +441,12 @@ describe(`Packaged corpus journey — ${BASENAME}`, () => {
       { timeout: 30000, timeoutMsg: "restored page 2 rendered no text layer" },
     );
 
-    // CLAIM 5: delete the book through the public card control; the library
-    // must be empty afterwards (this book was the only row), and the
-    // observer confirms no cached cover/audio file remains for its id.
+    // CLAIM 5: delete the book through the public card control; the target
+    // row (by title) must be absent afterwards (Fix 4: NOT a global-zero
+    // assertion — the profile may legitimately hold other rows). Cache
+    // cleanup is verified by the runner post-phase fs check keyed by SHA.
     // Return to the library via the public Ctrl+L shortcut
-    // (useCommandKeys toggle-library — the ONLY public return path on this
-    // base; no toolbar Back button exists, see issue #120 corpus notes).
+    // (useCommandKeys toggle-library).
     await browser.keys(["Control", "l"]);
     const del = await $(".document-card-delete");
     await del.waitForExist({ timeout: 15000 });
@@ -330,25 +458,31 @@ describe(`Packaged corpus journey — ${BASENAME}`, () => {
     try {
       await browser.acceptAlert();
     } catch {
-      /* alert may already be gone; the empty-library wait is the verdict */
+      /* alert may already be gone; the target-row wait is the verdict */
     }
     await browser.waitUntil(
       async () =>
-        browser.execute(() => {
-          const cards = document.querySelectorAll(
-            ".document-card, [class*='document-card']",
+        browser.execute((title) => {
+          // Target row absent: no card carries this book's title, and no
+          // Resume button names it.
+          const cards = Array.from(
+            document.querySelectorAll(".document-card, [class*='document-card']"),
           );
-          return cards.length === 0;
-        }),
-      { timeout: 15000, timeoutMsg: "library not empty after delete" },
+          const cardHasTitle = cards.some((c) =>
+            (c.textContent || "").includes(title),
+          );
+          const resumeHasTitle = !!document.querySelector(
+            `button[aria-label^="Resume ${title.replace(/"/g, '\\"')}"]`,
+          );
+          return !cardHasTitle && !resumeHasTitle;
+        }, TITLE),
+      { timeout: 15000, timeoutMsg: "target book row still present after delete" },
     );
 
     const observerClean = await browser.execute(() => {
       const b = window.__E2E_READ__;
       return {
-        // Read-only observer probes that exist on this base: the deleted
-        // document's IPC row should be gone, and no error should be pending.
-        ipcProbe: b?.ipcDocumentPage ? "row-probe-available" : "n/a",
+        // Read-only observer probes that exist on this base.
         storeError: b?.storeError ? b.storeError() : null,
       };
     });
@@ -359,6 +493,7 @@ describe(`Packaged corpus journey — ${BASENAME}`, () => {
         phase: "verify",
         resumeLabel,
         deleted: true,
+        targetRowAbsent: true,
         observer: observerClean,
       }),
     );
