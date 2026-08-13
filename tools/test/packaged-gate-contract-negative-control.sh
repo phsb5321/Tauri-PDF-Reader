@@ -198,4 +198,16 @@ expect_violation "semver-tag mutable action ref" "mutable action ref found"
 sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|uses: '\''actions/checkout@v4'\''|' "$WF" >"$WORK/tampered.yml"
 expect_violation "single-quoted mutable action ref" "mutable action ref found"
 
-echo "NEGATIVE CONTROL PASS: contract catches all thirty-four drop attempts for the intended reasons"
+# Tamper 35: mutable ref with a trailing YAML comment (comment-strip class).
+sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|uses: actions/checkout@v4 # mutable|' "$WF" >"$WORK/tampered.yml"
+expect_violation "mutable action ref with trailing comment" "mutable action ref found"
+
+# Tamper 36: quoted job ID injected (quoted-ID class).
+sed 's|^jobs:$|jobs:\n  "EVIL_JOB":\n    if: github.event_name == '\''pull_request'\''\n    runs-on: [self-hosted, Linux, X64, vm103]\n    steps:\n      - run: echo exposed|' "$WF" >"$WORK/tampered.yml"
+expect_violation "quoted job ID injected" "unexpected self-hosted job set"
+
+# Tamper 37: single-quoted job ID injected (both quoted forms must be caught).
+sed 's|^jobs:$|jobs:\n  '\''EVIL_JOB'\'':\n    if: github.event_name == '\''pull_request'\''\n    runs-on: [self-hosted, Linux, X64, vm103]\n    steps:\n      - run: echo exposed|' "$WF" >"$WORK/tampered.yml"
+expect_violation "single-quoted job ID injected" "unexpected self-hosted job set"
+
+echo "NEGATIVE CONTROL PASS: contract catches all thirty-seven drop attempts for the intended reasons"

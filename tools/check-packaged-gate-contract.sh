@@ -75,15 +75,14 @@ grep -qE '^[[:space:]]*continue-on-error:' "$WF" && fail "continue-on-error foun
 #    true on a pull_request must carry the same-repo guard.
 JOBS_SECTION="$(awk '/^jobs:$/{f=1;next} f && /^[^ ]/{exit} f' "$WF")"
 # The self-hosted job set is CLOSED: only the four canonical jobs are
-# permitted. Any other job (uppercase, new, renamed, or condition-gamed) is
-# a violation — adding a self-hosted job requires a reviewed contract change.
-# A condition game like `!= 'pull_request' || == 'pull_request'` on a new job
-# cannot slip through because the job itself is rejected.
+# permitted. Any other job (uppercase, quoted, new, renamed, or
+# condition-gamed) is a violation — adding a self-hosted job requires a
+# reviewed contract change. Quoted IDs (`"EVIL_JOB":`) are normalized.
 EXPECTED_JOBS="contract full-matrix pr-fast real-corpus"
-ACTUAL_JOBS="$(printf '%s\n' "$JOBS_SECTION" | awk '/^  [A-Za-z0-9_-]+:$/ { gsub(":$", ""); print $1 }' | sort | tr '\n' ' ' | sed 's/ $//')"
+ACTUAL_JOBS="$(printf '%s\n' "$JOBS_SECTION" | awk '/^  [^ :]+:$/ { gsub(":$", ""); print $1 }' | tr -d "\"'" | sort | tr '\n' ' ' | sed 's/ $//')"
 [ "$ACTUAL_JOBS" = "$EXPECTED_JOBS" ] \
   || fail "unexpected self-hosted job set ($ACTUAL_JOBS) — only contract pr-fast full-matrix real-corpus are permitted"
-for job in $(printf '%s\n' "$JOBS_SECTION" | awk '/^  [A-Za-z0-9_-]+:$/ { gsub(":$", ""); print $1 }'); do
+for job in $(printf '%s\n' "$JOBS_SECTION" | awk '/^  [^ :]+:$/ { gsub(":$", ""); print $1 }' | tr -d "\"'"); do
   [ "$job" = "pr-fast" ] && continue  # the exact pr-fast check below owns it
   JOB_BLOCK="$(awk -v j="$job" '$0 ~ "^  " j ":$" {f=1;next} f && /^  [A-Za-z0-9_-]+:$/ {exit} f' "$WF")"
   JOB_IF="$(printf '%s\n' "$JOB_BLOCK" | sed -n 's/^    if: //p')"
@@ -155,10 +154,9 @@ printf '%s\n' "$CONTRACT_BLOCK" | grep -q 'BOOTSTRAP-INERT' \
 grep -qE '^  group: packaged-user-gate$' "$WF" || fail "concurrency group is not the fixed runner-wide packaged-user-gate"
 grep -q 'github.ref' <(sed 's/#.*//' "$WF") && fail "concurrency group uses github.ref — fixed group required"
 # SHA-only enforcement: every uses: ref must be a 40-hex commit SHA.
-# Tag/branch/version refs — quoted or not, in any form (@v4, @v4.0.0,
-# @refs/heads/release) — are mutable third-party code on the self-hosted
-# runner and are rejected outright.
-grep -E '^[[:space:]]*uses: ' "$WF" | tr -d "\"'" \
+# Tag/branch/version refs — quoted or not, trailing YAML comments stripped —
+# are mutable third-party code on the self-hosted runner and are rejected.
+grep -E '^[[:space:]]*uses: ' "$WF" | tr -d "\"'" | sed 's/#.*//; s/[[:space:]]*$//' \
   | sed -n 's/^[[:space:]]*uses: [^@ ]*@\([^ ]*\)$/\1/p' \
   | grep -vqE '^[0-9a-f]{40}$' \
   && fail "mutable action ref found — every uses: ref must be a 40-hex SHA"
