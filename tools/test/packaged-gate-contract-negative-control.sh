@@ -182,13 +182,13 @@ expect_violation "full-matrix job-level if deleted (exact)" "full-matrix job has
 # Tamper 31: an uppercase job ID without any condition (job-scan class —
 # now caught by the CLOSED job set).
 sed 's|^jobs:$|jobs:\n  EVIL_JOB:\n    runs-on: [self-hosted, Linux, X64, vm103]\n    steps:\n      - run: echo exposed|' "$WF" >"$WORK/tampered.yml"
-expect_violation "uppercase unguarded job injected" "unexpected self-hosted job set"
+expect_violation "uppercase unguarded job injected" "unexpected self-hosted job key"
 
 # Tamper 33: a new job with a condition game that is true on pull requests
 # (`!= pull_request || == pull_request`) — the closed job set rejects the
 # job itself, not the condition.
 sed 's|^jobs:$|jobs:\n  EVIL_JOB:\n    if: github.event_name != '\''pull_request'\'' \|\| github.event_name == '\''pull_request'\''\n    runs-on: [self-hosted, Linux, X64, vm103]\n    steps:\n      - run: echo exposed|' "$WF" >"$WORK/tampered.yml"
-expect_violation "condition-gamed job injected" "unexpected self-hosted job set"
+expect_violation "condition-gamed job injected" "unexpected self-hosted job key"
 
 # Tamper 34: a mutable ref in a form the old tag list missed (@v4.0.0).
 sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|uses: actions/checkout@v4.0.0|' "$WF" >"$WORK/tampered.yml"
@@ -204,10 +204,30 @@ expect_violation "mutable action ref with trailing comment" "mutable action ref 
 
 # Tamper 36: quoted job ID injected (quoted-ID class).
 sed 's|^jobs:$|jobs:\n  "EVIL_JOB":\n    if: github.event_name == '\''pull_request'\''\n    runs-on: [self-hosted, Linux, X64, vm103]\n    steps:\n      - run: echo exposed|' "$WF" >"$WORK/tampered.yml"
-expect_violation "quoted job ID injected" "unexpected self-hosted job set"
+expect_violation "quoted job ID injected" "unexpected self-hosted job key"
 
 # Tamper 37: single-quoted job ID injected (both quoted forms must be caught).
 sed 's|^jobs:$|jobs:\n  '\''EVIL_JOB'\'':\n    if: github.event_name == '\''pull_request'\''\n    runs-on: [self-hosted, Linux, X64, vm103]\n    steps:\n      - run: echo exposed|' "$WF" >"$WORK/tampered.yml"
-expect_violation "single-quoted job ID injected" "unexpected self-hosted job set"
+expect_violation "single-quoted job ID injected" "unexpected self-hosted job key"
 
-echo "NEGATIVE CONTROL PASS: contract catches all thirty-seven drop attempts for the intended reasons"
+# Tamper 38: whitespace before the colon in a job key (valid YAML).
+sed 's|^jobs:$|jobs:\n  EVIL_JOB :\n    runs-on: [self-hosted, Linux, X64, vm103]\n    steps:\n      - run: echo exposed|' "$WF" >"$WORK/tampered.yml"
+expect_violation "whitespace-colon job key injected" "unexpected self-hosted job key"
+
+# Tamper 39: unquoted job key with a trailing YAML comment.
+sed 's|^jobs:$|jobs:\n  EVIL_JOB: # comment\n    runs-on: [self-hosted, Linux, X64, vm103]\n    steps:\n      - run: echo exposed|' "$WF" >"$WORK/tampered.yml"
+expect_violation "trailing-comment job key injected" "unexpected self-hosted job key"
+
+# Tamper 40: quoted job key with a trailing YAML comment.
+sed 's|^jobs:$|jobs:\n  "EVIL_JOB": # comment\n    runs-on: [self-hosted, Linux, X64, vm103]\n    steps:\n      - run: echo exposed|' "$WF" >"$WORK/tampered.yml"
+expect_violation "quoted trailing-comment job key injected" "unexpected self-hosted job key"
+
+# Tamper 41: local action (no-@ form).
+sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|uses: ./scripts/local-action|' "$WF" >"$WORK/tampered.yml"
+expect_violation "local action ref" "mutable action ref found"
+
+# Tamper 42: docker action (no-@ form).
+sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|uses: docker://alpine:latest|' "$WF" >"$WORK/tampered.yml"
+expect_violation "docker action ref" "mutable action ref found"
+
+echo "NEGATIVE CONTROL PASS: contract catches all forty-two drop attempts for the intended reasons"

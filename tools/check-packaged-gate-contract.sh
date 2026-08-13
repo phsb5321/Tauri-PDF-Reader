@@ -74,54 +74,34 @@ grep -qE '^[[:space:]]*continue-on-error:' "$WF" && fail "continue-on-error foun
 #    PR execute on the self-hosted runner. EVERY job whose condition can be
 #    true on a pull_request must carry the same-repo guard.
 JOBS_SECTION="$(awk '/^jobs:$/{f=1;next} f && /^[^ ]/{exit} f' "$WF")"
-# The self-hosted job set is CLOSED: only the four canonical jobs are
-# permitted. Any other job (uppercase, quoted, new, renamed, or
-# condition-gamed) is a violation — adding a self-hosted job requires a
-# reviewed contract change. Quoted IDs (`"EVIL_JOB":`) are normalized.
-EXPECTED_JOBS="contract full-matrix pr-fast real-corpus"
-ACTUAL_JOBS="$(printf '%s\n' "$JOBS_SECTION" | awk '/^  [^ :]+:$/ { gsub(":$", ""); print $1 }' | tr -d "\"'" | sort | tr '\n' ' ' | sed 's/ $//')"
-[ "$ACTUAL_JOBS" = "$EXPECTED_JOBS" ] \
-  || fail "unexpected self-hosted job set ($ACTUAL_JOBS) — only contract pr-fast full-matrix real-corpus are permitted"
-for job in $(printf '%s\n' "$JOBS_SECTION" | awk '/^  [^ :]+:$/ { gsub(":$", ""); print $1 }' | tr -d "\"'"); do
-  [ "$job" = "pr-fast" ] && continue  # the exact pr-fast check below owns it
-  JOB_BLOCK="$(awk -v j="$job" '$0 ~ "^  " j ":$" {f=1;next} f && /^  [A-Za-z0-9_-]+:$/ {exit} f' "$WF")"
+# STRUCTURAL closed job set: within the jobs: section, every nonblank /
+# noncomment line at EXACT 2-space indentation must be one of the four exact
+# literals. This rejects quoted keys, whitespace-before-colon, trailing
+# comments, anchors/merges, and any new/renamed job — no normalization, no
+# blacklist.
+BAD_KEYS="$(printf '%s\n' "$JOBS_SECTION" | awk '/^  [^ #]/{ if ($0 != "  contract:" && $0 != "  pr-fast:" && $0 != "  full-matrix:" && $0 != "  real-corpus:") print $0 }')"
+[ -z "$BAD_KEYS" ] || fail "unexpected self-hosted job key ($(printf '%s\n' "$BAD_KEYS" | head -1 | tr -d '\n')) — only the exact literals '  contract:' '  pr-fast:' '  full-matrix:' '  real-corpus:' are permitted"
+for j in contract pr-fast full-matrix real-corpus; do
+  [ "$(printf '%s\n' "$JOBS_SECTION" | grep -c "^  $j:\$")" -eq 1 ] || fail "job $j must appear exactly once"
+done
+# Exact canonical conditions for the three fixed non-PR jobs (pr-fast is
+# checked separately below); a missing or skip-capable variant must fail.
+for job in contract full-matrix real-corpus; do
+  JOB_BLOCK="$(awk -v j="$job" '$0 ~ "^  " j ":$" {f=1;next} f && /^  [^ #]/ {exit} f' "$WF")"
   JOB_IF="$(printf '%s\n' "$JOB_BLOCK" | sed -n 's/^    if: //p')"
-  if [ -z "$JOB_IF" ]; then
-    fail "$job job has no job-level if — it runs on every event including fork PRs"
-    continue
-  fi
-  # Exact canonical conditions for the fixed jobs: a skip-capable variant
-  # (false, schedule-only, bare != pull_request without the OR-guard) must
-  # fail — substring acceptance is a bypass.
+  [ -n "$JOB_IF" ] || { fail "$job job has no job-level if — it runs on every event including fork PRs"; continue; }
   case "$job" in
     contract)
       printf '%s\n' "$JOB_IF" | grep -qx 'github.event_name != '\''pull_request'\'' || github.event.pull_request.head.repo.full_name == github.repository' \
         || fail "contract job-level if: is not the exact canonical guard"
-      continue
       ;;
     full-matrix)
       printf '%s\n' "$JOB_IF" | grep -qx 'github.event_name != '\''pull_request'\''' \
         || fail "full-matrix job-level if: is not the exact canonical condition"
-      continue
       ;;
     real-corpus)
       printf '%s\n' "$JOB_IF" | grep -qx 'github.event_name == '\''workflow_dispatch'\''' \
         || fail "real-corpus job-level if: is not exactly the workflow_dispatch trigger"
-      continue
-      ;;
-  esac
-  case "$JOB_IF" in
-    *pull_request*)
-      # A condition that EXCLUDES pull_request (e.g. `!= 'pull_request'`)
-      # cannot run on a PR — no guard needed. Anything else that mentions
-      # pull_request must carry the same-repo guard.
-      case "$JOB_IF" in
-        *"github.event_name != 'pull_request'"*) ;;
-        *)
-          printf '%s\n' "$JOB_IF" | grep -q 'github.event.pull_request.head.repo.full_name == github.repository' \
-            || fail "$job job can run on pull_request without the same-repo guard (fork execution)"
-          ;;
-      esac
       ;;
   esac
 done
@@ -153,13 +133,16 @@ printf '%s\n' "$CONTRACT_BLOCK" | grep -q 'BOOTSTRAP-INERT' \
 # /tmp paths, so no two runs may ever execute.
 grep -qE '^  group: packaged-user-gate$' "$WF" || fail "concurrency group is not the fixed runner-wide packaged-user-gate"
 grep -q 'github.ref' <(sed 's/#.*//' "$WF") && fail "concurrency group uses github.ref — fixed group required"
-# SHA-only enforcement: every uses: ref must be a 40-hex commit SHA.
-# Tag/branch/version refs — quoted or not, trailing YAML comments stripped —
-# are mutable third-party code on the self-hosted runner and are rejected.
-grep -E '^[[:space:]]*uses: ' "$WF" | tr -d "\"'" | sed 's/#.*//; s/[[:space:]]*$//' \
-  | sed -n 's/^[[:space:]]*uses: [^@ ]*@\([^ ]*\)$/\1/p' \
-  | grep -vqE '^[0-9a-f]{40}$' \
-  && fail "mutable action ref found — every uses: ref must be a 40-hex SHA"
+# STRUCTURAL SHA-only: every uses: value, after trim + quote removal, must
+# be exactly `owner/repo@<40 lowercase hex>`. No-@ forms (local ./actions,
+# docker://, reusable calls without @), block scalars, tags, branches, and
+# trailing comments are rejected outright.
+grep -E '^[[:space:]]*uses:[[:space:]]*[>|][>-]?[[:space:]]*$' "$WF" \
+  && fail "mutable action ref found — block scalar uses: rejected; every uses: must be owner/repo@<40 lowercase hex>"
+grep -E '^[[:space:]]*uses:' "$WF" | tr -d "\"'" | sed 's/#.*//; s/[[:space:]]*$//' \
+  | sed -n 's/^[[:space:]]*uses:[[:space:]]*//p' \
+  | grep -vqE '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@[0-9a-f]{40}$' \
+  && fail "mutable action ref found — every uses: must be owner/repo@<40 lowercase hex>"
 # The driver prerequisite is the PINNED devShell: no host provisioning, no
 # ~/.cargo/bin hardcode.
 grep -q 'cargo/bin/tauri-driver' "$WF" && fail "driver assert hardcodes ~/.cargo/bin — the pinned devShell is the toolchain"
