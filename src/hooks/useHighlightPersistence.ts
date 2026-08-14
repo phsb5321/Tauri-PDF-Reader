@@ -79,6 +79,56 @@ function scheduleFlush(delayMs: number): void {
  * the wrapper carries the identity (for the joiner's match), the outcome
  * carries the result (for the caller's loop).
  */
+async function applyPendingUpdate(pending: PendingUpdate): Promise<void> {
+  switch (pending.type) {
+    case "create":
+      await highlightsCreate({
+        documentId: pending.highlight.documentId,
+        pageNumber: pending.highlight.pageNumber,
+        rects: pending.highlight.rects,
+        color: pending.highlight.color,
+        textContent: pending.highlight.textContent ?? undefined,
+      } satisfies CreateHighlightInput);
+      break;
+    case "update":
+      await highlightsUpdate(pending.highlight.id, {
+        color: pending.highlight.color,
+        note: pending.highlight.note,
+      });
+      break;
+    case "delete":
+      await highlightsDelete(pending.highlight.id);
+      break;
+  }
+}
+
+function handlePendingFailure(
+  id: string,
+  pending: PendingUpdate,
+  error: unknown,
+  propagate: boolean,
+): void {
+  console.error(`Failed to ${pending.type} highlight:`, error);
+  try {
+    pending.onError?.(
+      error instanceof Error ? error : new Error(String(error)),
+    );
+  } catch (callbackError) {
+    // A UI callback must never turn a settled background write into an
+    // unhandled rejection.
+    console.error("Highlight onError callback threw:", callbackError);
+  }
+
+  if (!propagate && pending.type !== "delete") {
+    // Re-queue only if no newer intent for this id arrived while the write
+    // was in flight. Object identity is the compare-and-set token.
+    const current = pendingUpdates.get(id);
+    if (current === undefined || current === pending) {
+      pendingUpdates.set(id, pending);
+    }
+  }
+}
+
 function flushPendingUpdates(opts?: {
   propagateFailure?: boolean;
 }): Promise<{ failed: boolean; error?: unknown; failedIds: string[] }> {
@@ -103,8 +153,11 @@ function flushPendingUpdates(opts?: {
   // been reassigned to the real wrapper below — the placeholder never
   // escapes this function (initialized here so TS's closure analysis and
   // eslint's prefer-const both hold).
-  let flush: Promise<{ failed: boolean; error?: unknown; failedIds: string[] }> =
-    Promise.resolve({ failed: false, failedIds: [] });
+  let flush: Promise<{
+    failed: boolean;
+    error?: unknown;
+    failedIds: string[];
+  }> = Promise.resolve({ failed: false, failedIds: [] });
   const run = (async () => {
     const updates = new Map(pendingUpdates);
     pendingUpdates.clear();
@@ -114,60 +167,12 @@ function flushPendingUpdates(opts?: {
 
     for (const [id, pending] of updates) {
       try {
-        switch (pending.type) {
-          case "create":
-            await highlightsCreate({
-              documentId: pending.highlight.documentId,
-              pageNumber: pending.highlight.pageNumber,
-              rects: pending.highlight.rects,
-              color: pending.highlight.color,
-              textContent: pending.highlight.textContent ?? undefined,
-            } satisfies CreateHighlightInput);
-            break;
-
-          case "update":
-            await highlightsUpdate(pending.highlight.id, {
-              color: pending.highlight.color,
-              note: pending.highlight.note,
-            });
-            break;
-
-          case "delete":
-            await highlightsDelete(pending.highlight.id);
-            break;
-        }
+        await applyPendingUpdate(pending);
       } catch (error) {
-        console.error(`Failed to ${pending.type} highlight:`, error);
         failed = true;
         firstError ??= error;
         failedIds.push(id);
-        // The error callback must never turn a background flush into a
-        // rejection (the create path resolves; the handler attaches only a
-        // fulfillment handler) — a throwing onError is logged, not
-        // propagated (exact-head codex review, MINOR).
-        try {
-          pending.onError?.(
-            error instanceof Error ? error : new Error(String(error)),
-          );
-        } catch (callbackError) {
-          console.error("Highlight onError callback threw:", callbackError);
-        }
-
-        if (!propagate && pending.type !== "delete") {
-          // Background path: re-queue failed updates for retry — but never
-          // over a NEWER entry for the same id. The queue is cleared at pass
-          // start, so an entry enqueued WHILE this write was in flight is the
-          // user's latest intent (e.g. a delete superseding a failing
-          // create); the stale retry must not clobber it (codex review,
-          // MAJOR). The CAS token is the entry OBJECT, not its timestamp: a
-          // same-millisecond enqueue is a different object, so the stale
-          // retry can never be confused with the newer intent (exact-head
-          // codex review, MINOR).
-          const current = pendingUpdates.get(id);
-          if (current === undefined || current === pending) {
-            pendingUpdates.set(id, pending);
-          }
-        }
+        handlePendingFailure(id, pending, error, propagate);
         // The close path (propagate) never re-queues — the window is going
         // away and the failure must surface, not retry.
       }
@@ -224,11 +229,15 @@ export function useHighlightPersistence({
 }: UseHighlightPersistenceOptions) {
   // Create a new highlight
   const createHighlight = useCallback(
-    (highlight: Highlight): Promise<{
-      failed: boolean;
-      error?: unknown;
-      failedIds: string[];
-    }> | undefined => {
+    (
+      highlight: Highlight,
+    ):
+      | Promise<{
+          failed: boolean;
+          error?: unknown;
+          failedIds: string[];
+        }>
+      | undefined => {
       if (!documentId) return undefined;
 
       pendingUpdates.set(highlight.id, {
