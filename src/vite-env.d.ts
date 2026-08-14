@@ -12,6 +12,9 @@ interface ImportMetaEnv {
   readonly VITE_E2E_NATIVE_SEED?: "single" | "dual";
   readonly VITE_E2E_PROFILE_DIR?: string;
   readonly VITE_E2E_OPEN_PATH?: string;
+  readonly VITE_E2E_REAUTH_MODE?: "cancel" | string;
+  readonly VITE_E2E_REAUTH_PATH?: string;
+  readonly VITE_E2E_REAUTH_OUT_PATH?: string;
 }
 
 /**

@@ -29,13 +29,19 @@ import {
 import type { Document } from "../lib/schemas";
 
 /**
- * plugin-fs v2 rejects reads outside the capability scope with this message.
+ * plugin-fs rejects reads outside the capability scope with one of:
+ * - v2.4.x Linux/Win: "forbidden path: {path}, maybe it is not allowed on the
+ *   scope for `allow-read-file` permission in your capability file"
+ * - other versions/platforms: "path not allowed on the configured scope"
  * A library book whose dialog grant never existed (pre-persisted-scope
  * sessions) or lapsed fails exactly here — the reauthorization trigger.
  */
 function isScopeDenial(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return /not allowed on the configured scope/i.test(message);
+  return (
+    /not allowed on the configured scope/i.test(message) ||
+    /forbidden path: .*not allowed on the scope/i.test(message)
+  );
 }
 
 /** Provides the shared open-a-document actions. */
@@ -147,9 +153,16 @@ export function useOpenPdf() {
       }
 
       const filePath = selected as string;
-      const pdf = await pdfService.loadDocument(filePath);
-
       const known = await libraryGetDocumentByPath(filePath);
+      // Every open of a KNOWN row binds the bytes to the row's content hash
+      // (the id): a file replaced at the same path is a different book and
+      // refused rather than rendered under the old book's progress.
+      const pdf = known
+        ? await pdfService.loadDocument(filePath, {
+            expectedSha256: known.id,
+          })
+        : await pdfService.loadDocument(filePath);
+
       const document = known
         ? await libraryOpenDocument(known.id)
         : await libraryAddDocument(filePath, undefined, pdf.numPages);
@@ -188,7 +201,12 @@ export function useOpenPdf() {
         let pdf: PDFDocumentProxy;
         let opened: Document;
         try {
-          pdf = await pdfService.loadDocument(document.filePath);
+          // Every known-row open binds the bytes to the row's content hash
+          // (the id), so a file replaced after a failed reauthorization (or
+          // any other swap) cannot be rendered unverified on a later resume.
+          pdf = await pdfService.loadDocument(document.filePath, {
+            expectedSha256: document.id,
+          });
 
           // `last_opened_at` is bookkeeping for the home's ordering, and the row
           // we were handed already carries everything the reader needs. Stamp it,

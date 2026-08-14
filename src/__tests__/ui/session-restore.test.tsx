@@ -146,7 +146,9 @@ describe("restoring a reading session", () => {
     const state = useDocumentStore.getState();
     expect(state.currentDocument?.id).toBe("doc-1");
     expect(state.currentPage).toBe(9);
-    expect(loadDocument).toHaveBeenCalledWith("/books/paper-1.pdf");
+    expect(loadDocument).toHaveBeenCalledWith("/books/paper-1.pdf", {
+      expectedSha256: "doc-1",
+    });
   });
 
   it("picks the document with the highest position (the one last read)", async () => {
@@ -283,7 +285,9 @@ describe("reauthorization failure during restore is visible on the reader", () =
     // Second restore: the stored path lost its fs grant; the user cancels
     // the reauthorization dialog.
     loadDocument.mockRejectedValueOnce(
-      new Error("path not allowed on the configured scope: /books/paper-1.pdf"),
+      new Error(
+        "forbidden path: /books/paper-1.pdf, maybe it is not allowed on the scope for `allow-read-file` permission in your capability file",
+      ),
     );
     openDialog.mockResolvedValue(null);
 
@@ -305,7 +309,9 @@ describe("reauthorization failure during restore is visible on the reader", () =
     );
 
     loadDocument.mockRejectedValueOnce(
-      new Error("path not allowed on the configured scope: /books/paper-1.pdf"),
+      new Error(
+        "forbidden path: /books/paper-1.pdf, maybe it is not allowed on the scope for `allow-read-file` permission in your capability file",
+      ),
     );
     openDialog.mockResolvedValue("/books/evil-impostor.pdf");
     mockInvoke.mockImplementation((command: string) => {

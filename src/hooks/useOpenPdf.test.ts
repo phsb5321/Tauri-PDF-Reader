@@ -85,7 +85,9 @@ describe("resumeDocument", () => {
     });
 
     expect(resumed).toBe(true);
-    expect(loadDocument).toHaveBeenCalledWith("/books/one.pdf");
+    expect(loadDocument).toHaveBeenCalledWith("/books/one.pdf", {
+      expectedSha256: "doc-1",
+    });
     const state = useDocumentStore.getState();
     expect(state.currentPage).toBe(142);
     expect(state.currentDocument?.id).toBe("doc-1");
@@ -203,11 +205,11 @@ describe("openPdf", () => {
   });
 });
 
-describe("resumeDocument reauthorization rung (issue #120)", () => {
-  const scopeDenial = new Error(
-    "path not allowed on the configured scope: /books/one.pdf",
-  );
+const scopeDenial = new Error(
+  "forbidden path: /books/one.pdf, maybe it is not allowed on the scope for `allow-read-file` permission in your capability file",
+);
 
+describe("resumeDocument reauthorization rung (issue #120)", () => {
   it("scope-denied book reauthorizes through the dialog and lands in the reader", async () => {
     const stored = doc({ currentPage: 42 });
     const relocated = doc({
@@ -248,7 +250,9 @@ describe("resumeDocument reauthorization rung (issue #120)", () => {
       id: "doc-1",
       newFilePath: "/books/moved/one.pdf",
     });
-    expect(loadDocument).toHaveBeenNthCalledWith(1, "/books/one.pdf");
+    expect(loadDocument).toHaveBeenNthCalledWith(1, "/books/one.pdf", {
+      expectedSha256: "doc-1",
+    });
     // The retry binds the opened bytes to the row id (the verified SHA-256).
     expect(loadDocument).toHaveBeenNthCalledWith(2, "/books/moved/one.pdf", {
       expectedSha256: "doc-1",
@@ -327,5 +331,91 @@ describe("resumeDocument reauthorization rung (issue #120)", () => {
       "library_relocate_document",
       expect.anything(),
     );
+  });
+});
+
+describe("every known-row open binds the bytes to the row hash (Codex exact-head)", () => {
+  it("a failed reauth retry does not disable verification on a later resume", async () => {
+    // First resume: the stored path lost its grant; reauthorization picks a
+    // WRONG file -> refused. The row stays at the old path.
+    const stored = doc({ currentPage: 42 });
+    loadDocument
+      .mockRejectedValueOnce(scopeDenial) // stored path: grant gone
+      .mockResolvedValueOnce(pdf(300)); // (unreachable — wrong file refuses)
+    openDialog.mockResolvedValue("/books/evil-impostor.pdf");
+    mockInvoke.mockImplementation((command: string) => {
+      if (command === "library_relocate_document") {
+        return Promise.reject(
+          "HASH_MISMATCH: File at new path has different content",
+        );
+      }
+      return Promise.resolve(stored);
+    });
+
+    const { result } = renderHook(() => useOpenPdf());
+    await act(async () => {
+      await result.current.resumeDocument(stored);
+    });
+    expect(useDocumentStore.getState().error).toContain("WRONG_DOCUMENT");
+
+    // Second resume (e.g. the user retries after fixing the file): the read
+    // must STILL carry the row-hash binding.
+    loadDocument.mockReset();
+    loadDocument.mockResolvedValue(pdf(300));
+    let resumed: boolean | undefined;
+    await act(async () => {
+      resumed = await result.current.resumeDocument(stored);
+    });
+
+    expect(resumed).toBe(true);
+    expect(loadDocument).toHaveBeenCalledWith("/books/one.pdf", {
+      expectedSha256: "doc-1",
+    });
+  });
+
+  it("openPdf binds the bytes when the picked file is already a library row", async () => {
+    const known = doc({ currentPage: 7 });
+    openDialog.mockResolvedValue("/books/one.pdf");
+    loadDocument.mockResolvedValue(pdf(300));
+    mockInvoke.mockImplementation((command: string) => {
+      if (command === "library_get_document_by_path") {
+        return Promise.resolve(known);
+      }
+      if (command === "library_open_document") return Promise.resolve(known);
+      return Promise.resolve(null);
+    });
+
+    const { result } = renderHook(() => useOpenPdf());
+    let opened: boolean | undefined;
+    await act(async () => {
+      opened = await result.current.openPdf();
+    });
+
+    expect(opened).toBe(true);
+    expect(loadDocument).toHaveBeenCalledWith("/books/one.pdf", {
+      expectedSha256: "doc-1",
+    });
+  });
+
+  it("a file replaced at the row's path is refused on resume, not rendered", async () => {
+    // The row's path now holds DIFFERENT bytes (a swap after a failed
+    // retry): the resume must refuse them instead of rendering unverified.
+    const stored = doc({ currentPage: 42 });
+    loadDocument.mockRejectedValue(
+      new Error(
+        "PDF_HASH_MISMATCH: File content changed after verification — the book was not opened.",
+      ),
+    );
+    mockInvoke.mockResolvedValue(stored);
+
+    const { result } = renderHook(() => useOpenPdf());
+    let resumed: boolean | undefined;
+    await act(async () => {
+      resumed = await result.current.resumeDocument(stored);
+    });
+
+    expect(resumed).toBe(false);
+    expect(useDocumentStore.getState().error).toContain("PDF_HASH_MISMATCH");
+    expect(useDocumentStore.getState().pdfDocument).toBeNull();
   });
 });

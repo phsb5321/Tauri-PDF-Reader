@@ -110,7 +110,9 @@ describe("release blockers (109)", () => {
     expect(
       screen.queryByRole("heading", { name: "Library" }),
     ).not.toBeInTheDocument();
-    expect(loadDocument).toHaveBeenCalledWith("/books/ddd.pdf");
+    expect(loadDocument).toHaveBeenCalledWith("/books/ddd.pdf", {
+      expectedSha256: DOC.id,
+    });
   });
 
   it("B2: a wrong key does not close the settings dialog and shows the error", async () => {

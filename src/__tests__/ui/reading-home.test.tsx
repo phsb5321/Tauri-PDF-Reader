@@ -150,7 +150,9 @@ describe("the reading home", () => {
     const state = useDocumentStore.getState();
     expect(state.currentDocument?.id).toBe("doc-1");
     expect(state.currentPage).toBe(213);
-    expect(loadDocument).toHaveBeenCalledWith("/books/moby-dick.pdf");
+    expect(loadDocument).toHaveBeenCalledWith("/books/moby-dick.pdf", {
+      expectedSha256: "doc-1",
+    });
   });
 
   it("is reachable again from inside a document", async () => {

@@ -114,7 +114,9 @@ describe("App-root reachability", () => {
     await waitFor(() =>
       expect(screen.getByTestId("pdf-viewer")).toBeInTheDocument(),
     );
-    expect(loadDocument).toHaveBeenCalledWith(IN_FLIGHT.filePath);
+    expect(loadDocument).toHaveBeenCalledWith(IN_FLIGHT.filePath, {
+      expectedSha256: IN_FLIGHT.id,
+    });
     expect(useDocumentStore.getState()).toMatchObject({
       currentDocument: expect.objectContaining({ id: IN_FLIGHT.id }),
       currentPage: IN_FLIGHT.currentPage,
