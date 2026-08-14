@@ -124,16 +124,20 @@ export function useHighlightCreation({
       // Persist to backend (async, with retry). The flush is awaited BEFORE
       // the success UX: "Highlight created" must never precede the write
       // attempt (exact-head codex review, MAJOR). The promise settles when
-      // the attempt finishes (background semantics — a failure re-queues and
-      // surfaces via onError, it does not throw), so under a hard teardown
-      // that kills the write mid-flight the toast is never shown.
+      // the attempt finishes — background failures re-queue and resolve with
+      // { failed: true } (surfaced via onError, retried by the debounced
+      // path), so the toast fires ONLY when the write actually landed. Under
+      // a hard teardown that kills the write mid-flight the toast is never
+      // shown.
       const persist = createHighlight(highlight);
       const succeed = (): void => {
         onSuccess?.(highlight);
         toastSuccess("Highlight created");
       };
       if (persist) {
-        void persist.then(succeed);
+        void persist.then((outcome) => {
+          if (!outcome.failed) succeed();
+        });
       } else {
         succeed();
       }

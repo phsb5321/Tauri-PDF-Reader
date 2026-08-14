@@ -152,7 +152,10 @@ describe('Ctrl+Shift+H highlights the pending selection', () => {
     // enqueueing, before the IPC had even started.
     let resolveCreate!: () => void;
     createHighlight.mockImplementationOnce(
-      () => new Promise<void>((r) => (resolveCreate = r)),
+      () =>
+        new Promise<{ failed: boolean }>((r) => {
+          resolveCreate = () => r({ failed: false });
+        }),
     );
 
     const onSuccess = vi.fn();
@@ -177,6 +180,37 @@ describe('Ctrl+Shift+H highlights the pending selection', () => {
     expect(onSuccess).toHaveBeenCalledTimes(1);
     // The store update still lands immediately (the page renders the
     // highlight regardless of persistence timing).
+    expect(useDocumentStore.getState().highlights).toHaveLength(1);
+  });
+
+  it('does NOT signal success when the persistence attempt failed', async () => {
+    // A failed first attempt resolves { failed: true } (the background retry
+    // path re-queues and surfaces via onError) — the success UX must not
+    // fire; "Highlight created" would be a lie for a write that did not
+    // land (exact-head Codex review, MAJOR).
+    createHighlight.mockResolvedValueOnce({
+      failed: true,
+      error: new Error('backend down'),
+    });
+
+    const onSuccess = vi.fn();
+    const { result } = renderHook(() =>
+      useHighlightCreation({
+        documentId: 'doc-1',
+        scale: 1,
+        containerRef: { current: document.createElement('div') },
+        onSuccess,
+      }),
+    );
+    act(() => result.current.handleTextSelect(SELECTION));
+    press('H', { ctrlKey: true, shiftKey: true });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(onSuccess).not.toHaveBeenCalled();
+    // The store update still lands (the page shows the highlight; the
+    // retry path owns eventual persistence).
     expect(useDocumentStore.getState().highlights).toHaveLength(1);
   });
 });

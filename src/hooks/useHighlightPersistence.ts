@@ -38,7 +38,12 @@ let flushTimer: number | null = null;
 /** The flush attempt whose pass failed, bound to ITS OWN promise. A close
  * flush may only surface a failure it actually JOINED, and only that joiner
  * may consume it — identity, never a shared boolean an interleaved retry
- * pass could clear first (exact-head Codex review, MAJOR). */
+ * pass could clear first (exact-head Codex review, MAJOR). The record may
+ * be retained across mounts until a matching joiner consumes it or another
+ * failure overwrites it: it is INERT for any non-matching caller (the join
+ * check requires lastFlushFailed.flush === joinedFlush, and a completed
+ * flush is never joined again), so the retention is one bounded object, not
+ * a poison (exact-head Codex review, MINOR — accepted, documented). */
 let lastFlushFailed: {
   flush: Promise<{ failed: boolean; error?: unknown }>;
   error: unknown;
