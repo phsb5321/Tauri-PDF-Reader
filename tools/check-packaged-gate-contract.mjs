@@ -128,6 +128,17 @@ if (wf.defaults !== undefined)
 if (!wf.concurrency || wf.concurrency.group !== "packaged-user-gate")
   fail("concurrency group is not the fixed runner-wide packaged-user-gate");
 
+// ── Env closed structurally (BASH_ENV/PATH injection class) ─────────────────
+// Workflow env must be EXACTLY the pinned map; job-level env is banned;
+// step-level env is banned except the two exact pinned contract-step maps.
+const WF_ENV = JSON.stringify({
+  CARGO_TERM_COLOR: "always",
+  RUST_BACKTRACE: "1",
+  CI: "true",
+});
+if (JSON.stringify(wf.env || null) !== WF_ENV)
+  fail("workflow env is not the exact pinned map (CARGO_TERM_COLOR=always, RUST_BACKTRACE=1, CI=true)");
+
 // ── M2: workflow-level permissions must be exactly contents: read ───────────
 const PERMS = JSON.stringify(wf.permissions || null);
 if (PERMS !== JSON.stringify({ contents: "read" }))
@@ -210,6 +221,10 @@ for (const jobName of Object.keys(CANONICAL_IF)) {
     if (job.defaults !== undefined)
       fail("job-level defaults are not permitted — the fixture owns the default shell");
 
+    // BLOCKER: job-level env is banned (BASH_ENV/PATH injection class).
+    if (job.env !== undefined)
+      fail("job-level env is not permitted — BASH_ENV/PATH injection class");
+
     if (job.if === undefined) {
       if (jobName === "pr-fast")
         fail("pr-fast job-level if: is not the PR trigger + same-repo guard — the gate can be skipped or fork-executed");
@@ -290,6 +305,21 @@ for (const jobName of Object.keys(CANONICAL_IF)) {
     // evidence-copy and upload steps — a step-level `if: false` on the lane
     // or a driver assertion would skip the gate silently.
     const IF_ALLOWED_NAME = "Prerequisite receipt enforced";
+    // The ONLY permitted step-level env maps: the exact pinned contract-step
+    // maps (name → exact parsed env object).
+    const ALLOWED_STEP_ENV = [
+      { name: "Fetch the HEAD workflow file", env: { GH_TOKEN: "${{ github.token }}" } },
+      { name: "Contract negative-control", env: { PACKAGED_GATE_WF: "/tmp/head-workflow.yml" } },
+    ];
+    for (const s of steps) {
+      if (!s || s.env === undefined) continue;
+      const name = typeof s.name === "string" ? s.name : "";
+      const allowed = ALLOWED_STEP_ENV.find(
+        (a) => name.startsWith(a.name) && JSON.stringify(s.env) === JSON.stringify(a.env),
+      );
+      if (!allowed)
+        fail(`step-level env is not permitted on step "${name}" — only the exact pinned contract-step env maps are allowed`);
+    }
     for (const s of steps) {
       if (!s || s.if === undefined) continue;
       const name = typeof s.name === "string" ? s.name : "";

@@ -330,6 +330,22 @@ expect_violation "workflow-level defaults.run.shell" "workflow-level defaults ar
 sed '/^  pr-fast:$/a\    defaults:\n      run:\n        shell: bash -c '"'"'exit 0'"'"' {0}' "$WF" >"$WORK/tampered.yml"
 expect_violation "job-level defaults.run.shell" "job-level defaults are not permitted"
 
+# Tamper 71: workflow env gains BASH_ENV.
+sed 's|^env:$|env:\n  BASH_ENV: /tmp/evil|' "$WF" >"$WORK/tampered.yml"
+expect_violation "workflow env BASH_ENV injection" "workflow env is not the exact pinned map"
+
+# Tamper 72: job-level env on pr-fast.
+sed '/^  pr-fast:$/a\    env:\n      BASH_ENV: /tmp/evil' "$WF" >"$WORK/tampered.yml"
+expect_violation "job-level env BASH_ENV injection" "job-level env is not permitted"
+
+# Tamper 73: lane-step env with BASH_ENV.
+sed '/^      - name: Packaged PR-fast lane/a\        env:\n          BASH_ENV: /tmp/evil' "$WF" >"$WORK/tampered.yml"
+expect_violation "lane-step env BASH_ENV injection" "step-level env is not permitted"
+
+# Tamper 74: unexpected env at an allowed contract step (extra key).
+sed 's|GH_TOKEN: \${{ github.token }}|GH_TOKEN: \${{ github.token }}\n          PATH: /tmp/evil|' "$WF" >"$WORK/tampered.yml"
+expect_violation "unexpected env key at allowed step" "step-level env is not permitted"
+
 # ── Positive control (no-false-positive class) ───────────────────────────────
 python3 - "$WF" "$WORK/clean.yml" <<'PY'
 import sys
