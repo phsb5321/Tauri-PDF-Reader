@@ -54,7 +54,10 @@
 }
 
 /* Dark mode adjustments */
-[data-theme="dark"] .highlight-toolbar,
+[data-theme="dark"] .highlight-toolbar {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .highlight-toolbar {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);

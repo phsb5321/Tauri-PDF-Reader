@@ -54,6 +54,15 @@ export interface E2EBridge {
   installDialogFixture: () => Promise<boolean>;
   /** Slice 109 B4: arm the seams with corrupt bytes — a failed open must be visible. */
   installCorruptOpenFixture: () => Promise<boolean>;
+  /**
+   * Real-corpus mode (LECTRICE_REAL_PDF_CORPUS hook): arm ONLY the dialog
+   * seam with an ABSOLUTE staged path (the observer copies the real book
+   * into the hermetic profile's applocaldata, which is in fs scope). The fs
+   * read is left REAL — readFileFromTauri falls through to plugin-fs and
+   * reads the actual corpus bytes from disk. No bytes are embedded in the
+   * build, nothing is uploaded, nothing outlives the transient profile.
+   */
+  installCorpusBook: (absolutePath: string) => Promise<boolean>;
   /** Slice 111 measure: grow the root font size so the lane can assert rem scaling. */
   setRootFontSize: (px: number) => void;
   /** True once the bridge is installed (sanity probe). */
@@ -120,6 +129,18 @@ export function installE2EBridge(): void {
         "public/e2e-fixture.pdf";
       (globalThis as Record<string, unknown>).__E2E_FS_FIXTURE_BYTES__ =
         new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x00, 0x00, 0x00]);
+      return true;
+    },
+    async installCorpusBook(absolutePath) {
+      // Real-corpus mode: the dialog returns the staged REAL book (observer
+      // copied it into the hermetic profile = fs scope); the fs read is NOT
+      // faked, so plugin-fs serves the real bytes. The backend hashes the
+      // staged file like any real open. The corpus file never leaves the
+      // host and never outlives the transient profile (the runner's trap
+      // cleans it).
+      (globalThis as Record<string, unknown>).__E2E_DIALOG_FIXTURE__ =
+        absolutePath;
+      delete (globalThis as Record<string, unknown>).__E2E_FS_FIXTURE_BYTES__;
       return true;
     },
     setRootFontSize(px) {

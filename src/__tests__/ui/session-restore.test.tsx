@@ -26,6 +26,10 @@ import type { Document } from "../../lib/schemas";
 
 vi.mock("../../services/pdf-service", () => ({
   pdfService: { loadDocument: vi.fn(), getPage: vi.fn() },
+  isScopeDenial: (e: unknown) =>
+    /not allowed on the configured scope|forbidden path: .*not allowed on the scope/i.test(
+      e instanceof Error ? e.message : String(e),
+    ),
 }));
 
 // Heavy leaves under the shell; not the surface under test.
@@ -146,7 +150,9 @@ describe("restoring a reading session", () => {
     const state = useDocumentStore.getState();
     expect(state.currentDocument?.id).toBe("doc-1");
     expect(state.currentPage).toBe(9);
-    expect(loadDocument).toHaveBeenCalledWith("/books/paper-1.pdf");
+    expect(loadDocument).toHaveBeenCalledWith("/books/paper-1.pdf", {
+      expectedSha256: "doc-1",
+    });
   });
 
   it("picks the document with the highest position (the one last read)", async () => {
@@ -245,5 +251,109 @@ describe("restoring a reading session", () => {
     expect(
       await screen.findByRole("heading", { name: "Library" }),
     ).toBeInTheDocument();
+  });
+});
+
+/**
+ * Issue #120 caller-level contract: a reauthorization failure during session
+ * restore must be VISIBLE on the reader surface. Before the banner was
+ * hoisted out of the library branch, a cancel (or wrong file) while the
+ * reader was up set the store error that nothing rendered — the reader kept
+ * showing the old book silently.
+ */
+vi.mock("../../adapters/tauri/file-dialog.adapter", () => ({
+  fileDialog: { open: vi.fn(), save: vi.fn() },
+}));
+
+const { fileDialog } = await import("../../adapters/tauri/file-dialog.adapter");
+const openDialog = vi.mocked(fileDialog.open);
+
+describe("reauthorization failure during restore is visible on the reader", () => {
+  async function restoreOnce() {
+    fireEvent.click(screen.getByRole("button", { name: "Sessions" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Research Papers/ }),
+    );
+  }
+
+  it("shows the cancel error on the reader surface when reauthorization is cancelled", async () => {
+    render(<ReaderView />);
+    await screen.findByRole("heading", { name: "Library" });
+
+    // First restore succeeds — the reader is up.
+    await restoreOnce();
+    await waitFor(() =>
+      expect(screen.getByTestId("pdf-viewer")).toBeInTheDocument(),
+    );
+
+    // Second restore: the stored path lost its fs grant; the user cancels
+    // the reauthorization dialog.
+    loadDocument.mockRejectedValueOnce(
+      new Error(
+        "forbidden path: /books/paper-1.pdf, maybe it is not allowed on the scope for `allow-read-file` permission in your capability file",
+      ),
+    );
+    openDialog.mockResolvedValue(null);
+
+    await restoreOnce();
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/OPEN_CANCELLED/);
+    // The reader surface stays — the old book is still shown, with the error.
+    expect(screen.getByTestId("pdf-viewer")).toBeInTheDocument();
+  });
+
+  it("shows the wrong-file rejection on the reader surface and leaves the row untouched", async () => {
+    render(<ReaderView />);
+    await screen.findByRole("heading", { name: "Library" });
+
+    await restoreOnce();
+    await waitFor(() =>
+      expect(screen.getByTestId("pdf-viewer")).toBeInTheDocument(),
+    );
+
+    loadDocument.mockRejectedValueOnce(
+      new Error(
+        "forbidden path: /books/paper-1.pdf, maybe it is not allowed on the scope for `allow-read-file` permission in your capability file",
+      ),
+    );
+    openDialog.mockResolvedValue("/books/evil-impostor.pdf");
+    mockInvoke.mockImplementation((command: string) => {
+      if (command === "library_relocate_document") {
+        return Promise.reject(
+          "HASH_MISMATCH: File at new path has different content",
+        );
+      }
+      if (command === "session_restore")
+        return Promise.resolve({
+          success: true,
+          session: SESSION,
+          missingDocuments: [],
+        });
+      if (command === "session_list") return Promise.resolve([SUMMARY]);
+      if (command === "library_list_documents")
+        return Promise.resolve([LIBRARY_ROW]);
+      if (
+        command === "collections_list" ||
+        command === "collections_list_memberships"
+      )
+        return Promise.resolve([]);
+      if (command === "library_get_document")
+        return Promise.resolve(LIBRARY_ROW);
+      if (command === "library_open_document")
+        return Promise.resolve(LIBRARY_ROW);
+      return Promise.resolve(null);
+    });
+
+    await restoreOnce();
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/WRONG_DOCUMENT/);
+    expect(screen.getByTestId("pdf-viewer")).toBeInTheDocument();
+    // The impostor's path never replaced the stored row.
+    const row = await import("../../lib/api/library").then((m) =>
+      m.libraryGetDocument("doc-1"),
+    );
+    expect(row).toBe(LIBRARY_ROW);
   });
 });

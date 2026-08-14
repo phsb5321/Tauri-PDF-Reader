@@ -14,7 +14,11 @@ function isTauriAvailable(): boolean {
   );
 }
 
-// Dynamic import for Tauri fs plugin (only in Tauri context)
+// Read the PDF bytes for the reader via the frontend fs plugin. The
+// capability scope covers `$APPLOCALDATA/**` plus dialog-granted paths; the
+// card/resume path depends on the grant persisting (persisted-scope), and
+// `useOpenPdf` runs the reauthorization rung when a stored book's grant is
+// gone (issue #120).
 async function readFileFromTauri(filePath: string): Promise<Uint8Array> {
   // Slice 109 B1 test seam (VITE_E2E build only, tree-shaken out): the
   // packaged lane cannot drive the native file dialog, so the bridge also
@@ -35,6 +39,41 @@ async function readFileFromTauri(filePath: string): Promise<Uint8Array> {
   }
   const { readFile } = await import("@tauri-apps/plugin-fs");
   return readFile(filePath);
+}
+
+/**
+ * plugin-fs rejects reads outside the capability scope with one of:
+ * - v2.4.x: "forbidden path: {path}, maybe it is not allowed on the scope for
+ *   `allow-read-file` permission in your capability file"
+ * - other versions/platforms: "path not allowed on the configured scope"
+ * Shared by pdf-service (which must pass these through raw) and the
+ * reauthorization rung in useOpenPdf (which fires on them).
+ */
+export function isScopeDenial(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    /not allowed on the configured scope/i.test(message) ||
+    /forbidden path: .*not allowed on the scope/i.test(message)
+  );
+}
+
+/**
+ * SHA-256 of the buffer, lowercase hex — the same fingerprint the backend
+ * computes over the file (`compute_file_hash`), which is also a library row's
+ * id. Fails closed when WebCrypto is unavailable rather than opening bytes it
+ * cannot account for.
+ */
+async function sha256Hex(bytes: Uint8Array): Promise<string> {
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) {
+    throw new Error(
+      "PDF_VERIFY_UNAVAILABLE: Cannot verify the file content in this environment — the book was not opened.",
+    );
+  }
+  const digest = await subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 // Extend Window interface for Tauri
@@ -102,17 +141,49 @@ export interface TextContent {
  */
 export const pdfService = {
   /**
-   * Load a PDF document from a local file path
-   * Uses Tauri's fs plugin to read the file as binary data
+   * Load a PDF document from a local file path.
+   *
+   * `options.expectedSha256` binds the BYTES THAT ARE OPENED to a verified
+   * fingerprint: the read buffer is hashed (SHA-256, WebCrypto) and compared
+   * before pdf.js ever sees it. The reauthorization rung passes the row id
+   * (which IS the file's SHA-256, verified by `library_relocate_document`) —
+   * so a file swapped between the backend's verification and this read is
+   * refused instead of being rendered. Fails closed when WebCrypto is
+   * unavailable.
    */
-  async loadDocument(filePath: string): Promise<PDFDocumentProxy> {
+  async loadDocument(
+    filePath: string,
+    options?: { expectedSha256?: string },
+  ): Promise<PDFDocumentProxy> {
+    return (await this.loadDocumentBound(filePath, options)).pdf;
+  },
+
+  /**
+   * Load a PDF and report the fingerprint of the BYTES THAT WERE OPENED.
+   *
+   * A fresh import has no row to check against yet, so it cannot pass
+   * `expectedSha256` — the row is created from the file only afterwards, and
+   * a swap in between would bind one book's row to another book's bytes. The
+   * returned `sha256` is what closes that: the caller compares it to the id
+   * the library hands back and refuses the mismatch.
+   */
+  async loadDocumentBound(
+    filePath: string,
+    options?: { expectedSha256?: string },
+  ): Promise<{ pdf: PDFDocumentProxy; sha256: string }> {
     console.log("[PDF Service] Loading document:", filePath);
 
     try {
-      // Read the file as binary data using Tauri's fs plugin
-      console.log("[PDF Service] Reading file with fs plugin...");
-      console.log("[PDF Service] Tauri available:", isTauriAvailable());
       const fileData = await readFileFromTauri(filePath);
+      const sha256 = await sha256Hex(fileData);
+      if (
+        options?.expectedSha256 &&
+        sha256 !== options.expectedSha256.toLowerCase()
+      ) {
+        throw new Error(
+          "PDF_HASH_MISMATCH: File content changed after verification — the book was not opened.",
+        );
+      }
       console.log(
         "[PDF Service] File read successfully, size:",
         fileData.byteLength,
@@ -133,12 +204,20 @@ export const pdfService = {
         "[PDF Service] PDF loaded successfully, pages:",
         pdf.numPages,
       );
-      return pdf;
+      return { pdf, sha256 };
     } catch (error) {
       console.error("[PDF Service] Error loading PDF:", error);
       // Handle common PDF errors
       if (error instanceof Error) {
         console.error("[PDF Service] Error message:", error.message);
+        // Scope denials MUST pass through raw: the reauthorization rung
+        // (useOpenPdf.isScopeDenial) depends on the plugin's exact message
+        // ('forbidden path: ... not allowed on the scope for allow-read-file
+        // permission ...'), and the generic mapping below would swallow it
+        // into PDF_ACCESS_DENIED before the rung ever sees it.
+        if (isScopeDenial(error)) {
+          throw error;
+        }
         if (error.message.includes("password")) {
           throw new Error(
             "PDF_PASSWORD_REQUIRED: This PDF is password protected",

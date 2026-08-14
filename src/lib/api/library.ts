@@ -11,8 +11,14 @@ export async function libraryAddDocument(
   filePath: string,
   title?: string,
   pageCount?: number,
+  expectedSha256?: string,
 ): Promise<Document> {
-  return invoke("library_add_document", { filePath, title, pageCount });
+  return invoke("library_add_document", {
+    filePath,
+    title,
+    pageCount,
+    expectedSha256,
+  });
 }
 
 export async function libraryGetDocument(id: string): Promise<Document | null> {

@@ -32,6 +32,10 @@ import type { Document } from "../../lib/schemas";
 
 vi.mock("../../services/pdf-service", () => ({
   pdfService: { loadDocument: vi.fn(), getPage: vi.fn() },
+  isScopeDenial: (e: unknown) =>
+    /not allowed on the configured scope|forbidden path: .*not allowed on the scope/i.test(
+      e instanceof Error ? e.message : String(e),
+    ),
 }));
 
 // Stubs for what the shell hosts around the surface under test.
@@ -150,7 +154,9 @@ describe("the reading home", () => {
     const state = useDocumentStore.getState();
     expect(state.currentDocument?.id).toBe("doc-1");
     expect(state.currentPage).toBe(213);
-    expect(loadDocument).toHaveBeenCalledWith("/books/moby-dick.pdf");
+    expect(loadDocument).toHaveBeenCalledWith("/books/moby-dick.pdf", {
+      expectedSha256: "doc-1",
+    });
   });
 
   it("is reachable again from inside a document", async () => {

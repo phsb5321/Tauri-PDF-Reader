@@ -200,14 +200,20 @@
 }
 
 /* Dark mode */
-[data-theme="dark"] .note-editor-backdrop,
+[data-theme="dark"] .note-editor-backdrop {
+  background: rgba(0, 0, 0, 0.7);
+}
+
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .note-editor-backdrop {
     background: rgba(0, 0, 0, 0.7);
   }
 }
 
-[data-theme="dark"] .note-editor-modal,
+[data-theme="dark"] .note-editor-modal {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .note-editor-modal {
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);

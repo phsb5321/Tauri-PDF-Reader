@@ -10,14 +10,16 @@ import type {
   DocumentRepositoryPort,
   FileExistsResponse,
   OrderBy,
-} from '../../ports/document-repository.port';
-import { commands, type Document as BindingDocument } from '../../lib/bindings';
+} from "../../ports/document-repository.port";
+import { commands, type Document as BindingDocument } from "../../lib/bindings";
 
 /**
  * Helper to unwrap Result type from tauri-specta
  */
-function unwrapResult<T>(result: { status: 'ok'; data: T } | { status: 'error'; error: string }): T {
-  if (result.status === 'error') {
+function unwrapResult<T>(
+  result: { status: "ok"; data: T } | { status: "error"; error: string },
+): T {
+  if (result.status === "error") {
     throw new Error(result.error);
   }
   return result.data;
@@ -37,12 +39,13 @@ export class TauriDocumentRepository implements DocumentRepositoryPort {
   async add(
     filePath: string,
     title?: string,
-    pageCount?: number
+    pageCount?: number,
   ): Promise<Document> {
     const result = await commands.libraryAddDocument(
       filePath,
       title ?? null,
-      pageCount ?? null
+      pageCount ?? null,
+      null,
     );
     return mapDocument(unwrapResult(result));
   }
@@ -62,12 +65,12 @@ export class TauriDocumentRepository implements DocumentRepositoryPort {
   async list(
     orderBy?: OrderBy,
     limit?: number,
-    offset?: number
+    offset?: number,
   ): Promise<Document[]> {
     const result = await commands.libraryListDocuments(
       orderBy ?? null,
       limit ?? null,
-      offset ?? null
+      offset ?? null,
     );
     const docs = unwrapResult(result);
     return docs.map(mapDocument);
@@ -77,13 +80,13 @@ export class TauriDocumentRepository implements DocumentRepositoryPort {
     id: string,
     page: number,
     scroll?: number,
-    ttsChunkId?: string
+    ttsChunkId?: string,
   ): Promise<Document> {
     const result = await commands.libraryUpdateProgress(
       id,
       page,
       scroll ?? null,
-      ttsChunkId ?? null
+      ttsChunkId ?? null,
     );
     return mapDocument(unwrapResult(result));
   }
