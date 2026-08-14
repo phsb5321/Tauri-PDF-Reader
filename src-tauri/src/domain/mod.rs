@@ -1,4 +1,5 @@
 pub mod cache;
+pub mod cover;
 pub mod document;
 pub mod error;
 pub mod errors;

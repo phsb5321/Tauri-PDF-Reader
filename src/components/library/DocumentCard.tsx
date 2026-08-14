@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo } from "react";
 import type { Document } from "../../lib/schemas";
 import type { ViewMode } from "../../stores/library-store";
+import { DocumentCover } from "./DocumentCover";
 import "./DocumentCard.css";
 
 interface DocumentCardProps {
@@ -143,7 +144,18 @@ export function DocumentCard({
           onKeyDown={handlePrimaryKeyDown}
         >
           <div className="document-card-icon">
-            <PdfIcon />
+            {/* Keyed by filePath: a healed/relocated book keeps its content-hash
+                id while its path changes — the key forces the cover pipeline
+                (and its broken state) to reset and retry on the new path
+                (Codex round 4). */}
+            <DocumentCover
+              key={document.filePath}
+              documentId={document.id}
+              title={document.title}
+              filePath={document.filePath}
+              fileHash={document.fileHash}
+              size="sm"
+            />
           </div>
           <div className="document-card-info">
             <span className="document-card-title">
@@ -196,9 +208,24 @@ export function DocumentCard({
         onKeyDown={handlePrimaryKeyDown}
       >
         <div className="document-card-thumbnail">
-          <PdfIcon />
+          {/* Keyed by filePath — see the list branch's comment. */}
+          <DocumentCover
+            key={document.filePath}
+            documentId={document.id}
+            title={document.title}
+            filePath={document.filePath}
+            fileHash={document.fileHash}
+            size="md"
+          />
           {progress > 0 && (
-            <div className="document-card-progress-badge">{progress}%</div>
+            <>
+              <div
+                className="document-card-cover-progress"
+                style={{ width: `${progress}%` }}
+                aria-hidden="true"
+              />
+              <span className="document-card-cover-percent">{progress}%</span>
+            </>
           )}
         </div>
         <div className="document-card-content">
@@ -234,21 +261,6 @@ export function DocumentCard({
 
       {contextMenu}
     </article>
-  );
-}
-
-function PdfIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="pdf-icon" aria-hidden="true">
-      <path
-        d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"
-        fill="#E53935"
-      />
-      <path d="M14 2v6h6" fill="#EF9A9A" />
-      <text x="6" y="18" fontSize="6" fill="white" fontWeight="bold">
-        PDF
-      </text>
-    </svg>
   );
 }
 

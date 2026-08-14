@@ -81,6 +81,12 @@ export interface E2ENativeRead {
   ipcHighlights: () => Promise<unknown>;
   /** Whether the VITE_E2E_CONFIRM seam replaced the native confirm (read-only marker). */
   confirmSeamed: () => boolean;
+  /** Cover-cache negative control: a valid-shaped id that is NOT in the
+   *  library must be rejected (the DB-existence gate, slice 121). */
+  coverCacheRandomProbe: () => Promise<string>;
+  /** The coverless fixture's library id (content hash) — the fallback-seed
+   *  oracle (read-only IPC probe). */
+  ipcCoverlessDocId: () => Promise<string>;
   /** Observer log buffer: console messages since bootstrap (diagnostics). */
   logs: () => string[];
 }
@@ -104,38 +110,36 @@ async function seedLibraryProfile(): Promise<void> {
   // previous app just saved. The add is idempotent (file-hash dedupe); the
   // progress write must be first-launch-only.
   const pathA = `${PROFILE_DIR}/e2e-resume-fixture-a.pdf`;
-  const addedA = await commands.libraryAddDocument(
-    pathA,
-    "E2E Resume Fixture A",
-    5,
-    null,
-  );
-  if (addedA.status === "error") throw new Error(`seed A: ${addedA.error}`);
   const knownA = await commands.libraryGetDocumentByPath(pathA);
   if (knownA.status === "error") throw new Error(`probe A: ${knownA.error}`);
-  if (knownA.data?.currentPage === 1) {
-    const progA = await commands.libraryUpdateProgress(
-      addedA.data.id,
-      2,
-      null,
+  let docAId = knownA.data?.id ?? null;
+  if (!knownA.data) {
+    const addedA = await commands.libraryAddDocument(
+      pathA,
+      "E2E Resume Fixture A",
+      5,
       null,
     );
+    if (addedA.status === "error") throw new Error(`seed A: ${addedA.error}`);
+    docAId = addedA.data.id;
+    const progA = await commands.libraryUpdateProgress(docAId, 2, null, null);
     if (progA.status === "error")
       throw new Error(`seed progress A: ${progA.error}`);
   }
 
-  if (SEED_LANE === "dual") {
+  // dual (home key lane) and cover (121 cover lane) both need fixture B.
+  if (SEED_LANE === "dual" || SEED_LANE === "cover") {
     const pathB = `${PROFILE_DIR}/e2e-resume-fixture-b.pdf`;
-    const addedB = await commands.libraryAddDocument(
-      pathB,
-      "E2E Resume Fixture B",
-      3,
-      null,
-    );
-    if (addedB.status === "error") throw new Error(`seed B: ${addedB.error}`);
     const knownB = await commands.libraryGetDocumentByPath(pathB);
     if (knownB.status === "error") throw new Error(`probe B: ${knownB.error}`);
-    if (knownB.data?.currentPage === 1) {
+    if (!knownB.data) {
+      const addedB = await commands.libraryAddDocument(
+        pathB,
+        "E2E Resume Fixture B",
+        3,
+        null,
+      );
+      if (addedB.status === "error") throw new Error(`seed B: ${addedB.error}`);
       const progB = await commands.libraryUpdateProgress(
         addedB.data.id,
         2,
@@ -147,8 +151,10 @@ async function seedLibraryProfile(): Promise<void> {
     }
   }
 
+  if (!docAId) throw new Error("seed A: no document id after registration");
+
   // Stamp A most-recently-opened so it is the resume line's primary book.
-  const openedA = await commands.libraryOpenDocument(addedA.data.id);
+  const openedA = await commands.libraryOpenDocument(docAId);
   if (openedA.status === "error") throw new Error(`stamp A: ${openedA.error}`);
 
   // Issue #120 packaged black-box lane: simulate a LOST fs grant by
@@ -158,17 +164,36 @@ async function seedLibraryProfile(): Promise<void> {
   // first resume. The frontend build for this lane does NOT arm the
   // fixture-bytes seam, so the fs read is the real scope-gated one.
   const reauthOutPath = import.meta.env.VITE_E2E_REAUTH_OUT_PATH;
-  if (reauthOutPath) {
+  if (reauthOutPath && docAId) {
     const relocated = await commands.libraryRelocateDocument(
-      addedA.data.id,
+      docAId,
       reauthOutPath,
     );
     if (relocated.status === "error")
       throw new Error(`seed reauth relocate: ${relocated.error}`);
   }
 
+  // Cover lane (121): a third "book" whose file is NOT a PDF — the cover
+  // pipeline must fall back deterministically instead of writing garbage.
+  if (SEED_LANE === "cover") {
+    const coverlessPath = `${PROFILE_DIR}/e2e-coverless.pdf`;
+    const knownC = await commands.libraryGetDocumentByPath(coverlessPath);
+    if (knownC.status === "error")
+      throw new Error(`probe coverless: ${knownC.error}`);
+    if (!knownC.data) {
+      const addedC = await commands.libraryAddDocument(
+        coverlessPath,
+        "E2E Coverless",
+        null,
+        null,
+      );
+      if (addedC.status === "error")
+        throw new Error(`seed coverless: ${addedC.error}`);
+    }
+  }
+
   // The read oracle's target: the seeded resume book.
-  seededDocId = addedA.data.id;
+  seededDocId = docAId;
 }
 
 /** The seeded document id (home lane) — the highlight read oracle targets it. */
@@ -216,6 +241,17 @@ export async function installE2ENativeBootstrap(): Promise<void> {
         | string[]
         | undefined) ?? [],
     confirmSeamed: () => CONFIRM_SEAMED,
+    coverCacheRandomProbe: async () => {
+      const res = await commands.coverCache("0".repeat(64), null);
+      return res.status === "error" ? res.error : "unexpected-ok";
+    },
+    ipcCoverlessDocId: async () => {
+      if (!PROFILE_DIR) return "no-profile";
+      const res = await commands.libraryGetDocumentByPath(
+        `${PROFILE_DIR}/e2e-coverless.pdf`,
+      );
+      return res.status === "ok" && res.data ? res.data.id : "no-coverless";
+    },
   };
   (window as unknown as { __E2E_READ__: E2ENativeRead }).__E2E_READ__ = read;
 

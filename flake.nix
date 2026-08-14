@@ -85,14 +85,18 @@
         };
 
         devShells.default = pkgs.mkShell {
-          # pnpm is NOT pulled from nixpkgs (it ships pnpm 11 which clashes with
-          # the project's pnpm 10 lockfile). The devshell inherits the host PATH,
-          # which has Pedro's pnpm 10 at ~/.local/bin/pnpm.
-          # rustc + cargo pin the toolchain to the flake's nixpkgs rev —
-          # lanes build with the SAME pinned rust the tauri-driver package
-          # uses, never an unpinned host toolchain.
+          # pnpm is pinned to nixpkgs' pnpm_10: the project's lockfile is
+          # pnpm 10 format, and a host pnpm 11 on PATH (Pedro's ~/.local/bin
+          # was upgraded 13/08/2026) triggers pnpm's deps-status purge of the
+          # symlinked node_modules every time a lane runs a script inside the
+          # devShell (ERR_PNPM_ABORTED_REMOVE_MODULES_DIR). The shell must
+          # never fall back to the host's pnpm — the nix package is the pin.
+          # rustc + cargo + tauri-driver pin the toolchain to the flake's
+          # nixpkgs rev — lanes build with the SAME pinned rust the
+          # tauri-driver package uses, never an unpinned host toolchain.
           packages = [
             pkgs.nodejs_22
+            pkgs.pnpm_10
             tauri-driver
             pkgs.rustc
             pkgs.cargo
@@ -100,12 +104,6 @@
 
           # bindgen (used transitively by several -sys crates) needs libclang.
           LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
-
-          # Force host's pnpm 10 (at ~/.local/bin) to take precedence over any
-          # nix-cached pnpm 11 — the project's lockfile is pnpm 10 format.
-          shellHook = ''
-            export PATH="$HOME/.local/bin:$PATH"
-          '';
         };
 
         packages.tauri-driver = tauri-driver;

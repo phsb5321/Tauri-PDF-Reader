@@ -108,6 +108,11 @@ const CMAP_URL =
     ? "cmaps/"
     : new URL("cmaps/", document.baseURI).toString();
 
+export type CoverLoadResult =
+  | { doc: PDFDocumentProxy }
+  | { tooBig: true }
+  | null;
+
 export interface PageRenderOptions {
   canvas: HTMLCanvasElement;
   scale: number;
@@ -176,6 +181,54 @@ export const pdfService = {
    * refused instead of being rendered. Fails closed when WebCrypto is
    * unavailable.
    */
+  /**
+   * Load a PDF for cover generation — same fs read + pdf.js path as
+   * `loadDocument`, but size-bounded (a source above `maxBytes` returns
+   * `{ tooBig: true }` BEFORE the bytes are handed to pdf.js) and, when the
+   * library row carries a hash, SHA-verified against it — a swapped file must
+   * never be cached under the old content-hash id (the #122 row-verification
+   * discipline applies to covers too). Returns null when the file cannot be
+   * read or verified.
+   */
+  async loadDocumentForCover(
+    filePath: string,
+    maxBytes: number,
+    expectedSha256?: string | null,
+  ): Promise<CoverLoadResult> {
+    try {
+      const fileData = await readFileFromTauri(filePath);
+      if (fileData.byteLength > maxBytes) {
+        return { tooBig: true };
+      }
+      if (expectedSha256) {
+        const sha256 = await sha256Hex(fileData);
+        if (sha256 !== expectedSha256.toLowerCase()) {
+          return null; // swapped/changed file — never cache under this id
+        }
+      }
+      const loadingTask = getDocument({
+        data: fileData,
+        cMapUrl: CMAP_URL,
+        cMapPacked: true,
+      });
+      try {
+        return { doc: await loadingTask.promise };
+      } catch (error) {
+        // A failed loading task keeps its worker resources alive — destroy it
+        // before reporting the miss (Codex gate 121).
+        void loadingTask.destroy().catch(() => {});
+        throw error;
+      }
+    } catch (error) {
+      // NOTE (Codex MINOR): the size preflight (backend stat) and this
+      // post-read byteLength belt bound the PARSE amplification; a file
+      // replaced between the stat and this read costs exactly one transient
+      // read — the belt still stops it being handed to pdf.js.
+      console.warn("[PDF Service] Cover load failed:", error);
+      return null;
+    }
+  },
+
   async loadDocument(
     filePath: string,
     options?: { expectedSha256?: string },

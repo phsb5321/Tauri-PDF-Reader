@@ -7,6 +7,7 @@
 pub(crate) mod db;
 mod heal;
 
+use crate::commands::cover::remove_covers_for_document;
 use crate::db::models::{Document, FileExistsResponse};
 use chrono::Utc;
 use db::{compute_file_hash, get_pool, validate_pdf_path};
@@ -15,6 +16,7 @@ use sqlx::Row;
 use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
+use tauri::Manager;
 use tauri::{AppHandle, State};
 use tauri_plugin_sql::DbInstances;
 
@@ -306,6 +308,18 @@ pub async fn library_remove_document(
             "Failed to construct audio cache service during document delete: {:?}",
             e
         ),
+    }
+
+    // Slice 121: deleting a book must not strand its derived cover raster on
+    // disk. Best-effort, mirroring the audio-cache cleanup above — a cache
+    // failure must not block the delete the user asked for.
+    match app.path().app_cache_dir() {
+        Ok(root) => {
+            if let Err(e) = remove_covers_for_document(&root, &id) {
+                tracing::warn!("Failed to remove covers for deleted document {id}: {e}");
+            }
+        }
+        Err(e) => tracing::warn!("Failed to resolve app cache dir during document delete: {e}"),
     }
 
     let pool = get_pool(&db).await?;

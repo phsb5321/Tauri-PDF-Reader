@@ -4,10 +4,16 @@
   border: 1px solid var(--border-color, #e0e0e0);
   border-radius: 8px;
   cursor: pointer;
-  transition:
-    transform 0.2s,
-    box-shadow 0.2s,
-    border-color 0.2s;
+  transition: border-color 0.2s;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .document-card {
+    transition:
+      transform 0.2s,
+      box-shadow 0.2s,
+      border-color 0.2s;
+  }
 }
 
 .document-card-open {
@@ -26,11 +32,13 @@
   outline-offset: -2px;
 }
 
-.document-card:hover {
-  transform: translateY(-2px);
-  /* Quieted per the catch-up spec §2: the grid should recede against the
-     resume line above it rather than compete card-for-card. */
-  box-shadow: var(--shadow-sm);
+@media (prefers-reduced-motion: no-preference) {
+  .document-card:hover {
+    transform: translateY(-2px);
+    /* Quieted per the catch-up spec §2: the grid should recede against the
+       resume line above it rather than compete card-for-card. */
+    box-shadow: var(--shadow-sm);
+  }
 }
 
 .document-card.selected {
@@ -58,7 +66,8 @@
 
 .document-card--grid .document-card-thumbnail {
   position: relative;
-  height: 120px;
+  aspect-ratio: 2 / 3;
+  height: auto;
   background: var(--bg-tertiary, #f5f5f5);
   display: flex;
   align-items: center;
@@ -71,16 +80,26 @@
   height: 48px;
 }
 
-.document-card--grid .document-card-progress-badge {
+.document-card--grid .document-card-cover-progress {
   position: absolute;
-  bottom: 8px;
-  right: 8px;
-  padding: 2px var(--space-2);
-  background: var(--primary-color, #2196f3);
-  color: var(--color-on-accent);
-  border-radius: 12px;
+  left: 0;
+  right: auto;
+  bottom: 0;
+  height: 3px;
+  background: var(--color-accent, #2196f3);
+}
+
+.document-card--grid .document-card-cover-percent {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 1px 5px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--color-bg-toolbar) 78%, transparent);
+  color: var(--color-text-primary);
   font-size: var(--text-xs);
-  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
 }
 
 .document-card--grid .document-card-content {
@@ -155,8 +174,6 @@
 
 .document-card--list .document-card-icon {
   flex-shrink: 0;
-  width: 40px;
-  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;

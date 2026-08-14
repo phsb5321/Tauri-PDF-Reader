@@ -1,0 +1,78 @@
+/*
+ * DocumentCover — the 2:3 book-cover box shared by grid, list and (later)
+ * resume surfaces. One wrapper IS the skeleton: the deterministic fallback
+ * renders inside it from the first paint, so the raster arriving never
+ * reshapes the layout. Palette variants are token mixes, not ad-hoc hex —
+ * they flip with the theme automatically (Catppuccin Latte/Mocha).
+ */
+
+.document-cover {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-subtle);
+  display: block;
+}
+
+.document-cover--sm {
+  width: 44px;
+  flex: none;
+}
+
+.document-cover-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* No stretch, ever: crop to the 2:3 box with a center-TOP bias — a cover's
+     title sits at the top, never crop the middle out of it. */
+  object-fit: cover;
+  object-position: 50% 0%;
+}
+
+.cover-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cover-fallback-glyph {
+  width: 28%;
+  height: auto;
+  max-height: 40%;
+}
+
+/* Deterministic palette — seeded per document, drawn from the semantic
+   tokens so contrast + dark theme hold without new colors. */
+.cover-fallback--0 {
+  background: color-mix(in srgb, var(--color-accent) 14%, var(--color-bg-surface));
+  color: var(--color-accent-text);
+}
+
+.cover-fallback--1 {
+  background: color-mix(in srgb, var(--color-speak) 14%, var(--color-bg-surface));
+  color: var(--color-speak-text);
+}
+
+.cover-fallback--2 {
+  background: color-mix(in srgb, var(--color-accent-alpha) 24%, var(--color-bg-surface));
+  color: var(--color-text-primary);
+}
+
+.cover-fallback--3 {
+  background: color-mix(in srgb, var(--color-bg-subtle) 60%, var(--color-bg-surface));
+  color: var(--color-text-secondary);
+}
+
+.cover-fallback--4 {
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-bg-subtle));
+  color: var(--color-accent-hover);
+}
+
+.cover-fallback--5 {
+  background: color-mix(in srgb, var(--color-speak) 8%, var(--color-bg-subtle));
+  color: var(--color-text-primary);
+}

@@ -190,6 +190,7 @@ use commands::audio_export::{
     audio_export_cancel, audio_export_check_ready, audio_export_document, ExportState,
 };
 use commands::collections::*;
+use commands::cover::{cover_cache, cover_source_size};
 use commands::highlights::*;
 use commands::library::*;
 use commands::settings::*;
@@ -383,6 +384,9 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
         collections_add_document,
         collections_remove_document,
         collections_list_memberships,
+        // Cover cache commands (slice 121)
+        cover_cache,
+        cover_source_size,
         // Session commands
         session_create,
         session_get,
@@ -589,6 +593,9 @@ pub fn run() {
             highlights_delete,
             highlights_delete_for_document,
             highlights_export,
+            // Cover cache commands (slice 121)
+            cover_cache,
+            cover_source_size,
             // Shelf commands
             collections_create,
             collections_list,
