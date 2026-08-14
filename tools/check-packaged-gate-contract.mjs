@@ -148,10 +148,14 @@ const CANONICAL_IF = {
   "real-corpus": "github.event_name == 'workflow_dispatch'",
 };
 const USES_RE = /^[\w.-]+\/[\w.-]+(\/[^@]+)?@[0-9a-f]{40}$/;
-const LANE_RUN = {
-  "pr-fast": /^\s*bash e2e\/run-critical-loop\.sh(?:\s|$)/,
-  "full-matrix": /^\s*bash scripts\/e2e-matrix\.sh(?:\s|$)/,
-  "real-corpus": /^\s*(?:[A-Za-z_]\w*="[^"]*"\s+)*bash scripts\/e2e-real-corpus\.sh(?:\s|$)/,
+// Exact approved lane command text: after normalizing only trailing
+// whitespace, the run line must BE the approved command — no suffix, no
+// prefix, no operators (`bash … || true` would turn a failed lane green).
+const LANE_EXACT = {
+  "pr-fast": (line) => line === "bash e2e/run-critical-loop.sh",
+  "full-matrix": (line) => line === "bash scripts/e2e-matrix.sh",
+  "real-corpus": (line) =>
+    /^LECTRICE_CORPUS_OUT="[^"]*" bash scripts\/e2e-real-corpus\.sh$/.test(line),
 };
 const RECEIPT_STEP = "Prerequisite receipt enforced";
 
@@ -173,6 +177,15 @@ for (const jobName of Object.keys(CANONICAL_IF)) {
     // M2: runs-on must be the exact vm103 label set.
     if (JSON.stringify(job["runs-on"] || null) !== JSON.stringify(["self-hosted", "Linux", "X64", "vm103"]))
       fail(`${jobName} runs-on is not the exact vm103 label set [self-hosted, Linux, X64, vm103]`);
+
+    // BLOCKER: job-level continue-on-error is rejected (same class as the
+    // step-level skip-green).
+    if (job["continue-on-error"])
+      fail("continue-on-error found (skip-green)");
+
+    // BLOCKER: a job-local permissions block overrides the global one.
+    if (job.permissions !== undefined)
+      fail("job-level permissions are not permitted — the global permissions must be exactly contents: read");
 
     if (job.if === undefined) {
       if (jobName === "pr-fast")
@@ -219,9 +232,9 @@ for (const jobName of Object.keys(CANONICAL_IF)) {
 
       // Lane invocations: found in the PARSED run text (any YAML spelling of
       // the run block is normalized by the parser).
-      if (LANE_RUN[jobName]) {
+      if (LANE_EXACT[jobName]) {
         const hit = runs.some((r) =>
-          r.split("\n").some((line) => LANE_RUN[jobName].test(line)),
+          r.split("\n").some((line) => LANE_EXACT[jobName](line.trimEnd())),
         );
         if (!hit) {
           if (jobName === "pr-fast")

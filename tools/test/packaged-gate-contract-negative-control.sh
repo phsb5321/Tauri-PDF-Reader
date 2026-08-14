@@ -294,6 +294,18 @@ expect_violation "runs-on widened to self-hosted" "runs-on is not the exact vm10
 sed 's|^permissions:$|permissions:\n  contents: write|; /^  contents: read$/d' "$WF" >"$WORK/tampered.yml"
 expect_violation "permissions widened to contents: write" "permissions must be exactly contents: read"
 
+# Tamper 62: lane run gains a `|| true` operator (skip-green suffix).
+sed 's@bash e2e/run-critical-loop.sh$@bash e2e/run-critical-loop.sh || true@' "$WF" >"$WORK/tampered.yml"
+expect_violation "lane run with || true suffix" "pr-fast job does not run e2e/run-critical-loop.sh"
+
+# Tamper 63: job-level continue-on-error on pr-fast.
+sed '/^  pr-fast:$/a\    continue-on-error: true' "$WF" >"$WORK/tampered.yml"
+expect_violation "job-level continue-on-error" "continue-on-error found (skip-green)"
+
+# Tamper 64: job-local permissions block overrides the global.
+sed '/^  pr-fast:$/a\    permissions:\n      contents: write' "$WF" >"$WORK/tampered.yml"
+expect_violation "job-level permissions block" "job-level permissions are not permitted"
+
 # ── Positive control (no-false-positive class) ───────────────────────────────
 python3 - "$WF" "$WORK/clean.yml" <<'PY'
 import sys
