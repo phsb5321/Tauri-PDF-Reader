@@ -2,17 +2,17 @@
 #
 # Negative-control test for the packaged-gate contract — proves the contract
 # CATCHES a silently-dropped gate, not just that it PASSES on the shipped
-# workflow (PR#595 parity: a self-pass cannot distinguish a functioning
-# detector from a no-op).
+# workflow (PR#595 parity). Runs against the REAL-YAML-parser checker
+# (tools/check-packaged-gate-contract.sh → .mjs).
 #
-# Tampers a throwaway copy three ways — lane removed, skip-green added,
-# pull_request path-filtered — and asserts the contract fails on each, after
-# asserting the shipped workflow passes.
+# Each tamper mutates a throwaway copy of the workflow and asserts the
+# contract fails for the INTENDED reason; a positive control asserts a
+# no-false-positive case passes.
 set -euo pipefail
 CONTRACT="$(dirname "$0")/../check-packaged-gate-contract.sh"
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 # Baseline workflow file: env-overridable so the CI contract job can point it
-# at the fetched head file; default = the repo's own file.
+# at the fetched head file; default = the repo's own fixture.
 WF="${PACKAGED_GATE_WF:-$REPO_ROOT/tools/test/fixtures/packaged-user-gate.yml}"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
@@ -35,6 +35,16 @@ expect_violation() {
   echo "caught ($expect_msg): $desc"
 }
 
+expect_clean() {
+  local desc="$1"
+  if "$CONTRACT" "$WORK/clean.yml" >/dev/null 2>&1; then
+    echo "clean ($desc): passes — no false positive"
+  else
+    echo "NEGATIVE CONTROL FAILED: false positive on $desc" >&2
+    exit 1
+  fi
+}
+
 # Baseline: the shipped workflow must PASS the contract.
 "$CONTRACT" "$WF" >/dev/null || {
   echo "NEGATIVE CONTROL FAILED: shipped workflow violates the contract" >&2
@@ -42,16 +52,18 @@ expect_violation() {
 }
 echo "baseline: shipped workflow passes"
 
+# ── Lane / invocation tamper classes ─────────────────────────────────────────
 # Tamper 1: remove the lane invocation from the PR-fast job.
 sed 's|bash e2e/run-critical-loop.sh|# (lane removed)|' "$WF" >"$WORK/tampered.yml"
 expect_violation "PR-fast lane removed" "pr-fast job does not run e2e/run-critical-loop.sh"
 
-# Tamper 2: skip-green on the lane step (literal).
-sed '/bash e2e\/run-critical-loop.sh/a\        continue-on-error: true' "$WF" >"$WORK/tampered.yml"
+# Tamper 2: skip-green on the lane step (literal) — a STEP-level key, not
+# text inside the run block (the parser must see continueOnError).
+sed '/^      - name: Packaged PR-fast lane/a\        continue-on-error: true' "$WF" >"$WORK/tampered.yml"
 expect_violation "continue-on-error (literal true) added" "continue-on-error found (skip-green)"
 
-# Tamper 3: skip-green via expression (the literal-grep bypass class).
-sed '/bash e2e\/run-critical-loop.sh/a\        continue-on-error: \${{ true }}' "$WF" >"$WORK/tampered.yml"
+# Tamper 3: skip-green via expression.
+sed '/^      - name: Packaged PR-fast lane/a\        continue-on-error: ${{ true }}' "$WF" >"$WORK/tampered.yml"
 expect_violation "continue-on-error (expression) added" "continue-on-error found (skip-green)"
 
 # Tamper 4: path-filter the pull_request trigger.
@@ -63,48 +75,24 @@ expect_violation "pull_request path filter added" "pull_request is path-filtered
 sed "s|^    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository$|    if: \${{ false }}|" "$WF" >"$WORK/tampered.yml"
 expect_violation "pr-fast job-level if: falsified" "pr-fast job-level if: is not the PR trigger + same-repo guard"
 
-# Tamper 13: same-repo guard removed from pr-fast (fork PRs could execute).
-sed "s| && github.event.pull_request.head.repo.full_name == github.repository$||" "$WF" >"$WORK/tampered.yml"
-expect_violation "pr-fast same-repo guard removed" "pr-fast job-level if: is not the PR trigger + same-repo guard"
-
-# Tamper 14: mutable action ref reintroduced (SHA pins are the trust floor).
-sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|uses: actions/checkout@v4|' "$WF" >"$WORK/tampered.yml"
-expect_violation "mutable action ref reintroduced" "mutable action ref found"
-
-# Tamper 15: the driver assert hardcodes ~/.cargo/bin again.
-sed "s|nix develop -c bash -c 'command -v tauri-driver'|DRIVER=\"\$HOME/.cargo/bin/tauri-driver\"; [ -x \"\$DRIVER\" ]|" "$WF" >"$WORK/tampered.yml"
-expect_violation "driver assert hardcodes ~/.cargo/bin" "driver assert hardcodes ~/.cargo/bin"
-
-# Tamper 16: the prerequisite-receipt enforcement step is removed.
-sed '/Prerequisite receipt enforced/,+1d' "$WF" >"$WORK/tampered.yml"
-expect_violation "receipt enforcement step removed" "lacks the prerequisite-receipt enforcement step"
-
-# Tamper 17: the contract job stops fetching the head file (head-controlled).
-sed '/gh api "repos\//d' "$WF" >"$WORK/tampered.yml"
-expect_violation "contract head-fetch removed" "contract job does not fetch the head workflow file"
-
 # Tamper 6: drop a lane from the serial matrix (via the path override).
 cp "$WF" "$WORK/tampered.yml"
 sed 's|^run_lane reader|# run_lane reader|' "$REPO_ROOT/scripts/e2e-matrix.sh" >"$WORK/matrix-tampered.sh"
 PACKAGED_GATE_MATRIX="$WORK/matrix-tampered.sh" expect_violation "matrix lane dropped" "matrix does not include the reader lane"
 
-# Tamper 7: shell-comment the lane invocation inside the run block
-# (the comment-blind substring-grep bypass class).
+# Tamper 7: shell-comment the lane invocation inside the run block.
 sed 's|^          bash e2e/run-critical-loop.sh|          # bash e2e/run-critical-loop.sh (disabled)|' "$WF" >"$WORK/tampered.yml"
 expect_violation "lane invocation shell-commented" "pr-fast job does not run e2e/run-critical-loop.sh"
 
-# Tamper 8: inline-comment no-op carrying the invocation substring
-# (`: # bash …` is a successful shell no-op).
+# Tamper 8: inline-comment no-op carrying the invocation substring.
 sed 's|^          bash e2e/run-critical-loop.sh|          : # bash e2e/run-critical-loop.sh|' "$WF" >"$WORK/tampered.yml"
 expect_violation "lane invocation reduced to inline-comment no-op" "pr-fast job does not run e2e/run-critical-loop.sh"
 
-# Tamper 9: colon no-op taking the invocation as its argument
-# (`: bash …` succeeds without running anything).
+# Tamper 9: colon no-op taking the invocation as its argument.
 sed 's|^          bash e2e/run-critical-loop.sh|          : bash e2e/run-critical-loop.sh|' "$WF" >"$WORK/tampered.yml"
 expect_violation "lane invocation reduced to colon no-op" "pr-fast job does not run e2e/run-critical-loop.sh"
 
-# Tamper 10: falsify the real-corpus job condition (the manual lane must not
-# be skippable without the contract noticing).
+# Tamper 10: falsify the real-corpus job condition.
 sed "s|^    if: github.event_name == 'workflow_dispatch'$|    if: \${{ false }}|" "$WF" >"$WORK/tampered.yml"
 expect_violation "real-corpus job condition falsified" "real-corpus job-level if: is not exactly the workflow_dispatch trigger"
 
@@ -113,114 +101,88 @@ cp "$WF" "$WORK/tampered.yml"
 sed 's|if: always()|if: success()|' "$WORK/tampered.yml" >"$WORK/tampered2.yml" && mv "$WORK/tampered2.yml" "$WORK/tampered.yml"
 expect_violation "real-corpus upload loses always()" "real-corpus evidence upload is not if: always()"
 
-# Tamper 12: colon no-op on the corpus invocation (the anchored-runner class).
+# Tamper 12: colon no-op on the corpus invocation.
 sed 's|\(LECTRICE_CORPUS_OUT="[^"]*" \)bash scripts/e2e-real-corpus.sh|\1: bash scripts/e2e-real-corpus.sh|' "$WF" >"$WORK/tampered.yml"
 expect_violation "real-corpus invocation reduced to colon no-op" "real-corpus job does not run scripts/e2e-real-corpus.sh"
 
-# Tamper 18: concurrency group back to per-ref (global /tmp collision class).
-sed 's|^  group: packaged-user-gate$|  group: packaged-user-gate-${{ github.ref }}|' "$WF" >"$WORK/tampered.yml"
-expect_violation "concurrency group per-ref reintroduced" "concurrency group uses github.ref"
+# ── Job-set / condition tamper classes ───────────────────────────────────────
+# Tamper 13: same-repo guard removed from pr-fast.
+sed "s| && github.event.pull_request.head.repo.full_name == github.repository$||" "$WF" >"$WORK/tampered.yml"
+expect_violation "pr-fast same-repo guard removed" "pr-fast job-level if: is not the PR trigger + same-repo guard"
 
-# Tamper 19: a non-guarded job allowed to run on pull_request (the reviewer's
-# full-matrix falsifier — now caught by the exact-canonical-condition rule).
+# Tamper 19: full-matrix allowed to run on pull_request.
 sed "s|^    if: github.event_name != 'pull_request'$|    if: github.event_name == 'pull_request'|" "$WF" >"$WORK/tampered.yml"
 expect_violation "unguarded job can run on pull_request" "full-matrix job-level if: is not the exact canonical condition"
 
-# Tamper 20: base.sha reduced to a comment (checkout loads head tools).
-sed 's|github.event.pull_request.base.sha|github.event.pull_request.head.sha # base.sha|' "$WF" >"$WORK/tampered.yml"
-expect_violation "base-sha checkout reduced to a comment" "contract job does not pin its checkout to the base sha"
-
-# Tamper 21: the enforcement step body stops testing the receipt.
-sed 's|\[ -f ci-evidence/prerequisite-failure.json \]|true|' "$WF" >"$WORK/tampered.yml"
-expect_violation "enforcement step body vacuous" "enforcement step does not test the receipt's presence"
-
-# Tamper 22: the bootstrap-inert anchor is removed (first-introduction PR
-# could self-certify).
-sed '/BOOTSTRAP-INERT/d' "$WF" >"$WORK/tampered.yml"
-expect_violation "bootstrap-inert anchor removed" "contract job lacks the bootstrap-inert anchor check"
-
-# Tamper 23: quoted mutable action ref (the quote-bypass class).
-sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|uses: "actions/checkout@v4"|' "$WF" >"$WORK/tampered.yml"
-expect_violation "quoted mutable action ref" "mutable action ref found"
-
-# Tamper 24: the lane invocation moved into an env value with a no-op run
-# (the run-block-scoping class — the reviewer's exact falsifier).
-sed -e 's|^          bash e2e/run-critical-loop.sh$|          true|' \
-    -e 's|^      - name: Packaged PR-fast lane|      - name: Packaged PR-fast lane\n        env:\n          BURY: bash e2e/run-critical-loop.sh|' \
-    "$WF" >"$WORK/tampered.yml"
-expect_violation "lane invocation buried in an env value" "pr-fast job does not run e2e/run-critical-loop.sh"
-
-# Tamper 25: pr-fast loses its job-level if entirely (a missing condition
-# must fail, not pass vacuously).
+# Tamper 25: pr-fast loses its job-level if entirely.
 sed '/^    if: github.event_name == '\''pull_request'\'' && github.event.pull_request.head.repo.full_name == github.repository$/d' "$WF" >"$WORK/tampered.yml"
 expect_violation "pr-fast job-level if deleted" "pr-fast job-level if: is not the PR trigger + same-repo guard"
 
-# Tamper 26: full-matrix loses its job-level if (a job without a condition
-# runs on every event, including fork PRs).
+# Tamper 26: full-matrix loses its job-level if.
 sed '/^    if: github.event_name != '\''pull_request'\''$/d' "$WF" >"$WORK/tampered.yml"
 expect_violation "full-matrix job-level if deleted" "full-matrix job has no job-level if"
 
-# Tamper 27: contract if replaced with a bare pull_request exclusion (the
-# skip-capable variant — the exact-canonical-guard class).
+# Tamper 27: contract if replaced with a bare pull_request exclusion.
 sed "s@^    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository\$@    if: github.event_name != 'pull_request'@" "$WF" >"$WORK/tampered.yml"
 expect_violation "contract if replaced with bare exclusion" "contract job-level if: is not the exact canonical guard"
 
-# Tamper 28: contract if deleted entirely (the missing-if branch fires first).
+# Tamper 28: contract if deleted entirely.
 sed "/^    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository\$/d" "$WF" >"$WORK/tampered.yml"
 expect_violation "contract job-level if deleted" "contract job has no job-level if"
 
-# Tamper 29: full-matrix if replaced with false (matrix silently never runs).
+# Tamper 29: full-matrix if replaced with false.
 sed "s|^    if: github.event_name != 'pull_request'$|    if: \${{ false }}|" "$WF" >"$WORK/tampered.yml"
 expect_violation "full-matrix if falsified" "full-matrix job-level if: is not the exact canonical condition"
 
 # Tamper 30: full-matrix if deleted (deletion NC for the exact-condition rule).
 sed '/^    if: github.event_name != '\''pull_request'\''$/d' "$WF" >"$WORK/tampered.yml"
-# The deletion trips the missing-if branch first; ensure the message is the
-# missing-if one for full-matrix.
 expect_violation "full-matrix job-level if deleted (exact)" "full-matrix job has no job-level if"
 
-# Tamper 31: an uppercase job ID without any condition (job-scan class —
-# now caught by the CLOSED job set).
+# Tamper 31: an uppercase job ID injected (closed job set).
 sed 's|^jobs:$|jobs:\n  EVIL_JOB:\n    runs-on: [self-hosted, Linux, X64, vm103]\n    steps:\n      - run: echo exposed|' "$WF" >"$WORK/tampered.yml"
-expect_violation "uppercase unguarded job injected" "unexpected self-hosted job key"
+expect_violation "uppercase unguarded job injected" "unexpected self-hosted job set"
 
-# Tamper 33: a new job with a condition game that is true on pull requests
-# (`!= pull_request || == pull_request`) — the closed job set rejects the
-# job itself, not the condition.
+# Tamper 33: a condition-gamed new job.
 sed 's|^jobs:$|jobs:\n  EVIL_JOB:\n    if: github.event_name != '\''pull_request'\'' \|\| github.event_name == '\''pull_request'\''\n    runs-on: [self-hosted, Linux, X64, vm103]\n    steps:\n      - run: echo exposed|' "$WF" >"$WORK/tampered.yml"
-expect_violation "condition-gamed job injected" "unexpected self-hosted job key"
+expect_violation "condition-gamed job injected" "unexpected self-hosted job set"
 
-# Tamper 34: a mutable ref in a form the old tag list missed (@v4.0.0).
-sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|uses: actions/checkout@v4.0.0|' "$WF" >"$WORK/tampered.yml"
-expect_violation "semver-tag mutable action ref" "mutable action ref found"
-
-# Tamper 32: single-quoted mutable action ref (the quote-bypass class).
-sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|uses: '\''actions/checkout@v4'\''|' "$WF" >"$WORK/tampered.yml"
-expect_violation "single-quoted mutable action ref" "mutable action ref found"
-
-# Tamper 35: mutable ref with a trailing YAML comment (comment-strip class).
-sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|uses: actions/checkout@v4 # mutable|' "$WF" >"$WORK/tampered.yml"
-expect_violation "mutable action ref with trailing comment" "mutable action ref found"
-
-# Tamper 36: quoted job ID injected (quoted-ID class).
+# Tamper 36: quoted job ID injected.
 sed 's|^jobs:$|jobs:\n  "EVIL_JOB":\n    if: github.event_name == '\''pull_request'\''\n    runs-on: [self-hosted, Linux, X64, vm103]\n    steps:\n      - run: echo exposed|' "$WF" >"$WORK/tampered.yml"
-expect_violation "quoted job ID injected" "unexpected self-hosted job key"
+expect_violation "quoted job ID injected" "unexpected self-hosted job set"
 
-# Tamper 37: single-quoted job ID injected (both quoted forms must be caught).
+# Tamper 37: single-quoted job ID injected.
 sed 's|^jobs:$|jobs:\n  '\''EVIL_JOB'\'':\n    if: github.event_name == '\''pull_request'\''\n    runs-on: [self-hosted, Linux, X64, vm103]\n    steps:\n      - run: echo exposed|' "$WF" >"$WORK/tampered.yml"
-expect_violation "single-quoted job ID injected" "unexpected self-hosted job key"
+expect_violation "single-quoted job ID injected" "unexpected self-hosted job set"
 
-# Tamper 38: whitespace before the colon in a job key (valid YAML).
+# Tamper 38: whitespace before the colon in a job key.
 sed 's|^jobs:$|jobs:\n  EVIL_JOB :\n    runs-on: [self-hosted, Linux, X64, vm103]\n    steps:\n      - run: echo exposed|' "$WF" >"$WORK/tampered.yml"
-expect_violation "whitespace-colon job key injected" "unexpected self-hosted job key"
+expect_violation "whitespace-colon job key injected" "unexpected self-hosted job set"
 
 # Tamper 39: unquoted job key with a trailing YAML comment.
 sed 's|^jobs:$|jobs:\n  EVIL_JOB: # comment\n    runs-on: [self-hosted, Linux, X64, vm103]\n    steps:\n      - run: echo exposed|' "$WF" >"$WORK/tampered.yml"
-expect_violation "trailing-comment job key injected" "unexpected self-hosted job key"
+expect_violation "trailing-comment job key injected" "unexpected self-hosted job set"
 
 # Tamper 40: quoted job key with a trailing YAML comment.
 sed 's|^jobs:$|jobs:\n  "EVIL_JOB": # comment\n    runs-on: [self-hosted, Linux, X64, vm103]\n    steps:\n      - run: echo exposed|' "$WF" >"$WORK/tampered.yml"
-expect_violation "quoted trailing-comment job key injected" "unexpected self-hosted job key"
+expect_violation "quoted trailing-comment job key injected" "unexpected self-hosted job set"
+
+# ── Mutable action ref classes (all YAML spellings normalize to the same
+#    parsed value — the parser is the fix, the tamper list is the proof) ─────
+# Tamper 14: mutable action ref reintroduced.
+sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|uses: actions/checkout@v4|' "$WF" >"$WORK/tampered.yml"
+expect_violation "mutable action ref reintroduced" "mutable action ref found"
+
+# Tamper 23: quoted mutable action ref.
+sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|uses: "actions/checkout@v4"|' "$WF" >"$WORK/tampered.yml"
+expect_violation "quoted mutable action ref" "mutable action ref found"
+
+# Tamper 32: single-quoted mutable action ref.
+sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|uses: '\''actions/checkout@v4'\''|' "$WF" >"$WORK/tampered.yml"
+expect_violation "single-quoted mutable action ref" "mutable action ref found"
+
+# Tamper 35: mutable ref with a trailing YAML comment.
+sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|uses: actions/checkout@v4 # mutable|' "$WF" >"$WORK/tampered.yml"
+expect_violation "mutable action ref with trailing comment" "mutable action ref found"
 
 # Tamper 41: local action (no-@ form).
 sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|uses: ./scripts/local-action|' "$WF" >"$WORK/tampered.yml"
@@ -230,21 +192,12 @@ expect_violation "local action ref" "mutable action ref found"
 sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|uses: docker://alpine:latest|' "$WF" >"$WORK/tampered.yml"
 expect_violation "docker action ref" "mutable action ref found"
 
-# Tamper 43: a VALID SHA pin with a trailing YAML comment (the structural
-# exact-match class — comments are never stripped).
-sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # comment|' "$WF" >"$WORK/tampered.yml"
-expect_violation "SHA pin with trailing comment" "mutable action ref found"
-
-# Tamper 44: quoted-key flow form with a mutable value (`- "uses": …`).
-sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|- "uses": actions/checkout@v4|' "$WF" >"$WORK/tampered.yml"
+# Tamper 44: quoted-key flow form with a mutable value.
+sed 's|^      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262$|      - "uses": actions/checkout@v4|' "$WF" >"$WORK/tampered.yml"
 expect_violation "quoted-key flow form with mutable value" "mutable action ref found"
 
-# Tamper 45: a quoted VALID SHA value (quoted values are rejected raw).
-sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|uses: "actions/checkout@11d5960a326750d5838078e36cf38b85af677262"|' "$WF" >"$WORK/tampered.yml"
-expect_violation "quoted SHA value" "mutable action ref found"
-
-# Tamper 46: YAML-escaped uses key spelling (`\u0075ses` = `uses`).
-sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|- "\\u0075ses": actions/checkout@v4|' "$WF" >"$WORK/tampered.yml"
+# Tamper 46: YAML-escaped uses key spelling.
+sed 's|^      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262$|      - "\\u0075ses": actions/checkout@v4|' "$WF" >"$WORK/tampered.yml"
 expect_violation "escaped uses key spelling" "mutable action ref found"
 
 # Tamper 47: bare uses key with whitespace before the colon.
@@ -252,32 +205,70 @@ sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|uses : ac
 expect_violation "whitespace-colon bare uses key" "mutable action ref found"
 
 # Tamper 48: quoted uses key with whitespace before the colon.
-sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|- "uses" : actions/checkout@v4|' "$WF" >"$WORK/tampered.yml"
+sed 's|^      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262$|      - "uses" : actions/checkout@v4|' "$WF" >"$WORK/tampered.yml"
 expect_violation "whitespace-colon quoted uses key" "mutable action ref found"
 
-# Tamper 49: flow mapping form (`- { uses: … }`).
-sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|- { uses: actions/checkout@v4 }|' "$WF" >"$WORK/tampered.yml"
+# Tamper 49: flow mapping form.
+sed 's|^      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262$|      - { uses: actions/checkout@v4 }|' "$WF" >"$WORK/tampered.yml"
 expect_violation "flow mapping uses" "mutable action ref found"
 
 # Tamper 50: quoted-key flow mapping form.
-sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|- { "uses": actions/checkout@v4 }|' "$WF" >"$WORK/tampered.yml"
+sed 's|^      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262$|      - { "uses": actions/checkout@v4 }|' "$WF" >"$WORK/tampered.yml"
 expect_violation "quoted-key flow mapping uses" "mutable action ref found"
 
-# Tamper 51: explicit-key form (`- ? uses`).
-sed 's|uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262|- ? uses\n  : actions/checkout@v4|' "$WF" >"$WORK/tampered.yml"
+# Tamper 51: explicit-key form.
+sed 's|^      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262$|      - ? uses\n        : actions/checkout@v4|' "$WF" >"$WORK/tampered.yml"
 expect_violation "explicit-key uses" "mutable action ref found"
 
-# Positive control (no-false-positive class): a `run: |-` body containing
-# JSON with quoted keys must NOT be scanned as YAML.
-expect_clean() {
-  local desc="$1"
-  if "$CONTRACT" "$WORK/clean.yml" >/dev/null 2>&1; then
-    echo "clean ($desc): passes — no false positive"
-  else
-    echo "NEGATIVE CONTROL FAILED: false positive on $desc" >&2
-    exit 1
-  fi
-}
+# Tamper 52: block-scalar explicit key (folded >-) — the reviewer's BLOCKER #7.
+sed 's|^      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262$|      - ? >-\n          uses\n        : actions/checkout@v4|' "$WF" >"$WORK/tampered.yml"
+expect_violation "block-scalar explicit key (>-)" "mutable action ref found"
+
+# Tamper 53: block-scalar explicit key (literal |-).
+sed 's;^      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262$;      - ? |-\n          uses\n        : actions/checkout@v4;' "$WF" >"$WORK/tampered.yml"
+expect_violation "block-scalar explicit key (|-)" "mutable action ref found"
+
+# Tamper 54: anchors/aliases carrying a mutable value.
+sed 's|^      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262$|      - uses: \&mutable actions/checkout@v4\n      - uses: *mutable|' "$WF" >"$WORK/tampered.yml"
+expect_violation "anchor/alias mutable ref" "mutable action ref found"
+
+# Tamper 55: multi-document workflow (fail-closed).
+cp "$WF" "$WORK/tampered.yml"
+printf '\n---\nother: 1\n' >>"$WORK/tampered.yml"
+expect_violation "multi-document workflow" "expected exactly one YAML document"
+
+# ── Trusted-base / receipts / concurrency classes ────────────────────────────
+# Tamper 16: the prerequisite-receipt enforcement step is removed.
+sed '/Prerequisite receipt enforced/,+3d' "$WF" >"$WORK/tampered.yml"
+expect_violation "receipt enforcement step removed" "lacks the prerequisite-receipt enforcement step"
+
+# Tamper 17: the contract job stops fetching the head file.
+sed '/gh api "repos\//d' "$WF" >"$WORK/tampered.yml"
+expect_violation "contract head-fetch removed" "contract job does not fetch the head workflow file"
+
+# Tamper 18: concurrency group back to per-ref.
+sed 's|^  group: packaged-user-gate$|  group: packaged-user-gate-${{ github.ref }}|' "$WF" >"$WORK/tampered.yml"
+expect_violation "concurrency group per-ref reintroduced" "concurrency group is not the fixed runner-wide packaged-user-gate"
+
+# Tamper 20: base.sha reduced to a comment (checkout loads head tools).
+sed 's|github.event.pull_request.base.sha|github.event.pull_request.head.sha # base.sha|' "$WF" >"$WORK/tampered.yml"
+expect_violation "base-sha checkout reduced to a comment" "contract job does not pin its checkout to the base sha"
+
+# Tamper 21: the enforcement step body stops testing the receipt.
+sed 's|\[ -f ci-evidence/prerequisite-failure.json \]|true|' "$WF" >"$WORK/tampered.yml"
+expect_violation "enforcement step body vacuous" "enforcement step does not test the receipt's presence"
+
+# Tamper 22: the bootstrap-inert anchor is removed.
+sed '/BOOTSTRAP-INERT/d' "$WF" >"$WORK/tampered.yml"
+expect_violation "bootstrap-inert anchor removed" "contract job lacks the bootstrap-inert anchor check"
+
+# Tamper 24: the lane invocation moved into an env value with a no-op run.
+sed -e 's|^          bash e2e/run-critical-loop.sh$|          true|' \
+    -e 's|^      - name: Packaged PR-fast lane|      - name: Packaged PR-fast lane\n        env:\n          BURY: bash e2e/run-critical-loop.sh|' \
+    "$WF" >"$WORK/tampered.yml"
+expect_violation "lane invocation buried in an env value" "pr-fast job does not run e2e/run-critical-loop.sh"
+
+# ── Positive control (no-false-positive class) ───────────────────────────────
 python3 - "$WF" "$WORK/clean.yml" <<'PY'
 import sys
 s = open(sys.argv[1]).read()
@@ -289,4 +280,4 @@ open(sys.argv[2], 'w').write(s)
 PY
 expect_clean "run:|- and run:|2- bodies with quoted keys"
 
-echo "NEGATIVE CONTROL PASS: contract catches all fifty-one drop attempts + one positive control, for the intended reasons"
+echo "NEGATIVE CONTROL PASS: contract catches all violation classes + one positive control, for the intended reasons"

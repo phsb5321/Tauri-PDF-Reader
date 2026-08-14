@@ -40,6 +40,19 @@ jobs:
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.sha }}
 
+      - name: Setup Node.js (the parser-based checker needs node + yaml)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "20"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
+        with:
+          version: 10
+
+      - name: Install dependencies (yaml is an explicit devDependency)
+        run: pnpm install --frozen-lockfile
+
       - name: Bootstrap anchor check — base must own the gate tools
         # Trusted-base architecture: the checker that runs here must come
         # from BASE. This PR is the FIRST introduction of the workflow and
