@@ -10,7 +10,7 @@ vi.mock("../lib/tauri-invoke", () => ({
 }));
 
 import { useHighlightPersistence } from "./useHighlightPersistence";
-import { highlightsCreate, highlightsDelete } from "../lib/tauri-invoke";
+import { highlightsCreate, highlightsDelete, highlightsUpdate } from "../lib/tauri-invoke";
 import type { Highlight } from "../lib/schemas";
 
 function fakeHighlight(id: string): Highlight {
@@ -341,6 +341,135 @@ describe("useHighlightPersistence — the shared-queue close contract", () => {
     d.resolve();
     await act(async () => {
       await closeFlush;
+    });
+    expect(settled).toBe(true);
+    expect(highlightsCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("a close flush joining a failed flush with a REQUEUED create rejects — the background retry cannot consume the failure", async () => {
+    // The exact-head Codex review's MAJOR: a failed CREATE is re-queued
+    // (unlike a delete), so a navigation join's RETRY pass starts while the
+    // close flush is still joined to the ORIGINAL failed flush. The retry
+    // must not clear the failure before the close flush reads it — the close
+    // flush that joined the failing flush must still reject (identity-bound
+    // record). Pre-fix (shared boolean + pass-start reset) the close flush
+    // resolved while the retry was in flight and the protocol acked a write
+    // that had not landed.
+    const d = deferred();
+    highlightsCreate.mockImplementationOnce(() => d.promise);
+
+    const a = renderHook(() =>
+      useHighlightPersistence({ documentId: "doc-1" }),
+    );
+    act(() => {
+      a.result.current.createHighlight(fakeHighlight("h-1"));
+    });
+    const bg = a.result.current.flushImmediately(); // F1 in flight
+    await waitFor(() => expect(highlightsCreate).toHaveBeenCalledTimes(1));
+
+    // A navigation flushImmediately attaches to the SAME failing flush.
+    const navJoin = a.result.current.flushImmediately();
+    let rejected = false;
+    const closeFlush = a.result.current
+      .flushImmediately({ propagateFailure: true })
+      .then(
+        () => undefined,
+        () => {
+          rejected = true;
+        },
+      );
+    await Promise.resolve();
+    expect(rejected).toBe(false); // still in flight, nothing settled
+
+    d.reject(new Error("backend down")); // F1 fails; the create is re-queued
+    await act(async () => {
+      await Promise.allSettled([bg, navJoin, closeFlush]);
+    });
+    // The close flush joined the SAME failing flush — it must reject even
+    // though the nav join's retry ran first.
+    expect(rejected).toBe(true);
+  });
+
+  it("a failed create's requeue does not clobber a same-millisecond newer entry (object-identity CAS)", async () => {
+    // The exact-head Codex review's MINOR: the CAS token must not be the
+    // entry timestamp — a create and an update enqueued in the same
+    // millisecond (frozen fake clock) are DIFFERENT entry objects, so the
+    // stale create's requeue must not overwrite the newer update. Pre-fix
+    // (timestamp CAS) the equal timestamps made the stale create clobber the
+    // update and the update intent was lost.
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
+      const d = deferred();
+      highlightsCreate.mockImplementationOnce(() => d.promise);
+
+      const a = renderHook(() =>
+        useHighlightPersistence({ documentId: "doc-1" }),
+      );
+      act(() => {
+        a.result.current.createHighlight(fakeHighlight("h-1"));
+      });
+      // The immediate flush already invoked the IPC synchronously; the
+      // deferred keeps it in flight.
+      expect(highlightsCreate).toHaveBeenCalledTimes(1);
+      const bg = a.result.current.flushImmediately();
+
+      // Same fake-ms update: a NEW entry object with an identical timestamp.
+      act(() => {
+        a.result.current.updateHighlight({
+          ...fakeHighlight("h-1"),
+          color: "#ff0000",
+        });
+      });
+
+      d.reject(new Error("backend down"));
+      await act(async () => {
+        await bg.catch(() => undefined);
+      });
+
+      // The update survives the failed create — it is still pending (or was
+      // drained), never clobbered by the stale create's requeue.
+      await act(async () => {
+        await a.result.current.flushImmediately({
+          propagateFailure: true,
+        });
+      });
+      expect(highlightsUpdate).toHaveBeenCalledTimes(1);
+      // The stale create was never retried over the newer intent.
+      expect(highlightsCreate).toHaveBeenCalledTimes(1);
+      expect(a.result.current.hasPendingUpdates()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("createHighlight's returned flush settles only after the create attempt completes", async () => {
+    // The exact-head Codex review's MAJOR (toast-before-write): the handler
+    // gates its success UX on the returned flush, so the flush must not
+    // settle while the create IPC is still in flight.
+    const d = deferred();
+    highlightsCreate.mockImplementationOnce(() => d.promise);
+
+    const a = renderHook(() =>
+      useHighlightPersistence({ documentId: "doc-1" }),
+    );
+    let settled = false;
+    let persist: Promise<void> | undefined;
+    act(() => {
+      persist = a.result.current.createHighlight(fakeHighlight("h-1"));
+    });
+    expect(persist).toBeDefined();
+    if (persist) {
+      void persist.then(() => {
+        settled = true;
+      });
+    }
+    await Promise.resolve();
+    expect(settled).toBe(false); // the IPC is still in flight
+
+    d.resolve();
+    await act(async () => {
+      await persist;
     });
     expect(settled).toBe(true);
     expect(highlightsCreate).toHaveBeenCalledTimes(1);

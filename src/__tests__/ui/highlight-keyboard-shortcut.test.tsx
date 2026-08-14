@@ -143,4 +143,40 @@ describe('Ctrl+Shift+H highlights the pending selection', () => {
 
     expect(createHighlight).toHaveBeenCalledTimes(1);
   });
+
+  it('defers the success callback until the persistence attempt completes', async () => {
+    // The exact-head Codex review's MAJOR (toast-before-write): the handler
+    // must gate its success UX on the write attempt — "Highlight created"
+    // (the onSuccess callback next to the toast) must never precede the
+    // backend write. Pre-fix the callback fired synchronously after
+    // enqueueing, before the IPC had even started.
+    let resolveCreate!: () => void;
+    createHighlight.mockImplementationOnce(
+      () => new Promise<void>((r) => (resolveCreate = r)),
+    );
+
+    const onSuccess = vi.fn();
+    const { result } = renderHook(() =>
+      useHighlightCreation({
+        documentId: 'doc-1',
+        scale: 1,
+        containerRef: { current: document.createElement('div') },
+        onSuccess,
+      }),
+    );
+    act(() => result.current.handleTextSelect(SELECTION));
+    press('H', { ctrlKey: true, shiftKey: true });
+
+    expect(createHighlight).toHaveBeenCalledTimes(1);
+    // The write is still in flight — no success signal yet.
+    expect(onSuccess).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveCreate();
+    });
+    expect(onSuccess).toHaveBeenCalledTimes(1);
+    // The store update still lands immediately (the page renders the
+    // highlight regardless of persistence timing).
+    expect(useDocumentStore.getState().highlights).toHaveLength(1);
+  });
 });

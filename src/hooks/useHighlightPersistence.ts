@@ -33,10 +33,16 @@ interface PendingUpdate {
 // A just-created highlight must not be acknowledged as flushed by the other
 // instance's empty queue (the western review's blocker).
 const pendingUpdates = new Map<string, PendingUpdate>();
-let flushInFlight: Promise<void> | null = null;
+let flushInFlight: Promise<{ failed: boolean; error?: unknown }> | null = null;
 let flushTimer: number | null = null;
-let lastFlushFailed = false;
-let lastFlushFailure: unknown = null;
+/** The flush attempt whose pass failed, bound to ITS OWN promise. A close
+ * flush may only surface a failure it actually JOINED, and only that joiner
+ * may consume it — identity, never a shared boolean an interleaved retry
+ * pass could clear first (exact-head Codex review, MAJOR). */
+let lastFlushFailed: {
+  flush: Promise<{ failed: boolean; error?: unknown }>;
+  error: unknown;
+} | null = null;
 
 function scheduleFlush(delayMs: number): void {
   if (flushTimer !== null) window.clearTimeout(flushTimer);
@@ -52,16 +58,27 @@ function scheduleFlush(delayMs: number): void {
  * navigation) re-queue failures (except deletes) and settle; the EXPLICIT
  * close flush passes `true`, does NOT re-queue, records the failure, and
  * THROWS — the close protocol must refuse to ack a flush that did not land.
- * A propagate caller joining an in-flight background flush checks the
- * module failure record after the join, so a failed in-flight delete
- * cannot be acknowledged as success.
+ * A propagate caller that JOINED an in-flight flush surfaces the joined
+ * flush's failure by identity (flushImmediately), so a failed in-flight
+ * delete cannot be acknowledged as success.
+ *
+ * NOT an async function: the resolved value must be the pass's OWN outcome
+ * object. An async function would wrap the return value in its own promise,
+ * and `await` would unwrap it (a returned promise resolves to its value) —
+ * the caller's quiescence break compares the OUTCOME, never a promise
+ * identity, so the pass's flush wrapper and its outcome are kept distinct:
+ * the wrapper carries the identity (for the joiner's match), the outcome
+ * carries the result (for the caller's loop).
  */
-async function flushPendingUpdates(opts?: {
+function flushPendingUpdates(opts?: {
   propagateFailure?: boolean;
-}): Promise<void> {
+}): Promise<{ failed: boolean; error?: unknown }> {
   if (flushInFlight) {
-    // Join the in-flight flush; its outcome is in the module failure refs.
-    await flushInFlight.catch(() => undefined);
+    // Join the in-flight flush, then run our own pass. The resolved value
+    // is OUR pass's outcome; the joined flush's outcome, if any, is handled
+    // by the joiner's identity check in flushImmediately.
+    const joined = flushInFlight;
+    return joined.catch(() => undefined).then(() => flushPendingUpdates(opts));
   }
   if (pendingUpdates.size === 0) {
     // Nothing to land. The failure record is NOT consulted here — a stale
@@ -69,14 +86,17 @@ async function flushPendingUpdates(opts?: {
     // unrelated later close flush reject; the join-failure semantics live in
     // flushImmediately, which knows whether THIS call actually joined a
     // failing in-flight flush.
-    return;
+    return Promise.resolve({ failed: false });
   }
   const propagate = opts?.propagateFailure === true;
-  // A fresh attempt resets the failure record (the record is cross-call
-  // module state; without the reset a previous call's failure leaks into
-  // later flushes — the cross-test leakage the unit suite caught).
-  lastFlushFailed = false;
-  lastFlushFailure = null;
+  // Declared before the run so its closure can bind the wrapper's identity.
+  // The closure only READS it after the first await, by which time it has
+  // been reassigned to the real wrapper below — the placeholder never
+  // escapes this function (initialized here so TS's closure analysis and
+  // eslint's prefer-const both hold).
+  let flush: Promise<{ failed: boolean; error?: unknown }> = Promise.resolve({
+    failed: false,
+  });
   const run = (async () => {
     const updates = new Map(pendingUpdates);
     pendingUpdates.clear();
@@ -121,12 +141,12 @@ async function flushPendingUpdates(opts?: {
           // start, so an entry enqueued WHILE this write was in flight is the
           // user's latest intent (e.g. a delete superseding a failing
           // create); the stale retry must not clobber it (codex review,
-          // MAJOR).
+          // MAJOR). The CAS token is the entry OBJECT, not its timestamp: a
+          // same-millisecond enqueue is a different object, so the stale
+          // retry can never be confused with the newer intent (exact-head
+          // codex review, MINOR).
           const current = pendingUpdates.get(id);
-          if (
-            current === undefined ||
-            current.timestamp === pending.timestamp
-          ) {
+          if (current === undefined || current === pending) {
             pendingUpdates.set(id, pending);
           }
         }
@@ -135,8 +155,14 @@ async function flushPendingUpdates(opts?: {
       }
     }
 
-    lastFlushFailed = failed;
-    lastFlushFailure = firstError;
+    if (failed) {
+      // Bind the failure to THIS pass's promise — the joiner that awaits
+      // flushInFlight is the only caller allowed to surface it, and it can
+      // only match by identity: a later retry pass binding its own record
+      // can never clear the joined flush's failure before the joiner reads
+      // it (exact-head codex review, MAJOR).
+      lastFlushFailed = { flush, error: firstError };
+    }
 
     if (pendingUpdates.size > 0 && !propagate) {
       scheduleFlush(500);
@@ -148,11 +174,19 @@ async function flushPendingUpdates(opts?: {
     if (propagate && failed) {
       throw firstError ?? new Error("highlight flush did not land");
     }
+
+    // The pass outcome: the flush wrapper (identity) and the outcome
+    // (result) travel as distinct values.
+    return { failed, error: firstError };
   })();
-  flushInFlight = run.finally(() => {
+  // The flush wrapper carries the identity for the joiner's match; the run
+  // resolves to the OUTCOME object, so `flush` does too (.finally preserves
+  // the resolution value).
+  flush = run.finally(() => {
     flushInFlight = null;
   });
-  return flushInFlight;
+  flushInFlight = flush;
+  return flush;
 }
 
 /**
@@ -169,8 +203,8 @@ export function useHighlightPersistence({
 }: UseHighlightPersistenceOptions) {
   // Create a new highlight
   const createHighlight = useCallback(
-    (highlight: Highlight) => {
-      if (!documentId) return;
+    (highlight: Highlight): Promise<{ failed: boolean; error?: unknown }> | undefined => {
+      if (!documentId) return undefined;
 
       pendingUpdates.set(highlight.id, {
         highlight,
@@ -187,7 +221,13 @@ export function useHighlightPersistence({
       // saved. Flush immediately — the same un-debounced write principle
       // that fixed the DL-2 page position. The debounced schedule remains
       // for the requeued-retry path (background failures).
-      void flushPendingUpdates();
+      //
+      // The flush is RETURNED so the caller can gate its success UX on the
+      // write attempt completing — the "Highlight created" toast must never
+      // precede the write (exact-head codex review, MAJOR). Background
+      // semantics still hold: the promise settles when the ATTEMPT finishes
+      // (failures re-queue for the retry path), it does not throw.
+      return flushPendingUpdates();
     },
     [documentId, onError],
   );
@@ -263,36 +303,32 @@ export function useHighlightPersistence({
       if (joinedFlush) {
         await joinedFlush.catch(() => undefined);
       }
-      if (opts?.propagateFailure && lastFlushFailed && joinedFlush !== null) {
+      if (
+        opts?.propagateFailure &&
+        joinedFlush !== null &&
+        lastFlushFailed?.flush === joinedFlush
+      ) {
         // The flush we JOINED failed and left nothing pending for us to
         // drain (e.g. a dropped delete): surface its outcome exactly once,
-        // then consume it — an unrelated LATER flush must not be poisoned by
-        // this failure (the stale-flag contamination the unit suite caught).
-        const failure = lastFlushFailure ?? new Error("highlight flush failed");
-        lastFlushFailed = false;
-        lastFlushFailure = null;
+        // bound to the promise we joined. Identity — not a shared boolean —
+        // so an interleaved retry pass binding its own record can never
+        // consume the joined failure first, and a stale failure from an
+        // unjoined flush can never match (exact-head codex review, MAJOR).
+        const failure =
+          lastFlushFailed.error ?? new Error("highlight flush failed");
+        lastFlushFailed = null;
         throw failure;
       }
-      // A call that JOINED a flush must NOT reset the record: an earlier
-      // background join of the SAME failing flush may have run first, and
-      // the close flush that also joined it still needs to see the failure
-      // (codex review, MAJOR — the pre-fix unconditional reset let an
-      // interleaved background join consume it). A call that joined
-      // NOTHING may clear: a completed failed background flush must not
-      // poison its own drain.
-      if (joinedFlush === null) {
-        lastFlushFailed = false;
-        lastFlushFailure = null;
-      }
+      // No unconditional record reset: each pass binds its own outcome, and
+      // only a joiner that matches by identity consumes it.
       while (pendingUpdates.size > 0) {
         const before = pendingUpdates.size;
-        await flushPendingUpdates(opts);
-        // Background path re-queues failures: never busy-loop on a failing
-        // item — the re-queued entry retries through the debounced timer.
-        if (pendingUpdates.size >= before && lastFlushFailed) break;
-      }
-      if (opts?.propagateFailure && lastFlushFailed) {
-        throw lastFlushFailure ?? new Error("highlight flush failed");
+        // The pass OUTCOME drives the quiescence break: a background pass
+        // that failed re-queued (size >= before) must stop the loop — the
+        // re-queued entry retries through the debounced timer. A propagate
+        // pass that failed THREW already (the close flush must reject).
+        const outcome = await flushPendingUpdates(opts);
+        if (pendingUpdates.size >= before && outcome.failed) break;
       }
     },
     [],
