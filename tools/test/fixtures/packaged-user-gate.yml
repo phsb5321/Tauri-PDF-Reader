@@ -131,15 +131,9 @@ jobs:
           [ -f ci-evidence/prerequisite-failure.json ] || { echo "FAIL: BLOCKED prerequisite without its machine-readable receipt — evidence discipline broken"; exit 1; }
 
       - name: Packaged PR-fast lane — hermetic profile, X11 pin, Xvfb
-        # The repo's own runner: shared profile (#99 fail-closed) + flake
-        # devShell toolchain (#101 single source) + GDK_BACKEND=x11 (the
-        # negative-devicePixelRatio class) + Xvfb via -displayfd. Fixed /tmp
-        # evidence paths cleared first — a prior job's leftovers must never
-        # ride along (single-slot runner + per-ref concurrency = no live
-        # collision; the clear is defense in depth).
-        run: |
-          rm -f /tmp/lectrice-e2e-critical-loop-xvfb.log /tmp/lectrice-matrix-critical-loop.log
-          bash e2e/run-critical-loop.sh
+        # The single canonical command — the contract pins this step's run
+        # exactly. Stale-evidence clearing lives in the runner script.
+        run: bash e2e/run-critical-loop.sh
 
       - name: Copy failure evidence into the workspace (upload-artifact cannot read /tmp)
         if: failure()
@@ -196,10 +190,8 @@ jobs:
 
       - name: Run all packaged lanes — one at a time
         # Serial by construction: one job loops the eight self-contained lane
-        # runners. The single-slot runner must never be stampeded.
-        run: |
-          rm -f /tmp/lectrice-matrix-*.log /tmp/lectrice-e2e-*-xvfb.log
-          bash scripts/e2e-matrix.sh
+        # runners. The single canonical command — pinned exactly.
+        run: bash scripts/e2e-matrix.sh
 
       - name: Copy failure evidence into the workspace (upload-artifact cannot read /tmp)
         if: failure()
@@ -278,11 +270,9 @@ jobs:
             echo "BLOCKED: LECTRICE_REAL_PDF_CORPUS=$LECTRICE_REAL_PDF_CORPUS is not a directory — see ci-evidence/prerequisite-failure.json"; exit 1; }
 
       - name: Run the real-corpus soak (per-book phases, machine-readable summary)
-        # Run-scoped evidence dir: $RUNNER_TEMP is per-job, so fixed-path
-        # collisions across runs are impossible.
-        run: |
-          rm -rf "$RUNNER_TEMP/lectrice-corpus"
-          LECTRICE_CORPUS_OUT="$RUNNER_TEMP/lectrice-corpus" bash scripts/e2e-real-corpus.sh
+        # Run-scoped evidence dir: $RUNNER_TEMP is per-job. The single
+        # canonical command — pinned exactly.
+        run: LECTRICE_CORPUS_OUT="$RUNNER_TEMP/lectrice-corpus" bash scripts/e2e-real-corpus.sh
 
       - name: Copy evidence into the workspace (logs + summary ONLY — never the corpus)
         # ALWAYS runs: after a prerequisite BLOCKED the receipt in ci-evidence

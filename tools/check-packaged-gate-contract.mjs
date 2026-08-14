@@ -148,14 +148,26 @@ const CANONICAL_IF = {
   "real-corpus": "github.event_name == 'workflow_dispatch'",
 };
 const USES_RE = /^[\w.-]+\/[\w.-]+(\/[^@]+)?@[0-9a-f]{40}$/;
-// Exact approved lane command text: after normalizing only trailing
-// whitespace, the run line must BE the approved command — no suffix, no
-// prefix, no operators (`bash … || true` would turn a failed lane green).
-const LANE_EXACT = {
-  "pr-fast": (line) => line === "bash e2e/run-critical-loop.sh",
-  "full-matrix": (line) => line === "bash scripts/e2e-matrix.sh",
-  "real-corpus": (line) =>
-    /^LECTRICE_CORPUS_OUT="[^"]*" bash scripts\/e2e-real-corpus\.sh$/.test(line),
+// Each REQUIRED NAMED lane step: its COMPLETE parsed run string is pinned
+// to the single canonical command (one final newline normalized) and its
+// shell cannot be overridden (no shell key — the fixture owns the default).
+const LANE_STEP = {
+  "pr-fast": {
+    name: "Packaged PR-fast lane",
+    run: (r) => r === "bash e2e/run-critical-loop.sh",
+    canonical: "bash e2e/run-critical-loop.sh",
+  },
+  "full-matrix": {
+    name: "Run all packaged lanes",
+    run: (r) => r === "bash scripts/e2e-matrix.sh",
+    canonical: "bash scripts/e2e-matrix.sh",
+  },
+  "real-corpus": {
+    name: "Run the real-corpus soak",
+    run: (r) =>
+      /^LECTRICE_CORPUS_OUT="[^"]*" bash scripts\/e2e-real-corpus\.sh$/.test(r),
+    canonical: 'LECTRICE_CORPUS_OUT="$RUNNER_TEMP/lectrice-corpus" bash scripts/e2e-real-corpus.sh',
+  },
 };
 const RECEIPT_STEP = "Prerequisite receipt enforced";
 
@@ -230,18 +242,22 @@ for (const jobName of Object.keys(CANONICAL_IF)) {
           fail(`${jobName} enforcement step does not test the receipt's presence`);
       }
 
-      // Lane invocations: found in the PARSED run text (any YAML spelling of
-      // the run block is normalized by the parser).
-      if (LANE_EXACT[jobName]) {
-        const hit = runs.some((r) =>
-          r.split("\n").some((line) => LANE_EXACT[jobName](line.trimEnd())),
+      // Lane invocation: the REQUIRED NAMED step's COMPLETE run must equal
+      // the single canonical command (one trailing newline normalized) —
+      // `set +e; …; true` and `… || true` multi-command forms fail.
+      if (LANE_STEP[jobName]) {
+        const spec = LANE_STEP[jobName];
+        const laneStep = steps.find(
+          (st) => st && typeof st.name === "string" && st.name.startsWith(spec.name),
         );
-        if (!hit) {
-          if (jobName === "pr-fast")
-            fail("pr-fast job does not run e2e/run-critical-loop.sh");
-          else if (jobName === "full-matrix")
-            fail("full-matrix job does not run scripts/e2e-matrix.sh");
-          else fail("real-corpus job does not run scripts/e2e-real-corpus.sh");
+        if (!laneStep)
+          fail(`${jobName} job lacks the required lane step "${spec.name}"`);
+        else {
+          if (laneStep.shell !== undefined)
+            fail(`${jobName} lane step shell override is not permitted — the fixture owns the default shell`);
+          const run = typeof laneStep.run === "string" ? laneStep.run.replace(/\n$/, "") : "";
+          if (!spec.run(run))
+            fail(`${jobName} lane step run is not the exact canonical command (${spec.canonical})`);
         }
       }
 

@@ -18,6 +18,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# Clear stale evidence from prior runs (the workflow's lane step is the
+# single canonical command; the clear lives here).
+rm -f /tmp/lectrice-e2e-critical-loop-xvfb.log /tmp/lectrice-matrix-critical-loop.log
+
 source ./scripts/e2e-profile.sh
 source ./scripts/e2e-toolchain.sh
 

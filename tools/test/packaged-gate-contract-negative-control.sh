@@ -55,7 +55,7 @@ echo "baseline: shipped workflow passes"
 # ── Lane / invocation tamper classes ─────────────────────────────────────────
 # Tamper 1: remove the lane invocation from the PR-fast job.
 sed 's|bash e2e/run-critical-loop.sh|# (lane removed)|' "$WF" >"$WORK/tampered.yml"
-expect_violation "PR-fast lane removed" "pr-fast job does not run e2e/run-critical-loop.sh"
+expect_violation "PR-fast lane removed" "pr-fast lane step run is not the exact canonical command"
 
 # Tamper 2: skip-green on the lane step (literal) — a STEP-level key, not
 # text inside the run block (the parser must see continueOnError).
@@ -81,16 +81,16 @@ sed 's|^run_lane reader|# run_lane reader|' "$REPO_ROOT/scripts/e2e-matrix.sh" >
 PACKAGED_GATE_MATRIX="$WORK/matrix-tampered.sh" expect_violation "matrix lane dropped" "matrix does not include the reader lane"
 
 # Tamper 7: shell-comment the lane invocation inside the run block.
-sed 's|^          bash e2e/run-critical-loop.sh|          # bash e2e/run-critical-loop.sh (disabled)|' "$WF" >"$WORK/tampered.yml"
-expect_violation "lane invocation shell-commented" "pr-fast job does not run e2e/run-critical-loop.sh"
+sed 's@^        run: bash e2e/run-critical-loop.sh$@        run: |\n          # bash e2e/run-critical-loop.sh (disabled)@' "$WF" >"$WORK/tampered.yml"
+expect_violation "lane invocation shell-commented" "pr-fast lane step run is not the exact canonical command"
 
 # Tamper 8: inline-comment no-op carrying the invocation substring.
-sed 's|^          bash e2e/run-critical-loop.sh|          : # bash e2e/run-critical-loop.sh|' "$WF" >"$WORK/tampered.yml"
-expect_violation "lane invocation reduced to inline-comment no-op" "pr-fast job does not run e2e/run-critical-loop.sh"
+sed 's@^        run: bash e2e/run-critical-loop.sh$@        run: |\n          : # bash e2e/run-critical-loop.sh@' "$WF" >"$WORK/tampered.yml"
+expect_violation "lane invocation reduced to inline-comment no-op" "pr-fast lane step run is not the exact canonical command"
 
 # Tamper 9: colon no-op taking the invocation as its argument.
-sed 's|^          bash e2e/run-critical-loop.sh|          : bash e2e/run-critical-loop.sh|' "$WF" >"$WORK/tampered.yml"
-expect_violation "lane invocation reduced to colon no-op" "pr-fast job does not run e2e/run-critical-loop.sh"
+sed 's@^        run: bash e2e/run-critical-loop.sh$@        run: |\n          : bash e2e/run-critical-loop.sh@' "$WF" >"$WORK/tampered.yml"
+expect_violation "lane invocation reduced to colon no-op" "pr-fast lane step run is not the exact canonical command"
 
 # Tamper 10: falsify the real-corpus job condition.
 sed "s|^    if: github.event_name == 'workflow_dispatch'$|    if: \${{ false }}|" "$WF" >"$WORK/tampered.yml"
@@ -102,8 +102,8 @@ sed 's|if: always()|if: success()|' "$WORK/tampered.yml" >"$WORK/tampered2.yml" 
 expect_violation "real-corpus upload loses always()" "real-corpus evidence upload is not if: always()"
 
 # Tamper 12: colon no-op on the corpus invocation.
-sed 's|\(LECTRICE_CORPUS_OUT="[^"]*" \)bash scripts/e2e-real-corpus.sh|\1: bash scripts/e2e-real-corpus.sh|' "$WF" >"$WORK/tampered.yml"
-expect_violation "real-corpus invocation reduced to colon no-op" "real-corpus job does not run scripts/e2e-real-corpus.sh"
+sed 's@^        run: LECTRICE_CORPUS_OUT="[^"]*" bash scripts/e2e-real-corpus.sh$@        run: |\n          LECTRICE_CORPUS_OUT="$RUNNER_TEMP/lectrice-corpus" : bash scripts/e2e-real-corpus.sh@' "$WF" >"$WORK/tampered.yml"
+expect_violation "real-corpus invocation reduced to colon no-op" "real-corpus lane step run is not the exact canonical command"
 
 # ── Job-set / condition tamper classes ───────────────────────────────────────
 # Tamper 13: same-repo guard removed from pr-fast.
@@ -263,10 +263,10 @@ sed '/BOOTSTRAP-INERT/d' "$WF" >"$WORK/tampered.yml"
 expect_violation "bootstrap-inert anchor removed" "contract job lacks the bootstrap-inert anchor check"
 
 # Tamper 24: the lane invocation moved into an env value with a no-op run.
-sed -e 's|^          bash e2e/run-critical-loop.sh$|          true|' \
+sed -e 's|^        run: bash e2e/run-critical-loop.sh$|        run: true|' \
     -e 's|^      - name: Packaged PR-fast lane|      - name: Packaged PR-fast lane\n        env:\n          BURY: bash e2e/run-critical-loop.sh|' \
     "$WF" >"$WORK/tampered.yml"
-expect_violation "lane invocation buried in an env value" "pr-fast job does not run e2e/run-critical-loop.sh"
+expect_violation "lane invocation buried in an env value" "pr-fast lane step run is not the exact canonical command"
 
 # ── B1/B2/M1-merge/M2 classes ─────────────────────────────────────────────────
 # Tamper 56: step-level if: false on the PR-fast lane step (skips the gate).
@@ -296,7 +296,7 @@ expect_violation "permissions widened to contents: write" "permissions must be e
 
 # Tamper 62: lane run gains a `|| true` operator (skip-green suffix).
 sed 's@bash e2e/run-critical-loop.sh$@bash e2e/run-critical-loop.sh || true@' "$WF" >"$WORK/tampered.yml"
-expect_violation "lane run with || true suffix" "pr-fast job does not run e2e/run-critical-loop.sh"
+expect_violation "lane run with || true suffix" "pr-fast lane step run is not the exact canonical command"
 
 # Tamper 63: job-level continue-on-error on pr-fast.
 sed '/^  pr-fast:$/a\    continue-on-error: true' "$WF" >"$WORK/tampered.yml"
@@ -305,6 +305,22 @@ expect_violation "job-level continue-on-error" "continue-on-error found (skip-gr
 # Tamper 64: job-local permissions block overrides the global.
 sed '/^  pr-fast:$/a\    permissions:\n      contents: write' "$WF" >"$WORK/tampered.yml"
 expect_violation "job-level permissions block" "job-level permissions are not permitted"
+
+# Tamper 65: multi-command pr-fast lane run (set +e; …; true).
+sed 's@^        run: bash e2e/run-critical-loop.sh$@        run: |\n          set +e\n          bash e2e/run-critical-loop.sh\n          true@' "$WF" >"$WORK/tampered.yml"
+expect_violation "multi-command pr-fast lane run" "pr-fast lane step run is not the exact canonical command"
+
+# Tamper 66: multi-command full-matrix lane run.
+sed 's@^        run: bash scripts/e2e-matrix.sh$@        run: |\n          set +e\n          bash scripts/e2e-matrix.sh\n          true@' "$WF" >"$WORK/tampered.yml"
+expect_violation "multi-command full-matrix lane run" "full-matrix lane step run is not the exact canonical command"
+
+# Tamper 67: multi-command real-corpus lane run.
+sed 's@^        run: LECTRICE_CORPUS_OUT="\$RUNNER_TEMP/lectrice-corpus" bash scripts/e2e-real-corpus.sh$@        run: |\n          set +e\n          LECTRICE_CORPUS_OUT="$RUNNER_TEMP/lectrice-corpus" bash scripts/e2e-real-corpus.sh\n          true@' "$WF" >"$WORK/tampered.yml"
+expect_violation "multi-command real-corpus lane run" "real-corpus lane step run is not the exact canonical command"
+
+# Tamper 68: shell override on the pr-fast lane step.
+sed '/^      - name: Packaged PR-fast lane/a\        shell: bash' "$WF" >"$WORK/tampered.yml"
+expect_violation "lane step shell override" "lane step shell override is not permitted"
 
 # ── Positive control (no-false-positive class) ───────────────────────────────
 python3 - "$WF" "$WORK/clean.yml" <<'PY'

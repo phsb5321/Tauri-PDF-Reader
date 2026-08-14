@@ -17,6 +17,10 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
+# Clear stale evidence from prior runs (the workflow's lane step is the
+# single canonical command; the clear lives here).
+rm -f /tmp/lectrice-matrix-*.log /tmp/lectrice-e2e-*-xvfb.log
+
 STATUS=0
 run_lane() {
   local name="$1"
