@@ -319,16 +319,16 @@ export function ReaderView() {
         )
       }
     >
+      {error && (
+        <div className="library-error-banner" role="alert">
+          <span>{error}</span>
+          <button type="button" onClick={() => setError(null)}>
+            Dismiss
+          </button>
+        </div>
+      )}
       {libraryShowing ? (
         <div className="library-surface">
-          {error && (
-            <div className="library-error-banner" role="alert">
-              <span>{error}</span>
-              <button type="button" onClick={() => setError(null)}>
-                Dismiss
-              </button>
-            </div>
-          )}
           <LibraryView
             onDocumentSelect={(document) => {
               void handleResume(document);

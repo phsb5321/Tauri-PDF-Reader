@@ -468,9 +468,19 @@ pub fn run() {
     // a debug build and then remembers to commit the result, which is how the
     // checked-in file went six months and 8 commands out of date. The gate is
     // `tests/bindings_contract.rs`, which runs in CI.
+    //
+    // The write is CWD-relative (BINDINGS_PATH is "../src/lib/bindings.ts"),
+    // so a debug app launched from anywhere but `src-tauri/` cannot find its
+    // destination. That used to PANIC the app before the window opened — the
+    // packaged e2e lanes (wdio launches the binary from the repo root) and any
+    // manual `cargo run` from the root hit it. The export is a convenience;
+    // a failure warns and the app continues. `cargo run --example
+    // regenerate_bindings` and `tests/bindings_contract.rs` remain the
+    // authoritative regeneration/gate paths.
     #[cfg(debug_assertions)]
-    write_bindings(&specta_builder, bindings_exporter(), BINDINGS_PATH)
-        .expect("Failed to export TypeScript bindings");
+    if let Err(e) = write_bindings(&specta_builder, bindings_exporter(), BINDINGS_PATH) {
+        eprintln!("WARN: failed to regenerate TS bindings (non-fatal): {e}");
+    }
 
     #[allow(unused_mut)]
     let mut builder = tauri::Builder::default()

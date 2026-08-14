@@ -108,6 +108,7 @@ async function seedLibraryProfile(): Promise<void> {
     pathA,
     "E2E Resume Fixture A",
     5,
+    null,
   );
   if (addedA.status === "error") throw new Error(`seed A: ${addedA.error}`);
   const knownA = await commands.libraryGetDocumentByPath(pathA);
@@ -129,6 +130,7 @@ async function seedLibraryProfile(): Promise<void> {
       pathB,
       "E2E Resume Fixture B",
       3,
+      null,
     );
     if (addedB.status === "error") throw new Error(`seed B: ${addedB.error}`);
     const knownB = await commands.libraryGetDocumentByPath(pathB);
@@ -148,6 +150,22 @@ async function seedLibraryProfile(): Promise<void> {
   // Stamp A most-recently-opened so it is the resume line's primary book.
   const openedA = await commands.libraryOpenDocument(addedA.data.id);
   if (openedA.status === "error") throw new Error(`stamp A: ${openedA.error}`);
+
+  // Issue #120 packaged black-box lane: simulate a LOST fs grant by
+  // relocating the seeded book to a path OUTSIDE the capability scope (the
+  // observer pre-places the copy; relocate re-verifies the content hash, so
+  // the row stays the same book). The reauthorization rung then fires on the
+  // first resume. The frontend build for this lane does NOT arm the
+  // fixture-bytes seam, so the fs read is the real scope-gated one.
+  const reauthOutPath = import.meta.env.VITE_E2E_REAUTH_OUT_PATH;
+  if (reauthOutPath) {
+    const relocated = await commands.libraryRelocateDocument(
+      addedA.data.id,
+      reauthOutPath,
+    );
+    if (relocated.status === "error")
+      throw new Error(`seed reauth relocate: ${relocated.error}`);
+  }
 
   // The read oracle's target: the seeded resume book.
   seededDocId = addedA.data.id;

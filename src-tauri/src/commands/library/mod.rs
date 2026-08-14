@@ -20,6 +20,15 @@ use tauri_plugin_sql::DbInstances;
 
 use crate::commands::audio_cache::create_service as create_audio_cache_service;
 
+fn require_expected_hash(file_hash: &str, expected_sha256: Option<&str>) -> Result<(), String> {
+    if expected_sha256.is_some_and(|expected| !expected.eq_ignore_ascii_case(file_hash)) {
+        return Err(
+            "HASH_MISMATCH: File content changed while the document was being added".to_string(),
+        );
+    }
+    Ok(())
+}
+
 /// Add a new document to the library
 /// Uses SHA-256 content hash as ID for duplicate detection
 #[tauri::command]
@@ -29,6 +38,7 @@ pub async fn library_add_document(
     file_path: String,
     title: Option<String>,
     page_count: Option<i32>,
+    expected_sha256: Option<String>,
 ) -> Result<Document, String> {
     let pool = get_pool(&db).await?;
 
@@ -37,6 +47,11 @@ pub async fn library_add_document(
     }
 
     let file_hash = compute_file_hash(&file_path)?;
+    // Fresh imports parse bytes in the frontend before this command creates
+    // their row. Refuse a path swap between those reads BEFORE touching the
+    // database: the caller supplies the SHA of the exact bytes it parsed, and
+    // a document id is this same lowercase SHA-256.
+    require_expected_hash(&file_hash, expected_sha256.as_deref())?;
 
     // Check for existing document with same hash
     let existing: Vec<Document> = sqlx::query_as(
@@ -504,4 +519,22 @@ pub async fn library_heal_document(
         .to_string();
 
     library_relocate_document(db, id, new_file_path).await
+}
+
+#[cfg(test)]
+mod expected_hash_tests {
+    use super::require_expected_hash;
+
+    #[test]
+    fn fresh_import_accepts_the_hash_of_the_bytes_the_frontend_parsed() {
+        assert!(require_expected_hash("a1b2", Some("A1B2")).is_ok());
+        assert!(require_expected_hash("a1b2", None).is_ok());
+    }
+
+    #[test]
+    fn fresh_import_rejects_a_path_swap_before_database_mutation() {
+        let error = require_expected_hash("hash-of-file-b", Some("hash-of-file-a"))
+            .expect_err("different bytes must fail closed");
+        assert!(error.starts_with("HASH_MISMATCH:"));
+    }
 }

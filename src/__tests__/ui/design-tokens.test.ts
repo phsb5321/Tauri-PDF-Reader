@@ -1003,7 +1003,10 @@ describe("design tokens: WCAG AA contrast floor", () => {
     // own complete rule (the pre-fix comma-@media prelude parses as ONE
     // broken selector and matches neither).
     const pairs = [
-      ["components/pdf-viewer/HighlightContextMenu.css", ".highlight-context-menu"],
+      [
+        "components/pdf-viewer/HighlightContextMenu.css",
+        ".highlight-context-menu",
+      ],
       ["components/pdf-viewer/HighlightToolbar.css", ".highlight-toolbar"],
       ["components/pdf-viewer/TtsHighlight.css", ".tts-highlight-rect"],
       ["components/pdf-viewer/HighlightOverlay.css", ".highlight-rect"],
@@ -1054,9 +1057,10 @@ describe("design tokens: WCAG AA contrast floor", () => {
         "components/pdf-viewer/TtsHighlight.css|.tts-highlight-rect": [
           /background-color:\s*rgba\(255, 193, 7, 0\.3\)/,
         ],
-        "components/pdf-viewer/HighlightContextMenu.css|.highlight-context-menu": [
-          /box-shadow:[^;]*(?:0 4px 16px rgba\(0, 0, 0, 0\.4\)|rgba\(0, 0, 0, 0\.4\) 0 4px 16px)/,
-        ],
+        "components/pdf-viewer/HighlightContextMenu.css|.highlight-context-menu":
+          [
+            /box-shadow:[^;]*(?:0 4px 16px rgba\(0, 0, 0, 0\.4\)|rgba\(0, 0, 0, 0\.4\) 0 4px 16px)/,
+          ],
         "components/highlights/NoteEditor.css|.note-editor-backdrop": [
           /background:\s*rgba\(0, 0, 0, 0\.7\)/,
         ],
@@ -1121,13 +1125,11 @@ describe("design tokens: WCAG AA contrast floor", () => {
 
   it("binds the grid delete button to the semantic surface (no white blob in dark)", () => {
     const css = stripCssComments(
-      readFileSync(
-        join(SRC, "components/library/DocumentCard.css"),
-        "utf8",
-      ),
+      readFileSync(join(SRC, "components/library/DocumentCard.css"), "utf8"),
     );
     const rule = styleRules(css).find(
-      ({ selector }) => selector === ".document-card--grid .document-card-delete",
+      ({ selector }) =>
+        selector === ".document-card--grid .document-card-delete",
     );
     expect(rule?.body).toMatch(/background:\s*var\(--color-bg-surface\)/);
   });
