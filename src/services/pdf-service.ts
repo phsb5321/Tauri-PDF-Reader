@@ -65,9 +65,9 @@ GlobalWorkerOptions.workerSrc = new URL(
 // (http-served Windows builds), and against the document in the tauri://
 // main-thread path — an absolute URL is identical in both.
 const CMAP_URL =
-  typeof document !== "undefined"
-    ? new URL("cmaps/", document.baseURI).toString()
-    : "cmaps/";
+  typeof document === "undefined"
+    ? "cmaps/"
+    : new URL("cmaps/", document.baseURI).toString();
 
 export interface PageRenderOptions {
   canvas: HTMLCanvasElement;

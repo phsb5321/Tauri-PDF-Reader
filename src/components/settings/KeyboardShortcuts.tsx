@@ -50,10 +50,10 @@ export function KeyboardShortcuts() {
 function ShortcutGroup({
   title,
   chords,
-}: {
+}: Readonly<{
   title: string;
   chords: readonly { action: string; keys: string[] }[];
-}) {
+}>) {
   return (
     <>
       <div className="shortcut-group-title">{title}</div>

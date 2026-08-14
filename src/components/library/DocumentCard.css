@@ -118,7 +118,7 @@
   width: 28px;
   height: 28px;
   border: none;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--color-bg-surface);
   border-radius: 50%;
   cursor: pointer;
   display: flex;
