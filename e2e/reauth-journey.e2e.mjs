@@ -27,9 +27,17 @@
  *   REAUTH_PHASE=repeat  — TWO resumes in ONE process: the first pick is the
  *                          corrupt fixture (refused), the second is fixture
  *                          B — a real, parseable, DIFFERENT book. B must be
- *                          refused too. A binding applied only to the first
- *                          attempt would render B here, which is the hole a
- *                          single-resume phase cannot see.
+ *                          refused too: identity is re-checked on the LATER
+ *                          resume, not only on the first. (What refuses B is
+ *                          the backend relocate hash check; the reader's own
+ *                          row-hash binding is the second belt, covered by
+ *                          the unit falsifiers in useOpenPdf.test.ts.)
+ *   REAUTH_PHASE=retry   — the same two resumes, but the second pick is the
+ *                          CORRECT book: it must reach the reader. This is
+ *                          what makes `repeat` mean something — it shows the
+ *                          second resume is live and that the refusal above
+ *                          discriminates between books rather than being an
+ *                          app that stopped responding after one failure.
  *
  * This lane deliberately does NOT arm the dialog/fs fixture-bytes seams: the
  * fs read must be the REAL scope-gated plugin-fs read so the denial is real.
@@ -55,7 +63,9 @@ describe("Packaged reauthorization journey (lost fs grant, issue #120)", () => {
           ? "cancelling the reauthorization leaves a visible OPEN_CANCELLED alert"
           : PHASE === "repeat"
             ? "a resume after a failed retry is still refused a different book"
-            : "a wrong file is refused with a visible WRONG_DOCUMENT alert"
+            : PHASE === "retry"
+              ? "a resume after a failed retry still opens the correct book"
+              : "a wrong file is refused with a visible WRONG_DOCUMENT alert"
   }`, async () => {
     await browser.waitUntil(
       async () =>
@@ -80,6 +90,38 @@ describe("Packaged reauthorization journey (lost fs grant, issue #120)", () => {
         )
         ?.click(),
     );
+
+    if (PHASE === "retry") {
+      // First pick is the corrupt file: a visible refusal.
+      const firstAlert = await $(".library-error-banner");
+      await firstAlert.waitForExist({ timeout: 20000 });
+      expect(await firstAlert.getText()).toContain("WRONG_DOCUMENT");
+
+      // Second resume, same process, correct book this time.
+      await browser.execute(() =>
+        document
+          .querySelector(
+            'button[aria-label^="Resume E2E Resume Fixture A, page"]',
+          )
+          ?.click(),
+      );
+      await browser.waitUntil(
+        async () =>
+          browser.execute(() => {
+            const spans = document.querySelectorAll(
+              ".textLayer span, [class*='textLayer'] span",
+            );
+            return Array.from(spans).some((s) =>
+              (s.textContent || "").includes("alpha lectrice"),
+            );
+          }),
+        {
+          timeout: 30000,
+          timeoutMsg: "the book never opened on the resume after a failed one",
+        },
+      );
+      return;
+    }
 
     if (PHASE === "good") {
       // The book reopens: the reader displays the fixture's rendered text.

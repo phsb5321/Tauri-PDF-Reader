@@ -14,7 +14,10 @@
 #            (HASH_MISMATCH) -> WRONG_DOCUMENT alert visible, row untouched.
 #   repeat — two resumes in ONE launch: pick 1 = corrupt (refused), pick 2 =
 #            fixture B, a real DIFFERENT book, which must be refused too.
-#            Catches a binding that only covers the first attempt.
+#            Catches identity checked only on the first attempt.
+#   retry  — the same two resumes with the CORRECT book second: it must open.
+#            Without this, `repeat` would also pass against an app that stops
+#            responding after one failure.
 #
 # The observer (this script) pre-places the out-of-scope copy and the corrupt
 # fixture; the frontend is rebuilt per phase with the phase's picker-outcome
@@ -102,7 +105,9 @@ toolchain_exec '
   run_phase wrong "" "$CORRUPT" || WRONG_STATUS=$?
   REPEAT_STATUS=0
   run_phase repeat "" "$CORRUPT|$OTHER" || REPEAT_STATUS=$?
+  RETRY_STATUS=0
+  run_phase retry "" "$CORRUPT|$GOOD" || RETRY_STATUS=$?
 
-  echo "==> lane summary: seed=$SEED_STATUS good=$GOOD_STATUS cancel=$CANCEL_STATUS wrong=$WRONG_STATUS repeat=$REPEAT_STATUS"
-  [ "$SEED_STATUS" -eq 0 ] && [ "$GOOD_STATUS" -eq 0 ] && [ "$CANCEL_STATUS" -eq 0 ] && [ "$WRONG_STATUS" -eq 0 ] && [ "$REPEAT_STATUS" -eq 0 ]
+  echo "==> lane summary: seed=$SEED_STATUS good=$GOOD_STATUS cancel=$CANCEL_STATUS wrong=$WRONG_STATUS repeat=$REPEAT_STATUS retry=$RETRY_STATUS"
+  [ "$SEED_STATUS" -eq 0 ] && [ "$GOOD_STATUS" -eq 0 ] && [ "$CANCEL_STATUS" -eq 0 ] && [ "$WRONG_STATUS" -eq 0 ] && [ "$REPEAT_STATUS" -eq 0 ] && [ "$RETRY_STATUS" -eq 0 ]
 '
