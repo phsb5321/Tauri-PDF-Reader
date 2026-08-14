@@ -5,20 +5,24 @@
  * nothing in src-tauri handles on_window_event / CloseRequested, so pending
  * debounced writes are never flushed when the window goes away.
  *
- *   DL-1 — a highlight created just before quitting is lost AFTER the app
- *          said it saved (useHighlightPersistence debounceMs = 500; the
- *          success toast fires unconditionally).
+ *   DL-1 — a highlight created just before quitting is lost (the create
+ *          used to sit behind a 500 ms debounce; the success toast fired
+ *          unconditionally — now the toast is honest and the create flushes
+ *          immediately, so the race is the write's IPC vs the teardown).
  *   DL-2 — reading position is lost on close (useAutoSave scheduleSave(500)
  *          on page change; checkUnsavedProgress has zero callers).
  *
  * Four phases, one hermetic profile, fresh app process per phase:
- *   CLOSE_PHASE=dl1-create  resume → drag-select → Yellow → capture the
- *                           success toast → CLOSE IMMEDIATELY (inside the
- *                           500 ms debounce).
+ *   CLOSE_PHASE=dl1-create  resume → drag-select → PUBLIC Yellow click →
+ *                           observe the accepted highlight marker (optimistic
+ *                           overlay, NOT the toast — the toast now fires only
+ *                           after persistence, and waiting for it would
+ *                           destroy the race) → CLOSE IMMEDIATELY.
  *   CLOSE_PHASE=dl1-verify  relaunch → resume → the highlight must STILL be
- *                           there (the app claimed it saved). RED on main.
- *   CLOSE_PHASE=dl2-create  resume (page 2) → Next (page 3) → CLOSE
- *                           IMMEDIATELY (inside the 500 ms debounce).
+ *                           there. RED on main.
+ *   CLOSE_PHASE=dl2-create  resume (page 2) → PUBLIC Next click → observe
+ *                           the Current page input = 3 → CLOSE IMMEDIATELY
+ *                           (inside the 500 ms debounce).
  *   CLOSE_PHASE=dl2-verify  relaunch → resume → the page must be 3 (where
  *                           the user was). RED on main.
  *
@@ -335,36 +339,58 @@ describe("Packaged close journey (DL-1 highlight loss, DL-2 position loss)", () 
       // inside the measured interval.
       const closeAndObserve = prepareCloseObserver();
 
-      // ── THE TIMED PATH (harness contract): the Yellow click (the debounce
-      //    enqueue) AND the success-toast read happen inside ONE execute —
-      //    the toast is the app's unconditional claim, read synchronously in
-      //    the same round trip as the click. `tAction` is stamped AFTER the
-      //    click; NOTHING between tAction and the close (the old separate
-      //    toast execute inflated the measured interval).
-      const result = await browser.execute(() => {
+      // ── THE TIMED PATH (harness contract): tAction is stamped
+      //    IMMEDIATELY BEFORE the public activation. The activation is
+      //    element.click() via execute — the vimeflow#65 pin: on WebKitGTK
+      //    software-rendering, WebDriver pointer dispatch (both the
+      //    element-click command AND the performActions pointer sequence)
+      //    fires ZERO onClick handlers (14/08 lane-2 + lane-4 runs reproduced
+      //    the 04/08/2026 BLOCKED verdict verbatim; native-play + delete-
+      //    journey pin the same), while element.click() fires the SAME React
+      //    onClick as a real click and IS the fleet's honest public
+      //    activation ("not a bridge call", native-play §4). The waitForClickable
+      //    above already proved the button is genuinely visible/enabled/
+      //    unobscured. The success TOAST is NOT awaited: the product now
+      //    emits it only after the persistence promise yields (round-4/5
+      //    review), so waiting for it would let persistence finish and
+      //    destroy the fast-close race. The accepted-action marker is the
+      //    OPTIMISTIC highlight overlay — the store add (addHighlight) is
+      //    synchronous, so the public `Highlight: …` aria label renders
+      //    within a frame, BEFORE persistence. The observation time is part
+      //    of the measured action→close interval.
+      const tAction = Date.now();
+      await browser.execute(() =>
         document
           .querySelector('button[aria-label="Highlight with Yellow"]')
-          ?.click();
-        const toast = Array.from(
-          document.querySelectorAll("[class*='toast'], [role='status']"),
-        )
-          .map((el) => el.textContent)
-          .find((t) => t && /highlight/i.test(t));
-        return { tAction: Date.now(), toastText: toast ?? null };
+          ?.click(),
+      );
+      const observed = await browser.execute(async () => {
+        const deadline = Date.now() + 300;
+        while (Date.now() < deadline) {
+          const el = document.querySelector('[aria-label*="Highlight: "]');
+          if (el) {
+            return { accepted: true, label: el.getAttribute("aria-label") };
+          }
+          await new Promise((r) => setTimeout(r, 25));
+        }
+        return { accepted: false };
       });
-      const toastText = result.toastText;
-      // DL-1's premise is that the app SAID it saved. If the toast never
-      // appeared, the premise is absent and a later green would be vacuous.
-      if (!toastText) {
+      if (!observed.accepted) {
         throw new Error(
-          "no success toast after the Yellow click — DL-1's premise (the app claimed it saved) is unproven, so the close would test nothing",
+          "no accepted highlight marker after the public Yellow click — the app did not acknowledge the action, so the close would test nothing",
         );
       }
-      console.log("DIAG dl1-create:", JSON.stringify({ toastText }));
-      const timings = await closeAndObserve(result.tAction);
+      console.log(
+        "DIAG dl1-create:",
+        JSON.stringify({ accepted: observed.label }),
+      );
+      const timings = await closeAndObserve(tAction);
       console.log("DIAG dl1-close:", JSON.stringify(timings));
     } else if (PHASE === "dl1-verify") {
-      // ── THE CLAIM: the highlight survived — the app said it saved. ───────
+      // ── THE CLAIM: the highlight survived the immediate close. The
+      //    product no longer claims success before persistence (the toast is
+      //    honest, round-4/5) — the claim is that a highlight the user saw
+      //    created (the optimistic overlay) survives the close. ────────────
       await browser.waitUntil(
         async () =>
           browser.execute(
@@ -373,7 +399,7 @@ describe("Packaged close journey (DL-1 highlight loss, DL-2 position loss)", () 
         {
           timeout: 15000,
           timeoutMsg:
-            "highlight LOST after an immediate close — the app claimed success before the debounced write flushed (DL-1)",
+            "highlight LOST after an immediate close — a highlight the user saw created did not survive (DL-1)",
         },
       );
       console.log(
@@ -382,32 +408,51 @@ describe("Packaged close journey (DL-1 highlight loss, DL-2 position loss)", () 
       );
     } else if (PHASE === "dl2-create") {
       // ── Turn a page (page 3), then close IMMEDIATELY — inside the 500 ms
-      //    useAutoSave debounce. HARNESS CONTRACT: NOTHING between tAction
-      //    and the close — no waitUntil, no DOM read, no IPC probe. Those
-      //    round trips silently discard part of the window being raced and
-      //    inflated action→close past 500ms (the 551-571ms self-inflicted
-      //    measurements). The click AND the synchronous store read happen
-      //    inside ONE execute; `tAction` is stamped after the click, before
-      //    the 500ms debounce timer can mature.
+      //    useAutoSave debounce. HARNESS CONTRACT: the actor acts through
+      //    the PUBLIC WebDriver click (no injected DOM click); tAction is
+      //    stamped BEFORE it; the accepted marker is the PUBLIC Current page
+      //    input showing 3 (the store update is synchronous — the autosave
+      //    write is the async part); the observation time is part of the
+      //    measured action→close interval.
       const next = await $('button[title="Next page (Right Arrow)"]');
       await next.waitForClickable({ timeout: 10000 });
       // Prepare the close observer BEFORE the action (imports, regex,
       // precondition captures — nothing of it may run inside the interval).
       const closeAndObserve = prepareCloseObserver();
-      const result = await browser.execute(() => {
+      // The activation is element.click() via execute — the vimeflow#65 pin
+      // (WebDriver pointer dispatch fires zero onClick on this stack; see the
+      // dl1-create comment). tAction BEFORE the activation; the accepted
+      // marker is the synchronous page state (the store — the public
+      // Current-page input is an effect-synced render behind it); the
+      // observation time is part of the measured action→close interval.
+      const tAction = Date.now();
+      await browser.execute(() =>
         document
           .querySelector('button[title="Next page (Right Arrow)"]')
-          ?.click();
-        return {
-          tAction: Date.now(),
-          storePage: window.__E2E_READ__.currentPage(),
-        };
+          ?.click(),
+      );
+      const pageSeen = await browser.execute(async () => {
+        // The store updates SYNCHRONOUSLY in the click handler; the public
+        // Current-page input is an effect-synced render behind it (2 frames
+        // under load), so the synchronous page state is the reliable
+        // within-measurement marker — the same source the lane's verify
+        // probes read.
+        const deadline = Date.now() + 300;
+        while (Date.now() < deadline) {
+          if (window.__E2E_READ__ && window.__E2E_READ__.currentPage() === 3) {
+            return true;
+          }
+          await new Promise((r) => setTimeout(r, 25));
+        }
+        return false;
       });
       // The state updated synchronously after the public click — the user's
-      // action landed. (A stale store here would be a product defect, not a
+      // action landed. (A stale page here would be a product defect, not a
       // harness concern.)
-      expect(result.storePage).toBe(3);
-      const timings = await closeAndObserve(result.tAction);
+      if (!pageSeen) {
+        throw new Error("page did not advance to 3 after the public Next click");
+      }
+      const timings = await closeAndObserve(tAction);
       console.log("DIAG dl2-close:", JSON.stringify(timings));
     } else {
       // ── THE CLAIM: the position survived — the reader must return to the
