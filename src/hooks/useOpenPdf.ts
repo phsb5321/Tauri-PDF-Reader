@@ -94,13 +94,19 @@ export function useOpenPdf() {
         // operations correctly refused the reader but left the row for book A
         // pointing at bytes B. No database mutation happens until the exact
         // bytes to be displayed are known to be this row's book.
-        const pdf = await pdfService.loadDocument(path, {
+        await pdfService.loadDocument(path, {
           expectedSha256: document.id,
         });
         // Hash again at the backend boundary immediately before the update.
-        // If the path changed after the frontend read, relocate refuses and
-        // the verified PDF is never shown under a stale row.
+        // If the path changed after the frontend read, relocate refuses.
         const relocated = await libraryRelocateDocument(document.id, path);
+        // A mutable external path can change after ANY check. Read it once
+        // more after the DB mutation and display only these final, hash-bound
+        // bytes. If it changed, the row is still recoverable: ordinary resume
+        // treats PDF_HASH_MISMATCH like a lost grant and asks for the book.
+        const pdf = await pdfService.loadDocument(relocated.filePath, {
+          expectedSha256: document.id,
+        });
         return { pdf, document: relocated };
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
@@ -173,7 +179,16 @@ export function useOpenPdf() {
         );
       }
 
-      showInReader(pdf, document);
+      // Fresh imports mutate the row after the first read. Display a final
+      // bound read so a post-hash path replacement is never rendered under
+      // the row created for the earlier bytes. Known rows had no path mutation
+      // in this flow, so their already-bound read is the final one.
+      const displayPdf = known
+        ? pdf
+        : await pdfService.loadDocument(filePath, {
+            expectedSha256: document.id,
+          });
+      showInReader(displayPdf, document);
       return true;
     } catch (error: unknown) {
       const message =
@@ -225,10 +240,18 @@ export function useOpenPdf() {
             },
           );
         } catch (error: unknown) {
-          if (!isScopeDenial(error)) throw error;
+          const message =
+            error instanceof Error ? error.message : String(error);
+          const needsReauthorization =
+            isScopeDenial(error) || message.includes("PDF_HASH_MISMATCH");
+          if (!needsReauthorization) throw error;
 
-          // The stored path lost its fs grant (issue #120): reauthorize via
-          // the native dialog, verify content, relocate, retry.
+          // The stored path lost its fs grant OR its bytes no longer match the
+          // row (a mutable external path changed after an earlier verified
+          // open): reauthorize via the native dialog, verify content, relocate,
+          // retry. Hash mismatch must be recoverable, not a permanently broken
+          // row that can never reach the picker.
+
           const reauthorized = await reauthorizeAccess(document);
           if (!reauthorized) return false; // cancel/wrong file — error is set
           pdf = reauthorized.pdf;

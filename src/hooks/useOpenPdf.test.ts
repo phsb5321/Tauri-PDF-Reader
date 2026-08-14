@@ -159,6 +159,7 @@ describe("openPdf", () => {
   it("registers a file the library has never seen", async () => {
     openDialog.mockResolvedValue("/books/new.pdf");
     loadDocumentBound.mockResolvedValue(bytesOf(pdf(30)));
+    loadDocument.mockResolvedValue(pdf(30)); // final post-add bound read
     library({ known: null });
 
     const { result } = renderHook(() => useOpenPdf());
@@ -257,7 +258,8 @@ describe("resumeDocument reauthorization rung (issue #120)", () => {
 
     loadDocument
       .mockRejectedValueOnce(scopeDenial) // stored path: grant gone
-      .mockResolvedValueOnce(pdf(300)); // picked path: fresh dialog grant
+      .mockResolvedValueOnce(pdf(300)) // picked path: pre-mutation check
+      .mockResolvedValueOnce(pdf(300)); // picked path: final bound display read
     openDialog.mockResolvedValue("/books/moved/one.pdf");
     mockInvoke.mockImplementation((command: string) => {
       switch (command) {
@@ -443,16 +445,29 @@ describe("every known-row open binds the bytes to the row hash (Codex exact-head
     });
   });
 
-  it("a file replaced at the row's path is refused on resume, not rendered", async () => {
-    // The row's path now holds DIFFERENT bytes (a swap after a failed
-    // retry): the resume must refuse them instead of rendering unverified.
+  it("a row whose external path changed can reauthorize instead of staying broken", async () => {
     const stored = doc({ currentPage: 42 });
-    loadDocument.mockRejectedValue(
-      new Error(
-        "PDF_HASH_MISMATCH: File content changed after verification — the book was not opened.",
+    const repaired = doc({
+      currentPage: 42,
+      filePath: "/books/restored/one.pdf",
+    });
+    loadDocument
+      .mockRejectedValueOnce(
+        new Error(
+          "PDF_HASH_MISMATCH: File content changed after verification — the book was not opened.",
+        ),
+      )
+      .mockResolvedValueOnce(pdf(300)) // pre-relocate verification
+      .mockResolvedValueOnce(pdf(300)); // final post-relocate display read
+    openDialog.mockResolvedValue("/books/restored/one.pdf");
+    mockInvoke.mockImplementation((command: string) =>
+      Promise.resolve(
+        command === "library_relocate_document" ||
+          command === "library_open_document"
+          ? repaired
+          : null,
       ),
     );
-    mockInvoke.mockResolvedValue(stored);
 
     const { result } = renderHook(() => useOpenPdf());
     let resumed: boolean | undefined;
@@ -460,8 +475,15 @@ describe("every known-row open binds the bytes to the row hash (Codex exact-head
       resumed = await result.current.resumeDocument(stored);
     });
 
-    expect(resumed).toBe(false);
-    expect(useDocumentStore.getState().error).toContain("PDF_HASH_MISMATCH");
-    expect(useDocumentStore.getState().pdfDocument).toBeNull();
+    expect(resumed).toBe(true);
+    expect(openDialog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: expect.stringContaining("Reauthorize"),
+      }),
+    );
+    expect(useDocumentStore.getState().currentDocument?.filePath).toBe(
+      "/books/restored/one.pdf",
+    );
+    expect(useDocumentStore.getState().currentPage).toBe(42);
   });
 });
