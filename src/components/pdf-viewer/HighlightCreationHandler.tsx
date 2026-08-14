@@ -121,12 +121,30 @@ export function useHighlightCreation({
       // Add to store (immediate UI update)
       addHighlight(highlight);
 
-      // Persist to backend (async, with retry)
-      createHighlight(highlight);
-
-      // Notify success callback
-      onSuccess?.(highlight);
-      toastSuccess("Highlight created");
+      // Persist to backend (async, with retry). The flush is awaited BEFORE
+      // the success UX: "Highlight created" must never precede the write
+      // attempt (exact-head codex review, MAJOR). The promise settles when
+      // the attempt finishes — background failures re-queue and resolve with
+      // { failed: true } (surfaced via onError, retried by the debounced
+      // path), so the toast fires ONLY when the write actually landed. Under
+      // a hard teardown that kills the write mid-flight the toast is never
+      // shown.
+      const persist = createHighlight(highlight);
+      const succeed = (): void => {
+        onSuccess?.(highlight);
+        toastSuccess("Highlight created");
+      };
+      if (persist) {
+        void persist.then((outcome) => {
+          // Per-ENTRY gating: the pass outcome is shared across the entries
+          // it drained — a sibling's failure must not suppress THIS
+          // highlight's success signal when its own write landed (exact-
+          // head codex review, MAJOR).
+          if (!outcome.failedIds.includes(highlight.id)) succeed();
+        });
+      } else {
+        succeed();
+      }
 
       // Clear selection
       setPendingSelection(null);

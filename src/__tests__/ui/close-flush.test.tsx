@@ -62,7 +62,9 @@ beforeEach(() => {
   useLibraryStore.getState().reset();
   useCollectionsStore.getState().reset();
   loadDocument.mockReset();
-  loadDocument.mockResolvedValue({ numPages: 529 } as unknown as PDFDocumentProxy);
+  loadDocument.mockResolvedValue({
+    numPages: 529,
+  } as unknown as PDFDocumentProxy);
 
   mockInvoke.mockImplementation((command: string) => {
     switch (command) {
@@ -102,9 +104,13 @@ describe("the close-flush protocol (112)", () => {
   it("flushes pending position and acknowledges before the close completes", async () => {
     render(<ReaderView />);
 
-    const shelf = await screen.findByRole("region", { name: "Continue reading" });
+    const shelf = await screen.findByRole("region", {
+      name: "Continue reading",
+    });
     fireEvent.click(
-      within(shelf).getByRole("button", { name: /^Resume Domain-Driven Design, page/ }),
+      within(shelf).getByRole("button", {
+        name: /^Resume Domain-Driven Design, page/,
+      }),
     );
     await waitFor(() =>
       expect(screen.getByTestId("pdf-viewer")).toBeInTheDocument(),
@@ -131,8 +137,122 @@ describe("the close-flush protocol (112)", () => {
         .mock.calls.filter(([cmd]) => cmd === "library_update_progress");
       expect(calls.length).toBeGreaterThan(0);
     });
-    await waitFor(() =>
-      expect(emit).toHaveBeenCalledWith("app-close-ack"),
+    await waitFor(() => expect(emit).toHaveBeenCalledWith("app-close-ack"));
+  });
+
+  it("does NOT acknowledge until the in-flight position write lands", async () => {
+    // The close protocol must ack ONLY after the position write actually
+    // completed — never while it is still mid-IPC (the hook-level ordering
+    // is pinned in useAutoSave.test.ts; this pins it at the UI seam).
+    render(<ReaderView />);
+
+    const shelf = await screen.findByRole("region", {
+      name: "Continue reading",
+    });
+    fireEvent.click(
+      within(shelf).getByRole("button", {
+        name: /^Resume Domain-Driven Design, page/,
+      }),
     );
+    await waitFor(() =>
+      expect(screen.getByTestId("pdf-viewer")).toBeInTheDocument(),
+    );
+    await waitFor(() => expect(closeRequestedListener()).toBeDefined());
+
+    act(() => {
+      fireEvent.keyDown(window, { key: "PageDown" });
+    });
+    await waitFor(() =>
+      expect(useDocumentStore.getState().currentPage).toBe(214),
+    );
+
+    // The close path's position write stays in flight until we resolve it.
+    let resolveWrite!: () => void;
+    mockInvoke.mockImplementation((command: string) => {
+      if (command === "library_update_progress") {
+        return new Promise((resolve) => {
+          resolveWrite = () => resolve(null);
+        });
+      }
+      return Promise.resolve(null);
+    });
+
+    act(() => {
+      closeRequestedListener()?.();
+    });
+    await waitFor(() =>
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "library_update_progress",
+        expect.anything(),
+      ),
+    );
+
+    // The write is still in flight — let the flush settle, then assert the
+    // ack has NOT been emitted yet.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(vi.mocked(emit)).not.toHaveBeenCalledWith("app-close-ack");
+
+    act(() => {
+      resolveWrite();
+    });
+    await waitFor(() =>
+      expect(vi.mocked(emit)).toHaveBeenCalledWith("app-close-ack"),
+    );
+  });
+
+  it("does NOT acknowledge when the position flush rejects", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    render(<ReaderView />);
+
+    const shelf = await screen.findByRole("region", {
+      name: "Continue reading",
+    });
+    fireEvent.click(
+      within(shelf).getByRole("button", {
+        name: /^Resume Domain-Driven Design, page/,
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("pdf-viewer")).toBeInTheDocument(),
+    );
+    await waitFor(() => expect(closeRequestedListener()).toBeDefined());
+
+    // Turn a page — a pending position write — and make the BACKEND write
+    // fail, so the close flush rejects.
+    act(() => {
+      fireEvent.keyDown(window, { key: "PageDown" });
+    });
+    await waitFor(() =>
+      expect(useDocumentStore.getState().currentPage).toBe(214),
+    );
+    mockInvoke.mockImplementation((command: string) => {
+      if (command === "library_update_progress") {
+        return Promise.reject(new Error("backend down"));
+      }
+      return Promise.resolve(null);
+    });
+
+    act(() => {
+      closeRequestedListener()?.();
+    });
+
+    // First let the rejection path SETTLE — the failure is surfaced (the
+    // catch logs it). Only then is the negative ack assertion meaningful:
+    // asserting "not called" before the path settles can false-green.
+    await waitFor(() =>
+      expect(errorSpy).toHaveBeenCalledWith(
+        "Failed to flush on close:",
+        expect.anything(),
+      ),
+    );
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    // The flush rejected — the protocol must NOT have emitted the success
+    // ack, even after the rejection fully settled.
+    expect(vi.mocked(emit)).not.toHaveBeenCalledWith("app-close-ack");
+    errorSpy.mockRestore();
   });
 });

@@ -504,7 +504,7 @@ pub fn run() {
         // timeout (a hung renderer must not strand the user), then destroy.
         .on_window_event(|window, event| {
             use std::sync::atomic::{AtomicBool, Ordering};
-            use tauri::{Emitter, Manager};
+            use tauri::{Emitter, Listener, Manager};
             static CLOSE_FLUSH_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
 
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -517,23 +517,33 @@ pub fn run() {
 
                 let app_handle = window.app_handle().clone();
                 let win = window.clone();
-                // app-scoped emit: the frontend's listen() subscribes at the app
-                // level (matching every other event in this codebase); a
+                // REGISTER THE ACK LISTENER BEFORE THE EMIT — the exact-head
+                // review's race: an emit that fires before the listen can
+                // lose a FAST renderer ack (a flush with nothing pending
+                // acks immediately), stranding the window on the full 3s
+                // timeout for every fast close. The listener is app-scoped
+                // (matching every other event in this codebase). listen
+                // returns an EventId (Copy) — removal is the explicit
+                // app_handle.unlisten(id), never drop (clippy: drop of a
+                // Copy does nothing). watch::Sender::send is &self, so the
+                // Fn closure can signal it (oneshot's Sender would be moved
+                // out).
+                let (tx, mut rx) = tokio::sync::watch::channel(false);
+                let ack_id = app_handle.listen("app-close-ack", move |_| {
+                    let _ = tx.send(true);
+                });
+                // app-scoped emit: the frontend's listen() subscribes at the
+                // app level (matching every other event in this codebase); a
                 // window-scoped emit would never reach it.
                 let _ = app_handle.emit("app-close-requested", ());
                 tauri::async_runtime::spawn(async move {
-                    use tauri::Listener;
-                    // watch::Sender::send is &self, so the listen callback
-                    // (Fn, not FnOnce) can signal it; oneshot's Sender would
-                    // be moved out of the closure.
-                    let (tx, mut rx) = tokio::sync::watch::channel(false);
-                    let _unlisten = app_handle.listen("app-close-ack", move |_| {
-                        let _ = tx.send(true);
-                    });
                     // Timeout guard: if the renderer never acks, close anyway.
                     let _ =
                         tokio::time::timeout(std::time::Duration::from_secs(3), rx.changed()).await;
                     let _ = win.destroy();
+                    // The listener lived exactly as long as the protocol
+                    // needed it — remove it after the destroy.
+                    app_handle.unlisten(ack_id);
                 });
             }
         });
