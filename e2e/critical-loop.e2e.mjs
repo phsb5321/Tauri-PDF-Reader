@@ -148,6 +148,15 @@ describe("Critical loop (load → render → synced karaoke → menu dispatch)",
 });
 
   it("B4 (slice 109): a failed open surfaces the error banner on the library", async () => {
+    // The app may have reloaded since the session started (the karaoke step
+    // ends outside the startup surface); the bridge re-installs on load. Wait
+    // for it — calling installCorruptOpenFixture before it exists is the
+    // "undefined is not an object" race this lane hit in CI rehearsal.
+    await browser.waitUntil(
+      async () =>
+        browser.execute(() => !!(window.__E2E__ && window.__E2E__.ready)),
+      { timeout: 30000, timeoutMsg: "E2E bridge never became ready (B4)" },
+    );
     await browser.execute(async () =>
       window.__E2E__.installCorruptOpenFixture(),
     );
@@ -177,14 +186,18 @@ describe("Critical loop (load → render → synced karaoke → menu dispatch)",
 
   it("111: rem text scales with the root font size (OS text-size preference)", async () => {
     // #108 converted every stylesheet to rem; the root must not be pinned.
-    // Grow the root to 24px and assert a rem-sized element actually grows.
+    // Probe the LIBRARY TITLE: an always-present element on this surface,
+    // sized by the same 1.5rem token (--text-2xl) as the resume line. The
+    // critical-loop profile seeds no library rows, so .resume-line-title
+    // never exists here — measuring it makes the assertion null-vs-36px and
+    // fails deterministically on a healthy app.
     const before = await browser.execute(() => {
-      const el = document.querySelector(".resume-line-title");
+      const el = document.querySelector(".library-title");
       return el ? getComputedStyle(el).fontSize : null;
     });
     await browser.execute(async () => window.__E2E__.setRootFontSize(24));
     const after = await browser.execute(() => {
-      const el = document.querySelector(".resume-line-title");
+      const el = document.querySelector(".library-title");
       return el ? getComputedStyle(el).fontSize : null;
     });
     console.log(
