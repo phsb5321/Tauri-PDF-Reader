@@ -43,31 +43,35 @@ const fail = (msg) => {
 };
 
 // ── Fail-closed loading ─────────────────────────────────────────────────────
-let source;
-try {
-  source = readFileSync(WF, "utf8");
-} catch (e) {
-  console.error(`CONTRACT VIOLATION: workflow file unreadable: ${WF} (${e.message})`);
-  process.exit(2);
+function loadWorkflow(file) {
+  let source;
+  try {
+    source = readFileSync(file, "utf8");
+  } catch (e) {
+    console.error(`CONTRACT VIOLATION: workflow file unreadable: ${file} (${e.message})`);
+    process.exit(2);
+  }
+  let docs;
+  try {
+    docs = YAML.parseAllDocuments(source);
+  } catch (e) {
+    console.error(`CONTRACT VIOLATION: workflow unparseable: ${e.message}`);
+    process.exit(2);
+  }
+  if (docs.length !== 1) {
+    console.error(
+      `CONTRACT VIOLATION: expected exactly one YAML document, found ${docs.length} (multi-document workflows are rejected)`,
+    );
+    process.exit(2);
+  }
+  const d = docs[0];
+  if (d.errors && d.errors.length > 0) {
+    console.error(`CONTRACT VIOLATION: workflow unparseable: ${d.errors[0].message}`);
+    process.exit(2);
+  }
+  return d;
 }
-let docs;
-try {
-  docs = YAML.parseAllDocuments(source);
-} catch (e) {
-  console.error(`CONTRACT VIOLATION: workflow unparseable: ${e.message}`);
-  process.exit(2);
-}
-if (docs.length !== 1) {
-  console.error(
-    `CONTRACT VIOLATION: expected exactly one YAML document, found ${docs.length} (multi-document workflows are rejected)`,
-  );
-  process.exit(2);
-}
-const doc = docs[0];
-if (doc.errors && doc.errors.length > 0) {
-  console.error(`CONTRACT VIOLATION: workflow unparseable: ${doc.errors[0].message}`);
-  process.exit(2);
-}
+const doc = loadWorkflow(WF);
 // M1: anchors/aliases/merge keys are REJECTED BY PRESENCE — GitHub really
 // executes them, so the contract must not claim fail-closed by expanding
 // them. A manual AST walk (the visit() Pair callback resolves values and
@@ -361,5 +365,36 @@ const checkoutRef = (Array.isArray(contract.steps) ? contract.steps : [])
   .join(" ");
 if (!checkoutRef.includes("pull_request.base.sha"))
   fail("contract job does not pin its checkout to the base sha");
+
+// ── EXHAUSTIVE CLOSURE: deep structural equality against the BASE-OWNED
+// canonical fixture (resolved relative to THIS checker, never the candidate
+// or workspace cwd). Extra steps, command suffixes, token-bearing
+// modifications, env overrides and any unknown nested key all fail here.
+const CANONICAL = path.join(SCRIPT_DIR, "test", "fixtures", "packaged-user-gate.yml");
+const canonicalDoc = loadWorkflow(CANONICAL);
+const deepEqual = (a, b) => {
+  if (a === b) return true;
+  if (a === null || b === null || typeof a !== typeof b) return false;
+  if (Array.isArray(a) || Array.isArray(b))
+    return (
+      Array.isArray(a) &&
+      Array.isArray(b) &&
+      a.length === b.length &&
+      a.every((x, i) => deepEqual(x, b[i]))
+    );
+  if (typeof a === "object") {
+    const ka = Object.keys(a);
+    const kb = Object.keys(b);
+    return (
+      ka.length === kb.length &&
+      ka.every((k) => kb.includes(k) && deepEqual(a[k], b[k]))
+    );
+  }
+  return false;
+};
+if (!deepEqual(wf, canonicalDoc.toJS({ maxAliasCount: 100 })))
+  fail(
+    "candidate workflow is not deep-structural-equal to the canonical fixture — extra steps, command suffixes, token-bearing modifications and unknown fields are rejected",
+  );
 
 process.exit(status);
