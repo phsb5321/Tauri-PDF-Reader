@@ -474,4 +474,53 @@ describe("useHighlightPersistence — the shared-queue close contract", () => {
     expect(settled).toBe(true);
     expect(highlightsCreate).toHaveBeenCalledTimes(1);
   });
+
+  it("a pass outcome is per-entry: a sibling's failure does not mark a landed create", async () => {
+    // The exact-head Codex review's MAJOR (pass-wide outcome): A's first
+    // attempt fails (in flight), B enqueues and its join-pass retries A AND
+    // lands B; A's retry fails in that same pass. The pass outcome is
+    // { failed: true } (the pass failed) but failedIds must carry ONLY A —
+    // B's handler checks its own id and toasts a landed write.
+    const dA = deferred();
+    highlightsCreate
+      .mockImplementationOnce(() => dA.promise) // call 1: A in flight
+      .mockResolvedValueOnce(undefined) // call 2: B lands in the join-pass
+      .mockRejectedValueOnce(new Error("still down")); // call 3: A's retry fails
+
+    const a = renderHook(() =>
+      useHighlightPersistence({ documentId: "doc-1" }),
+    );
+    let outcomeA: { failed: boolean; failedIds: string[] } | undefined;
+    act(() => {
+      const p = a.result.current.createHighlight(fakeHighlight("h-A"));
+      if (p) void p.then((o) => {
+        outcomeA = o;
+      });
+    });
+    expect(highlightsCreate).toHaveBeenCalledTimes(1);
+
+    let outcomeB: { failed: boolean; failedIds: string[] } | undefined;
+    act(() => {
+      const p = a.result.current.createHighlight(fakeHighlight("h-B"));
+      if (p) void p.then((o) => {
+        outcomeB = o;
+      });
+    });
+
+    dA.reject(new Error("backend down"));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // A's own outcome marks A failed.
+    expect(outcomeA?.failed).toBe(true);
+    expect(outcomeA?.failedIds).toContain("h-A");
+    // B landed in the pass that retried A: the pass FAILED (A's retry), but
+    // B's id is NOT in failedIds — the per-entry gate lets B's handler
+    // signal success for the write that actually landed.
+    expect(outcomeB?.failed).toBe(true);
+    expect(outcomeB?.failedIds).not.toContain("h-B");
+  });
 });

@@ -136,7 +136,11 @@ export function useHighlightCreation({
       };
       if (persist) {
         void persist.then((outcome) => {
-          if (!outcome.failed) succeed();
+          // Per-ENTRY gating: the pass outcome is shared across the entries
+          // it drained — a sibling's failure must not suppress THIS
+          // highlight's success signal when its own write landed (exact-
+          // head codex review, MAJOR).
+          if (!outcome.failedIds.includes(highlight.id)) succeed();
         });
       } else {
         succeed();

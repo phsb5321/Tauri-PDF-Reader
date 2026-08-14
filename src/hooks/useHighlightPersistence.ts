@@ -33,7 +33,11 @@ interface PendingUpdate {
 // A just-created highlight must not be acknowledged as flushed by the other
 // instance's empty queue (the western review's blocker).
 const pendingUpdates = new Map<string, PendingUpdate>();
-let flushInFlight: Promise<{ failed: boolean; error?: unknown }> | null = null;
+let flushInFlight: Promise<{
+  failed: boolean;
+  error?: unknown;
+  failedIds: string[];
+}> | null = null;
 let flushTimer: number | null = null;
 /** The flush attempt whose pass failed, bound to ITS OWN promise. A close
  * flush may only surface a failure it actually JOINED, and only that joiner
@@ -45,7 +49,7 @@ let flushTimer: number | null = null;
  * flush is never joined again), so the retention is one bounded object, not
  * a poison (exact-head Codex review, MINOR — accepted, documented). */
 let lastFlushFailed: {
-  flush: Promise<{ failed: boolean; error?: unknown }>;
+  flush: Promise<{ failed: boolean; error?: unknown; failedIds: string[] }>;
   error: unknown;
 } | null = null;
 
@@ -77,7 +81,7 @@ function scheduleFlush(delayMs: number): void {
  */
 function flushPendingUpdates(opts?: {
   propagateFailure?: boolean;
-}): Promise<{ failed: boolean; error?: unknown }> {
+}): Promise<{ failed: boolean; error?: unknown; failedIds: string[] }> {
   if (flushInFlight) {
     // Join the in-flight flush, then run our own pass. The resolved value
     // is OUR pass's outcome; the joined flush's outcome, if any, is handled
@@ -91,7 +95,7 @@ function flushPendingUpdates(opts?: {
     // unrelated later close flush reject; the join-failure semantics live in
     // flushImmediately, which knows whether THIS call actually joined a
     // failing in-flight flush.
-    return Promise.resolve({ failed: false });
+    return Promise.resolve({ failed: false, failedIds: [] });
   }
   const propagate = opts?.propagateFailure === true;
   // Declared before the run so its closure can bind the wrapper's identity.
@@ -99,14 +103,14 @@ function flushPendingUpdates(opts?: {
   // been reassigned to the real wrapper below — the placeholder never
   // escapes this function (initialized here so TS's closure analysis and
   // eslint's prefer-const both hold).
-  let flush: Promise<{ failed: boolean; error?: unknown }> = Promise.resolve({
-    failed: false,
-  });
+  let flush: Promise<{ failed: boolean; error?: unknown; failedIds: string[] }> =
+    Promise.resolve({ failed: false, failedIds: [] });
   const run = (async () => {
     const updates = new Map(pendingUpdates);
     pendingUpdates.clear();
     let failed = false;
     let firstError: unknown = null;
+    const failedIds: string[] = [];
 
     for (const [id, pending] of updates) {
       try {
@@ -136,9 +140,18 @@ function flushPendingUpdates(opts?: {
         console.error(`Failed to ${pending.type} highlight:`, error);
         failed = true;
         firstError ??= error;
-        pending.onError?.(
-          error instanceof Error ? error : new Error(String(error)),
-        );
+        failedIds.push(id);
+        // The error callback must never turn a background flush into a
+        // rejection (the create path resolves; the handler attaches only a
+        // fulfillment handler) — a throwing onError is logged, not
+        // propagated (exact-head codex review, MINOR).
+        try {
+          pending.onError?.(
+            error instanceof Error ? error : new Error(String(error)),
+          );
+        } catch (callbackError) {
+          console.error("Highlight onError callback threw:", callbackError);
+        }
 
         if (!propagate && pending.type !== "delete") {
           // Background path: re-queue failed updates for retry — but never
@@ -181,8 +194,11 @@ function flushPendingUpdates(opts?: {
     }
 
     // The pass outcome: the flush wrapper (identity) and the outcome
-    // (result) travel as distinct values.
-    return { failed, error: firstError };
+    // (result) travel as distinct values. failedIds is PER-ENTRY — a
+    // highlight that landed in a pass where a SIBLING failed must still be
+    // acknowledged as landed (its handler checks its own id, exact-head
+    // codex review, MAJOR).
+    return { failed, error: firstError, failedIds };
   })();
   // The flush wrapper carries the identity for the joiner's match; the run
   // resolves to the OUTCOME object, so `flush` does too (.finally preserves
@@ -208,7 +224,11 @@ export function useHighlightPersistence({
 }: UseHighlightPersistenceOptions) {
   // Create a new highlight
   const createHighlight = useCallback(
-    (highlight: Highlight): Promise<{ failed: boolean; error?: unknown }> | undefined => {
+    (highlight: Highlight): Promise<{
+      failed: boolean;
+      error?: unknown;
+      failedIds: string[];
+    }> | undefined => {
       if (!documentId) return undefined;
 
       pendingUpdates.set(highlight.id, {

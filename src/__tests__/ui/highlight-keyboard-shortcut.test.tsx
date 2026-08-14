@@ -153,8 +153,8 @@ describe('Ctrl+Shift+H highlights the pending selection', () => {
     let resolveCreate!: () => void;
     createHighlight.mockImplementationOnce(
       () =>
-        new Promise<{ failed: boolean }>((r) => {
-          resolveCreate = () => r({ failed: false });
+        new Promise<{ failed: boolean; failedIds: string[] }>((r) => {
+          resolveCreate = () => r({ failed: false, failedIds: [] });
         }),
     );
 
@@ -184,14 +184,19 @@ describe('Ctrl+Shift+H highlights the pending selection', () => {
   });
 
   it('does NOT signal success when the persistence attempt failed', async () => {
-    // A failed first attempt resolves { failed: true } (the background retry
-    // path re-queues and surfaces via onError) — the success UX must not
-    // fire; "Highlight created" would be a lie for a write that did not
-    // land (exact-head Codex review, MAJOR).
-    createHighlight.mockResolvedValueOnce({
-      failed: true,
-      error: new Error('backend down'),
-    });
+    // A failed first attempt resolves { failed: true } with THIS highlight's
+    // id in failedIds (the background retry path re-queues and surfaces via
+    // onError) — the success UX must not fire; "Highlight created" would be
+    // a lie for a write that did not land (exact-head Codex review, MAJOR).
+    createHighlight.mockImplementationOnce(() =>
+      Promise.resolve({
+        failed: true,
+        error: new Error('backend down'),
+        // The handler adds the highlight to the store BEFORE calling
+        // createHighlight, so the generated id is already knowable here.
+        failedIds: [useDocumentStore.getState().highlights[0].id],
+      }),
+    );
 
     const onSuccess = vi.fn();
     const { result } = renderHook(() =>
@@ -212,5 +217,36 @@ describe('Ctrl+Shift+H highlights the pending selection', () => {
     // The store update still lands (the page shows the highlight; the
     // retry path owns eventual persistence).
     expect(useDocumentStore.getState().highlights).toHaveLength(1);
+  });
+
+  it("signals success when a sibling's write failed but this one landed", async () => {
+    // The pass outcome is shared across the entries it drains: a failing
+    // sibling (a different highlight id in failedIds) must not suppress
+    // THIS highlight's success signal when its own write landed (exact-head
+    // Codex review, MAJOR).
+    createHighlight.mockImplementationOnce(() =>
+      Promise.resolve({
+        failed: true,
+        error: new Error('backend down'),
+        failedIds: ['some-other-highlight-id'],
+      }),
+    );
+
+    const onSuccess = vi.fn();
+    const { result } = renderHook(() =>
+      useHighlightCreation({
+        documentId: 'doc-1',
+        scale: 1,
+        containerRef: { current: document.createElement('div') },
+        onSuccess,
+      }),
+    );
+    act(() => result.current.handleTextSelect(SELECTION));
+    press('H', { ctrlKey: true, shiftKey: true });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(onSuccess).toHaveBeenCalledTimes(1);
   });
 });
