@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* global process, console */
 /**
  * check-packaged-gate-contract.mjs — the REAL-YAML-parser contract for the
  * packaged-user-gate EXECUTION workflow candidate.

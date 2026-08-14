@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* global process, console */
 /**
  * check-packaged-gate-trust-anchor.mjs — static validation of the TRUST
  * ANCHOR workflow fixture (tools/test/fixtures/packaged-gate-trust-anchor.yml).
