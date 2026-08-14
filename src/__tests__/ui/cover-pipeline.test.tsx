@@ -355,6 +355,60 @@ describe("cover pipeline contract (121)", () => {
     expect(mockRepoStore).not.toHaveBeenCalled();
   });
 
+  it("no-observer path balances its ref: the last unmount revokes a pending evicted URL", async () => {
+    // Force the no-IntersectionObserver branch of the effect — a leaked ref
+    // there would defer an evicted URL's revoke forever (Codex round 3).
+    const OriginalIO = globalThis.IntersectionObserver;
+    vi.stubGlobal("IntersectionObserver", undefined);
+    try {
+      stubCanvasToBlob();
+      mockRepoGet.mockResolvedValue(null);
+      mockRepoStore.mockResolvedValue(undefined);
+      mockRepoSize.mockResolvedValue(4096);
+      loadDocumentForCover.mockResolvedValue({
+        doc: { destroy: vi.fn().mockResolvedValue(undefined) },
+      });
+      const { pdfService } = await import("../../services/pdf-service");
+      vi.mocked(pdfService.getPage).mockResolvedValue({
+        getViewport: () => ({ width: 612, height: 792 }),
+      });
+      vi.mocked(pdfService.renderPage).mockReturnValue({
+        promise: Promise.resolve(),
+        cancel: vi.fn(),
+      });
+
+      // Fill the in-memory cache past its bound (64) with unique docs — the
+      // first doc's URL gets evicted while its card is still mounted, so its
+      // revoke is deferred to the last unmount.
+      const mounted: ReturnType<typeof render>[] = [];
+      for (let i = 0; i < 65; i += 1) {
+        const id = (i + 0x80).toString(16).padStart(2, "0");
+        const doc = makeDoc(id.repeat(32));
+        mounted.push(
+          render(
+            <DocumentCover
+              documentId={doc.id}
+              title={doc.title}
+              filePath={doc.filePath}
+            />,
+          ),
+        );
+      }
+      await waitFor(() => expect(mockRepoStore.mock.calls.length).toBe(65));
+
+      // Unmount the FIRST card (its URL was evicted from the cache but it is
+      // still mounted): the balanced ref must fire the deferred revoke.
+      const firstUrl = URL.createObjectURL.mock.results[0].value;
+      act(() => mounted[0].unmount());
+      await waitFor(() =>
+        expect(URL.revokeObjectURL).toHaveBeenCalledWith(firstUrl),
+      );
+      mounted.slice(1).forEach((m) => m.unmount());
+    } finally {
+      vi.stubGlobal("IntersectionObserver", OriginalIO);
+    }
+  });
+
   it("grid card: the open button keeps working with the cover inside", async () => {
     const onClick = vi.fn();
     const { getByRole } = render(

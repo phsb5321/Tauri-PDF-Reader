@@ -107,10 +107,16 @@ describe("Packaged cover journey (slice 121: real first-page covers)", () => {
     await coverC.waitForExist({ timeout: 15000 });
 
     if (PHASE === "first") {
-      // 2. Real rasters: A and B both reach "ready" with decoded pixels.
+      // 2. Real rasters: BOTH A and B must reach "ready" before either hash
+      //    is computed — hashing B while it is still loading would yield a
+      //    null hash and poison the two-cover oracle (Codex round 3).
       await browser.waitUntil(
-        async () => (await coverState("E2E Resume Fixture A"))?.state === "ready",
-        { timeout: 30000, timeoutMsg: "cover A never reached ready" },
+        async () => {
+          const a = await coverState("E2E Resume Fixture A");
+          const b = await coverState("E2E Resume Fixture B");
+          return a?.state === "ready" && b?.state === "ready";
+        },
+        { timeout: 30000, timeoutMsg: "covers A/B never both reached ready" },
       );
       const hashA = await coverHash("E2E Resume Fixture A");
       const hashB = await coverHash("E2E Resume Fixture B");

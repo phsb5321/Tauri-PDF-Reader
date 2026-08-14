@@ -219,20 +219,25 @@ export function useCover({
   useEffect(() => {
     // The refcount tracks MOUNTED cards (acquire here, release in the
     // cleanup) — a card that never intersected must still balance its ref so
-    // a sibling's evicted URL is never revoked while it is displayed.
+    // a sibling's evicted URL is never revoked while it is displayed. ONE
+    // release function is returned from EVERY branch (the no-observer path
+    // included) — a leaked ref would defer an evicted URL's revoke forever.
     const key = cacheKey(documentId);
     acquireCoverRef(key);
-    const el = ref.current;
-    if (!el) {
+    const release = () => {
       const revoke = releaseCoverRef(key);
       if (revoke) URL.revokeObjectURL(revoke);
+    };
+    const el = ref.current;
+    if (!el) {
+      release();
       return;
     }
     // jsdom has no IntersectionObserver; without one, generate immediately so
     // unit tests (and any exotic WebView) still resolve.
     if (typeof IntersectionObserver === "undefined") {
       void generate();
-      return;
+      return release;
     }
     const observer = new IntersectionObserver(
       (entries) => {
@@ -246,8 +251,7 @@ export function useCover({
     observer.observe(el);
     return () => {
       observer.disconnect();
-      const revoke = releaseCoverRef(key);
-      if (revoke) URL.revokeObjectURL(revoke);
+      release();
     };
   }, [generate, documentId]);
 

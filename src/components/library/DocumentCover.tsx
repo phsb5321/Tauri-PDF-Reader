@@ -1,4 +1,4 @@
-import { useMemo, type Ref } from "react";
+import { useMemo, useState, type Ref } from "react";
 import { useCover } from "../../hooks/useCover";
 import "./DocumentCover.css";
 
@@ -32,6 +32,10 @@ export function DocumentCover({
   size = "md",
 }: DocumentCoverProps) {
   const { ref, state, url } = useCover({ documentId, filePath });
+  // UI belt for a raster the backend structurally accepted but the renderer
+  // still cannot decode: fall back deterministically instead of showing a
+  // broken image (Codex round 3).
+  const [broken, setBroken] = useState(false);
   const name = useMemo(
     () => (title && title.trim() ? title.trim() : fileNameFromPath(filePath)),
     [title, filePath],
@@ -52,12 +56,13 @@ export function DocumentCover({
       data-state={state}
       data-seed={String(seed)}
     >
-      {state === "ready" && url ? (
+      {state === "ready" && url && !broken ? (
         <img
           src={url}
           alt=""
           draggable={false}
           className="document-cover-img"
+          onError={() => setBroken(true)}
         />
       ) : (
         <div

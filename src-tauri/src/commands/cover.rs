@@ -37,13 +37,40 @@ use crate::domain::cover::{
     cover_file_name, covers_dir, is_valid_doc_id, COVER_FORMAT_VERSION, MAX_COVER_FILE_BYTES,
 };
 
+/// CRC-32 (IEEE, the PNG polynomial) — table-driven, pure std. A chunk's CRC
+/// covers the chunk type + data; a corrupt cache entry fails it.
+fn crc32(data: &[u8]) -> u32 {
+    fn table() -> [u32; 256] {
+        let mut t = [0u32; 256];
+        for (i, entry) in t.iter_mut().enumerate() {
+            let mut c = i as u32;
+            for _ in 0..8 {
+                c = if c & 1 != 0 {
+                    0xEDB8_8320 ^ (c >> 1)
+                } else {
+                    c >> 1
+                };
+            }
+            *entry = c;
+        }
+        t
+    }
+    static TABLE: std::sync::OnceLock<[u32; 256]> = std::sync::OnceLock::new();
+    let t = TABLE.get_or_init(table);
+    let mut c = 0xFFFF_FFFFu32;
+    for &b in data {
+        c = t[((c ^ b as u32) & 0xFF) as usize] ^ (c >> 8);
+    }
+    c ^ 0xFFFF_FFFF
+}
+
 /// Full PNG structure validation: the signature, then a chunk walk that
-/// enforces every chunk's bounds, an IHDR first with sane dimensions, and a
-/// terminal IEND. A truncated file with a valid header (magic + IHDR only) is
+/// enforces every chunk's bounds, an IHDR first with sane dimensions, a
+/// NON-EMPTY IDAT (the image data), a ZERO-LENGTH terminal IEND, and a valid
+/// CRC-32 on every chunk. A truncated, corrupted, or data-less file is
 /// REJECTED — it must read as a cache miss so the frontend regenerates
-/// instead of serving a broken raster forever. CRC bytes are not recomputed
-/// (the chunk-length bounds + terminal IEND already catch truncation and
-/// structural corruption).
+/// instead of serving a broken raster forever (the decoder is a real
+/// renderer's first gate; CRC + structure is the honest std-only bar).
 fn validate_cover_png(bytes: &[u8]) -> Result<(), String> {
     const SIGNATURE: [u8; 8] = [0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
     if bytes.len() < 8 || bytes[..8] != SIGNATURE {
@@ -67,6 +94,18 @@ fn validate_cover_png(bytes: &[u8]) -> Result<(), String> {
         let total = 8 + len + 4; // header + data + crc
         if offset + total > bytes.len() {
             return Err("VALIDATION_ERROR: truncated PNG chunk".to_string());
+        }
+        // The stored CRC must match the chunk type + data (a corrupt cache
+        // entry — any flipped byte — fails this).
+        let stored_crc = u32::from_be_bytes([
+            bytes[offset + 8 + len],
+            bytes[offset + 8 + len + 1],
+            bytes[offset + 8 + len + 2],
+            bytes[offset + 8 + len + 3],
+        ]);
+        let actual_crc = crc32(&bytes[offset + 4..offset + 8 + len]);
+        if stored_crc != actual_crc {
+            return Err("VALIDATION_ERROR: PNG chunk CRC mismatch".to_string());
         }
         if first {
             if chunk_type != b"IHDR" {
@@ -94,9 +133,15 @@ fn validate_cover_png(bytes: &[u8]) -> Result<(), String> {
         }
         if chunk_type == b"IDAT" {
             saw_idat = true;
+            if len == 0 {
+                return Err("VALIDATION_ERROR: PNG IDAT carries no data".to_string());
+            }
         }
         if chunk_type == b"IEND" {
             saw_iend = true;
+            if len != 0 {
+                return Err("VALIDATION_ERROR: PNG IEND must be zero-length".to_string());
+            }
             offset += total;
             break; // IEND is the TERMINAL chunk — anything after it is garbage
         }
@@ -294,24 +339,32 @@ mod tests {
         dir
     }
 
+    fn chunk(chunk_type: &[u8; 4], data: &[u8]) -> Vec<u8> {
+        // [len:u32][type:4][data][crc32(type+data)] — REAL CRCs (the
+        // validator recomputes them, so fixtures must carry correct ones).
+        let mut out = Vec::with_capacity(12 + data.len());
+        out.extend_from_slice(&(data.len() as u32).to_be_bytes());
+        out.extend_from_slice(chunk_type);
+        out.extend_from_slice(data);
+        let mut body = Vec::with_capacity(4 + data.len());
+        body.extend_from_slice(chunk_type);
+        body.extend_from_slice(data);
+        out.extend_from_slice(&crc32(&body).to_be_bytes());
+        out
+    }
+
     fn tiny_png(w: u32, h: u32) -> Vec<u8> {
-        // A structurally valid minimal PNG: signature + IHDR chunk (13-byte
-        // data: dims + bit depth/color type) + terminal IEND chunk. CRCs are
-        // placeholders (the validator bounds-checks, it does not recompute).
+        // A structurally valid minimal PNG: signature + IHDR (13-byte data:
+        // dims + bit depth/color type) + a NON-EMPTY IDAT (2 zlib header
+        // bytes) + a zero-length terminal IEND, all with real CRCs.
+        let mut ihdr = Vec::new();
+        ihdr.extend_from_slice(&w.to_be_bytes());
+        ihdr.extend_from_slice(&h.to_be_bytes());
+        ihdr.extend_from_slice(&[8, 2, 0, 0, 0]);
         let mut bytes = vec![0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
-        bytes.extend_from_slice(&13u32.to_be_bytes());
-        bytes.extend_from_slice(b"IHDR");
-        bytes.extend_from_slice(&w.to_be_bytes());
-        bytes.extend_from_slice(&h.to_be_bytes());
-        bytes.extend_from_slice(&[8, 2, 0, 0, 0]);
-        bytes.extend_from_slice(&[0, 0, 0, 0]); // crc placeholder
-                                                // A minimal (empty) IDAT — the validator requires image data.
-        bytes.extend_from_slice(&0u32.to_be_bytes());
-        bytes.extend_from_slice(b"IDAT");
-        bytes.extend_from_slice(&[0, 0, 0, 0]); // crc placeholder
-        bytes.extend_from_slice(&0u32.to_be_bytes());
-        bytes.extend_from_slice(b"IEND");
-        bytes.extend_from_slice(&[0, 0, 0, 0]); // crc placeholder
+        bytes.extend_from_slice(&chunk(b"IHDR", &ihdr));
+        bytes.extend_from_slice(&chunk(b"IDAT", &[0x78, 0x9c]));
+        bytes.extend_from_slice(&chunk(b"IEND", &[]));
         bytes
     }
 
@@ -335,13 +388,37 @@ mod tests {
         let mut corrupt = tiny_png(300, 450);
         corrupt[8..12].copy_from_slice(&1_000_000u32.to_be_bytes()); // bogus IDAT len
         assert!(validate_cover_png(&corrupt).is_err());
+
         // IHDR directly followed by IEND — structurally complete but carrying
         // NO image data; it must never be cached (blank-cover class). The
-        // IDAT chunk sits at bytes 33..45 (sig 8 + IHDR 25).
+        // IDAT chunk sits at bytes 33..47 (sig 8 + IHDR 25 + IDAT 14).
         let mut no_idat = tiny_png(300, 450);
-        no_idat.drain(33..45);
+        no_idat.drain(33..47);
         assert_eq!(&no_idat[37..41], b"IEND", "test premise: IHDR then IEND");
         assert!(validate_cover_png(&no_idat).is_err());
+
+        // A zero-data IDAT is rejected — no image bytes to render.
+        let mut ihdr = Vec::new();
+        ihdr.extend_from_slice(&300u32.to_be_bytes());
+        ihdr.extend_from_slice(&450u32.to_be_bytes());
+        ihdr.extend_from_slice(&[8, 2, 0, 0, 0]);
+        let mut empty_idat = vec![0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
+        empty_idat.extend_from_slice(&chunk(b"IHDR", &ihdr));
+        empty_idat.extend_from_slice(&chunk(b"IDAT", &[]));
+        empty_idat.extend_from_slice(&chunk(b"IEND", &[]));
+        assert!(validate_cover_png(&empty_idat).is_err());
+
+        // A flipped byte anywhere breaks the chunk CRC — a corrupt cache
+        // entry must never read as a hit.
+        let mut bad_crc = tiny_png(300, 450);
+        bad_crc[30] ^= 0x01; // inside IHDR data
+        assert!(validate_cover_png(&bad_crc).is_err());
+
+        // A non-zero-length IEND is rejected (the PNG spec pins it at 0).
+        let mut long_iend = tiny_png(300, 450);
+        long_iend.truncate(long_iend.len() - 12);
+        long_iend.extend_from_slice(&chunk(b"IEND", &[0xAA, 0xBB]));
+        assert!(validate_cover_png(&long_iend).is_err());
     }
 
     #[test]
