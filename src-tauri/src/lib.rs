@@ -536,11 +536,8 @@ pub fn run() {
                 let _ = app_handle.emit("app-close-requested", ());
                 tauri::async_runtime::spawn(async move {
                     // Timeout guard: if the renderer never acks, close anyway.
-                    let _ = tokio::time::timeout(
-                        std::time::Duration::from_secs(3),
-                        rx.changed(),
-                    )
-                    .await;
+                    let _ =
+                        tokio::time::timeout(std::time::Duration::from_secs(3), rx.changed()).await;
                     let _ = win.destroy();
                     // The listener lived exactly as long as the protocol
                     // needed it — remove it after the destroy.

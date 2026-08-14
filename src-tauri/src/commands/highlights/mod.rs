@@ -28,7 +28,11 @@ fn parse_e2e_delay(value: Option<&str>) -> u64 {
 
 #[cfg(feature = "e2e-tts-fixture")]
 fn e2e_highlight_create_delay_ms() -> u64 {
-    parse_e2e_delay(std::env::var("LECTRICE_E2E_HIGHLIGHT_CREATE_DELAY_MS").ok().as_deref())
+    parse_e2e_delay(
+        std::env::var("LECTRICE_E2E_HIGHLIGHT_CREATE_DELAY_MS")
+            .ok()
+            .as_deref(),
+    )
 }
 
 /// Create a new highlight
