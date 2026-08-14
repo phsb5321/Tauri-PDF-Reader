@@ -19,7 +19,7 @@ import { useCallback } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { useFileDialog, FILE_FILTERS } from "./useFileDialog";
 import { useDocumentStore } from "../stores/document-store";
-import { pdfService } from "../services/pdf-service";
+import { isScopeDenial, pdfService } from "../services/pdf-service";
 import {
   libraryAddDocument,
   libraryGetDocumentByPath,
@@ -27,22 +27,6 @@ import {
   libraryRelocateDocument,
 } from "../lib/tauri-invoke";
 import type { Document } from "../lib/schemas";
-
-/**
- * plugin-fs rejects reads outside the capability scope with one of:
- * - v2.4.x Linux/Win: "forbidden path: {path}, maybe it is not allowed on the
- *   scope for `allow-read-file` permission in your capability file"
- * - other versions/platforms: "path not allowed on the configured scope"
- * A library book whose dialog grant never existed (pre-persisted-scope
- * sessions) or lapsed fails exactly here — the reauthorization trigger.
- */
-function isScopeDenial(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return (
-    /not allowed on the configured scope/i.test(message) ||
-    /forbidden path: .*not allowed on the scope/i.test(message)
-  );
-}
 
 /** Provides the shared open-a-document actions. */
 export function useOpenPdf() {

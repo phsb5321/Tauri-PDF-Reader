@@ -42,6 +42,22 @@ async function readFileFromTauri(filePath: string): Promise<Uint8Array> {
 }
 
 /**
+ * plugin-fs rejects reads outside the capability scope with one of:
+ * - v2.4.x: "forbidden path: {path}, maybe it is not allowed on the scope for
+ *   `allow-read-file` permission in your capability file"
+ * - other versions/platforms: "path not allowed on the configured scope"
+ * Shared by pdf-service (which must pass these through raw) and the
+ * reauthorization rung in useOpenPdf (which fires on them).
+ */
+export function isScopeDenial(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    /not allowed on the configured scope/i.test(message) ||
+    /forbidden path: .*not allowed on the scope/i.test(message)
+  );
+}
+
+/**
  * Fail-closed fingerprint check: the buffer that is about to be opened must
  * hash to the verified SHA-256, or the open is refused.
  */
@@ -178,6 +194,14 @@ export const pdfService = {
       // Handle common PDF errors
       if (error instanceof Error) {
         console.error("[PDF Service] Error message:", error.message);
+        // Scope denials MUST pass through raw: the reauthorization rung
+        // (useOpenPdf.isScopeDenial) depends on the plugin's exact message
+        // ('forbidden path: ... not allowed on the scope for allow-read-file
+        // permission ...'), and the generic mapping below would swallow it
+        // into PDF_ACCESS_DENIED before the rung ever sees it.
+        if (isScopeDenial(error)) {
+          throw error;
+        }
         if (error.message.includes("password")) {
           throw new Error(
             "PDF_PASSWORD_REQUIRED: This PDF is password protected",

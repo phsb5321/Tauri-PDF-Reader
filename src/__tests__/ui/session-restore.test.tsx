@@ -26,6 +26,10 @@ import type { Document } from "../../lib/schemas";
 
 vi.mock("../../services/pdf-service", () => ({
   pdfService: { loadDocument: vi.fn(), getPage: vi.fn() },
+  isScopeDenial: (e: unknown) =>
+    /not allowed on the configured scope|forbidden path: .*not allowed on the scope/i.test(
+      e instanceof Error ? e.message : String(e),
+    ),
 }));
 
 // Heavy leaves under the shell; not the surface under test.

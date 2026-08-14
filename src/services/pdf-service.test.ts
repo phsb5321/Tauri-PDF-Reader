@@ -103,3 +103,29 @@ describe("pdf-service reauthorization read contract", () => {
     }
   });
 });
+
+describe("scope-denial pass-through (Codex exact-head boundary)", () => {
+  it("rethrows the raw scope denial instead of mapping it to PDF_ACCESS_DENIED", async () => {
+    // The REAL plugin-fs v2.4.5 rejection, as an Error instance: it contains
+    // the word "permission", so the generic mapping WOULD rewrite it to
+    // PDF_ACCESS_DENIED — which the reauthorization rung cannot recognize.
+    // It must reach useOpenPdf verbatim.
+    const raw = new Error(
+      "forbidden path: /books/one.pdf, maybe it is not allowed on the scope " +
+        "for `allow-read-file` permission in your capability file",
+    );
+    readFileMock.mockRejectedValue(raw);
+
+    await expect(pdfService.loadDocument("/books/one.pdf")).rejects.toBe(raw);
+  });
+
+  it("still maps a genuine permission error that is not a scope denial", async () => {
+    readFileMock.mockRejectedValue(
+      new Error("EACCES: permission denied, open '/books/one.pdf'"),
+    );
+
+    await expect(pdfService.loadDocument("/books/one.pdf")).rejects.toThrow(
+      /PDF_ACCESS_DENIED/,
+    );
+  });
+});

@@ -20,6 +20,10 @@ import type { Document } from "../lib/schemas";
 
 vi.mock("../services/pdf-service", () => ({
   pdfService: { loadDocument: vi.fn() },
+  isScopeDenial: (e: unknown) =>
+    /not allowed on the configured scope|forbidden path: .*not allowed on the scope/i.test(
+      e instanceof Error ? e.message : String(e),
+    ),
 }));
 
 vi.mock("../adapters/tauri/file-dialog.adapter", () => ({
