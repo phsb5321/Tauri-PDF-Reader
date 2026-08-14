@@ -14,8 +14,6 @@
 - **Western adversarial review round 2 (Codex, OpenAI-lineage): DONE** — 3 MAJORs / 2 TEST-GAPs; two MAJORs real and fixed fail-first (an interleaved background flush-join could consume the failure record before the close flush that joined the SAME failing flush read it → the record reset is now guarded to non-joining calls; the background requeue of a failed create/update could overwrite a NEWER delete/update enqueued while the write was in flight → requeue is now compare-and-set on timestamp), one REJECTED as out-of-branch (native ack listener-registration race in pre-merged #113 lib.rs — bounded by the 3s timeout, delayed to a backlog slice), both TEST-GAPs closed (UI ordering pin `does NOT acknowledge until the in-flight position write lands`; cross-instance deferred-join test). Evidence: 2 fail-first tests RED pre-fix / GREEN post-fix, 17/17 close surface, record in `.claude/reviews/122-dl2-close-owned.md`. (The round-1 “Review record appended to the PR body” line is superseded: the durable records are the commit bodies + `.claude/reviews/`.)
 - **Revert:** `git revert <squash>` — useAutoSave.ts, useHighlightPersistence.ts, ReaderView.tsx, PageNavigation.tsx, wdio.conf.mjs, e2e/close-journey.e2e.mjs, the three test files, this backlog entry.
 
-||||||| parent of e0326c2 (docs(backlog): iteration #63 — the cover pipeline slice (121))
-
 ## Iteration #64 — 14/08/2026 (121-cover-pipeline: real first-page covers, PR #126)
 
 - **Branch:** `121-cover-pipeline` (off `origin/main` 4fe30e3 → rebased over 8848fc3; worktree `../tauri-pdf-reader-121-cover-pipeline`).
