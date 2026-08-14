@@ -102,6 +102,10 @@ export interface UseCoverOptions {
   filePath: string;
   /** Cards can disable the pipeline (e.g. a missing file the store healed). */
   enabled?: boolean;
+  /** The library row's content hash — a swapped file must never be cached
+   *  under the old id (the #122 row-verification discipline, applied to
+   *  covers). */
+  expectedSha256?: string | null;
 }
 
 export interface UseCoverResult {
@@ -122,6 +126,7 @@ export function useCover({
   documentId,
   filePath,
   enabled = true,
+  expectedSha256,
 }: UseCoverOptions): UseCoverResult {
   const ref = useRef<HTMLDivElement | null>(null);
   const [state, setState] = useState<CoverState>("loading");
@@ -178,6 +183,7 @@ export function useCover({
       loaded = await pdfService.loadDocumentForCover(
         filePath,
         MAX_COVER_SOURCE_BYTES,
+        expectedSha256,
       );
       if (!loaded || "tooBig" in loaded) {
         setState("fallback");
@@ -214,7 +220,7 @@ export function useCover({
       }
       releaseSlot();
     }
-  }, [documentId, filePath, enabled]);
+  }, [documentId, filePath, enabled, expectedSha256]);
 
   useEffect(() => {
     // The refcount tracks MOUNTED cards (acquire here, release in the

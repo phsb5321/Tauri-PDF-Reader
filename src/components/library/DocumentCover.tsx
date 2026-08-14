@@ -6,6 +6,8 @@ interface DocumentCoverProps {
   documentId: string;
   title: string | null;
   filePath: string;
+  /** The library row's content hash (SHA-256) — verified before caching. */
+  fileHash?: string | null;
   size?: "sm" | "md" | "lg";
 }
 
@@ -29,9 +31,14 @@ export function DocumentCover({
   documentId,
   title,
   filePath,
+  fileHash,
   size = "md",
 }: DocumentCoverProps) {
-  const { ref, state, url } = useCover({ documentId, filePath });
+  const { ref, state, url } = useCover({
+    documentId,
+    filePath,
+    expectedSha256: fileHash,
+  });
   // UI belt for a raster the backend structurally accepted but the renderer
   // still cannot decode: fall back deterministically instead of showing a
   // broken image (Codex round 3).

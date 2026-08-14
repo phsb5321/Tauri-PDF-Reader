@@ -153,6 +153,7 @@ export function DocumentCard({
               documentId={document.id}
               title={document.title}
               filePath={document.filePath}
+              fileHash={document.fileHash}
               size="sm"
             />
           </div>
@@ -213,6 +214,7 @@ export function DocumentCard({
             documentId={document.id}
             title={document.title}
             filePath={document.filePath}
+            fileHash={document.fileHash}
             size="md"
           />
           {progress > 0 && (

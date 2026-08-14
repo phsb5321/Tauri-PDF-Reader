@@ -459,9 +459,13 @@ describe("cover pipeline contract (121)", () => {
     await waitFor(() =>
       expect(getByRole("img", { name: "Paper One" }).dataset.state).toBe("ready"),
     );
-    expect(loadDocumentForCover).toHaveBeenCalledWith(
+    // The LAST call is the new-path retry (the first was the failed old
+    // path). This direct render passes no fileHash, so the hook forwards
+    // undefined (the card wires document.fileHash in production).
+    expect(loadDocumentForCover).toHaveBeenLastCalledWith(
       "/books/new.pdf",
       expect.any(Number),
+      undefined,
     );
   });
 

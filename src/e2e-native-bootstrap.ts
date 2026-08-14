@@ -164,9 +164,9 @@ async function seedLibraryProfile(): Promise<void> {
   // first resume. The frontend build for this lane does NOT arm the
   // fixture-bytes seam, so the fs read is the real scope-gated one.
   const reauthOutPath = import.meta.env.VITE_E2E_REAUTH_OUT_PATH;
-  if (reauthOutPath) {
+  if (reauthOutPath && docAId) {
     const relocated = await commands.libraryRelocateDocument(
-      addedA.data.id,
+      docAId,
       reauthOutPath,
     );
     if (relocated.status === "error")
@@ -184,6 +184,7 @@ async function seedLibraryProfile(): Promise<void> {
       const addedC = await commands.libraryAddDocument(
         coverlessPath,
         "E2E Coverless",
+        null,
         null,
       );
       if (addedC.status === "error")
