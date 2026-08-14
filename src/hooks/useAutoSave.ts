@@ -183,8 +183,7 @@ export function useAutoSave({
         while (force || isDirty()) {
           const current = { ...liveRef.current };
           if (
-            lastAttempted &&
-            lastAttempted.documentId === current.documentId &&
+            lastAttempted?.documentId === current.documentId &&
             lastAttempted.currentPage === current.currentPage &&
             lastAttempted.scrollPosition === current.scrollPosition &&
             lastAttempted.lastTtsChunkId === current.lastTtsChunkId

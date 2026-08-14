@@ -136,6 +136,31 @@ export interface TextContent {
   }>;
 }
 
+function rethrowPdfLoadError(error: unknown): never {
+  console.error("[PDF Service] Error loading PDF:", error);
+  if (!(error instanceof Error)) throw error;
+
+  console.error("[PDF Service] Error message:", error.message);
+  // Scope denials MUST pass through raw: the reauthorization rung depends on
+  // the plugin's exact message, which a generic access mapping would swallow.
+  if (isScopeDenial(error)) throw error;
+  if (error.message.includes("password")) {
+    throw new Error("PDF_PASSWORD_REQUIRED: This PDF is password protected");
+  }
+  if (error.message.includes("Invalid PDF")) {
+    throw new Error("PDF_INVALID: The file is not a valid PDF or is corrupted");
+  }
+  if (
+    error.message.includes("denied") ||
+    error.message.includes("permission")
+  ) {
+    throw new Error(
+      "PDF_ACCESS_DENIED: Cannot access the file. Check file permissions.",
+    );
+  }
+  throw error;
+}
+
 /**
  * PDF service for loading and rendering PDF documents
  */
@@ -206,38 +231,7 @@ export const pdfService = {
       );
       return { pdf, sha256 };
     } catch (error) {
-      console.error("[PDF Service] Error loading PDF:", error);
-      // Handle common PDF errors
-      if (error instanceof Error) {
-        console.error("[PDF Service] Error message:", error.message);
-        // Scope denials MUST pass through raw: the reauthorization rung
-        // (useOpenPdf.isScopeDenial) depends on the plugin's exact message
-        // ('forbidden path: ... not allowed on the scope for allow-read-file
-        // permission ...'), and the generic mapping below would swallow it
-        // into PDF_ACCESS_DENIED before the rung ever sees it.
-        if (isScopeDenial(error)) {
-          throw error;
-        }
-        if (error.message.includes("password")) {
-          throw new Error(
-            "PDF_PASSWORD_REQUIRED: This PDF is password protected",
-          );
-        }
-        if (error.message.includes("Invalid PDF")) {
-          throw new Error(
-            "PDF_INVALID: The file is not a valid PDF or is corrupted",
-          );
-        }
-        if (
-          error.message.includes("denied") ||
-          error.message.includes("permission")
-        ) {
-          throw new Error(
-            "PDF_ACCESS_DENIED: Cannot access the file. Check file permissions.",
-          );
-        }
-      }
-      throw error;
+      rethrowPdfLoadError(error);
     }
   },
 
