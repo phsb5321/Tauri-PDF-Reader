@@ -60,3 +60,34 @@ PR-fast stays deterministic fixtures. The real-corpus hook is
 workflow_dispatch-only (post-merge/manual); it is never wired to
 pull_request. Missing corpus, missing driver, missing display → BLOCKED red,
 never skip-green.
+
+## Trust architecture — 3-stage reference (root fix, 14/08)
+
+An in-workflow contract can never self-establish trust: the candidate's
+pull_request workflow controls its own steps before any checker runs. The
+trust boundary is therefore a BASE-OWNED anchor, in three stages:
+
+1. **This bootstrap PR (#119)** — tooling/config only, NO `.github/workflows/**`
+   diff: the parser checkers, the canonical EXECUTION fixture
+   (`tools/test/fixtures/packaged-user-gate.yml` — the three lane jobs only,
+   no contract job), the canonical TRUST-ANCHOR fixture
+   (`tools/test/fixtures/packaged-gate-trust-anchor.yml`), the negative
+   controls, the flake tooling and the e2e runners. Merges safe: nothing in
+   it executes on the self-hosted runner.
+2. **Follow-up PR A (Pedro-gated)** — copies the TRUST-ANCHOR fixture into
+   `.github/workflows/packaged-gate-trust-anchor.yml` and merges. The anchor
+   runs on `pull_request_target` (resolved from BASE — the head cannot
+   modify it), with BASE tools: checkout BASE SHA, fetch the candidate
+   execution workflow at the HEAD sha via the GitHub API AS DATA (never
+   checked out, never executed, no head scripts, HEAD_SHA via env only),
+   run the BASE checker + NC against the fetched file. The first
+   introduction cannot self-run; after this merge the anchor is live.
+3. **Follow-up PR B (Pedro-gated)** — copies the EXECUTION fixture into
+   `.github/workflows/packaged-user-gate.yml`. From then on, EVERY PR's
+   execution workflow is validated by the base anchor (a required check)
+   BEFORE any head-controlled code can reach the self-hosted runner.
+
+The anchor itself is validated by `tools/check-packaged-gate-trust-anchor.mjs`
+(trigger set, one job, same-repo guard, base checkout, API-only head fetch,
+no event-payload shell interpolation, no head execution, SHA pins, deep
+equality) plus review — it is the trust root by construction.

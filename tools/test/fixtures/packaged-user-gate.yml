@@ -24,73 +24,13 @@ env:
   CI: "true"
 
 jobs:
-  contract:
-    # Trusted-base architecture: this job checks out the BASE branch's tools
-    # (never the head's copy — the contract cannot be head-controlled) and
-    # validates the HEAD's workflow file fetched via the API. The self-hosted
-    # runner executes PRs ONLY from this repository (fork PRs are excluded).
-    name: Gate contract (base tools vs head file)
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: [self-hosted, Linux, X64, vm103]
-    timeout-minutes: 10
-
-    steps:
-      - name: Checkout BASE tools (never the head's copy)
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.sha }}
-
-      - name: Setup Node.js (the parser-based checker needs node + yaml)
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: "20"
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
-        with:
-          version: 10
-
-      - name: Install dependencies (yaml is an explicit devDependency)
-        run: pnpm install --frozen-lockfile
-
-      - name: Bootstrap anchor check — base must own the gate tools
-        # Trusted-base architecture: the checker that runs here must come
-        # from BASE. This PR is the FIRST introduction of the workflow and
-        # checker — base does not own them yet, so PR-controlled self-hosted
-        # execution is INERT on this bootstrap PR: the contract job fails
-        # with this exact message, pr-fast is needs-gated off it, and no
-        # head-controlled lane runs. The merge anchors base; every later PR
-        # is enforced by the base-owned copy.
-        run: |
-          if [ ! -x tools/check-packaged-gate-contract.sh ]; then
-            echo "BOOTSTRAP-INERT: base ${{ github.event.pull_request.base.sha || github.sha }} does not yet own tools/check-packaged-gate-contract.sh — this PR only lands the infrastructure; pr-fast is needs-gated off this failure. A follow-up PR after the base anchor can enable base-owned enforcement."
-            exit 1
-          fi
-
-      - name: Fetch the HEAD workflow file and run the BASE contract against it
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            FILE_REF="${{ github.event.pull_request.head.sha }}"
-          else
-            FILE_REF="${{ github.sha }}"
-          fi
-          gh api "repos/${{ github.repository }}/contents/.github/workflows/packaged-user-gate.yml?ref=$FILE_REF" \
-            --jq '.content' | base64 -d > /tmp/head-workflow.yml
-          ./tools/check-packaged-gate-contract.sh /tmp/head-workflow.yml
-
-      - name: Contract negative-control (base tools, head file)
-        env:
-          PACKAGED_GATE_WF: /tmp/head-workflow.yml
-        run: ./tools/test/packaged-gate-contract-negative-control.sh
-
   pr-fast:
     # Same-repo PRs only: the self-hosted runner never executes fork PRs.
+    # This execution workflow is validated by the base-owned trust anchor
+    # (packaged-gate-trust-anchor.yml) BEFORE any head code reaches the
+    # runner — the anchor is a required check.
     name: Packaged PR-fast lane (critical-loop)
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-    needs: contract
     runs-on: [self-hosted, Linux, X64, vm103]
     timeout-minutes: 60
 
@@ -113,10 +53,7 @@ jobs:
       - name: Assert tauri-driver inside the PINNED flake devShell (BLOCKED if missing)
         # The flake devShell is the ONE pinned toolchain place (#101): it ships
         # tauri-driver (packages.tauri-driver, fetchCrate 2.0.6 + cargoLock) and
-        # the pinned rust (rustPlatform.rust). No host provisioning, no
-        # ~/.cargo/bin symlink, no runtime cargo install. A missing driver
-        # means the pinned flake build failed — BLOCKED with a machine-readable
-        # receipt before any lane log exists.
+        # the pinned rust. No host provisioning, no runtime cargo install.
         run: |
           if ! nix develop -c bash -c 'command -v tauri-driver' >/dev/null 2>&1; then
             mkdir -p ci-evidence
@@ -154,7 +91,6 @@ jobs:
   full-matrix:
     name: Full packaged matrix (all lanes, strictly serial)
     if: github.event_name != 'pull_request'
-    needs: contract
     runs-on: [self-hosted, Linux, X64, vm103]
     timeout-minutes: 240
 
@@ -216,11 +152,8 @@ jobs:
     # Engineering corpus). Copyright boundary: the hook stages a TRANSIENT
     # copy inside the hermetic profile (fs scope) and the artifact upload
     # below carries ONLY logs + summary — never PDFs or derived renders.
-    # Run-scoped temps: LECTRICE_CORPUS_OUT lands under runner.temp (per-job),
-    # so fixed-path collisions across runs are impossible.
     name: Real-corpus soak (real PDFs, post-merge/manual)
     if: github.event_name == 'workflow_dispatch'
-    needs: contract
     runs-on: [self-hosted, Linux, X64, vm103]
     timeout-minutes: 240
 
@@ -255,8 +188,6 @@ jobs:
           [ -f ci-evidence/prerequisite-failure.json ] || { echo "FAIL: BLOCKED prerequisite without its machine-readable receipt — evidence discipline broken"; exit 1; }
 
       - name: Assert the real corpus is provisioned locally (BLOCKED if missing)
-        # The corpus lives on the host (never a URL); the hook never stores
-        # or uploads the PDFs. Same receipt discipline as the driver assert.
         run: |
           if [ -z "$LECTRICE_REAL_PDF_CORPUS" ]; then
             mkdir -p ci-evidence

@@ -1,20 +1,20 @@
 #!/usr/bin/env node
 /**
- * check-packaged-gate-contract.mjs — the REAL-YAML-parser gate contract for
- * the packaged-user-gate workflow candidate.
+ * check-packaged-gate-contract.mjs — the REAL-YAML-parser contract for the
+ * packaged-user-gate EXECUTION workflow candidate.
  *
- * Replaces the grep-based checker: a text matcher cannot enforce YAML
- * semantics (flow mappings, explicit keys, escaped keys, block-scalar keys,
- * anchors/aliases all spell the same object differently). This checker
- * parses the workflow with the `yaml` package (explicit devDependency,
- * lockfile-pinned 2.9.0) and asserts on the PARSED OBJECT.
- *
- * Fail-CLOSED: an unreadable file, an unparseable file, or a multi-document
- * file exits non-zero with a distinct message. Anchors/aliases are resolved
- * (bounded) — an aliased pin is the same pin.
+ * Architecture (3-stage): the candidate execution workflow (only the lane
+ * jobs — pr-fast/full-matrix/real-corpus) is validated by the BASE-OWNED
+ * trust anchor (packaged-gate-trust-anchor.yml), which runs on
+ * pull_request_target with BASE tools and fetches the candidate file as
+ * DATA. This checker is the anchor's enforcement: parse with `yaml`
+ * (explicit devDependency, lockfile-pinned), fail-closed on unreadable /
+ * unparseable / multi-document files, reject anchors/aliases/merge keys by
+ * presence, assert the specific semantic invariants, and LAST require deep
+ * structural equality of the whole candidate object against the canonical
+ * execution fixture.
  *
  * Usage: node tools/check-packaged-gate-contract.mjs [workflow.yml]
- *        (default: tools/test/fixtures/packaged-user-gate.yml)
  * Exit: 0 = contract holds · 1 = violation · 2 = tooling/parse failure
  */
 import { readFileSync } from "node:fs";
@@ -26,15 +26,8 @@ const require = createRequire(import.meta.url);
 const YAML = require("yaml");
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
-const DEFAULT_WF = path.join(
-  SCRIPT_DIR,
-  "..",
-  "tools",
-  "test",
-  "fixtures",
-  "packaged-user-gate.yml",
-);
-const WF = process.argv[2] || DEFAULT_WF;
+const CANONICAL = path.join(SCRIPT_DIR, "test", "fixtures", "packaged-user-gate.yml");
+const WF = process.argv[2] || CANONICAL;
 
 let status = 0;
 const fail = (msg) => {
@@ -72,10 +65,10 @@ function loadWorkflow(file) {
   return d;
 }
 const doc = loadWorkflow(WF);
+
 // M1: anchors/aliases/merge keys are REJECTED BY PRESENCE — GitHub really
-// executes them, so the contract must not claim fail-closed by expanding
-// them. A manual AST walk (the visit() Pair callback resolves values and
-// hides the pair keys) inspects every pair key and node property.
+// executes them. A manual AST walk (the visit() Pair callback resolves
+// values and hides the pair keys) inspects every pair key and node property.
 const hasForbiddenYaml = (node) => {
   if (!node || typeof node !== "object") return false;
   if (node.anchor || node.type === "ALIAS" || node.type === "MERGE_KEY") return true;
@@ -85,7 +78,6 @@ const hasForbiddenYaml = (node) => {
       if (it.key && (it.key.value === "<<" || it.key.type === "MERGE_KEY")) return true;
       if (hasForbiddenYaml(it.key)) return true;
       if (hasForbiddenYaml(it.value)) return true;
-      // Sequence items that are not pairs: the item node itself is the child.
       if (it.key === undefined && it.value === undefined) {
         if (hasForbiddenYaml(it)) return true;
       }
@@ -96,10 +88,9 @@ const hasForbiddenYaml = (node) => {
 };
 if (hasForbiddenYaml(doc.contents))
   fail("YAML anchors/aliases/merge keys are not permitted — GitHub executes them; presence is rejected, not expanded");
+
 let wf;
 try {
-  // Bounded alias expansion: the workflow is tiny; a pathological alias bomb
-  // fails closed below the cap.
   wf = doc.toJS({ maxAliasCount: 100 });
 } catch (e) {
   console.error(`CONTRACT VIOLATION: alias expansion failed: ${e.message}`);
@@ -122,56 +113,42 @@ else {
     fail("no nightly schedule for the full matrix");
 }
 
-// ── Inherited shell override: the defaults key is rejected outright ─────────
-// A workflow- or job-level defaults.run.shell would apply to the lane steps
-// (the fixture owns the default shell; nothing needs defaults).
-if (wf.defaults !== undefined)
-  fail("workflow-level defaults are not permitted — the fixture owns the default shell");
-
-// ── Concurrency ──────────────────────────────────────────────────────────────
+// ── Concurrency / permissions / env / defaults (workflow level) ──────────────
 if (!wf.concurrency || wf.concurrency.group !== "packaged-user-gate")
   fail("concurrency group is not the fixed runner-wide packaged-user-gate");
 
-// ── Env closed structurally (BASH_ENV/PATH injection class) ─────────────────
-// Workflow env must be EXACTLY the pinned map; job-level env is banned;
-// step-level env is banned except the two exact pinned contract-step maps.
-const WF_ENV = JSON.stringify({
-  CARGO_TERM_COLOR: "always",
-  RUST_BACKTRACE: "1",
-  CI: "true",
-});
-if (JSON.stringify(wf.env || null) !== WF_ENV)
-  fail("workflow env is not the exact pinned map (CARGO_TERM_COLOR=always, RUST_BACKTRACE=1, CI=true)");
-
-// ── M2: workflow-level permissions must be exactly contents: read ───────────
-const PERMS = JSON.stringify(wf.permissions || null);
-if (PERMS !== JSON.stringify({ contents: "read" }))
+if (JSON.stringify(wf.permissions || null) !== JSON.stringify({ contents: "read" }))
   fail("permissions must be exactly contents: read");
 
-// ── Jobs: closed canonical set ───────────────────────────────────────────────
+if (
+  JSON.stringify(wf.env || null) !==
+  JSON.stringify({ CARGO_TERM_COLOR: "always", RUST_BACKTRACE: "1", CI: "true" })
+)
+  fail("workflow env is not the exact pinned map (CARGO_TERM_COLOR=always, RUST_BACKTRACE=1, CI=true)");
+
+if (wf.defaults !== undefined)
+  fail("workflow-level defaults are not permitted — the fixture owns the default shell");
+
+// ── Jobs: closed canonical set (execution jobs only) ─────────────────────────
 if (!wf.jobs || typeof wf.jobs !== "object")
   fail("jobs section missing or not a mapping");
 else {
-  const expected = ["contract", "full-matrix", "pr-fast", "real-corpus"];
+  const expected = ["full-matrix", "pr-fast", "real-corpus"];
   const actual = Object.keys(wf.jobs).sort();
   if (JSON.stringify(actual) !== JSON.stringify(expected))
     fail(
-      `unexpected self-hosted job set (${actual.join(" ")}) — only contract pr-fast full-matrix real-corpus are permitted`,
+      `unexpected self-hosted job set (${actual.join(" ")}) — only pr-fast full-matrix real-corpus are permitted`,
     );
 }
 
 const CANONICAL_IF = {
-  contract:
-    "github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository",
   "full-matrix": "github.event_name != 'pull_request'",
   "pr-fast":
     "github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository",
   "real-corpus": "github.event_name == 'workflow_dispatch'",
 };
 const USES_RE = /^[\w.-]+\/[\w.-]+(\/[^@]+)?@[0-9a-f]{40}$/;
-// Each REQUIRED NAMED lane step: its COMPLETE parsed run string is pinned
-// to the single canonical command (one final newline normalized) and its
-// shell cannot be overridden (no shell key — the fixture owns the default).
+const RECEIPT_STEP = "Prerequisite receipt enforced";
 const LANE_STEP = {
   "pr-fast": {
     name: "Packaged PR-fast lane",
@@ -190,7 +167,6 @@ const LANE_STEP = {
     canonical: 'LECTRICE_CORPUS_OUT="$RUNNER_TEMP/lectrice-corpus" bash scripts/e2e-real-corpus.sh',
   },
 };
-const RECEIPT_STEP = "Prerequisite receipt enforced";
 
 for (const jobName of Object.keys(CANONICAL_IF)) {
   const job = wf.jobs[jobName];
@@ -198,37 +174,6 @@ for (const jobName of Object.keys(CANONICAL_IF)) {
     fail(`${jobName} job missing from the workflow`);
   else {
     // Exact canonical condition (a missing or skip-capable variant fails).
-    // B2: every lane job must gate on the contract job.
-    if (jobName !== "contract") {
-      const needsOk =
-        job.needs === "contract" ||
-        (Array.isArray(job.needs) && job.needs.includes("contract"));
-      if (!needsOk)
-        fail(`${jobName} job does not require needs: contract — a failing base contract must gate every lane job`);
-    }
-
-    // M2: runs-on must be the exact vm103 label set.
-    if (JSON.stringify(job["runs-on"] || null) !== JSON.stringify(["self-hosted", "Linux", "X64", "vm103"]))
-      fail(`${jobName} runs-on is not the exact vm103 label set [self-hosted, Linux, X64, vm103]`);
-
-    // BLOCKER: job-level continue-on-error is rejected (same class as the
-    // step-level skip-green).
-    if (job["continue-on-error"])
-      fail("continue-on-error found (skip-green)");
-
-    // BLOCKER: a job-local permissions block overrides the global one.
-    if (job.permissions !== undefined)
-      fail("job-level permissions are not permitted — the global permissions must be exactly contents: read");
-
-    // BLOCKER: a job-level defaults.run.shell would inherit onto the lane
-    // steps, bypassing the shell pin.
-    if (job.defaults !== undefined)
-      fail("job-level defaults are not permitted — the fixture owns the default shell");
-
-    // BLOCKER: job-level env is banned (BASH_ENV/PATH injection class).
-    if (job.env !== undefined)
-      fail("job-level env is not permitted — BASH_ENV/PATH injection class");
-
     if (job.if === undefined) {
       if (jobName === "pr-fast")
         fail("pr-fast job-level if: is not the PR trigger + same-repo guard — the gate can be skipped or fork-executed");
@@ -236,141 +181,114 @@ for (const jobName of Object.keys(CANONICAL_IF)) {
         fail(`${jobName} job has no job-level if — it runs on every event including fork PRs`);
     } else if (job.if !== CANONICAL_IF[jobName]) {
       if (jobName === "pr-fast")
-        fail(
-          "pr-fast job-level if: is not the PR trigger + same-repo guard — the gate can be skipped or fork-executed",
-        );
-      else if (jobName === "contract")
-        fail("contract job-level if: is not the exact canonical guard");
+        fail("pr-fast job-level if: is not the PR trigger + same-repo guard — the gate can be skipped or fork-executed");
       else if (jobName === "full-matrix")
         fail("full-matrix job-level if: is not the exact canonical condition");
       else fail("real-corpus job-level if: is not exactly the workflow_dispatch trigger");
     }
+
+    // M2: runs-on must be the exact vm103 label set.
+    if (JSON.stringify(job["runs-on"] || null) !== JSON.stringify(["self-hosted", "Linux", "X64", "vm103"]))
+      fail(`${jobName} runs-on is not the exact vm103 label set [self-hosted, Linux, X64, vm103]`);
+
+    // Banned job-level keys (BASH_ENV/PATH injection + override classes).
+    if (job["continue-on-error"])
+      fail("continue-on-error found (skip-green)");
+    if (job.permissions !== undefined)
+      fail("job-level permissions are not permitted — the global permissions must be exactly contents: read");
+    if (job.defaults !== undefined)
+      fail("job-level defaults are not permitted — the fixture owns the default shell");
+    if (job.env !== undefined)
+      fail("job-level env is not permitted — BASH_ENV/PATH injection class");
 
     const steps = Array.isArray(job.steps) ? job.steps : [];
     const runs = steps
       .filter((s) => s && typeof s.run === "string")
       .map((s) => s.run);
 
-    if (jobName !== "contract") {
-      // Driver prerequisite: the pinned devShell must be asserted in a run.
-      if (
-        !runs.some(
-          (r) => r.includes("nix develop") && r.includes("command -v tauri-driver"),
-        )
+    // Driver prerequisite: the pinned devShell must be asserted in a run.
+    if (
+      !runs.some(
+        (r) => r.includes("nix develop") && r.includes("command -v tauri-driver"),
       )
-        fail("driver assert does not check command -v tauri-driver inside nix develop");
+    )
+      fail("driver assert does not check command -v tauri-driver inside nix develop");
 
-      // Prerequisite receipts: the enforcement step must exist, be
-      // failure-gated, and test the receipt's presence.
-      const enf = steps.find((s) => s && typeof s.name === "string" && s.name.startsWith(RECEIPT_STEP));
-      if (!enf)
-        fail(`${jobName} job lacks the prerequisite-receipt enforcement step`);
-      else {
-        if (enf.if !== "failure()")
-          fail(`${jobName} enforcement step is not failure-gated`);
-        if (typeof enf.run !== "string" || !enf.run.includes("ci-evidence/prerequisite-failure.json"))
-          fail(`${jobName} enforcement step does not test the receipt's presence`);
-      }
-
-      // Lane invocation: the REQUIRED NAMED step's COMPLETE run must equal
-      // the single canonical command (one trailing newline normalized) —
-      // `set +e; …; true` and `… || true` multi-command forms fail.
-      if (LANE_STEP[jobName]) {
-        const spec = LANE_STEP[jobName];
-        const laneStep = steps.find(
-          (st) => st && typeof st.name === "string" && st.name.startsWith(spec.name),
-        );
-        if (!laneStep)
-          fail(`${jobName} job lacks the required lane step "${spec.name}"`);
-        else {
-          if (laneStep.shell !== undefined)
-            fail(`${jobName} lane step shell override is not permitted — the fixture owns the default shell`);
-          const run = typeof laneStep.run === "string" ? laneStep.run.replace(/\n$/, "") : "";
-          if (!spec.run(run))
-            fail(`${jobName} lane step run is not the exact canonical command (${spec.canonical})`);
-        }
-      }
-
-      // Failure/always evidence uploads.
-      if (jobName === "real-corpus") {
-        const up = steps.find((s) => s && typeof s.uses === "string" && s.uses.includes("upload-artifact"));
-        if (!up) fail("real-corpus job has no evidence upload");
-        else if (up.if !== "always()")
-          fail("real-corpus evidence upload is not if: always() — a BLOCKED receipt would never upload");
-      } else {
-        const ups = steps.filter((s) => s && typeof s.uses === "string" && s.uses.includes("upload-artifact"));
-        if (ups.length === 0) fail("no failure-artifact upload");
-        else if (!ups.some((u) => u.if === "failure()"))
-          fail("artifact upload not gated on failure");
-      }
+    // Prerequisite receipts: the enforcement step must exist, be
+    // failure-gated, and test the receipt's presence.
+    const enf = steps.find(
+      (s) => s && typeof s.name === "string" && s.name.startsWith(RECEIPT_STEP),
+    );
+    if (!enf)
+      fail(`${jobName} job lacks the prerequisite-receipt enforcement step`);
+    else {
+      if (enf.if !== "failure()")
+        fail(`${jobName} enforcement step is not failure-gated`);
+      if (typeof enf.run !== "string" || !enf.run.includes("ci-evidence/prerequisite-failure.json"))
+        fail(`${jobName} enforcement step does not test the receipt's presence`);
     }
 
-    // B1: step-level if is only permitted on the receipt-enforcement,
-    // evidence-copy and upload steps — a step-level `if: false` on the lane
-    // or a driver assertion would skip the gate silently.
-    const IF_ALLOWED_NAME = "Prerequisite receipt enforced";
-    // The ONLY permitted step-level env maps: the exact pinned contract-step
-    // maps (name → exact parsed env object).
-    const ALLOWED_STEP_ENV = [
-      { name: "Fetch the HEAD workflow file", env: { GH_TOKEN: "${{ github.token }}" } },
-      { name: "Contract negative-control", env: { PACKAGED_GATE_WF: "/tmp/head-workflow.yml" } },
-    ];
-    for (const s of steps) {
-      if (!s || s.env === undefined) continue;
-      const name = typeof s.name === "string" ? s.name : "";
-      const allowed = ALLOWED_STEP_ENV.find(
-        (a) => name.startsWith(a.name) && JSON.stringify(s.env) === JSON.stringify(a.env),
+    // Lane invocation: the REQUIRED NAMED step's COMPLETE run must equal the
+    // single canonical command (one trailing newline normalized).
+    if (LANE_STEP[jobName]) {
+      const spec = LANE_STEP[jobName];
+      const laneStep = steps.find(
+        (st) => st && typeof st.name === "string" && st.name.startsWith(spec.name),
       );
-      if (!allowed)
-        fail(`step-level env is not permitted on step "${name}" — only the exact pinned contract-step env maps are allowed`);
-    }
-    for (const s of steps) {
-      if (!s || s.if === undefined) continue;
-      const name = typeof s.name === "string" ? s.name : "";
-      const isEnforcement = name.startsWith(IF_ALLOWED_NAME);
-      const isCopy = name.startsWith("Copy ") && name.includes("evidence");
-      const isUpload =
-        typeof s.uses === "string" && s.uses.includes("upload-artifact");
-      if (!(isEnforcement || isCopy || isUpload))
-        fail(`step-level if: not permitted on step "${name}" — only the receipt-enforcement, evidence-copy and upload steps may be conditionally gated`);
+      if (!laneStep)
+        fail(`${jobName} job lacks the required lane step "${spec.name}"`);
+      else {
+        if (laneStep.shell !== undefined)
+          fail(`${jobName} lane step shell override is not permitted — the fixture owns the default shell`);
+        const run = typeof laneStep.run === "string" ? laneStep.run.replace(/\n$/, "") : "";
+        if (!spec.run(run))
+          fail(`${jobName} lane step run is not the exact canonical command (${spec.canonical})`);
+      }
     }
 
-    // Every step.uses must be a pinned SHA (any YAML key/value spelling
-    // normalizes to the same parsed value).
+    // Failure/always evidence uploads.
+    if (jobName === "real-corpus") {
+      const up = steps.find((s) => s && typeof s.uses === "string" && s.uses.includes("upload-artifact"));
+      if (!up) fail("real-corpus job has no evidence upload");
+      else if (up.if !== "always()")
+        fail("real-corpus evidence upload is not if: always() — a BLOCKED receipt would never upload");
+    } else {
+      const ups = steps.filter((s) => s && typeof s.uses === "string" && s.uses.includes("upload-artifact"));
+      if (ups.length === 0) fail("no failure-artifact upload");
+      else if (!ups.some((u) => u.if === "failure()"))
+        fail("artifact upload not gated on failure");
+    }
+
+    // Step-level closure: no env anywhere, no continue-on-error, no
+    // step-level if except the enforcement/copy/upload allowlist, SHA-only
+    // uses.
+    const IF_ALLOWED_NAME = "Prerequisite receipt enforced";
     for (const s of steps) {
-      if (s && typeof s.uses === "string" && !USES_RE.test(s.uses))
+      if (!s) continue;
+      if (s.env !== undefined)
+        fail(`step-level env is not permitted on step "${typeof s.name === "string" ? s.name : ""}" — BASH_ENV/PATH injection class`);
+      if (s["continue-on-error"] || s.continueOnError)
+        fail("continue-on-error found (skip-green)");
+      if (typeof s.uses === "string" && !USES_RE.test(s.uses))
         fail(
           `mutable action ref found — every uses: must be owner/repo(/path)?@<40 lowercase hex> (got: ${s.uses})`,
         );
-      if (s && (s["continue-on-error"] || s.continueOnError))
-        fail("continue-on-error found (skip-green)");
+      if (s.if !== undefined) {
+        const name = typeof s.name === "string" ? s.name : "";
+        const isEnforcement = name.startsWith(IF_ALLOWED_NAME);
+        const isCopy = name.startsWith("Copy ") && name.includes("evidence");
+        const isUpload = typeof s.uses === "string" && s.uses.includes("upload-artifact");
+        if (!(isEnforcement || isCopy || isUpload))
+          fail(`step-level if: not permitted on step "${name}" — only the receipt-enforcement, evidence-copy and upload steps may be conditionally gated`);
+      }
     }
   }
 }
 
-// ── Contract job specifics (trusted base + bootstrap-inert) ─────────────────
-const contract = wf.jobs.contract;
-const cRuns = (Array.isArray(contract.steps) ? contract.steps : [])
-  .filter((s) => s && typeof s.run === "string")
-  .map((s) => s.run);
-if (!cRuns.some((r) => r.includes("BOOTSTRAP-INERT")))
-  fail("contract job lacks the bootstrap-inert anchor check");
-if (!cRuns.some((r) => r.includes("contents/.github/workflows/packaged-user-gate.yml")))
-  fail("contract job does not fetch the head workflow file via the API");
-if (!cRuns.some((r) => r.includes("gh api")))
-  fail("contract job does not use gh api to fetch the head file");
-const checkoutRef = (Array.isArray(contract.steps) ? contract.steps : [])
-  .filter((s) => s && typeof s.uses === "string" && s.uses.includes("actions/checkout"))
-  .map((s) => (s.with && s.with.ref) || "")
-  .join(" ");
-if (!checkoutRef.includes("pull_request.base.sha"))
-  fail("contract job does not pin its checkout to the base sha");
-
 // ── EXHAUSTIVE CLOSURE: deep structural equality against the BASE-OWNED
-// canonical fixture (resolved relative to THIS checker, never the candidate
-// or workspace cwd). Extra steps, command suffixes, token-bearing
+// canonical execution fixture (resolved relative to THIS checker, never the
+// candidate or workspace cwd). Extra steps, command suffixes, token-bearing
 // modifications, env overrides and any unknown nested key all fail here.
-const CANONICAL = path.join(SCRIPT_DIR, "test", "fixtures", "packaged-user-gate.yml");
 const canonicalDoc = loadWorkflow(CANONICAL);
 const deepEqual = (a, b) => {
   if (a === b) return true;
@@ -394,7 +312,7 @@ const deepEqual = (a, b) => {
 };
 if (!deepEqual(wf, canonicalDoc.toJS({ maxAliasCount: 100 })))
   fail(
-    "candidate workflow is not deep-structural-equal to the canonical fixture — extra steps, command suffixes, token-bearing modifications and unknown fields are rejected",
+    "candidate workflow is not deep-structural-equal to the canonical execution fixture — extra steps, command suffixes, token-bearing modifications and unknown fields are rejected",
   );
 
 process.exit(status);
