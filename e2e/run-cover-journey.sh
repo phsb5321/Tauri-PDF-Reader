@@ -110,6 +110,12 @@ toolchain_run '
   VERIFY_STATUS=0
   EXPECT_COVER_A_HASH="$(grep -oP "COVER_A_HASH=\K[0-9a-f]+" "$PHASE1_LOG" | head -1 || true)"
   EXPECT_COVER_B_HASH="$(grep -oP "COVER_B_HASH=\K[0-9a-f]+" "$PHASE1_LOG" | head -1 || true)"
+  # The warm-cache proof is MANDATORY: a verify with no cross-relaunch hash
+  # would be a false green (Codex gate round 2).
+  if [ -z "$EXPECT_COVER_A_HASH" ] || [ -z "$EXPECT_COVER_B_HASH" ]; then
+    echo "==> FATAL: phase-1 cover hashes missing from the lane output — refusing to verify"
+    exit 3
+  fi
   COVER_PHASE=verify EXPECT_COVER_A_HASH="$EXPECT_COVER_A_HASH" \
     EXPECT_COVER_B_HASH="$EXPECT_COVER_B_HASH" \
     E2E_SPEC=./e2e/cover-journey.e2e.mjs pnpm test:e2e || VERIFY_STATUS=$?

@@ -132,7 +132,6 @@ export function useCover({
     if (!enabled || startedRef.current) return;
     startedRef.current = true;
     const key = cacheKey(documentId);
-    acquireCoverRef(key);
 
     // 1. In-memory hit — the common case for a second mount in one session.
     const cachedUrl = coverBlobCache.get(key);
@@ -218,8 +217,17 @@ export function useCover({
   }, [documentId, filePath, enabled]);
 
   useEffect(() => {
+    // The refcount tracks MOUNTED cards (acquire here, release in the
+    // cleanup) — a card that never intersected must still balance its ref so
+    // a sibling's evicted URL is never revoked while it is displayed.
+    const key = cacheKey(documentId);
+    acquireCoverRef(key);
     const el = ref.current;
-    if (!el) return;
+    if (!el) {
+      const revoke = releaseCoverRef(key);
+      if (revoke) URL.revokeObjectURL(revoke);
+      return;
+    }
     // jsdom has no IntersectionObserver; without one, generate immediately so
     // unit tests (and any exotic WebView) still resolve.
     if (typeof IntersectionObserver === "undefined") {
@@ -238,7 +246,7 @@ export function useCover({
     observer.observe(el);
     return () => {
       observer.disconnect();
-      const revoke = releaseCoverRef(cacheKey(documentId));
+      const revoke = releaseCoverRef(key);
       if (revoke) URL.revokeObjectURL(revoke);
     };
   }, [generate, documentId]);

@@ -51,6 +51,7 @@ fn validate_cover_png(bytes: &[u8]) -> Result<(), String> {
     }
     let mut offset = 8usize;
     let mut first = true;
+    let mut saw_idat = false;
     let mut saw_iend = false;
     while offset < bytes.len() {
         if offset + 8 > bytes.len() {
@@ -91,6 +92,9 @@ fn validate_cover_png(bytes: &[u8]) -> Result<(), String> {
             }
             first = false;
         }
+        if chunk_type == b"IDAT" {
+            saw_idat = true;
+        }
         if chunk_type == b"IEND" {
             saw_iend = true;
             offset += total;
@@ -100,6 +104,11 @@ fn validate_cover_png(bytes: &[u8]) -> Result<(), String> {
     }
     if !saw_iend {
         return Err("VALIDATION_ERROR: PNG missing terminal IEND".to_string());
+    }
+    // A PNG with no IDAT carries no image data — accepting it would cache a
+    // permanently blank/broken cover (write_once never replaces it).
+    if !saw_idat {
+        return Err("VALIDATION_ERROR: PNG has no IDAT (no image data)".to_string());
     }
     if offset != bytes.len() {
         return Err("VALIDATION_ERROR: trailing bytes after PNG IEND".to_string());
@@ -296,6 +305,10 @@ mod tests {
         bytes.extend_from_slice(&h.to_be_bytes());
         bytes.extend_from_slice(&[8, 2, 0, 0, 0]);
         bytes.extend_from_slice(&[0, 0, 0, 0]); // crc placeholder
+                                                // A minimal (empty) IDAT — the validator requires image data.
+        bytes.extend_from_slice(&0u32.to_be_bytes());
+        bytes.extend_from_slice(b"IDAT");
+        bytes.extend_from_slice(&[0, 0, 0, 0]); // crc placeholder
         bytes.extend_from_slice(&0u32.to_be_bytes());
         bytes.extend_from_slice(b"IEND");
         bytes.extend_from_slice(&[0, 0, 0, 0]); // crc placeholder
@@ -322,6 +335,13 @@ mod tests {
         let mut corrupt = tiny_png(300, 450);
         corrupt[8..12].copy_from_slice(&1_000_000u32.to_be_bytes()); // bogus IDAT len
         assert!(validate_cover_png(&corrupt).is_err());
+        // IHDR directly followed by IEND — structurally complete but carrying
+        // NO image data; it must never be cached (blank-cover class). The
+        // IDAT chunk sits at bytes 33..45 (sig 8 + IHDR 25).
+        let mut no_idat = tiny_png(300, 450);
+        no_idat.drain(33..45);
+        assert_eq!(&no_idat[37..41], b"IEND", "test premise: IHDR then IEND");
+        assert!(validate_cover_png(&no_idat).is_err());
     }
 
     #[test]

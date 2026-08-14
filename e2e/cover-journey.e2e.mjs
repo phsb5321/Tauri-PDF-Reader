@@ -219,11 +219,16 @@ describe("Packaged cover journey (slice 121: real first-page covers)", () => {
         readyCard === "A" ? "E2E Resume Fixture A" : "E2E Resume Fixture B",
       );
       expect(readyHash.naturalWidth).toBeGreaterThan(0);
+      // The runner FATALs when a phase-1 hash is missing, so the compare is
+      // unconditional here (Codex gate round 2).
       const expectedReadyHash =
         readyCard === "A"
           ? process.env.EXPECT_COVER_A_HASH
           : process.env.EXPECT_COVER_B_HASH;
-      if (expectedReadyHash) expect(readyHash.hash).toBe(expectedReadyHash);
+      if (!expectedReadyHash) {
+        throw new Error("runner must have supplied the phase-1 hash");
+      }
+      expect(readyHash.hash).toBe(expectedReadyHash);
       const stateC = await coverState("E2E Coverless");
       expect(stateC.state).toBe("fallback");
     }
