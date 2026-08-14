@@ -83,28 +83,20 @@ describe("Packaged reauthorization journey (lost fs grant, issue #120)", () => {
       'button[aria-label^="Resume E2E Resume Fixture A, page"]',
     );
     await resumeButton.waitForExist({ timeout: 15000 });
-    await browser.execute(() =>
-      document
-        .querySelector(
-          'button[aria-label^="Resume E2E Resume Fixture A, page"]',
-        )
-        ?.click(),
-    );
+    await resumeButton.click();
 
     if (PHASE === "retry") {
       // First pick is the corrupt file: a visible refusal.
       const firstAlert = await $(".library-error-banner");
       await firstAlert.waitForExist({ timeout: 20000 });
       expect(await firstAlert.getText()).toContain("WRONG_DOCUMENT");
+      expect(await firstAlert.getText()).toContain("corrupt.pdf");
 
-      // Second resume, same process, correct book this time.
-      await browser.execute(() =>
-        document
-          .querySelector(
-            'button[aria-label^="Resume E2E Resume Fixture A, page"]',
-          )
-          ?.click(),
+      // Second resume, same process, correct book this time — public control.
+      const retryButton = await $(
+        'button[aria-label^="Resume E2E Resume Fixture A, page"]',
       );
+      await retryButton.click();
       await browser.waitUntil(
         async () =>
           browser.execute(() => {
@@ -175,38 +167,29 @@ describe("Packaged reauthorization journey (lost fs grant, issue #120)", () => {
     // cleanly on its own. It is NOT this row's book, so it must be refused
     // exactly like the corrupt one. If the row-hash binding were applied
     // only to the first attempt, B's pages would appear here under A's row.
-    await browser.execute(() =>
-      document
-        .querySelector(
-          'button[aria-label^="Resume E2E Resume Fixture A, page"]',
-        )
-        ?.click(),
+    const secondResumeButton = await $(
+      'button[aria-label^="Resume E2E Resume Fixture A, page"]',
     );
+    await secondResumeButton.click();
 
-    // Give the second attempt as long as a successful open would need, so
-    // "nothing rendered" cannot be an artefact of looking too early.
-    let rendered = 0;
-    await browser.waitUntil(
-      async () => {
-        rendered = await browser.execute(
-          () => document.querySelectorAll(".textLayer span").length,
-        );
-        return rendered > 0;
-      },
-      { timeout: 20000, timeoutMsg: "__EXPECTED_NO_RENDER__" },
-    ).then(
-      () => {
-        throw new Error(
-          `second resume rendered a different book: ${rendered} text spans`,
-        );
-      },
-      (err) => {
-        if (!String(err.message).includes("__EXPECTED_NO_RENDER__")) throw err;
-      },
-    );
-
+    // This text can only be produced after the SECOND picker value was
+    // consumed and verified. Reusing the first alert or hanging after click
+    // cannot satisfy it.
     const secondAlert = await $(".library-error-banner");
-    await secondAlert.waitForExist({ timeout: 20000 });
+    await browser.waitUntil(
+      async () => (await secondAlert.getText()).includes("fixture-b.pdf"),
+      {
+        timeout: 20000,
+        timeoutMsg:
+          "second wrong-book attempt produced no fixture-b-specific refusal",
+      },
+    );
     expect(await secondAlert.getText()).toContain("WRONG_DOCUMENT");
+    // The reader must still not mount after processing the second attempt.
+    expect(
+      await browser.execute(() =>
+        document.querySelectorAll(".textLayer span").length,
+      ),
+    ).toBe(0);
   });
 });

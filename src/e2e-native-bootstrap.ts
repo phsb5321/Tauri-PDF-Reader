@@ -108,6 +108,7 @@ async function seedLibraryProfile(): Promise<void> {
     pathA,
     "E2E Resume Fixture A",
     5,
+    null,
   );
   if (addedA.status === "error") throw new Error(`seed A: ${addedA.error}`);
   const knownA = await commands.libraryGetDocumentByPath(pathA);
@@ -129,6 +130,7 @@ async function seedLibraryProfile(): Promise<void> {
       pathB,
       "E2E Resume Fixture B",
       3,
+      null,
     );
     if (addedB.status === "error") throw new Error(`seed B: ${addedB.error}`);
     const knownB = await commands.libraryGetDocumentByPath(pathB);

@@ -10,9 +10,9 @@ export const commands = {
  * Add a new document to the library
  * Uses SHA-256 content hash as ID for duplicate detection
  */
-async libraryAddDocument(filePath: string, title: string | null, pageCount: number | null) : Promise<Result<Document, string>> {
+async libraryAddDocument(filePath: string, title: string | null, pageCount: number | null, expectedSha256: string | null) : Promise<Result<Document, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("library_add_document", { filePath, title, pageCount }) };
+    return { status: "ok", data: await TAURI_INVOKE("library_add_document", { filePath, title, pageCount, expectedSha256 }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };

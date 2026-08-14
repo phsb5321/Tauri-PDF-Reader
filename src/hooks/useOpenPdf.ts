@@ -87,29 +87,34 @@ export function useOpenPdf() {
       }
 
       const path = picked as string;
-      const relocated = await libraryRelocateDocument(document.id, path).catch(
-        (error: unknown) => {
-          const message =
-            error instanceof Error ? error.message : String(error);
-          if (message.includes("HASH_MISMATCH")) {
-            setError(
-              "WRONG_DOCUMENT: The selected file is not this book — the library was not changed.",
-            );
-          } else {
-            setError(`Reauthorization failed: ${message}`);
-          }
-          return null;
-        },
-      );
-      if (!relocated) return null;
-
-      // Bind the opened bytes to the verified fingerprint: the row id is the
-      // file's SHA-256 (relocate re-verified it above), so the read is
-      // refused if the path's content was swapped in between.
-      const pdf = await pdfService.loadDocument(relocated.filePath, {
-        expectedSha256: document.id,
-      });
-      return { pdf, document: relocated };
+      const pickedName = path.split(/[\\/]/).pop() || "selected file";
+      try {
+        // Verify and parse BEFORE relocating the row. The old order updated
+        // file_path first, then read through plugin-fs; a swap between those
+        // operations correctly refused the reader but left the row for book A
+        // pointing at bytes B. No database mutation happens until the exact
+        // bytes to be displayed are known to be this row's book.
+        const pdf = await pdfService.loadDocument(path, {
+          expectedSha256: document.id,
+        });
+        // Hash again at the backend boundary immediately before the update.
+        // If the path changed after the frontend read, relocate refuses and
+        // the verified PDF is never shown under a stale row.
+        const relocated = await libraryRelocateDocument(document.id, path);
+        return { pdf, document: relocated };
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (message.includes("HASH_MISMATCH")) {
+          // Basename only: useful feedback + an observable retry transition,
+          // without leaking a private absolute path into UI/log artifacts.
+          setError(
+            `WRONG_DOCUMENT: “${pickedName}” is not this book — the library was not changed.`,
+          );
+        } else {
+          setError(`Reauthorization failed: ${message}`);
+        }
+        return null;
+      }
     },
     [openFile, setError],
   );
@@ -148,7 +153,13 @@ export function useOpenPdf() {
 
       const document = known
         ? await libraryOpenDocument(known.id)
-        : await libraryAddDocument(filePath, undefined, pdf.numPages);
+        : await libraryAddDocument(
+            filePath,
+            undefined,
+            pdf.numPages,
+            // Bind the backend's DB mutation to the exact bytes parsed above.
+            sha256,
+          );
 
       // A fresh import is hashed twice: here, over the bytes actually opened,
       // and again in the backend when the row is created. A file swapped

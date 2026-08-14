@@ -177,6 +177,7 @@ describe("openPdf", () => {
       filePath: "/books/new.pdf",
       title: undefined,
       pageCount: 30,
+      expectedSha256: "doc-1",
     });
     expect(useDocumentStore.getState().totalPages).toBe(30);
   });
@@ -303,16 +304,15 @@ describe("resumeDocument reauthorization rung (issue #120)", () => {
   it("a wrong file cannot substitute or be read — the row stays untouched", async () => {
     const stored = doc({ currentPage: 42 });
 
-    loadDocument.mockRejectedValue(scopeDenial);
+    loadDocument
+      .mockRejectedValueOnce(scopeDenial)
+      .mockRejectedValueOnce(
+        new Error(
+          "PDF_HASH_MISMATCH: File content changed after verification — the book was not opened.",
+        ),
+      );
     openDialog.mockResolvedValue("/books/evil-impostor.pdf");
-    mockInvoke.mockImplementation((command: string) => {
-      if (command === "library_relocate_document") {
-        return Promise.reject(
-          "HASH_MISMATCH: File at new path has different content",
-        );
-      }
-      return Promise.resolve(stored);
-    });
+    mockInvoke.mockResolvedValue(stored);
 
     const { result } = renderHook(() => useOpenPdf());
     let resumed: boolean | undefined;
@@ -323,10 +323,19 @@ describe("resumeDocument reauthorization rung (issue #120)", () => {
     expect(resumed).toBe(false);
     const state = useDocumentStore.getState();
     expect(state.error).toContain("WRONG_DOCUMENT");
+    expect(state.error).toContain("evil-impostor.pdf");
     expect(state.pdfDocument).toBeNull();
-    // The impostor's bytes were never read.
-    expect(loadDocument).toHaveBeenCalledTimes(1);
-    expect(loadDocument).not.toHaveBeenCalledWith("/books/evil-impostor.pdf");
+    // Verify the selected bytes BEFORE any row mutation. The impostor is read
+    // only under the expected row hash and fails closed.
+    expect(loadDocument).toHaveBeenNthCalledWith(
+      2,
+      "/books/evil-impostor.pdf",
+      { expectedSha256: "doc-1" },
+    );
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "library_relocate_document",
+      expect.anything(),
+    );
   });
 
   it("cancelling the reauthorization leaves the library with an actionable error", async () => {

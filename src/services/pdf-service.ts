@@ -76,22 +76,6 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
     .join("");
 }
 
-/**
- * Fail-closed fingerprint check: the buffer that is about to be opened must
- * hash to the verified SHA-256, or the open is refused.
- */
-async function verifyBytesHash(
-  bytes: Uint8Array,
-  expectedSha256: string,
-): Promise<void> {
-  const hex = await sha256Hex(bytes);
-  if (hex !== expectedSha256.toLowerCase()) {
-    throw new Error(
-      "PDF_HASH_MISMATCH: File content changed after verification — the book was not opened.",
-    );
-  }
-}
-
 // Extend Window interface for Tauri
 declare global {
   interface Window {
@@ -192,8 +176,13 @@ export const pdfService = {
     try {
       const fileData = await readFileFromTauri(filePath);
       const sha256 = await sha256Hex(fileData);
-      if (options?.expectedSha256) {
-        await verifyBytesHash(fileData, options.expectedSha256);
+      if (
+        options?.expectedSha256 &&
+        sha256 !== options.expectedSha256.toLowerCase()
+      ) {
+        throw new Error(
+          "PDF_HASH_MISMATCH: File content changed after verification — the book was not opened.",
+        );
       }
       console.log(
         "[PDF Service] File read successfully, size:",
