@@ -40,8 +40,8 @@ export const config = {
     // The debug binary rewrites src/lib/bindings.ts at startup
     // (BINDINGS_PATH = "../src/lib/bindings.ts", relative to the process
     // cwd). tauri-driver launches the app from ITS cwd, so spawn the driver
-    // from src-tauri — the same cwd `cargo run` uses — or every packaged
-    // debug run panics with "Failed to export TypeScript bindings".
+    // from src-tauri — the same cwd `cargo run` uses — or the packaged debug
+    // app panics with "Failed to export TypeScript bindings".
     tauriDriver = spawn(
       TAURI_DRIVER,
       ["--port", "4444", "--native-driver", NATIVE_DRIVER],
