@@ -245,11 +245,19 @@ export function ReaderView() {
     let cancelled = false;
     void onAppCloseRequested(async () => {
       try {
-        await Promise.all([flushImmediately(), flushProgress()]);
+        await Promise.all([
+          flushImmediately({ propagateFailure: true }),
+          flushProgress(),
+        ]);
+        // Ack ONLY after both flushes landed, and always on success — a
+        // listener re-registration mid-flush must never withhold the ack
+        // (the `cancelled` flag only governs the unlisten bookkeeping).
+        // A failed flush throws: no ack, and the backend's 3s timeout
+        // destroys the window — the honest outcome for an unlanded write.
+        void emitAppCloseAck();
       } catch (error) {
         console.error("Failed to flush on close:", error);
-      } finally {
-        if (!cancelled) void emitAppCloseAck();
+        // No ack — the protocol must not lie about success.
       }
     }).then((fn) => {
       if (cancelled) fn();

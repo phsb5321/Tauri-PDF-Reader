@@ -143,4 +143,110 @@ describe('Ctrl+Shift+H highlights the pending selection', () => {
 
     expect(createHighlight).toHaveBeenCalledTimes(1);
   });
+
+  it('defers the success callback until the persistence attempt completes', async () => {
+    // The exact-head Codex review's MAJOR (toast-before-write): the handler
+    // must gate its success UX on the write attempt — "Highlight created"
+    // (the onSuccess callback next to the toast) must never precede the
+    // backend write. Pre-fix the callback fired synchronously after
+    // enqueueing, before the IPC had even started.
+    let resolveCreate!: () => void;
+    createHighlight.mockImplementationOnce(
+      () =>
+        new Promise<{ failed: boolean; failedIds: string[] }>((r) => {
+          resolveCreate = () => r({ failed: false, failedIds: [] });
+        }),
+    );
+
+    const onSuccess = vi.fn();
+    const { result } = renderHook(() =>
+      useHighlightCreation({
+        documentId: 'doc-1',
+        scale: 1,
+        containerRef: { current: document.createElement('div') },
+        onSuccess,
+      }),
+    );
+    act(() => result.current.handleTextSelect(SELECTION));
+    press('H', { ctrlKey: true, shiftKey: true });
+
+    expect(createHighlight).toHaveBeenCalledTimes(1);
+    // The write is still in flight — no success signal yet.
+    expect(onSuccess).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveCreate();
+    });
+    expect(onSuccess).toHaveBeenCalledTimes(1);
+    // The store update still lands immediately (the page renders the
+    // highlight regardless of persistence timing).
+    expect(useDocumentStore.getState().highlights).toHaveLength(1);
+  });
+
+  it('does NOT signal success when the persistence attempt failed', async () => {
+    // A failed first attempt resolves { failed: true } with THIS highlight's
+    // id in failedIds (the background retry path re-queues and surfaces via
+    // onError) — the success UX must not fire; "Highlight created" would be
+    // a lie for a write that did not land (exact-head Codex review, MAJOR).
+    createHighlight.mockImplementationOnce(() =>
+      Promise.resolve({
+        failed: true,
+        error: new Error('backend down'),
+        // The handler adds the highlight to the store BEFORE calling
+        // createHighlight, so the generated id is already knowable here.
+        failedIds: [useDocumentStore.getState().highlights[0].id],
+      }),
+    );
+
+    const onSuccess = vi.fn();
+    const { result } = renderHook(() =>
+      useHighlightCreation({
+        documentId: 'doc-1',
+        scale: 1,
+        containerRef: { current: document.createElement('div') },
+        onSuccess,
+      }),
+    );
+    act(() => result.current.handleTextSelect(SELECTION));
+    press('H', { ctrlKey: true, shiftKey: true });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(onSuccess).not.toHaveBeenCalled();
+    // The store update still lands (the page shows the highlight; the
+    // retry path owns eventual persistence).
+    expect(useDocumentStore.getState().highlights).toHaveLength(1);
+  });
+
+  it("signals success when a sibling's write failed but this one landed", async () => {
+    // The pass outcome is shared across the entries it drains: a failing
+    // sibling (a different highlight id in failedIds) must not suppress
+    // THIS highlight's success signal when its own write landed (exact-head
+    // Codex review, MAJOR).
+    createHighlight.mockImplementationOnce(() =>
+      Promise.resolve({
+        failed: true,
+        error: new Error('backend down'),
+        failedIds: ['some-other-highlight-id'],
+      }),
+    );
+
+    const onSuccess = vi.fn();
+    const { result } = renderHook(() =>
+      useHighlightCreation({
+        documentId: 'doc-1',
+        scale: 1,
+        containerRef: { current: document.createElement('div') },
+        onSuccess,
+      }),
+    );
+    act(() => result.current.handleTextSelect(SELECTION));
+    press('H', { ctrlKey: true, shiftKey: true });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(onSuccess).toHaveBeenCalledTimes(1);
+  });
 });

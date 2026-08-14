@@ -4,6 +4,7 @@ import { useAiTtsStore } from "../stores/ai-tts-store";
 import { useAnnounce, ANNOUNCEMENTS } from "../hooks/useAnnounce";
 import { aiTtsStop } from "../lib/tauri-invoke";
 import { commands } from "../lib/bindings";
+import { enqueueProgressWrite } from "../hooks/useAutoSave";
 import "./PageNavigation.css";
 
 export function PageNavigation() {
@@ -21,20 +22,26 @@ export function PageNavigation() {
   const saveProgress = useCallback(
     async (page: number) => {
       if (currentDocument) {
-        try {
-          // Using tauri-specta generated bindings for type-safe command invocation
-          const result = await commands.libraryUpdateProgress(
-            currentDocument.id,
-            page,
-            null,
-            null,
-          );
-          if (result.status === "error") {
-            console.error("Failed to save reading progress:", result.error);
+        // The direct write must serialize through the SAME app-wide chain
+        // as the autosave (useAutoSave.enqueueProgressWrite): an un-serialized
+        // delayed direct write could otherwise land after the close flush and
+        // revert the row.
+        void enqueueProgressWrite(async () => {
+          try {
+            // Using tauri-specta generated bindings for type-safe command invocation
+            const result = await commands.libraryUpdateProgress(
+              currentDocument.id,
+              page,
+              null,
+              null,
+            );
+            if (result.status === "error") {
+              console.error("Failed to save reading progress:", result.error);
+            }
+          } catch (error) {
+            console.error("Failed to save reading progress:", error);
           }
-        } catch (error) {
-          console.error("Failed to save reading progress:", error);
-        }
+        });
       }
     },
     [currentDocument],

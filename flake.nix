@@ -46,9 +46,16 @@
           speechd
           xvfb
           # Close-journey lane (113): drives a GENUINE WM_DELETE_WINDOW close
-          # through the X server (xdotool windowclose) — a process kill would
-          # prove nothing about CloseRequested.
+          # through the X server (xdotool windowquit — the graceful close-
+          # confirmation message; windowclose would destroy the window without
+          # any client close request) — a process kill would prove nothing
+          # about CloseRequested.
           xdotool
+          # Close-journey lane (125): windowquit's WM_DELETE_WINDOW only
+          # reaches the app when a REAL window manager is running — without
+          # one the client message never arrives (lane-9: zero CloseRequested
+          # firings). openbox is started by run-close-journey.sh after Xvfb.
+          openbox
         ];
       in
       rec {
