@@ -24,6 +24,12 @@
  *                          must refuse (HASH_MISMATCH); the library stays
  *                          with a visible WRONG_DOCUMENT alert and the row
  *                          untouched.
+ *   REAUTH_PHASE=repeat  — TWO resumes in ONE process: the first pick is the
+ *                          corrupt fixture (refused), the second is fixture
+ *                          B — a real, parseable, DIFFERENT book. B must be
+ *                          refused too. A binding applied only to the first
+ *                          attempt would render B here, which is the hole a
+ *                          single-resume phase cannot see.
  *
  * This lane deliberately does NOT arm the dialog/fs fixture-bytes seams: the
  * fs read must be the REAL scope-gated plugin-fs read so the denial is real.
@@ -47,7 +53,9 @@ describe("Packaged reauthorization journey (lost fs grant, issue #120)", () => {
         ? "same-hash re-pick reopens the book in the reader"
         : PHASE === "cancel"
           ? "cancelling the reauthorization leaves a visible OPEN_CANCELLED alert"
-          : "a wrong file is refused with a visible WRONG_DOCUMENT alert"
+          : PHASE === "repeat"
+            ? "a resume after a failed retry is still refused a different book"
+            : "a wrong file is refused with a visible WRONG_DOCUMENT alert"
   }`, async () => {
     await browser.waitUntil(
       async () =>
@@ -104,7 +112,7 @@ describe("Packaged reauthorization journey (lost fs grant, issue #120)", () => {
       return;
     }
 
-    // cancel / wrong: the refusal is VISIBLE on the shown surface.
+    // cancel / wrong / repeat: the refusal is VISIBLE on the shown surface.
     const alert = await $(".library-error-banner");
     await alert.waitForExist({ timeout: 20000 });
     const text = await alert.getText();
@@ -117,5 +125,46 @@ describe("Packaged reauthorization journey (lost fs grant, issue #120)", () => {
         document.querySelectorAll(".textLayer span").length,
       ),
     ).toBe(0);
+
+    if (PHASE !== "repeat") return;
+
+    // ── SECOND resume, same process, after the failed retry above. ───────
+    // The picker now hands over fixture B: a real 3-page PDF that opens
+    // cleanly on its own. It is NOT this row's book, so it must be refused
+    // exactly like the corrupt one. If the row-hash binding were applied
+    // only to the first attempt, B's pages would appear here under A's row.
+    await browser.execute(() =>
+      document
+        .querySelector(
+          'button[aria-label^="Resume E2E Resume Fixture A, page"]',
+        )
+        ?.click(),
+    );
+
+    // Give the second attempt as long as a successful open would need, so
+    // "nothing rendered" cannot be an artefact of looking too early.
+    let rendered = 0;
+    await browser.waitUntil(
+      async () => {
+        rendered = await browser.execute(
+          () => document.querySelectorAll(".textLayer span").length,
+        );
+        return rendered > 0;
+      },
+      { timeout: 20000, timeoutMsg: "__EXPECTED_NO_RENDER__" },
+    ).then(
+      () => {
+        throw new Error(
+          `second resume rendered a different book: ${rendered} text spans`,
+        );
+      },
+      (err) => {
+        if (!String(err.message).includes("__EXPECTED_NO_RENDER__")) throw err;
+      },
+    );
+
+    const secondAlert = await $(".library-error-banner");
+    await secondAlert.waitForExist({ timeout: 20000 });
+    expect(await secondAlert.getText()).toContain("WRONG_DOCUMENT");
   });
 });

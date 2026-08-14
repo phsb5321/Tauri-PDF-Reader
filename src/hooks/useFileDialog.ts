@@ -63,7 +63,17 @@ export function useFileDialog() {
           const reauthMode = import.meta.env.VITE_E2E_REAUTH_MODE;
           if (reauthMode === "cancel") return null;
           const reauthPath = import.meta.env.VITE_E2E_REAUTH_PATH;
-          if (reauthPath) return reauthPath;
+          if (reauthPath) {
+            // A '|'-separated list answers successive picks, so ONE launch
+            // can drive a retry AFTER a failed one. That is what proves a
+            // later resume is still hash-bound: the second pick is a real,
+            // parseable book, and it must still be refused.
+            const picks = reauthPath.split("|");
+            const seam = globalThis as { __E2E_REAUTH_PICKS__?: number };
+            const taken = seam.__E2E_REAUTH_PICKS__ ?? 0;
+            seam.__E2E_REAUTH_PICKS__ = taken + 1;
+            return picks[Math.min(taken, picks.length - 1)];
+          }
         }
         const e2eOpenPath = import.meta.env.VITE_E2E_OPEN_PATH;
         if (e2eOpenPath) return e2eOpenPath;

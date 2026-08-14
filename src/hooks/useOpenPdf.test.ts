@@ -19,7 +19,7 @@ import { useDocumentStore } from "../stores/document-store";
 import type { Document } from "../lib/schemas";
 
 vi.mock("../services/pdf-service", () => ({
-  pdfService: { loadDocument: vi.fn() },
+  pdfService: { loadDocument: vi.fn(), loadDocumentBound: vi.fn() },
   isScopeDenial: (e: unknown) =>
     /not allowed on the configured scope|forbidden path: .*not allowed on the scope/i.test(
       e instanceof Error ? e.message : String(e),
@@ -32,6 +32,10 @@ vi.mock("../adapters/tauri/file-dialog.adapter", () => ({
 
 const { pdfService } = await import("../services/pdf-service");
 const loadDocument = vi.mocked(pdfService.loadDocument);
+// `openPdf` reads through the bound variant, which also reports the
+// fingerprint of the bytes it opened; `resumeDocument` already has a row id
+// to check against and stays on `loadDocument`.
+const loadDocumentBound = vi.mocked(pdfService.loadDocumentBound);
 const { fileDialog } = await import("../adapters/tauri/file-dialog.adapter");
 const openDialog = vi.mocked(fileDialog.open);
 
@@ -55,7 +59,14 @@ const doc = (over: Partial<Document> = {}): Document =>
 beforeEach(() => {
   useDocumentStore.getState().reset();
   loadDocument.mockReset();
+  loadDocumentBound.mockReset();
   openDialog.mockReset();
+});
+
+/** Bytes that hash to `sha256` — by default the id the library hands back. */
+const bytesOf = (proxy: PDFDocumentProxy, sha256 = "doc-1") => ({
+  pdf: proxy,
+  sha256,
 });
 
 /**
@@ -147,7 +158,7 @@ describe("resumeDocument", () => {
 describe("openPdf", () => {
   it("registers a file the library has never seen", async () => {
     openDialog.mockResolvedValue("/books/new.pdf");
-    loadDocument.mockResolvedValue(pdf(30));
+    loadDocumentBound.mockResolvedValue(bytesOf(pdf(30)));
     library({ known: null });
 
     const { result } = renderHook(() => useOpenPdf());
@@ -172,7 +183,7 @@ describe("openPdf", () => {
 
   it("reopens a book the library already holds at its stored page", async () => {
     openDialog.mockResolvedValue("/books/one.pdf");
-    loadDocument.mockResolvedValue(pdf(300));
+    loadDocumentBound.mockResolvedValue(bytesOf(pdf(300)));
     library({ known: doc({ currentPage: 88 }) });
 
     const { result } = renderHook(() => useOpenPdf());
@@ -205,7 +216,29 @@ describe("openPdf", () => {
     const state = useDocumentStore.getState();
     expect(state.pdfDocument).toBeNull();
     expect(state.currentDocument).toBeNull();
-    expect(loadDocument).not.toHaveBeenCalled();
+    expect(loadDocumentBound).not.toHaveBeenCalled();
+  });
+
+  it("refuses a fresh import whose file changed while it was being added", async () => {
+    // The bytes on screen hash to A; by the time the backend hashed the file
+    // to create the row, the path held B. Binding one book's pages to the
+    // other's row would file its progress, highlights and audio against the
+    // wrong document — so nothing is shown.
+    openDialog.mockResolvedValue("/books/new.pdf");
+    loadDocumentBound.mockResolvedValue(bytesOf(pdf(30), "hash-of-A"));
+    library({ known: null }); // library_add_document answers with id doc-1 (B)
+
+    const { result } = renderHook(() => useOpenPdf());
+    let opened: boolean | undefined;
+    await act(async () => {
+      opened = await result.current.openPdf();
+    });
+
+    expect(opened).toBe(false);
+    const state = useDocumentStore.getState();
+    expect(state.error).toContain("PDF_HASH_MISMATCH");
+    expect(state.pdfDocument).toBeNull();
+    expect(state.currentDocument).toBeNull();
   });
 });
 
@@ -380,7 +413,7 @@ describe("every known-row open binds the bytes to the row hash (Codex exact-head
   it("openPdf binds the bytes when the picked file is already a library row", async () => {
     const known = doc({ currentPage: 7 });
     openDialog.mockResolvedValue("/books/one.pdf");
-    loadDocument.mockResolvedValue(pdf(300));
+    loadDocumentBound.mockResolvedValue(bytesOf(pdf(300)));
     mockInvoke.mockImplementation((command: string) => {
       if (command === "library_get_document_by_path") {
         return Promise.resolve(known);
@@ -396,7 +429,7 @@ describe("every known-row open binds the bytes to the row hash (Codex exact-head
     });
 
     expect(opened).toBe(true);
-    expect(loadDocument).toHaveBeenCalledWith("/books/one.pdf", {
+    expect(loadDocumentBound).toHaveBeenCalledWith("/books/one.pdf", {
       expectedSha256: "doc-1",
     });
   });

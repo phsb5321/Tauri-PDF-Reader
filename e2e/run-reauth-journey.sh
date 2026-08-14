@@ -12,6 +12,9 @@
 #   cancel — picker returns null -> OPEN_CANCELLED alert visible.
 #   wrong  — picker returns the corrupt fixture -> relocate refuses
 #            (HASH_MISMATCH) -> WRONG_DOCUMENT alert visible, row untouched.
+#   repeat — two resumes in ONE launch: pick 1 = corrupt (refused), pick 2 =
+#            fixture B, a real DIFFERENT book, which must be refused too.
+#            Catches a binding that only covers the first attempt.
 #
 # The observer (this script) pre-places the out-of-scope copy and the corrupt
 # fixture; the frontend is rebuilt per phase with the phase's picker-outcome
@@ -57,6 +60,9 @@ toolchain_exec '
 
   GOOD="$XDG_DATA_HOME/com.lectrice.reader/e2e-resume-fixture-a.pdf"
   CORRUPT="$XDG_DATA_HOME/com.lectrice.reader/corrupt.pdf"
+  # A real, parseable book that is NOT row A: the second pick in phase repeat.
+  # (No apostrophes below this line — the whole block is single-quoted.)
+  OTHER="$XDG_DATA_HOME/com.lectrice.reader/e2e-resume-fixture-b.pdf"
   OUTSCOPE="$OUT_SCOPE_PATH"
 
   echo "==> PHASE seed"
@@ -94,7 +100,9 @@ toolchain_exec '
   run_phase cancel cancel "" || CANCEL_STATUS=$?
   WRONG_STATUS=0
   run_phase wrong "" "$CORRUPT" || WRONG_STATUS=$?
+  REPEAT_STATUS=0
+  run_phase repeat "" "$CORRUPT|$OTHER" || REPEAT_STATUS=$?
 
-  echo "==> lane summary: seed=$SEED_STATUS good=$GOOD_STATUS cancel=$CANCEL_STATUS wrong=$WRONG_STATUS"
-  [ "$SEED_STATUS" -eq 0 ] && [ "$GOOD_STATUS" -eq 0 ] && [ "$CANCEL_STATUS" -eq 0 ] && [ "$WRONG_STATUS" -eq 0 ]
+  echo "==> lane summary: seed=$SEED_STATUS good=$GOOD_STATUS cancel=$CANCEL_STATUS wrong=$WRONG_STATUS repeat=$REPEAT_STATUS"
+  [ "$SEED_STATUS" -eq 0 ] && [ "$GOOD_STATUS" -eq 0 ] && [ "$CANCEL_STATUS" -eq 0 ] && [ "$WRONG_STATUS" -eq 0 ] && [ "$REPEAT_STATUS" -eq 0 ]
 '

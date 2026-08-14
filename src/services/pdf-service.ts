@@ -58,13 +58,12 @@ export function isScopeDenial(error: unknown): boolean {
 }
 
 /**
- * Fail-closed fingerprint check: the buffer that is about to be opened must
- * hash to the verified SHA-256, or the open is refused.
+ * SHA-256 of the buffer, lowercase hex — the same fingerprint the backend
+ * computes over the file (`compute_file_hash`), which is also a library row's
+ * id. Fails closed when WebCrypto is unavailable rather than opening bytes it
+ * cannot account for.
  */
-async function verifyBytesHash(
-  bytes: Uint8Array,
-  expectedSha256: string,
-): Promise<void> {
+async function sha256Hex(bytes: Uint8Array): Promise<string> {
   const subtle = globalThis.crypto?.subtle;
   if (!subtle) {
     throw new Error(
@@ -72,9 +71,20 @@ async function verifyBytesHash(
     );
   }
   const digest = await subtle.digest("SHA-256", bytes);
-  const hex = Array.from(new Uint8Array(digest))
+  return Array.from(new Uint8Array(digest))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
+}
+
+/**
+ * Fail-closed fingerprint check: the buffer that is about to be opened must
+ * hash to the verified SHA-256, or the open is refused.
+ */
+async function verifyBytesHash(
+  bytes: Uint8Array,
+  expectedSha256: string,
+): Promise<void> {
+  const hex = await sha256Hex(bytes);
   if (hex !== expectedSha256.toLowerCase()) {
     throw new Error(
       "PDF_HASH_MISMATCH: File content changed after verification — the book was not opened.",
@@ -161,10 +171,27 @@ export const pdfService = {
     filePath: string,
     options?: { expectedSha256?: string },
   ): Promise<PDFDocumentProxy> {
+    return (await this.loadDocumentBound(filePath, options)).pdf;
+  },
+
+  /**
+   * Load a PDF and report the fingerprint of the BYTES THAT WERE OPENED.
+   *
+   * A fresh import has no row to check against yet, so it cannot pass
+   * `expectedSha256` — the row is created from the file only afterwards, and
+   * a swap in between would bind one book's row to another book's bytes. The
+   * returned `sha256` is what closes that: the caller compares it to the id
+   * the library hands back and refuses the mismatch.
+   */
+  async loadDocumentBound(
+    filePath: string,
+    options?: { expectedSha256?: string },
+  ): Promise<{ pdf: PDFDocumentProxy; sha256: string }> {
     console.log("[PDF Service] Loading document:", filePath);
 
     try {
       const fileData = await readFileFromTauri(filePath);
+      const sha256 = await sha256Hex(fileData);
       if (options?.expectedSha256) {
         await verifyBytesHash(fileData, options.expectedSha256);
       }
@@ -188,7 +215,7 @@ export const pdfService = {
         "[PDF Service] PDF loaded successfully, pages:",
         pdf.numPages,
       );
-      return pdf;
+      return { pdf, sha256 };
     } catch (error) {
       console.error("[PDF Service] Error loading PDF:", error);
       // Handle common PDF errors

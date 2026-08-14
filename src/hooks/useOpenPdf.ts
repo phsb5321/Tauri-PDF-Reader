@@ -141,15 +141,26 @@ export function useOpenPdf() {
       // Every open of a KNOWN row binds the bytes to the row's content hash
       // (the id): a file replaced at the same path is a different book and
       // refused rather than rendered under the old book's progress.
-      const pdf = known
-        ? await pdfService.loadDocument(filePath, {
-            expectedSha256: known.id,
-          })
-        : await pdfService.loadDocument(filePath);
+      const { pdf, sha256 } = await pdfService.loadDocumentBound(
+        filePath,
+        known ? { expectedSha256: known.id } : undefined,
+      );
 
       const document = known
         ? await libraryOpenDocument(known.id)
         : await libraryAddDocument(filePath, undefined, pdf.numPages);
+
+      // A fresh import is hashed twice: here, over the bytes actually opened,
+      // and again in the backend when the row is created. A file swapped
+      // between the two reads would put THIS book on screen under THAT book's
+      // row — progress, highlights and audio all filed against the wrong
+      // document. The row id IS the backend's fingerprint, so comparing them
+      // closes the window.
+      if (document.id.toLowerCase() !== sha256) {
+        throw new Error(
+          "PDF_HASH_MISMATCH: File content changed while the book was being added — the book was not opened.",
+        );
+      }
 
       showInReader(pdf, document);
       return true;

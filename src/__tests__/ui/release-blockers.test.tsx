@@ -28,7 +28,11 @@ import { SettingsPanel } from "../../components/settings/SettingsPanel";
 import type { Document } from "../../lib/schemas";
 
 vi.mock("../../services/pdf-service", () => ({
-  pdfService: { loadDocument: vi.fn(), getPage: vi.fn() },
+  pdfService: {
+    loadDocument: vi.fn(),
+    loadDocumentBound: vi.fn(),
+    getPage: vi.fn(),
+  },
 }));
 vi.mock("../../adapters/tauri/file-dialog.adapter", () => ({
   fileDialog: { open: vi.fn(), save: vi.fn() },
@@ -41,7 +45,9 @@ vi.mock("../../components/playback-bar/AiPlaybackBar", () => ({
 }));
 
 const { pdfService } = await import("../../services/pdf-service");
-const loadDocument = vi.mocked(pdfService.loadDocument);
+// The Open button goes through `openPdf`, which reads via the bound variant
+// so it can check the bytes it opened against the row the library returns.
+const loadDocument = vi.mocked(pdfService.loadDocumentBound);
 const { fileDialog } = await import("../../adapters/tauri/file-dialog.adapter");
 
 const DOC: Document = {
@@ -64,8 +70,10 @@ beforeEach(() => {
   useAiTtsStore.getState().reset();
   loadDocument.mockReset();
   loadDocument.mockResolvedValue({
-    numPages: 529,
-  } as unknown as PDFDocumentProxy);
+    pdf: { numPages: 529 } as unknown as PDFDocumentProxy,
+    // The library answers with DOC, whose id IS the file fingerprint.
+    sha256: DOC.id,
+  });
   vi.mocked(fileDialog.open).mockReset();
   vi.mocked(fileDialog.open).mockResolvedValue("/books/ddd.pdf" as never);
 
