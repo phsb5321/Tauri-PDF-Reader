@@ -230,7 +230,7 @@ expect_violation "block-scalar explicit key (|-)" "mutable action ref found"
 
 # Tamper 54: anchors/aliases carrying a mutable value.
 sed 's|^      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262$|      - uses: \&mutable actions/checkout@v4\n      - uses: *mutable|' "$WF" >"$WORK/tampered.yml"
-expect_violation "anchor/alias mutable ref" "mutable action ref found"
+expect_violation "anchor/alias mutable ref" "YAML anchors/aliases/merge keys are not permitted"
 
 # Tamper 55: multi-document workflow (fail-closed).
 cp "$WF" "$WORK/tampered.yml"
@@ -267,6 +267,32 @@ sed -e 's|^          bash e2e/run-critical-loop.sh$|          true|' \
     -e 's|^      - name: Packaged PR-fast lane|      - name: Packaged PR-fast lane\n        env:\n          BURY: bash e2e/run-critical-loop.sh|' \
     "$WF" >"$WORK/tampered.yml"
 expect_violation "lane invocation buried in an env value" "pr-fast job does not run e2e/run-critical-loop.sh"
+
+# ── B1/B2/M1-merge/M2 classes ─────────────────────────────────────────────────
+# Tamper 56: step-level if: false on the PR-fast lane step (skips the gate).
+sed '/^      - name: Packaged PR-fast lane/a\        if: false' "$WF" >"$WORK/tampered.yml"
+expect_violation "step-level if: false on the lane step" "step-level if: not permitted"
+
+# Tamper 57: step-level if: false on the driver assertion.
+sed '/^      - name: Assert tauri-driver inside the PINNED flake devShell/a\        if: false' "$WF" >"$WORK/tampered.yml"
+expect_violation "step-level if: false on the driver assertion" "step-level if: not permitted"
+
+# Tamper 58: needs: contract deleted from pr-fast (head code runs when the
+# base contract fails).
+sed '/^    needs: contract$/d' "$WF" >"$WORK/tampered.yml"
+expect_violation "needs: contract deleted" "does not require needs: contract"
+
+# Tamper 59: merge key present (M1 presence rejection).
+sed 's|^jobs:$|jobs:\n  <<: &merge_jobs {}\n  |' "$WF" >"$WORK/tampered.yml"
+expect_violation "merge key present" "YAML anchors/aliases/merge keys are not permitted"
+
+# Tamper 60: runs-on widened away from the exact vm103 label set.
+sed 's|runs-on: \[self-hosted, Linux, X64, vm103\]|runs-on: [self-hosted, Linux, X64]|' "$WF" >"$WORK/tampered.yml"
+expect_violation "runs-on widened to self-hosted" "runs-on is not the exact vm103 label set"
+
+# Tamper 61: permissions widened to contents: write.
+sed 's|^permissions:$|permissions:\n  contents: write|; /^  contents: read$/d' "$WF" >"$WORK/tampered.yml"
+expect_violation "permissions widened to contents: write" "permissions must be exactly contents: read"
 
 # ── Positive control (no-false-positive class) ───────────────────────────────
 python3 - "$WF" "$WORK/clean.yml" <<'PY'

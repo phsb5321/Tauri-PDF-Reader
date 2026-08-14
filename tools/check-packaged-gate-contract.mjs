@@ -68,6 +68,30 @@ if (doc.errors && doc.errors.length > 0) {
   console.error(`CONTRACT VIOLATION: workflow unparseable: ${doc.errors[0].message}`);
   process.exit(2);
 }
+// M1: anchors/aliases/merge keys are REJECTED BY PRESENCE — GitHub really
+// executes them, so the contract must not claim fail-closed by expanding
+// them. A manual AST walk (the visit() Pair callback resolves values and
+// hides the pair keys) inspects every pair key and node property.
+const hasForbiddenYaml = (node) => {
+  if (!node || typeof node !== "object") return false;
+  if (node.anchor || node.type === "ALIAS" || node.type === "MERGE_KEY") return true;
+  if (node.items && Array.isArray(node.items)) {
+    for (const it of node.items) {
+      if (!it || typeof it !== "object") continue;
+      if (it.key && (it.key.value === "<<" || it.key.type === "MERGE_KEY")) return true;
+      if (hasForbiddenYaml(it.key)) return true;
+      if (hasForbiddenYaml(it.value)) return true;
+      // Sequence items that are not pairs: the item node itself is the child.
+      if (it.key === undefined && it.value === undefined) {
+        if (hasForbiddenYaml(it)) return true;
+      }
+    }
+    return false;
+  }
+  return false;
+};
+if (hasForbiddenYaml(doc.contents))
+  fail("YAML anchors/aliases/merge keys are not permitted — GitHub executes them; presence is rejected, not expanded");
 let wf;
 try {
   // Bounded alias expansion: the workflow is tiny; a pathological alias bomb
@@ -97,6 +121,11 @@ else {
 // ── Concurrency ──────────────────────────────────────────────────────────────
 if (!wf.concurrency || wf.concurrency.group !== "packaged-user-gate")
   fail("concurrency group is not the fixed runner-wide packaged-user-gate");
+
+// ── M2: workflow-level permissions must be exactly contents: read ───────────
+const PERMS = JSON.stringify(wf.permissions || null);
+if (PERMS !== JSON.stringify({ contents: "read" }))
+  fail("permissions must be exactly contents: read");
 
 // ── Jobs: closed canonical set ───────────────────────────────────────────────
 if (!wf.jobs || typeof wf.jobs !== "object")
@@ -132,6 +161,19 @@ for (const jobName of Object.keys(CANONICAL_IF)) {
     fail(`${jobName} job missing from the workflow`);
   else {
     // Exact canonical condition (a missing or skip-capable variant fails).
+    // B2: every lane job must gate on the contract job.
+    if (jobName !== "contract") {
+      const needsOk =
+        job.needs === "contract" ||
+        (Array.isArray(job.needs) && job.needs.includes("contract"));
+      if (!needsOk)
+        fail(`${jobName} job does not require needs: contract — a failing base contract must gate every lane job`);
+    }
+
+    // M2: runs-on must be the exact vm103 label set.
+    if (JSON.stringify(job["runs-on"] || null) !== JSON.stringify(["self-hosted", "Linux", "X64", "vm103"]))
+      fail(`${jobName} runs-on is not the exact vm103 label set [self-hosted, Linux, X64, vm103]`);
+
     if (job.if === undefined) {
       if (jobName === "pr-fast")
         fail("pr-fast job-level if: is not the PR trigger + same-repo guard — the gate can be skipped or fork-executed");
@@ -202,6 +244,21 @@ for (const jobName of Object.keys(CANONICAL_IF)) {
         else if (!ups.some((u) => u.if === "failure()"))
           fail("artifact upload not gated on failure");
       }
+    }
+
+    // B1: step-level if is only permitted on the receipt-enforcement,
+    // evidence-copy and upload steps — a step-level `if: false` on the lane
+    // or a driver assertion would skip the gate silently.
+    const IF_ALLOWED_NAME = "Prerequisite receipt enforced";
+    for (const s of steps) {
+      if (!s || s.if === undefined) continue;
+      const name = typeof s.name === "string" ? s.name : "";
+      const isEnforcement = name.startsWith(IF_ALLOWED_NAME);
+      const isCopy = name.startsWith("Copy ") && name.includes("evidence");
+      const isUpload =
+        typeof s.uses === "string" && s.uses.includes("upload-artifact");
+      if (!(isEnforcement || isCopy || isUpload))
+        fail(`step-level if: not permitted on step "${name}" — only the receipt-enforcement, evidence-copy and upload steps may be conditionally gated`);
     }
 
     // Every step.uses must be a pinned SHA (any YAML key/value spelling
