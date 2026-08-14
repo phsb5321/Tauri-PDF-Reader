@@ -322,6 +322,14 @@ expect_violation "multi-command real-corpus lane run" "real-corpus lane step run
 sed '/^      - name: Packaged PR-fast lane/a\        shell: bash' "$WF" >"$WORK/tampered.yml"
 expect_violation "lane step shell override" "lane step shell override is not permitted"
 
+# Tamper 69: workflow-level defaults.run.shell override.
+sed 's|^permissions:$|defaults:\n  run:\n    shell: bash -c '"'"'exit 0'"'"' {0}\npermissions:|' "$WF" >"$WORK/tampered.yml"
+expect_violation "workflow-level defaults.run.shell" "workflow-level defaults are not permitted"
+
+# Tamper 70: job-level defaults.run.shell on pr-fast.
+sed '/^  pr-fast:$/a\    defaults:\n      run:\n        shell: bash -c '"'"'exit 0'"'"' {0}' "$WF" >"$WORK/tampered.yml"
+expect_violation "job-level defaults.run.shell" "job-level defaults are not permitted"
+
 # ── Positive control (no-false-positive class) ───────────────────────────────
 python3 - "$WF" "$WORK/clean.yml" <<'PY'
 import sys

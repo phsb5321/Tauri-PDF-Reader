@@ -118,6 +118,12 @@ else {
     fail("no nightly schedule for the full matrix");
 }
 
+// ── Inherited shell override: the defaults key is rejected outright ─────────
+// A workflow- or job-level defaults.run.shell would apply to the lane steps
+// (the fixture owns the default shell; nothing needs defaults).
+if (wf.defaults !== undefined)
+  fail("workflow-level defaults are not permitted — the fixture owns the default shell");
+
 // ── Concurrency ──────────────────────────────────────────────────────────────
 if (!wf.concurrency || wf.concurrency.group !== "packaged-user-gate")
   fail("concurrency group is not the fixed runner-wide packaged-user-gate");
@@ -198,6 +204,11 @@ for (const jobName of Object.keys(CANONICAL_IF)) {
     // BLOCKER: a job-local permissions block overrides the global one.
     if (job.permissions !== undefined)
       fail("job-level permissions are not permitted — the global permissions must be exactly contents: read");
+
+    // BLOCKER: a job-level defaults.run.shell would inherit onto the lane
+    // steps, bypassing the shell pin.
+    if (job.defaults !== undefined)
+      fail("job-level defaults are not permitted — the fixture owns the default shell");
 
     if (job.if === undefined) {
       if (jobName === "pr-fast")
