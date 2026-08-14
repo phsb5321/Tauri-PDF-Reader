@@ -15,6 +15,22 @@ use tauri::State;
 use tauri_plugin_sql::DbInstances;
 use uuid::Uuid;
 
+/// E2E-only env-calibrated delay for the highlight create IPC, read BEFORE
+/// the DB mutation: the packaged close lane races a GENUINE close against a
+/// deliberately in-flight create (LECTRICE_E2E_HIGHLIGHT_CREATE_DELAY_MS).
+/// Feature-gated AND env-gated: the default is ZERO — the delay activates
+/// ONLY when the runner explicitly exports the var (=250), so no other
+/// e2e-tts-fixture packaged lane is slowed.
+#[cfg(feature = "e2e-tts-fixture")]
+fn parse_e2e_delay(value: Option<&str>) -> u64 {
+    value.and_then(|v| v.parse::<u64>().ok()).unwrap_or(0)
+}
+
+#[cfg(feature = "e2e-tts-fixture")]
+fn e2e_highlight_create_delay_ms() -> u64 {
+    parse_e2e_delay(std::env::var("LECTRICE_E2E_HIGHLIGHT_CREATE_DELAY_MS").ok().as_deref())
+}
+
 /// Create a new highlight
 #[tauri::command]
 #[specta::specta]
@@ -46,6 +62,19 @@ pub async fn highlights_create(
 
     if doc_exists == 0 {
         return Err("DOCUMENT_NOT_FOUND: Document does not exist".to_string());
+    }
+
+    // E2E harness seam: keep the create IPC deliberately in flight for the
+    // calibrated window BEFORE the DB mutation, so the packaged close lane
+    // can prove a close held the window for the pending write (the close
+    // must land >= the delay and the write must survive). No-op in
+    // production: feature-gated AND env-gated.
+    #[cfg(feature = "e2e-tts-fixture")]
+    {
+        let delay = e2e_highlight_create_delay_ms();
+        if delay > 0 {
+            tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
+        }
     }
 
     let id = Uuid::new_v4().to_string();
@@ -335,4 +364,24 @@ pub async fn highlights_export(
         &response.highlights,
         &format,
     ))
+}
+
+#[cfg(all(test, feature = "e2e-tts-fixture"))]
+mod e2e_delay_tests {
+    use super::parse_e2e_delay;
+
+    // Pure-function cases only — no process-global env mutation.
+    #[test]
+    fn e2e_delay_pure_parse() {
+        // Unset → 0 (feature+env gated: the delay must NOT activate unless
+        // the runner explicitly exports the var).
+        assert_eq!(parse_e2e_delay(None), 0);
+        // Explicit calibration.
+        assert_eq!(parse_e2e_delay(Some("250")), 250);
+        assert_eq!(parse_e2e_delay(Some("500")), 500);
+        // Garbage → 0 (fail closed, never a silent large delay).
+        assert_eq!(parse_e2e_delay(Some("not-a-number")), 0);
+        // Explicit zero is honored (disables the delay).
+        assert_eq!(parse_e2e_delay(Some("0")), 0);
+    }
 }

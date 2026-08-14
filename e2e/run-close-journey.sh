@@ -8,7 +8,11 @@
 # produced a false "resume-side defect" reading.
 #
 #   dl1-create  resume → drag-select → Yellow → capture the success toast →
-#               GENUINE window close (xdotool windowclose = WM_DELETE_WINDOW,
+#               GENUINE window close (xdotool windowquit — per `man xdotool`,
+#               "sends a request, allowing application close confirmation":
+#               WM_DELETE_WINDOW. NOT windowclose, which destroys the window
+#               without any client close request — the lane would never
+#               exercise CloseRequested (14/08 lane-6/8 evidence).
 #               the message a window manager sends on the close button — NOT
 #               a process kill, which would prove nothing about
 #               CloseRequested and would pass a broken fix).
@@ -61,6 +65,11 @@ TIMING_DIR="$E2E_PROFILE_DIR/close-timing"
 rm -rf "$TIMING_DIR"
 mkdir -p "$TIMING_DIR"
 export TIMING_DIR
+# DL-1 attribution seam: the create IPC is deliberately held in flight for
+# this window (Rust highlights_create, e2e-tts-fixture only, read BEFORE the
+# DB mutation) so the lane's close can prove the window was HELD for the
+# pending write. Inherited by the app through wdio → tauri-driver.
+export LECTRICE_E2E_HIGHLIGHT_CREATE_DELAY_MS=250
 node scripts/gen-e2e-fixtures.mjs "$APP_DIR" >/dev/null
 
 echo "==> Building frontend (VITE_E2E_NATIVE=true, seed=single, no TTS)"
@@ -83,6 +92,37 @@ toolchain_exec '
   for _ in $(seq 1 100); do [ -s "$DISPNUM_FILE" ] && break; sleep 0.1; done
   export DISPLAY=":$(cat "$DISPNUM_FILE")"
   echo "Xvfb ready on DISPLAY=$DISPLAY profile=$XDG_DATA_HOME"
+
+  # A REAL window manager is mandatory (125): xdotool windowquit sends
+  # WM_DELETE_WINDOW (the graceful close-confirmation message), but without a
+  # WM the client message never reaches the app — lane-9 measured ZERO
+  # CloseRequested firings with no WM. openbox makes the close reach the app
+  # close handler. Fail if openbox dies: a close lane without a WM is a
+  # false-green machine.
+  openbox --sm-disable >/tmp/lectrice-e2e-close-openbox.log 2>&1 &
+  OPENBOX_PID=$!
+  trap "kill $OPENBOX_PID 2>/dev/null || true; kill $XVFB_PID 2>/dev/null || true; rm -f $DISPNUM_FILE" EXIT
+  # WM liveness: openbox becomes the WM within ~300ms of start. Prefer the
+  # _NET_SUPPORTING_WM_CHECK probe when xprop exists; the devShell does not
+  # ship it, so settle on process liveness (a dead openbox is a hard fail).
+  WM_UP=0
+  for _ in $(seq 1 30); do
+    if ! kill -0 "$OPENBOX_PID" 2>/dev/null; then
+      echo "FATAL: openbox exited on DISPLAY=$DISPLAY — no WM for the close lane; windowquit cannot reach CloseRequested without one (lane-9 evidence)" >&2
+      exit 1
+    fi
+    if command -v xprop >/dev/null 2>&1; then
+      if xprop -root _NET_SUPPORTING_WM_CHECK >/dev/null 2>&1; then
+        WM_UP=1
+        break
+      fi
+    else
+      WM_UP=1
+    fi
+    sleep 0.1
+  done
+  [ "$WM_UP" -eq 1 ] || { echo "FATAL: WM never came up on DISPLAY=$DISPLAY" >&2; exit 1; }
+  echo "openbox WM ready (pid=$OPENBOX_PID)"
 
   DB="$XDG_DATA_HOME/com.lectrice.reader/pdf-reader.db"
   # ANCHORED to this worktree: an unanchored "target/debug/tauri-pdf-reade[r]"
