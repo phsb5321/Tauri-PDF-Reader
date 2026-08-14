@@ -26,22 +26,14 @@
 /* Dark mode adjustments */
 [data-theme="dark"] .tts-highlight-rect {
   background-color: rgba(255, 193, 7, 0.3);
+  animation-name: tts-pulse-dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .tts-highlight-rect {
     background-color: rgba(255, 193, 7, 0.3);
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .tts-highlight-rect {
     animation-name: tts-pulse-dark;
   }
-}
-
-[data-theme="dark"] .tts-highlight-rect {
-  animation-name: tts-pulse-dark;
 }
 
 @keyframes tts-pulse-dark {
