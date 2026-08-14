@@ -409,6 +409,62 @@ describe("cover pipeline contract (121)", () => {
     }
   });
 
+  it("relocation resets the pipeline: a healed path reaches ready on the same id", async () => {
+    // The library keeps the content-hash id while healing/relocation changes
+    // the filePath; the card keys the cover by path so the pipeline (and the
+    // broken state) resets and retries on the new path (Codex round 4).
+    stubCanvasToBlob();
+    mockRepoGet.mockResolvedValue(null);
+    mockRepoStore.mockResolvedValue(undefined);
+    mockRepoSize.mockResolvedValue(4096);
+    loadDocumentForCover
+      .mockRejectedValueOnce(new Error("PDF_INVALID: missing"))
+      .mockResolvedValueOnce({
+        doc: { destroy: vi.fn().mockResolvedValue(undefined) },
+      });
+    const { pdfService } = await import("../../services/pdf-service");
+    vi.mocked(pdfService.getPage).mockResolvedValue({
+      getViewport: () => ({ width: 612, height: 792 }),
+    });
+    vi.mocked(pdfService.renderPage).mockReturnValue({
+      promise: Promise.resolve(),
+      cancel: vi.fn(),
+    });
+
+    const doc = makeDoc("88b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8");
+    const { rerender, getByRole } = render(
+      <DocumentCover
+        key="/books/old.pdf"
+        documentId={doc.id}
+        title={doc.title}
+        filePath="/books/old.pdf"
+      />,
+    );
+    act(() => intersect());
+    await waitFor(() =>
+      expect(getByRole("img", { name: "Paper One" }).dataset.state).toBe("fallback"),
+    );
+    // The book heals: same id, new path. The key change remounts the cover —
+    // the fresh pipeline retries and reaches ready.
+    rerender(
+      <DocumentCover
+        key="/books/new.pdf"
+        documentId={doc.id}
+        title={doc.title}
+        filePath="/books/new.pdf"
+      />,
+    );
+    // The remounted cover has its own observer — intersect it.
+    act(() => intersect());
+    await waitFor(() =>
+      expect(getByRole("img", { name: "Paper One" }).dataset.state).toBe("ready"),
+    );
+    expect(loadDocumentForCover).toHaveBeenCalledWith(
+      "/books/new.pdf",
+      expect.any(Number),
+    );
+  });
+
   it("grid card: the open button keeps working with the cover inside", async () => {
     const onClick = vi.fn();
     const { getByRole } = render(

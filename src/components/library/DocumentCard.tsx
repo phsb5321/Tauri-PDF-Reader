@@ -144,7 +144,12 @@ export function DocumentCard({
           onKeyDown={handlePrimaryKeyDown}
         >
           <div className="document-card-icon">
+            {/* Keyed by filePath: a healed/relocated book keeps its content-hash
+                id while its path changes — the key forces the cover pipeline
+                (and its broken state) to reset and retry on the new path
+                (Codex round 4). */}
             <DocumentCover
+              key={document.filePath}
               documentId={document.id}
               title={document.title}
               filePath={document.filePath}
@@ -202,7 +207,9 @@ export function DocumentCard({
         onKeyDown={handlePrimaryKeyDown}
       >
         <div className="document-card-thumbnail">
+          {/* Keyed by filePath — see the list branch's comment. */}
           <DocumentCover
+            key={document.filePath}
             documentId={document.id}
             title={document.title}
             filePath={document.filePath}
