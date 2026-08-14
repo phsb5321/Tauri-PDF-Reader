@@ -522,12 +522,14 @@ pub fn run() {
                 // lose a FAST renderer ack (a flush with nothing pending
                 // acks immediately), stranding the window on the full 3s
                 // timeout for every fast close. The listener is app-scoped
-                // (matching every other event in this codebase); a
-                // window-scoped listen would never receive the app-scoped
-                // emit. watch::Sender::send is &self, so the Fn closure can
-                // signal it (oneshot's Sender would be moved out).
+                // (matching every other event in this codebase). listen
+                // returns an EventId (Copy) — removal is the explicit
+                // app_handle.unlisten(id), never drop (clippy: drop of a
+                // Copy does nothing). watch::Sender::send is &self, so the
+                // Fn closure can signal it (oneshot's Sender would be moved
+                // out).
                 let (tx, mut rx) = tokio::sync::watch::channel(false);
-                let unlisten = app_handle.listen("app-close-ack", move |_| {
+                let ack_id = app_handle.listen("app-close-ack", move |_| {
                     let _ = tx.send(true);
                 });
                 // app-scoped emit: the frontend's listen() subscribes at the
@@ -541,7 +543,7 @@ pub fn run() {
                     let _ = win.destroy();
                     // The listener lived exactly as long as the protocol
                     // needed it — remove it after the destroy.
-                    drop(unlisten);
+                    app_handle.unlisten(ack_id);
                 });
             }
         });
