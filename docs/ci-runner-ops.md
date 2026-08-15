@@ -157,7 +157,10 @@ went green and the binary is present.
 Reversal: `/usr/local/sbin/runner-cleanup.sh.bak-20260815`.
 
 If it recurs: check `find _tool -name '*.complete'` against the presence of the
-binary. A marker without its payload is this bug, not a download failure.
+binary. A marker whose payload is missing means the install was deleted after
+it completed — a post-install eviction of some kind, not a failed download.
+This prune was one such deleter; a manual `rm` or filesystem damage leaves the
+same shape, so confirm the deleter before blaming the timer again.
 
 ## Runner cleanup log rotation — resolved 15/08/2026
 
