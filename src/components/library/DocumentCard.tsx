@@ -139,6 +139,7 @@ export function DocumentCard({
         <button
           type="button"
           className="document-card-open"
+          aria-label={`Open ${document.title || fileName}`}
           onClick={onClick}
           onDoubleClick={onDoubleClick}
           onKeyDown={handlePrimaryKeyDown}
@@ -154,6 +155,7 @@ export function DocumentCard({
               title={document.title}
               filePath={document.filePath}
               fileHash={document.fileHash}
+              decorative
               size="sm"
             />
           </div>
@@ -203,6 +205,7 @@ export function DocumentCard({
       <button
         type="button"
         className="document-card-open"
+        aria-label={`Open ${document.title || fileName}`}
         onClick={onClick}
         onDoubleClick={onDoubleClick}
         onKeyDown={handlePrimaryKeyDown}
@@ -215,6 +218,7 @@ export function DocumentCard({
             title={document.title}
             filePath={document.filePath}
             fileHash={document.fileHash}
+            decorative
             size="md"
           />
           {progress > 0 && (

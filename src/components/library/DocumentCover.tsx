@@ -8,6 +8,8 @@ interface DocumentCoverProps {
   filePath: string;
   /** The library row's content hash (SHA-256) — verified before caching. */
   fileHash?: string | null;
+  /** Adjacent card text already names the book; avoid duplicate announcement. */
+  decorative?: boolean;
   size?: "sm" | "md" | "lg";
 }
 
@@ -32,6 +34,7 @@ export function DocumentCover({
   title,
   filePath,
   fileHash,
+  decorative = false,
   size = "md",
 }: Readonly<DocumentCoverProps>) {
   const { ref, state, url } = useCover({
@@ -64,7 +67,7 @@ export function DocumentCover({
       {state === "ready" && url && !broken ? (
         <img
           src={url}
-          alt={name}
+          alt={decorative ? "" : name}
           draggable={false}
           className="document-cover-img"
           onError={() => setBroken(true)}
@@ -74,8 +77,9 @@ export function DocumentCover({
           <svg
             viewBox="0 0 24 24"
             className="cover-fallback-glyph"
-            role="img"
-            aria-label={name}
+            role={decorative ? undefined : "img"}
+            aria-label={decorative ? undefined : name}
+            aria-hidden={decorative || undefined}
           >
             <path
               d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"

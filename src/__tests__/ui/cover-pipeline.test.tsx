@@ -3,7 +3,8 @@
  * packet §5, plus the adjudications the dispatch demanded:
  *
  *  1. Fallback is deterministic (same id → same seed class across renders).
- *  2. Accessible name: the cover is always role="img" named by the title.
+ *  2. Accessible name: standalone covers are named; card covers are decorative
+ *     because the containing Open control already names the same book.
  *  3. No network: the cover pipeline modules carry no fetch/XHR markers.
  *  4. Warm in-session cache: a second mount of the same id resolves from the
  *     in-memory cache — extraction runs exactly once.
@@ -537,13 +538,16 @@ describe("cover pipeline contract (121)", () => {
         onDelete={vi.fn()}
       />,
     );
-    const open = getByRole("button", { name: /Paper One/ });
+    const open = getByRole("button", { name: "Open Paper One" });
     open.click();
     expect(onClick).toHaveBeenCalled();
+    // The button already has the title; its cover is decorative, so the name
+    // is announced exactly once.
+    expect(open).toHaveAccessibleName("Open Paper One");
   });
 
-  it("list card: the cover thumb is named by the title too", () => {
-    const { getByRole } = render(
+  it("list card: the named button does not double-announce its cover", () => {
+    const { getByRole, queryByRole } = render(
       <DocumentCard
         document={DOC}
         isSelected={false}
@@ -553,6 +557,9 @@ describe("cover pipeline contract (121)", () => {
         onDelete={vi.fn()}
       />,
     );
-    expect(getByRole("img", { name: "Paper One" })).toBeInTheDocument();
+    expect(
+      getByRole("button", { name: "Open Paper One" }),
+    ).toHaveAccessibleName("Open Paper One");
+    expect(queryByRole("img", { name: "Paper One" })).not.toBeInTheDocument();
   });
 });
