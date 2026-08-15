@@ -9,8 +9,7 @@ Tauri 2.x (React/TypeScript + Rust).
 The name is French for _a person employed to read aloud to someone_ — the app
 is your lectrice. See [`docs/brand/`](docs/brand/) for the full brand system.
 
-> **Status:** v0.1.0 shipped for **Linux (AppImage + deb)**. The current tree
-> (84 commits past the tag) is the v0.2.0 candidate; see
+> **Status:** v0.2.0 for **Linux (AppImage + deb)**; see
 > [CHANGELOG.md](CHANGELOG.md) and
 > [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md). macOS and Windows are
 > **not yet covered by packaged builds or packaged tests** — see Platform
@@ -23,9 +22,8 @@ What is in the tree today, with the receipt that proved it:
 - Open and view local PDF files — offline; PDF resources (CMaps) are bundled
   locally, no CDN egress ([#97]).
 - Text selection and highlighting, **persisted locally** and restored on
-  reopen, and **surviving a quick window close** ([#102], [#113]).
-  (Reading position on fast close is an open defect — see
-  [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).)
+  reopen, and **surviving a quick window close** ([#102], [#113]) — as does
+  your reading position ([#125]).
 - Read a highlighted passage aloud with **AI text-to-speech (ElevenLabs)**
   ([#89], [#92]); requires an ElevenLabs API key (session-only, [#73]).
 - Resume reading: the library shows where each book left off and one action
@@ -171,6 +169,7 @@ Private - All rights reserved.
 [#111]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/111
 [#113]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/113
 [#114]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/114
+[#125]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/125
 [#83]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/83
 [#108]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/108
 [release workflow]: .github/workflows/release.yml

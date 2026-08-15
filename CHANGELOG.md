@@ -4,14 +4,12 @@ All dates are the merge date of the PR that landed the change. "Receipt" links
 to the PR body or the test that proved the change — this project's rule is
 that a claim about behavior is backed by a runnable assertion, not a glance.
 
-## Unreleased — v0.2.0 candidate
+## v0.2.0 — 15/08/2026
 
-The tree between `v0.1.0` (21/06/2026) and today is the v0.2.0 candidate:
-84 commits, every one the squash-merge of a merged PR (84 PRs since the tag,
-verified against `gh pr list --state merged` merge-commit SHAs). **No tag has
-been cut for v0.2.0.** Cutting the tag
-is a release decision (release.md) — this changelog documents what a release
-would say, using the receipts that exist today.
+Everything between `v0.1.0` (21/06/2026) and this tag, every commit the
+squash-merge of a merged PR. The three version fields (`package.json`,
+`src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`) move to `0.2.0` in the
+same slice as this entry, so the published artifacts identify as 0.2.0.
 
 > Platform note for the release: packaged builds and packaged E2E exist for
 > **Linux only** (AppImage + deb). Nothing in this changelog claims macOS or
@@ -31,6 +29,17 @@ would say, using the receipts that exist today.
   _and_ the right page.
 - **Highlight persistence proven**: packaged highlight-journey lane creates a
   highlight and proves it survives a relaunch ([#100], [#102], [#113]).
+- **Real first-page covers**: the home shows each book's own first page,
+  rastered by pdf.js into a narrow Rust-side cache with a deterministic
+  fallback and cleanup on delete ([#126]). Cards expose the cover as
+  decorative and carry a truthful control name — click selects, Enter and
+  double-click open ([#129]).
+- **Books whose file grant lapsed reopen**: a stored book that lost its
+  filesystem authorization is reauthorized through the dialog and the opened
+  bytes are hash-bound to the stored identity before the reader displays them
+  ([#122]).
+- **Deleting a book is a proven journey**: the packaged delete lane asserts
+  the row and its cached audio both go ([#124]).
 - **Keyboard shortcuts panel derives from the real bindings** — the panel
   can no longer advertise a chord that does not exist ([#111]).
 - **UI tracks OS text size**: rem replaces fixed-pixel font sizes across the
@@ -38,12 +47,16 @@ would say, using the receipts that exist today.
 
 ### Fixed (selected, all with receipts)
 
-- Closing the window no longer drops a pending highlight save: the
-  close-flush protocol was added for both writers, and the packaged
-  close-journey lane proves **highlights survive** a genuine window close
-  inside the save debounce (dl1 PASS; [#113]). **Reading position is not yet
-  proven** on that path (dl2-verify FAIL, per [#115]) and remains an open
-  defect — see `docs/KNOWN_LIMITATIONS.md`.
+- Closing the window no longer drops a pending write. The close-flush
+  protocol covers both writers ([#113]), and after the autosave-snapshot
+  rework in [#125] the packaged close lane proves **both** data-loss paths on
+  a genuine close inside the save debounce: the highlight survives (window
+  gone at 387 ms) and the reading position survives (window gone at 401 ms,
+  persisted row and restarted reader both on page 3). This closes the defect
+  [#115] left open.
+- Dark mode no longer drops rules: the duplicated/invalid dark blocks were
+  merged and repaired, and contrast is now bound by executable contracts
+  ([#123], [#127]).
 - Failed opens are no longer silent; a dismissible error banner surfaces
   `PDF_INVALID` and friends ([#109], [#110]).
 - Settings no longer shows a dead "native TTS" panel or a telemetry fiction;
@@ -68,33 +81,37 @@ would say, using the receipts that exist today.
   outbound egress (ElevenLabs) with file:line receipts.
 - Secrets hygiene: API keys are session-only ([#73]); a secret scanner guards
   the repo.
+- CodeQL actually runs — it had never executed once before it moved to the
+  self-hosted runner ([#116]) — and the repository ends this cycle with zero
+  open code-scanning alerts ([#132]).
+- The packaged user gate has a three-stage trust anchor and parser-based
+  workflow checkers, so a lane cannot report green by measuring its own
+  harness ([#119]).
+- Release evidence is exact-SHA and fail-closed: a private real-book corpus
+  lane opens five full-length PDFs, ties each displayed cover to its cached
+  bytes, and refuses to run from a dirty tree or to clean resources it does
+  not own ([#130], [#131]). No private bytes, titles, hashes, or paths enter
+  this repository or its CI artifacts.
 
 ### Known limitations (see `docs/KNOWN_LIMITATIONS.md` for the full list)
 
-- **Fast-close verification position (track A)**: the close-flush protocol is
-  shipped ([#113]) and **highlights survive** a driver-mediated genuine window
-  close (dl1 PASS). **Reading-position persistence under fast close is an open
-  defect** (dl2-verify FAIL, [#115]: relaunch lands on page 2 instead of 3).
-  The E2E harness additionally cannot deterministically deliver `CloseRequested`
-  (documented BLOCKED in `docs/agent-backlog-state.md`). Three separate
-  facts: protocol has direct test coverage; dl1 passes the drivable path;
-  dl2 fails it — and the harness has its own nondeterminism on top.
 - **Fixture-vs-live TTS**: packaged E2E drives a deterministic fixture engine,
   not live ElevenLabs. The live path needs an API key and is not exercised in
   CI.
 - **Linux artifact reality**: AppImage + deb only; no macOS/Windows packaged
-  build or test exists.
+  build or test exists. The close, cover, corpus and session evidence above is
+  Linux/X11/WebKitGTK scoped.
 
 ### v0.2.0 release-note draft
 
 > **Lectrice v0.2.0 — read aloud.**
 >
 > This release is the first big step past v0.1.0's "a reader that speaks":
-> your library remembers where you stopped and resumes on one action;
-> highlights survive restarts and a quick close (reading position on fast
-> close remains an open defect — see KNOWN_LIMITATIONS); PDFs load fully
-> offline (no CDN); the shortcuts panel tells the truth; and the interface
-> now scales with your OS text size.
+> the home shows each book by its own first page and remembers where you
+> stopped; one action resumes and narrates; highlights *and* your place
+> survive a restart and a quick close; PDFs load fully offline (no CDN); the
+> shortcuts panel tells the truth; and the interface now scales with your OS
+> text size.
 >
 > **Platform:** Linux AppImage + deb. (macOS/Windows builds are not shipped
 > in this release.)
@@ -104,12 +121,6 @@ would say, using the receipts that exist today.
 > `SECURITY.md`.
 >
 > See `CHANGELOG.md` for the receipt-backed list.
->
-> _Release gate: cutting v0.2.0 must also bump `package.json`,
-> `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json` from 0.1.0 to 0.2.0
-> together — a tag on the current tree would publish artifacts that still
-> identify as 0.1.0. The bump is intentionally NOT in this docs slice; it
-> belongs to the release slice._
 
 ## v0.1.0 — 21/06/2026
 
@@ -138,3 +149,16 @@ work listed above.
 [#111]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/111
 [#113]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/113
 [#114]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/114
+[#115]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/115
+[#116]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/116
+[#119]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/119
+[#122]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/122
+[#123]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/123
+[#124]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/124
+[#125]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/125
+[#126]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/126
+[#127]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/127
+[#129]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/129
+[#130]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/130
+[#131]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/131
+[#132]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/132
