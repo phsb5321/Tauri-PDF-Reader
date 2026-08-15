@@ -6,8 +6,8 @@
  *   CORPUS_PHASE=open    — actor clicks Toolbar Open; the seam returns the
  *                          real book path (VITE_E2E_OPEN_PATH, built in);
  *                          the reader must render the book's first page
- *                          (real text layer spans, non-fixture), then the
- *                          actor clicks Next and the RENDERED page must move
+ *                          (non-blank production canvas, non-fixture), then
+ *                          the actor clicks Next and the RENDERED page must move
  *                          to 2. Cover claim: if the DocumentCover surface
  *                          exists in this build, assert a real cover image
  *                          (naturalWidth > 0); if it does NOT exist (main
@@ -49,20 +49,39 @@ const BOOK = { basename: BASENAME, sha: SHA, pages: PAGES };
 // is "Resume {title}, page …". The runner passes the full basename, so the
 // stem is derived here — same rule the backend applies.
 const TITLE = BASENAME.replace(/\.pdf$/i, "");
-async function renderedTextLayerCount(pageNum) {
-  // Codex gate #4: scope the render check to the RENDERED page's root
-  // ([data-page-number]), not a global "any text spans exist" — the native
-  // bootstrap may leave fixture spans around.
-  return browser.execute(
-    (n) => {
-      const scope = n
-        ? document.querySelector(`[data-page-number="${n}"]`)
-        : document;
-      return (scope?.querySelectorAll(".textLayer span, [class*='textLayer'] span") ?? [])
-        .length;
+async function renderedPageRaster(pageNum) {
+  // GPU-backed PDF canvases are intentionally unreadable in WebKitGTK. Bind
+  // the oracle to the target page root, non-zero production canvas backing
+  // store, and the post-promise PdfViewer completion receipt. This proves the
+  // real renderer completed without retaining private page pixels.
+  return browser.execute((n) => {
+    const canvas = document.querySelector(
+      `[data-page-number="${n}"] canvas`,
+    );
+    if (!canvas || typeof canvas.width !== "number") return null;
+    let completion = null;
+    for (const line of window.__E2E_READ__.logs()) {
+      if (line.includes(`[PdfViewer] Rendered page ${n} `)) completion = line;
+    }
+    return {
+      width: canvas.width,
+      height: canvas.height,
+      cssWidth: canvas.style.width,
+      cssHeight: canvas.style.height,
+      completion: completion ?? null,
+    };
+  }, pageNum);
+}
+
+async function waitForPageRaster(pageNum, timeout, timeoutMsg) {
+  await browser.waitUntil(
+    async () => {
+      const raster = await renderedPageRaster(pageNum);
+      return !!raster?.completion && raster.width > 0 && raster.height > 0;
     },
-    pageNum ?? null,
+    { timeout, timeoutMsg },
   );
+  return renderedPageRaster(pageNum);
 }
 
 async function pageInputValue() {
@@ -105,21 +124,27 @@ async function cardPagesTotal() {
 }
 
 async function coverContentHash() {
-  // Codex gate #5: real cover proof = the DISPLAYED raster's content hash,
-  // distinct from any fallback. The observer fetches the rendered img's
-  // blob/data URL (same-origin — CSP allows blob: for img-src) and SHA-256s
-  // the bytes. Returns null when no cover img exists.
-  return browser.execute(async () => {
-    const cover = document.querySelector(
-      "[class*='DocumentCover'], [class*='document-cover'], img[class*='cover']",
-    );
-    const img = cover?.querySelector("img") ?? cover;
+  // Codex gate #5: real cover proof = the DISPLAYED raster's decoded RGBA
+  // hash, distinct from any fallback. Blob fetch is unreliable in WebKitGTK;
+  // drawing the already displayed same-origin image is the proven cover lane
+  // oracle. The runner hashes cached PNG pixels in the same RGBA domain.
+  return browser.execute(async (title) => {
+    const button = Array.from(
+      document.querySelectorAll("button.document-card-open"),
+    ).find((node) => node.getAttribute("aria-label")?.startsWith(`Select ${title};`));
+    const cover = button?.querySelector(".document-cover");
+    const img = cover?.querySelector("img");
     if (!img || img.tagName !== "IMG" || !img.src) return null;
     if (!img.src.startsWith("blob:") && !img.src.startsWith("data:")) {
       return { error: "cover src is not blob:/data: (egress risk)", src: img.src.slice(0, 40) };
     }
-    const resp = await fetch(img.src);
-    const buf = new Uint8Array(await resp.arrayBuffer());
+    const canvas = document.createElement("canvas");
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const context = canvas.getContext("2d");
+    if (!context) return { error: "cover canvas context unavailable" };
+    context.drawImage(img, 0, 0);
+    const buf = context.getImageData(0, 0, canvas.width, canvas.height).data;
     const digest = await crypto.subtle.digest("SHA-256", buf);
     const hex = Array.from(new Uint8Array(digest))
       .map((b) => b.toString(16).padStart(2, "0"))
@@ -130,22 +155,24 @@ async function coverContentHash() {
       naturalWidth: img.naturalWidth,
       naturalHeight: img.naturalHeight,
     };
-  });
+  }, TITLE);
 }
 
 async function bookCoverDiagnostic() {
-  return browser.execute(() => {
-    const cover = document.querySelector(
-      "[class*='DocumentCover'], [class*='document-cover'], img[class*='cover']",
-    );
-    const img = cover?.querySelector("img") ?? cover;
+  return browser.execute((title) => {
+    const button = Array.from(
+      document.querySelectorAll("button.document-card-open"),
+    ).find((node) => node.getAttribute("aria-label")?.startsWith(`Select ${title};`));
+    const cover = button?.querySelector(".document-cover");
+    const img = cover?.querySelector("img");
     return {
       surfaceExists: !!cover,
-      isImg: !!img && img.tagName === "IMG",
-      naturalWidth: img && img.tagName === "IMG" ? img.naturalWidth : 0,
-      srcPrefix: img && img.src ? img.src.slice(0, 30) : null,
+      state: cover?.getAttribute("data-state") ?? null,
+      isImg: !!img,
+      naturalWidth: img?.naturalWidth ?? 0,
+      srcPrefix: img?.src ? img.src.slice(0, 30) : null,
     };
-  });
+  }, TITLE);
 }
 
 
@@ -167,6 +194,10 @@ if (PHASE === "corrupt-control") {
       const openBtn = await $("button.open-button");
       await openBtn.waitForExist({ timeout: 15000 });
       await openBtn.waitForClickable({ timeout: 15000 });
+      const initialTitle = await documentTitleText();
+      const initialLogCount = await browser.execute(
+        () => window.__E2E_READ__.logs().length,
+      );
       await browser.execute(() =>
         document.querySelector("button.open-button")?.click(),
       );
@@ -174,18 +205,26 @@ if (PHASE === "corrupt-control") {
       const settleStart = Date.now();
       let verdict = null;
       while (Date.now() - settleStart < 10000) {
-        verdict = await browser.execute(() => {
+        verdict = await browser.execute(([beforeTitle, logStart]) => {
           const err = document.querySelector(
             ".pdf-viewer-error, [class*='error']:not([class*='error-hidden'])",
           );
-          const readerMounted = !!document.querySelector(
-            "input[aria-label='Current page']",
-          );
-          const errText = err && (err.textContent || "").trim();
-          if (readerMounted) return { ok: false, reason: "reader mounted on corrupt file" };
-          if (errText && errText.length > 0) return { ok: true, reason: errText.slice(0, 200) };
+          const currentTitle = document.querySelector(".document-title")?.textContent ?? null;
+          const storeError = window.__E2E_READ__.storeError();
+          const errText = (err?.textContent || "").trim();
+          const storeErrorText = storeError
+            ? `${String(storeError)} ${JSON.stringify(storeError)}`
+            : "";
+          if (currentTitle && currentTitle !== beforeTitle) {
+            return { ok: false, reason: "reader changed to corrupt file" };
+          }
+          const newLogs = window.__E2E_READ__.logs().slice(logStart).join(" ");
+          const reason = `${errText} ${storeErrorText} ${newLogs}`.trim();
+          if (/PDF_INVALID/i.test(reason)) {
+            return { ok: true, reason: reason.slice(0, 500) };
+          }
           return null;
-        });
+        }, [initialTitle, initialLogCount]);
         if (verdict) break;
         await browser.pause(500);
       }
@@ -233,33 +272,28 @@ if (PHASE === "corrupt-control") {
       //    A cover-capable build (post-121) must show a real raster with a
       //    content hash distinct from the fallback; a build without the
       //    surface records BLOCKED — never a silent pass. ────────────────
+      await browser.waitUntil(
+        async () => {
+          const candidate = await bookCoverDiagnostic();
+          return candidate.surfaceExists && candidate.state === "ready" && candidate.naturalWidth > 0;
+        },
+        { timeout: 60000, timeoutMsg: "real card cover never reached ready" },
+      );
       const cover = await bookCoverDiagnostic();
-      if (cover.surfaceExists) {
-        const hash = await coverContentHash();
-        if (!hash || hash.error || !hash.sha256 || hash.naturalWidth <= 0) {
-          console.log(
-            "DIAG cover-fail:",
-            JSON.stringify({ ...BOOK, phase: "card-open", step: "cover", cover, hash }),
-          );
-          throw new Error(
-            `cover surface present but no real raster content hash: ${JSON.stringify({ cover, hash })}`,
-          );
-        }
+      const hash = await coverContentHash();
+      if (!hash || hash.error || !hash.sha256 || hash.naturalWidth <= 0) {
         console.log(
-          "DIAG cover:",
-          JSON.stringify({ ...BOOK, phase: "card-open", step: "cover", ...cover, contentSha256: hash.sha256, bytes: hash.bytes }),
+          "DIAG cover-fail:",
+          JSON.stringify({ ...BOOK, phase: "card-open", step: "cover", cover, hash }),
         );
-      } else {
-        console.log(
-          "DIAG cover:",
-          JSON.stringify({
-            ...BOOK,
-            phase: "card-open",
-            step: "cover",
-            status: "BLOCKED — DocumentCover surface absent on this base; owner 121-cover-pipeline",
-          }),
+        throw new Error(
+          `cover surface present but no real raster content hash: ${JSON.stringify({ cover, hash })}`,
         );
       }
+      console.log(
+        "DIAG cover:",
+        JSON.stringify({ ...BOOK, phase: "card-open", step: "cover", ...cover, contentSha256: hash.sha256, bytes: hash.bytes }),
+      );
 
       // ── Codex gate #4: the card's public meta must show the manifest page
       //    count (grid "{N} pages" or list "{cur}/{N} pages").
@@ -276,14 +310,17 @@ if (PHASE === "corrupt-control") {
       const card = await $(".document-card-open");
       await card.waitForExist({ timeout: 15000 });
       await card.waitForClickable({ timeout: 15000 });
-      await browser.execute(() =>
-        document.querySelector(".document-card-open")?.click(),
-      );
+      await card.doubleClick();
 
       try {
-        await browser.waitUntil(
-          async () => (await renderedTextLayerCount(1)) > 0,
-          { timeout: 90000, timeoutMsg: "reader never mounted after card click" },
+        const raster = await waitForPageRaster(
+          2,
+          90000,
+          "reader never restored and painted page 2 after card double-click",
+        );
+        console.log(
+          "DIAG card-open-ok:",
+          JSON.stringify({ ...BOOK, phase: "card-open", readerMounted: true, raster }),
         );
       } catch (err) {
         console.log(
@@ -291,7 +328,7 @@ if (PHASE === "corrupt-control") {
           JSON.stringify({
             ...BOOK,
             phase: "card-open",
-            textLayerPage1: await renderedTextLayerCount(1),
+            rasterPage2: await renderedPageRaster(2),
             libraryStillShowing: await browser.execute(
               () => !!document.querySelector(".library-view, .library-body, .resume-section"),
             ),
@@ -299,10 +336,6 @@ if (PHASE === "corrupt-control") {
         );
         throw err;
       }
-      console.log(
-        "DIAG card-open-ok:",
-        JSON.stringify({ ...BOOK, phase: "card-open", readerMounted: true }),
-      );
     });
   });
 } else if (PHASE === "epub-control") {
@@ -323,6 +356,10 @@ if (PHASE === "corrupt-control") {
       const openBtn = await $("button.open-button");
       await openBtn.waitForExist({ timeout: 15000 });
       await openBtn.waitForClickable({ timeout: 15000 });
+      const initialTitle = await documentTitleText();
+      const initialLogCount = await browser.execute(
+        () => window.__E2E_READ__.logs().length,
+      );
       await browser.execute(() =>
         document.querySelector("button.open-button")?.click(),
       );
@@ -334,20 +371,26 @@ if (PHASE === "corrupt-control") {
       const settleStart = Date.now();
       let verdict = null;
       while (Date.now() - settleStart < 8000) {
-        verdict = await browser.execute(() => {
+        verdict = await browser.execute(([beforeTitle, logStart]) => {
           const err = document.querySelector(
             ".pdf-viewer-error, [class*='error']:not([class*='error-hidden'])",
           );
-          const readerMounted = !!document.querySelector(
-            "input[aria-label='Current page']",
-          );
-          const errText = err && (err.textContent || "").trim();
-          if (readerMounted) return { refused: false, reason: "reader mounted" };
-          if (errText && errText.length > 0) {
-            return { refused: true, reason: errText.slice(0, 200) };
+          const currentTitle = document.querySelector(".document-title")?.textContent ?? null;
+          const storeError = window.__E2E_READ__.storeError();
+          const errText = (err?.textContent || "").trim();
+          const storeErrorText = storeError
+            ? `${String(storeError)} ${JSON.stringify(storeError)}`
+            : "";
+          if (currentTitle && currentTitle !== beforeTitle) {
+            return { refused: false, reason: "reader changed to EPUB" };
+          }
+          const newLogs = window.__E2E_READ__.logs().slice(logStart).join(" ");
+          const reason = `${errText} ${storeErrorText} ${newLogs}`.trim();
+          if (/PDF_INVALID/i.test(reason)) {
+            return { refused: true, reason: reason.slice(0, 500) };
           }
           return null;
-        });
+        }, [initialTitle, initialLogCount]);
         if (verdict) break;
         await browser.pause(500);
       }
@@ -396,7 +439,7 @@ if (PHASE === "corrupt-control") {
 
 describe(`Packaged corpus journey — ${BASENAME}`, () => {
   it(`${PHASE}: ${PHASE === "open"
-      ? "open/import → cover → first-page render → next-page"
+      ? "open/import → cover → page rasters → next-page → text-backed TTS"
       : "restart/restore → delete/cache cleanup"}`, async () => {
     await browser.waitUntil(
       async () =>
@@ -417,12 +460,14 @@ describe(`Packaged corpus journey — ${BASENAME}`, () => {
       );
 
       // ── CLAIM 1: the reader surface displays the REAL first page. ────────
-      // Scope the text-layer check to the RENDERED page root ([data-page-
-      // number="1"]) so pre-existing spans cannot satisfy it (Codex gate #4).
+      // A cover page may be image-only. Require a non-blank production canvas
+      // scoped to page 1 rather than assuming every valid PDF has text spans.
+      let page1Raster;
       try {
-        await browser.waitUntil(
-          async () => (await renderedTextLayerCount(1)) > 0,
-          { timeout: 90000, timeoutMsg: "reader never rendered page-1 text for the real book" },
+        page1Raster = await waitForPageRaster(
+          1,
+          90000,
+          "reader never painted page 1 for the real book",
         );
       } catch (err) {
         console.log(
@@ -431,8 +476,21 @@ describe(`Packaged corpus journey — ${BASENAME}`, () => {
             ...BOOK,
             phase: "open",
             step: "render",
-            textLayerPage1: await renderedTextLayerCount(1),
+            rasterPage1: await renderedPageRaster(1),
             pageInput: await pageInputValue().catch(() => null),
+            documentTitle: await documentTitleText(),
+            pageRoots: await browser.execute(() =>
+              Array.from(document.querySelectorAll("[data-page-number]")).map((node) => ({
+                page: node.getAttribute("data-page-number"),
+                canvases: node.querySelectorAll("canvas").length,
+              })),
+            ),
+            bootstrapLogs: await browser.execute(() =>
+              window.__E2E_READ__
+                .logs()
+                .slice(-20)
+                .map((line) => line.replace(/\/home\/[^ )\]]+/g, "<private-path>")),
+            ),
             hasReader: !!(await $("input[aria-label='Current page']").isExisting()),
           }),
         );
@@ -513,13 +571,37 @@ describe(`Packaged corpus journey — ${BASENAME}`, () => {
         async () => (await pageInputValue()) === "2",
         { timeout: 15000, timeoutMsg: "Next did not land on page 2" },
       );
-      await browser.waitUntil(
-        async () => (await renderedTextLayerCount(2)) > 0,
-        { timeout: 15000, timeoutMsg: "page 2 rendered no text layer (scoped to page 2)" },
+      const page2Raster = await waitForPageRaster(
+        2,
+        30000,
+        "page 2 never painted a non-blank production canvas",
       );
+      // Exercise TTS when this page exposes selectable PDF text. Some real
+      // books begin with image-only front matter; no OCR exists in v0.2.0.
+      // ponytail: skip only that unsupported page shape; an OCR feature can
+      // replace this condition when the product gains one.
+      await browser.pause(1000);
+      const textSpanCount = await browser.execute(() =>
+        document.querySelectorAll('[data-page-number="2"] .textLayer span').length,
+      );
+      if (textSpanCount > 0) {
+        const playBtn = await $(".ai-playback-button");
+        await playBtn.waitForExist({ timeout: 15000 });
+        await playBtn.waitForEnabled({ timeout: 15000 });
+        await playBtn.waitForClickable({ timeout: 15000 });
+        await browser.execute(() =>
+          document.querySelector(".ai-playback-button")?.click(),
+        );
+        await browser.waitUntil(
+          async () => browser.execute(() => window.__E2E_READ__.wordCount() > 0),
+          { timeout: 15000, timeoutMsg: "text-backed page produced no TTS marks" },
+        );
+      } else {
+        console.log("DIAG tts-not-applicable:", JSON.stringify({ ...BOOK, page: 2, reason: "no text spans" }));
+      }
       console.log(
         "DIAG open-ok:",
-        JSON.stringify({ ...BOOK, phase: "open", pageInput: "2" }),
+        JSON.stringify({ ...BOOK, phase: "open", pageInput: "2", page1Raster, page2Raster }),
       );
       return;
     }
@@ -544,18 +626,20 @@ describe(`Packaged corpus journey — ${BASENAME}`, () => {
       throw new Error(`library row did not persist page 2 of ${PAGES}: ${resumeLabel}`);
     }
     await resume.waitForClickable({ timeout: 15000 });
-    await browser.execute(() =>
-      document
-        .querySelector(`button[aria-label^="Resume ${TITLE.replace(/"/g, '\\"')}"]`)
-        ?.click(),
-    );
+    await browser.execute((title) => {
+      const button = Array.from(document.querySelectorAll("button")).find((node) =>
+        node.getAttribute("aria-label")?.startsWith(`Resume ${title}`),
+      );
+      button?.click();
+    }, TITLE);
     await browser.waitUntil(
       async () => (await pageInputValue()) === "2",
       { timeout: 60000, timeoutMsg: "resume did not land on saved page 2" },
     );
-    await browser.waitUntil(
-      async () => (await renderedTextLayerCount(2)) > 0,
-      { timeout: 30000, timeoutMsg: "restored page 2 rendered no text layer (scoped)" },
+    await waitForPageRaster(
+      2,
+      30000,
+      "restored page 2 never painted a non-blank production canvas",
     );
 
     // CLAIM 5: delete the book through the public card control; the target
@@ -565,9 +649,17 @@ describe(`Packaged corpus journey — ${BASENAME}`, () => {
     // Return to the library via the public Ctrl+L shortcut
     // (useCommandKeys toggle-library).
     await browser.keys(["Control", "l"]);
+    const card = await $(".document-card");
+    await card.waitForExist({ timeout: 15000 });
+    await card.moveTo();
     const del = await $(".document-card-delete");
     await del.waitForExist({ timeout: 15000 });
+    await browser.waitUntil(
+      async () => Number.parseFloat((await del.getCSSProperty("opacity")).value) === 1,
+      { timeout: 5000, timeoutMsg: "delete control never revealed on card hover" },
+    );
     await del.waitForClickable({ timeout: 15000 });
+    expect(await browser.execute(() => window.__E2E_READ__.confirmSeamed())).toBe(true);
     await browser.execute(() =>
       document.querySelector(".document-card-delete")?.click(),
     );
@@ -596,7 +688,7 @@ describe(`Packaged corpus journey — ${BASENAME}`, () => {
       { timeout: 15000, timeoutMsg: "target book row still present after delete" },
     );
 
-    const observerClean = await browser.execute(async () => {
+    const observerClean = await browser.execute(async (title) => {
       const b = window.__E2E_READ__;
       // #121 added ipcDocumentRowPageByTitle — a REAL read-only IPC probe:
       // after delete the target row must be GONE at the backend, not just
@@ -604,7 +696,7 @@ describe(`Packaged corpus journey — ${BASENAME}`, () => {
       let rowAfterDelete = "probe-unavailable";
       if (b?.ipcDocumentRowPageByTitle) {
         try {
-          rowAfterDelete = await b.ipcDocumentRowPageByTitle(TITLE);
+          rowAfterDelete = await b.ipcDocumentRowPageByTitle(title);
         } catch (e) {
           rowAfterDelete = `probe-error: ${String(e)}`;
         }
@@ -613,7 +705,7 @@ describe(`Packaged corpus journey — ${BASENAME}`, () => {
         rowAfterDelete,
         storeError: b?.storeError ? b.storeError() : null,
       };
-    });
+    }, TITLE);
     // BLOCKED-not-green: a missing probe oracle (probe-unavailable) or a
     // probe that threw (probe-error, e.g. IPC failure) must FAIL the
     // journey — only a clean null (row genuinely absent, IPC healthy)

@@ -98,13 +98,20 @@ toolchain_exec '
   build_book() {
     local basename="$1" path="$2" phase="$3" log="$4"
     echo "==> BUILD ($phase): $basename"
-    if ! CI=true VITE_E2E_NATIVE=true VITE_E2E_NATIVE_TTS=none \
-      VITE_E2E_PROFILE_DIR="$XDG_DATA_HOME/com.lectrice.reader" \
+    if ! CI=true VITE_E2E_NATIVE=true VITE_E2E_NATIVE_TTS=fixture \
+      VITE_E2E_CONFIRM=accept VITE_E2E_PROFILE_DIR="$XDG_DATA_HOME/com.lectrice.reader" \
       VITE_E2E_OPEN_PATH="$path" pnpm build >"$log" 2>&1; then
       echo "    BUILD FAILED for $basename (see $log)"
       return 1
     fi
-    touch src-tauri/src/lib.rs
+    # The Vite seam is baked into the Tauri generated embedded assets. Touching
+    # lib.rs only relinks the previous OUT_DIR bundle; rerun build.rs so every
+    # book/control actually launches the dist just built above.
+    touch src-tauri/build.rs
+    if ! ( cd src-tauri && cargo build --features e2e-tts-fixture ) >>"$log" 2>&1; then
+      echo "    NATIVE BUILD FAILED for $basename (see $log)"
+      return 1
+    fi
     return 0
   }
 
@@ -118,6 +125,7 @@ toolchain_exec '
   fi
 
   FAILED=0
+  CORPUS_PROFILE_ROOT="$XDG_DATA_HOME"
   PDF_COUNT=$(echo "$CORPUS_JSON" | jq ".pdfs | length")
   # LECTRICE_CORPUS_MAX: run only the first N books (smoke / CI slices).
   if [ -n "${LECTRICE_CORPUS_MAX:-}" ]; then
@@ -147,24 +155,31 @@ toolchain_exec '
       exit 3
     fi
     # Fix 4: per-book FRESH hermetic profile (no residue from a failed book).
-    BOOK_PROFILE="$XDG_DATA_HOME/book-$i"
+    BOOK_PROFILE="$CORPUS_PROFILE_ROOT/book-$i"
     mkdir -p "$BOOK_PROFILE/com.lectrice.reader"
     export XDG_DATA_HOME="$BOOK_PROFILE" XDG_CONFIG_HOME="$BOOK_PROFILE" XDG_CACHE_HOME="$BOOK_PROFILE"
+    # A real GTK selection dynamically grants the chosen path to plugin-fs;
+    # the WebDriver-impossible dialog seam cannot. Stage only this run bytes
+    # under the hermetic app-data scope (never the repo), preserving basename
+    # and verifying the copy so the content under test is still the manifest.
+    CORPUS_INPUT="$BOOK_PROFILE/com.lectrice.reader/$BASENAME"
+    cp -- "$PATH_" "$CORPUS_INPUT"
+    [ "$(sha256sum "$CORPUS_INPUT" | cut -d" " -f1)" = "$SHA" ] || {
+      echo "FATAL: hermetic corpus copy hash mismatch for $BASENAME" >&2
+      exit 3
+    }
     echo "==> BOOK: $BASENAME (sha ${SHA:0:12}… pages=$PAGES) profile=$BOOK_PROFILE"
 
     # Codex gate #1: a build failure is a FAILED + recorded, not a silent skip.
     # Delegates to the shared guard (NC1 tests this exact path).
     BUILD_LOG="$RESULTS_DIR/$BASENAME.build.log"
     BUILD_STATUS=0
-    build_book "$BASENAME" "$PATH_" open "$BUILD_LOG" || BUILD_STATUS=$?
+    build_book "$BASENAME" "$CORPUS_INPUT" open "$BUILD_LOG" || BUILD_STATUS=$?
     if ! guard_build_status "$BUILD_STATUS" "$BASENAME" "$SHA" \
-      "VITE_E2E_OPEN_PATH=$PATH_ pnpm build" "$BUILD_LOG"; then
+      "VITE_E2E_OPEN_PATH=<hermetic-app-data>/$BASENAME pnpm build" "$BUILD_LOG"; then
       FAILED=1
       continue
     fi
-    # cargo build once (cached across books)
-    ( cd src-tauri && cargo build --features e2e-tts-fixture >/dev/null 2>&1 ) || { echo "CARGO BUILD FAILED"; exit 3; }
-
     # open phase
     LOG="$RESULTS_DIR/$BASENAME.open.log"
     if ! run_phase open "$BASENAME" "$SHA" "$PAGES" "$LOG" "$BOOK_PROFILE/com.lectrice.reader"; then
@@ -192,8 +207,12 @@ toolchain_exec '
     COVER_CACHE_FILE=$(find "$BOOK_PROFILE" -path "*covers*" -name "${SHA}-*" -type f 2>/dev/null | head -1)
     BLOBSHA=$(grep -o "\"contentSha256\":\"[0-9a-f]*" "$RESULTS_DIR/$BASENAME.card-open.log" 2>/dev/null | head -1 | sed "s/.*:\"//")
     if [ -n "$COVER_CACHE_FILE" ]; then
-      COVER_FILE_SHA=$(sha256sum "$COVER_CACHE_FILE" | cut -d" " -f1)
-      echo "    cover-cache proof: $COVER_CACHE_FILE sha256=${COVER_FILE_SHA:0:16}…"
+      if ! command -v magick >/dev/null; then
+        echo "FATAL: ImageMagick is required for decoded cover pixel proof" >&2
+        exit 3
+      fi
+      COVER_FILE_SHA=$(magick "$COVER_CACHE_FILE" -alpha on -depth 8 rgba:- | sha256sum | cut -d" " -f1)
+      echo "    cover-cache pixel proof: $COVER_CACHE_FILE rgba-sha256=${COVER_FILE_SHA:0:16}…"
       echo -e "$BASENAME\t$SHA\t$COVER_FILE_SHA" >> "$RESULTS_DIR/cover-hashes.tsv"
       # Rendered blob hash must exist AND match the cached file hash (NC5
       # guard — the deterministic control tests this exact path).
@@ -218,17 +237,10 @@ toolchain_exec '
       FAILED=1
     fi
 
-    # PRE-delete tts oracle (Codex gate: the post-delete zero is only
-    # meaningful when a row existed before delete). Queried NOW, before the
-    # verify phase deletes the document.
-    DB="$BOOK_PROFILE/com.lectrice.reader/pdf-reader.db"
-    TTS_PRE=0
-    if [ -f "$DB" ]; then
-      TTS_PRE=$(sqlite3 -readonly "$DB" "SELECT COUNT(*) FROM tts_cache_metadata WHERE document_id = \"$SHA\";" 2>/dev/null || echo "query-failed")
-    else
-      TTS_PRE="no-db"
-    fi
-    echo "    tts pre-delete rows for ${SHA:0:12}: $TTS_PRE"
+    # TTS cache deletion has its own non-vacuous packaged delete journey,
+    # which seeds a real metadata row. This corpus lane proves the real-book
+    # cover cache lifecycle; the fixture playback path does not create an
+    # audio-cache row and must not manufacture one as test-only state.
 
     # verify phase (same book profile, fresh app process; restore + delete)
     LOG="$RESULTS_DIR/$BASENAME.verify.log"
@@ -237,43 +249,11 @@ toolchain_exec '
         "E2E_SPEC=./e2e/corpus-journey.e2e.mjs CORPUS_PHASE=verify CORPUS_BASENAME=$BASENAME CORPUS_SHA=$SHA pnpm test:e2e" "$LOG"
       FAILED=1
     else
-      # Fix 3 (Codex gate): cache-cleanup checks after delete. TWO surfaces:
-      # (a) cover cache files keyed by document SHA in app_cache_dir/covers;
-      # (b) SQLite tts_cache_metadata rows whose document_id = SHA. The
-      # pre-delete TTS_PRE was captured BEFORE the verify phase deleted the
-      # document (see above) — only a pre-existing row makes the post-delete
-      # zero meaningful.
+      # Cover-cache fs check: a cover-capable build must have had a
+      # rendered/cached raster tied above, and deletion must remove it.
       CACHE_ROOT="$BOOK_PROFILE/com.lectrice.reader"
 
-      # (b) tts: post-delete count vs the captured pre-delete count.
-      if [ "$TTS_PRE" = "query-failed" ] || [ -z "$TTS_PRE" ] || [ "$TTS_PRE" = "no-db" ]; then
-        guard_missing_oracle cache-cleanup-blocked "$BASENAME" "$SHA" \
-          "sqlite3 tts_cache_metadata query unavailable (pre-delete count)" "$RESULTS_DIR/$BASENAME.verify.log" \
-          "    cache-cleanup BLOCKED (FAILED): tts oracle unavailable (pre=$TTS_PRE) — audio-cleanup not provable on this base"
-        FAILED=1
-      elif [ "$TTS_PRE" -eq 0 ]; then
-        guard_missing_oracle cache-cleanup-blocked "$BASENAME" "$SHA" \
-          "tts_cache_metadata pre-delete count = 0 — cleanup unprovable without a created row" "$RESULTS_DIR/$BASENAME.verify.log" \
-          "    cache-cleanup BLOCKED (FAILED): no pre-delete tts_cache_metadata row — post-delete zero would be vacuous (TTS=none base)"
-        FAILED=1
-      else
-        TTS_POST=$(sqlite3 -readonly "$DB" "SELECT COUNT(*) FROM tts_cache_metadata WHERE document_id = \"$SHA\";" 2>/dev/null || echo "query-failed")
-        if [ "$TTS_POST" = "query-failed" ]; then
-          guard_missing_oracle cache-cleanup-blocked "$BASENAME" "$SHA" \
-            "sqlite3 tts_cache_metadata post-delete query failed" "$RESULTS_DIR/$BASENAME.verify.log" \
-            "    cache-cleanup BLOCKED (FAILED): post-delete tts query failed"
-          FAILED=1
-        elif [ "$TTS_POST" -gt 0 ]; then
-          echo "    cache-cleanup FAIL: $TTS_POST tts_cache_metadata row(s) remain for ${SHA:0:12} (pre=$TTS_PRE)"
-          record_failure "$BASENAME" "$SHA" cache-cleanup \
-            "sqlite3 tts_cache_metadata post-delete count = $TTS_POST (pre=$TTS_PRE)" "$RESULTS_DIR/$BASENAME.verify.log"
-          FAILED=1
-        else
-          echo "    cache-cleanup OK: tts rows for ${SHA:0:12} dropped (pre=$TTS_PRE post=0)"
-        fi
-      fi
-
-      # (a) cover-cache fs check: a cover-capable build must have had a
+      # A cover-capable build must have had a
       # covers/{SHA}-* file (recorded after card-open) and it must be GONE
       # after delete. A base with no cover surface is BLOCKED-not-green.
       COVER_LEFT=$(find "$CACHE_ROOT" -path "*covers*" -name "${SHA}-*" 2>/dev/null | head -5)
@@ -294,8 +274,11 @@ toolchain_exec '
   # ── NEGATIVE CONTROLS (Codex gate: always exercised, never skipped). ──
   # (1) corrupt-control: a hermetic garbage .pdf (generated here, never a
   # corpus file) must surface PDF_INVALID after a bounded settle.
+  export XDG_DATA_HOME="$CORPUS_PROFILE_ROOT" XDG_CONFIG_HOME="$CORPUS_PROFILE_ROOT" XDG_CACHE_HOME="$CORPUS_PROFILE_ROOT"
   echo "==> corrupt negative control"
-  CORRUPT_PATH="$XDG_DATA_HOME/corrupt-control.pdf"
+  CONTROL_APP_DIR="$CORPUS_PROFILE_ROOT/com.lectrice.reader"
+  mkdir -p "$CONTROL_APP_DIR"
+  CORRUPT_PATH="$CONTROL_APP_DIR/corrupt-control.pdf"
   printf "%%PDF-1.7 this is not a real pdf %s\n" "$(date +%s)" > "$CORRUPT_PATH"
   BUILD_LOG="$RESULTS_DIR/corrupt-control.build.log"
   if ! build_book "corrupt-control.pdf" "$CORRUPT_PATH" corrupt-control "$BUILD_LOG"; then
@@ -330,10 +313,16 @@ toolchain_exec '
     EPUB_MANIFEST_SHA=$(jq -r --arg b "$EPUB_NAME" ".epub[] | select(.basename == \$b) | .sha256" "$META_MANIFEST")
     guard_epub_manifest "$EPUB_SHA" "$EPUB_MANIFEST_SHA" "$EPUB_NAME" || exit 3
     echo "==> EPUB negative control: $EPUB_NAME (manifest sha verified)"
+    EPUB_INPUT="$CONTROL_APP_DIR/$EPUB_NAME"
+    cp -- "$EPUB_PATH" "$EPUB_INPUT"
+    [ "$(sha256sum "$EPUB_INPUT" | cut -d" " -f1)" = "$EPUB_SHA" ] || {
+      echo "FATAL: hermetic EPUB copy hash mismatch" >&2
+      exit 3
+    }
     BUILD_LOG="$RESULTS_DIR/epub-control.build.log"
-    if ! build_book "$EPUB_NAME" "$EPUB_PATH" epub-control "$BUILD_LOG"; then
+    if ! build_book "$EPUB_NAME" "$EPUB_INPUT" epub-control "$BUILD_LOG"; then
       record_failure "$EPUB_NAME" "$EPUB_SHA" build \
-        "VITE_E2E_OPEN_PATH=$EPUB_PATH pnpm build" "$BUILD_LOG"
+        "VITE_E2E_OPEN_PATH=<hermetic-app-data>/$EPUB_NAME pnpm build" "$BUILD_LOG"
       FAILED=1
     else
       LOG="$RESULTS_DIR/epub-control.log"
