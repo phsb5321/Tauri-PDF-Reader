@@ -117,12 +117,17 @@ vm103 processes them **serially** (1 slot). A merge that triggers 2 CI runs + 1 
 4. **`##[error]The operation was canceled.` in Frontend Checks means the job timed out, not that a human cancelled it.** Read the last timestamp before the error and compare it to when the tests finished; an eight-minute gap of identical `Sent …` lines is the cache upload, not your diff.
 5. **Cancel superseded runs by hand.** `ci.yml` has no `concurrency` group, so pushing to a branch queues a _second_ run rather than replacing the first, and on a one-slot runner the stale one is charged real minutes ahead of the live one. `gh run cancel <id>` on the run whose `headSha` no longer matches the PR head.
 
-## Known infra debt — catalogue only, do not patch from this repo (13/08/2026)
+## Runner cleanup log rotation — resolved 15/08/2026
 
-- **`runner-cleanup-hook.sh` line 192 logs
-  `/var/log/runner-cleanup.log.tmp: Permission denied`** on every job
-  completion (observed on the packaged-user-gate PR #119 runs, 13/08). The
-  hook runs as the runner user but the log path needs root; the hook's OWN
-  logging fails — job results and the cleanup itself are unaffected. The fix
-  belongs to the runner host admin (writable log path or chown), never to a
-  repo/workflow file. Same class as the earlier `/var/log` quirk family.
+The hook previously wrote `/var/log/runner-cleanup.log.tmp` before `mv`. The
+runner user owns the log file but cannot create a sibling inside root-owned
+`/var/log`, so every rotation emitted `Permission denied` after otherwise-green
+jobs.
+
+The vm103 host hook now writes the trimmed tail to a mode-safe `mktemp` file in
+`/tmp`, streams it back through the already-writable log file, and removes the
+temporary file. Live validation with a correctly scoped `RUNNER_WORKSPACE`:
+`rc=0`, log `7747 → 500` lines, stderr `0` bytes, leftover temp files `0`.
+Backup/reversal: `/usr/local/bin/runner-cleanup-hook.sh.bak-20260815` can be
+restored atomically, then `bash -n` rerun. This is host-local runner
+configuration; no application workflow or gate was weakened.
