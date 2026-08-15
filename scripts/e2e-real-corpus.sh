@@ -54,8 +54,14 @@ cleanup() {
 trap cleanup EXIT
 
 CORPUS_RESULTS_DIR="$PRIVATE_RESULTS" \
-  bash e2e/run-corpus-journey.sh
+  bash e2e/run-corpus-journey.sh \
+  > "$PRIVATE_RESULTS/canonical.log" 2>&1
 STATUS=$?
+if [ "$STATUS" -eq 0 ]; then
+  echo "CORPUS: canonical private gate passed"
+else
+  echo "CORPUS: canonical private gate failed (identity-bearing diagnostics suppressed)" >&2
+fi
 
 SOURCE_SHA=""
 if [ -f "$PRIVATE_RESULTS/source.json" ]; then

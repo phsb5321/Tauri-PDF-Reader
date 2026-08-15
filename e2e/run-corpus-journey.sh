@@ -50,16 +50,24 @@ if [ -n "${E2E_PROFILE_DIR:-}" ]; then
   echo "FATAL: corpus runner refuses a caller-owned E2E_PROFILE_DIR" >&2
   exit 2
 fi
+if [ -e "$E2E_REPO_ROOT/dist" ]; then
+  echo "FATAL: corpus runner refuses a pre-existing generated dist" >&2
+  exit 2
+fi
 
 export CI=true
 source ./scripts/e2e-profile.sh
 source ./scripts/e2e-toolchain.sh
 CORPUS_PROFILE_ROOT="$E2E_PROFILE_DIR"
 PROFILE_MARKER="$CORPUS_PROFILE_ROOT/.lectrice-corpus-owned"
+DIST_MARKER="$CORPUS_PROFILE_ROOT/.lectrice-dist-owned"
 : > "$PROFILE_MARKER"
+: > "$DIST_MARKER"
 cleanup_outer() {
   local status=$?
   trap - EXIT
+  local owns_dist=0
+  [ -f "$DIST_MARKER" ] && owns_dist=1
   case "$CORPUS_PROFILE_ROOT" in
     /tmp/tmp.*)
       if [ -f "$PROFILE_MARKER" ] && [ "$CORPUS_PROFILE_ROOT" = "$E2E_PROFILE_DIR" ]; then
@@ -75,9 +83,15 @@ cleanup_outer() {
       status=3
       ;;
   esac
-  # Vite embeds the temporary selected path. The build output is generated;
-  # remove it so no corpus basename/path survives the acceptance run.
-  rm -rf -- "$E2E_REPO_ROOT/dist" || status=3
+  # Vite embeds the temporary selected path. Remove only the dist this run
+  # proved it owned; a pre-existing caller dist was rejected before setup.
+  if [ "$owns_dist" -eq 1 ]; then
+    rm -rf -- "$E2E_REPO_ROOT/dist" || status=3
+    [ ! -e "$E2E_REPO_ROOT/dist" ] || status=3
+  else
+    echo "cleanup FAILED: dist ownership marker missing" >&2
+    status=3
+  fi
   exit "$status"
 }
 trap cleanup_outer EXIT
