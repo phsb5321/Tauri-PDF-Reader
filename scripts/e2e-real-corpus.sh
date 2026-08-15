@@ -7,7 +7,7 @@
 # mode-0700 temporary directory, emits only an identity-free summary to the
 # caller's artifact directory, and deletes the private results on every exit.
 
-set -uo pipefail
+set -euo pipefail
 cd "$(dirname "$0")/.."
 umask 077
 
@@ -53,10 +53,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
+set +e
 CORPUS_RESULTS_DIR="$PRIVATE_RESULTS" \
   bash e2e/run-corpus-journey.sh \
   > "$PRIVATE_RESULTS/canonical.log" 2>&1
 STATUS=$?
+set -e
 if [ "$STATUS" -eq 0 ]; then
   echo "CORPUS: canonical private gate passed"
 else
