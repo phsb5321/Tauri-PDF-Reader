@@ -8,6 +8,8 @@ interface DocumentCoverProps {
   filePath: string;
   /** The library row's content hash (SHA-256) — verified before caching. */
   fileHash?: string | null;
+  /** Adjacent card text already names the book; avoid duplicate announcement. */
+  decorative?: boolean;
   size?: "sm" | "md" | "lg";
 }
 
@@ -22,18 +24,19 @@ function fileNameFromPath(filePath: string): string {
 /**
  * A document's cover: the real first-page raster when the pipeline produced
  * one, otherwise the deterministic seed fallback — same id, same colors,
- * every run. The wrapper is ALWAYS `role="img"` named by the title (the inner
- * raster is `alt=""` to avoid double-announcing), and the placeholder IS the
- * fallback, so the box never shifts shape when the raster arrives: the 2:3
- * wrapper is the skeleton.
+ * every run. The real raster uses native `alt`; the fallback SVG carries the
+ * same accessible name.
+ * The placeholder IS the fallback, so the box never shifts shape when the
+ * raster arrives: the 2:3 wrapper is the skeleton.
  */
 export function DocumentCover({
   documentId,
   title,
   filePath,
   fileHash,
+  decorative = false,
   size = "md",
-}: DocumentCoverProps) {
+}: Readonly<DocumentCoverProps>) {
   const { ref, state, url } = useCover({
     documentId,
     filePath,
@@ -44,7 +47,7 @@ export function DocumentCover({
   // broken image (Codex round 3).
   const [broken, setBroken] = useState(false);
   const name = useMemo(
-    () => (title && title.trim() ? title.trim() : fileNameFromPath(filePath)),
+    () => (title?.trim() ? title.trim() : fileNameFromPath(filePath)),
     [title, filePath],
   );
   // Deterministic seed: first 8 hex chars of the SHA-256 id.
@@ -58,25 +61,26 @@ export function DocumentCover({
     <div
       ref={ref as Ref<HTMLDivElement>}
       className={`document-cover document-cover--${size}`}
-      role="img"
-      aria-label={name}
       data-state={state}
       data-seed={String(seed)}
     >
       {state === "ready" && url && !broken ? (
         <img
           src={url}
-          alt=""
+          alt={decorative ? "" : name}
           draggable={false}
           className="document-cover-img"
           onError={() => setBroken(true)}
         />
       ) : (
-        <div
-          className={`cover-fallback cover-fallback--${variant}`}
-          aria-hidden="true"
-        >
-          <svg viewBox="0 0 24 24" className="cover-fallback-glyph">
+        <div className={`cover-fallback cover-fallback--${variant}`}>
+          <svg
+            viewBox="0 0 24 24"
+            className="cover-fallback-glyph"
+            role={decorative ? undefined : "img"}
+            aria-label={decorative ? undefined : name}
+            aria-hidden={decorative || undefined}
+          >
             <path
               d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"
               fill="currentColor"

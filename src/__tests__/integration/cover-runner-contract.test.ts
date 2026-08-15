@@ -45,17 +45,22 @@ describe("cover journey runner contract (121)", () => {
 
   it("the spec opens cards through a REAL WebDriver double-click, never injected events", () => {
     // The actor contract: no dispatchEvent/MouseEvent synthesis, no element
-    // enumeration via $$ — the open button is located by its accessible text.
+    // enumeration via $$ — the open button is located by its exact accessible
+    // instruction and the same visible handle is reused for activation.
     expect(spec).not.toMatch(/dispatchEvent\(new MouseEvent/);
     expect(spec).not.toMatch(/\$\$\(/);
-    expect(spec).toMatch(/contains\(@class, 'document-card-open'\)/);
-    expect(spec).toMatch(/\.doubleClick\(\)/);
+    expect(spec).toMatch(
+      /Select E2E Resume Fixture A; press Enter or double-click to open/,
+    );
+    expect(spec).toMatch(/cardA\.doubleClick\(\)/);
     // wdio's expect takes exactly one argument — no chai-style messages.
     expect(spec).not.toMatch(/expect\([^)]*,[^)]*\)/);
   });
 
   it("cache corruption is a REQUIRED negative control, never a silent skip", () => {
-    expect(runner).toMatch(/COVER_COUNT=\$\(ls "\$COVERS_DIR" 2>\/dev\/null \| grep -c -- "-v1\.png" \|\| true\)/);
+    expect(runner).toMatch(
+      /COVER_COUNT=\$\(ls "\$COVERS_DIR" 2>\/dev\/null \| grep -c -- "-v1\.png" \|\| true\)/,
+    );
     // A count other than exactly two fails the runner — a false green must
     // be impossible (Codex gate 121).
     expect(runner).toMatch(/if \[ "\$COVER_COUNT" -ne 2 \]/);
