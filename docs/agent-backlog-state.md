@@ -2,6 +2,12 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #66 — 15/08/2026 (CodeQL alert closure + vm103 cleanup rotation)
+
+- **Main:** #132 merged as `3747f5d`; exact-main CodeQL run `31876592453` succeeded and high alert #4 is `fixed`. Exact-main Sonar run `31876592457` succeeded with authenticated quality gate `OK`. Clean exact-main corpus receipt `/tmp/lectrice-corpus-final-main-3747f5d.log`: five PDFs, failures 0 bytes, covers 5/5 distinct/tied, all phases/controls green, profile/dist absent.
+- **Runner host:** root cause of the persistent line-192 warning was directory creation, not log ownership: `notroot` owned `/var/log/runner-cleanup.log` but could not create `/var/log/runner-cleanup.log.tmp`. Host-local hook now uses `mktemp /tmp`, `tail` + `cat` into the owned log, and removes the temp. Scoped validation: rc 0, 7747→500 lines, stderr 0, no residue. Revert backup: `/usr/local/bin/runner-cleanup-hook.sh.bak-20260815`.
+- **Release state:** no non-gated code/quality blocker is known. `v0.2.0` remains NOT CUTTABLE solely pending Pedro-gated RC tag/dry run and exact-SHA macOS install/open/render/restart proof, followed by one final exact-SHA audit.
+
 ## Iteration #65 — 15/08/2026 (release truth, reproducible corpus evidence)
 
 - **Merged baseline:** `4f74f4b` (#130). Open PRs were zero; authenticated post-merge Sonar was `OK`. The five-PDF private corpus run passed all open/card-open/verify phases, five displayed-to-cache RGBA ties, cleanup, and corrupt/EPUB controls, but the run preceded the final commits and therefore was not exact-SHA release evidence.

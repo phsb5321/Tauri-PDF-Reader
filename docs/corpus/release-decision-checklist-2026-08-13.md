@@ -38,8 +38,9 @@ and adversarial-audit evidence.
 
 ## Remaining infrastructure/documentation evidence
 
-- [ ] Confirm the host runner cleanup hook writes its receipt without the old
-      `/var/log/runner-cleanup.log.tmp` permission error.
+- [x] Host runner cleanup rotation fixed 15/08/2026: scoped manual validation
+      returned rc 0, stderr 0, rotated 7747 → 500 lines, no temp residue.
+      Reversal backup: `runner-cleanup-hook.sh.bak-20260815`.
 - [x] `docs/JOURNEY_EVIDENCE.md` records open, home, reader, session,
       close, highlight, native-play, cover, settings, search, delete, theme,
       accessibility, and error as PROVEN/PARTIAL with their oracle.
