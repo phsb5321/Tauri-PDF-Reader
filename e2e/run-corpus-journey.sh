@@ -53,7 +53,20 @@ toolchain_exec '
   DISPNUM_FILE=$(mktemp)
   Xvfb -displayfd 3 -screen 0 1280x1024x24 3>$DISPNUM_FILE >/tmp/lectrice-e2e-corpus-xvfb.log 2>&1 &
   XVFB_PID=$!
-  trap "kill $XVFB_PID 2>/dev/null || true" EXIT
+  CORPUS_PROFILE_ROOT="$E2E_PROFILE_DIR"
+  cleanup() {
+    kill "$XVFB_PID" 2>/dev/null || true
+    case "$CORPUS_PROFILE_ROOT" in
+      /tmp/tmp.*)
+        [ "$CORPUS_PROFILE_ROOT" = "$E2E_PROFILE_DIR" ] && rm -rf -- "$CORPUS_PROFILE_ROOT"
+        ;;
+      *) echo "cleanup REFUSED unexpected profile root" >&2 ;;
+    esac
+    # Vite embeds the temporary selected path. The build output is generated;
+    # remove it so no corpus basename/path survives the acceptance run.
+    rm -rf -- "$E2E_REPO_ROOT/dist"
+  }
+  trap cleanup EXIT
   for _ in $(seq 1 100); do [ -s "$DISPNUM_FILE" ] && break; sleep 0.1; done
   export DISPLAY=:$(cat "$DISPNUM_FILE")
   echo "Xvfb ready on DISPLAY=$DISPLAY profile=$XDG_DATA_HOME"
@@ -125,7 +138,6 @@ toolchain_exec '
   fi
 
   FAILED=0
-  CORPUS_PROFILE_ROOT="$XDG_DATA_HOME"
   PDF_COUNT=$(echo "$CORPUS_JSON" | jq ".pdfs | length")
   # LECTRICE_CORPUS_MAX: run only the first N books (smoke / CI slices).
   if [ -n "${LECTRICE_CORPUS_MAX:-}" ]; then

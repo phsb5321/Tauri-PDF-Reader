@@ -660,15 +660,14 @@ describe(`Packaged corpus journey — ${BASENAME}`, () => {
     );
     await del.waitForClickable({ timeout: 15000 });
     expect(await browser.execute(() => window.__E2E_READ__.confirmSeamed())).toBe(true);
+    expect(await browser.execute(() => window.__E2E_READ__.confirmCalls())).toBe(0);
     await browser.execute(() =>
       document.querySelector(".document-card-delete")?.click(),
     );
-    // The delete flow shows window.confirm — accept it (public dialog).
-    try {
-      await browser.acceptAlert();
-    } catch {
-      /* alert may already be gone; the target-row wait is the verdict */
-    }
+    await browser.waitUntil(
+      async () => browser.execute(() => window.__E2E_READ__.confirmCalls() === 1),
+      { timeout: 5000, timeoutMsg: "delete flow never invoked confirmation" },
+    );
     await browser.waitUntil(
       async () =>
         browser.execute((title) => {

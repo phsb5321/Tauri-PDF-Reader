@@ -81,6 +81,8 @@ export interface E2ENativeRead {
   ipcHighlights: () => Promise<unknown>;
   /** Whether the VITE_E2E_CONFIRM seam replaced the native confirm (read-only marker). */
   confirmSeamed: () => boolean;
+  /** Number of times product code invoked the confirm seam (read-only oracle). */
+  confirmCalls: () => number;
   /** Cover-cache negative control: a valid-shaped id that is NOT in the
    *  library must be rejected (the DB-existence gate, slice 121). */
   coverCacheRandomProbe: () => Promise<string>;
@@ -200,6 +202,7 @@ async function seedLibraryProfile(): Promise<void> {
 let seededDocId: string | null = null;
 
 export async function installE2ENativeBootstrap(): Promise<void> {
+  let confirmCallCount = 0;
   const read: E2ENativeRead = {
     ready: false,
     error: null,
@@ -247,6 +250,7 @@ export async function installE2ENativeBootstrap(): Promise<void> {
         | string[]
         | undefined) ?? [],
     confirmSeamed: () => CONFIRM_SEAMED,
+    confirmCalls: () => confirmCallCount,
     coverCacheRandomProbe: async () => {
       const res = await commands.coverCache("0".repeat(64), null);
       return res.status === "error" ? res.error : "unexpected-ok";
@@ -268,7 +272,10 @@ export async function installE2ENativeBootstrap(): Promise<void> {
   // chain runs below it. Tree-shaken out unless VITE_E2E_NATIVE=true.
   const CONFIRM_SEAMED = import.meta.env.VITE_E2E_CONFIRM === "accept";
   if (CONFIRM_SEAMED) {
-    window.confirm = () => true;
+    window.confirm = () => {
+      confirmCallCount += 1;
+      return true;
+    };
   }
 
   // Observer log buffer: capture console for deterministic failure evidence
