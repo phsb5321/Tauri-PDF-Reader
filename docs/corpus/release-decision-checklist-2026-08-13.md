@@ -1,6 +1,6 @@
 # Release decision checklist — v0.2.0
 
-Last reconciled: 15/08/2026 07:07 BRT, main `3747f5d`.
+Last reconciled: 15/08/2026 17:40 BRT, main `9b13a1f` plus this release slice.
 
 ## Decision
 
@@ -30,6 +30,11 @@ and adversarial-audit evidence.
       is `OK` with no failing conditions.
 - [x] Exact-SHA CodeQL run `31876592453` succeeded; high alert #4 is fixed and
       the repository has zero open code-scanning alerts.
+
+The three boxes above were re-run green at `9b13a1f` as well (corpus
+`/tmp/lectrice-corpus-final-main-9b13a1f.log`, Sonar `31880371934`, CodeQL
+`31880371936`); they must be re-run once more at whatever `FINAL_SHA` the tag
+is cut from, since this slice moves the head.
 - [ ] Exact-SHA macOS build/install/open/render/restart proof records one app
       instance, executable path/PID/SHA, and a real private PDF rendered.
 - [ ] `v0.2.0-rc.0` release-pipeline dry run succeeds and produces AppImage +
@@ -47,20 +52,22 @@ and adversarial-audit evidence.
       close, highlight, native-play, cover, settings, search, delete, theme,
       accessibility, and error as PROVEN/PARTIAL with their oracle.
 
-## Human gates
+## Authorization state
 
-The following are intentionally not autonomous:
+Pedro authorized the release actions on 15/08/2026 (17:15 BRT): the
+`v0.2.0-rc.0` dry run, the macOS proof, and the final `v0.2.0` tag/release may
+proceed without a further per-step ask. Authorization does not lower any
+evidence bar — each box above still needs its own exact-SHA receipt, and a
+missing runner, offline Mac, or absent artifact stays BLOCKED rather than
+becoming a green box.
 
-- macOS hardware/session action and visual confirmation;
-- creating/deleting an RC tag or GitHub release assets;
-- the final real `v0.2.0` tag/release;
-- any risk acceptance for a remaining limitation.
-
-No tag or release is authorized by this checklist.
+Risk acceptance for a remaining limitation is still Pedro's alone.
 
 ## Current exact-SHA history
 
-At `3747f5d`, clean exact-SHA corpus, Sonar, and CodeQL evidence are green, and
-CodeQL alert #4 is fixed. The remaining sequence is human-gated RC dry run and
-exact-SHA macOS proof, followed by a final different-family audit on that same
-post-gate SHA. Until then the verdict remains `NOT CUTTABLE`.
+At `3747f5d` and again at `9b13a1f`, clean exact-SHA corpus, Sonar, and CodeQL
+evidence are green and CodeQL alert #4 is fixed. This slice bumps the version
+fields and release notes, so the remaining sequence runs against the SHA it
+merges to: `v0.2.0-rc.0` dry run, macOS proof, re-run of the three exact-SHA
+boxes, then a different-family audit. Until those land the verdict remains
+`NOT CUTTABLE`.
