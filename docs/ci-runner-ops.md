@@ -117,6 +117,48 @@ vm103 processes them **serially** (1 slot). A merge that triggers 2 CI runs + 1 
 4. **`##[error]The operation was canceled.` in Frontend Checks means the job timed out, not that a human cancelled it.** Read the last timestamp before the error and compare it to when the tests finished; an eight-minute gap of identical `Sent …` lines is the cache upload, not your diff.
 5. **Cancel superseded runs by hand.** `ci.yml` has no `concurrency` group, so pushing to a branch queues a _second_ run rather than replacing the first, and on a one-slot runner the stale one is charged real minutes ahead of the live one. `gh run cancel <id>` on the run whose `headSha` no longer matches the PR head.
 
+## CodeQL "Unable to locate executable file" — root-caused 15/08/2026
+
+The symptom is a red `Analyze (javascript-typescript)` whose only error is:
+
+```
+##[error]Unable to download and extract CodeQL CLI: Unable to locate executable
+file: …/_work/_tool/CodeQL/2.26.3/x64/codeql/codeql
+```
+
+It is **not** a workflow, permissions, or network problem, and re-running alone
+only fixes it until the next cleanup pass. The host timer
+`runner-cleanup.service` pruned the runner tool cache per file:
+
+```bash
+find "$d/_tool" -mindepth 1 -mtime +30 -delete   # the defect
+```
+
+A tool cache stores `<tool>/<version>/<arch>` beside a 0-byte
+`<arch>.complete` marker the runner writes at install time, while the extracted
+payload keeps its **upstream** mtimes — the CodeQL CLI ships files months older
+than the install. So the prune deleted a tool installed minutes earlier, and
+left behind precisely what `-delete` cannot remove: the directories, plus the
+fresh marker. The cache then reads as installed and has no executable, and
+every later run fails identically. Observed shape: `x64/codeql/` holding only
+`java/ javascript/ qlpacks/ tools/`, no binary.
+
+This is the same trap the script's own header documents for `_temp` (pnpm,
+01/08/2026) — age is evidence of nothing for a reused or upstream-dated install.
+
+**Fixed host-side** (`/usr/local/sbin/runner-cleanup.sh`): age the `.complete`
+marker, the one file whose mtime really is install time, and evict marker and
+payload together so a survivor cannot lie about what is cached. Falsifier run
+on vm103 before deployment: a fresh install with a 2024-dated payload survives
+(marker and binary both), and a genuinely 60-day-old install is reclaimed
+whole, marker included — 4/4. After clearing the corrupt cache the CodeQL job
+went green and the binary is present.
+
+Reversal: `/usr/local/sbin/runner-cleanup.sh.bak-20260815`.
+
+If it recurs: check `find _tool -name '*.complete'` against the presence of the
+binary. A marker without its payload is this bug, not a download failure.
+
 ## Runner cleanup log rotation — resolved 15/08/2026
 
 The hook previously wrote `/var/log/runner-cleanup.log.tmp` before `mv`. The
