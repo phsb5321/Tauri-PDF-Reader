@@ -18,10 +18,12 @@
  *             2 = env missing/invalid, 3 = root unreadable/not a dir.
  */
 
+/* global process, console */
+
 import { readdir, stat, realpath } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 
 const ROOT = process.env.LECTRICE_REAL_PDF_CORPUS;
 if (!ROOT) {
