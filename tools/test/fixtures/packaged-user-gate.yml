@@ -191,7 +191,7 @@ jobs:
         run: |
           if [ -z "$LECTRICE_REAL_PDF_CORPUS" ]; then
             mkdir -p ci-evidence
-            printf '{"blocked":"LECTRICE_REAL_PDF_CORPUS unset","remedy":"set it in the runner .env (local dir, e.g. /home/notroot/corpus-de)","time":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ci-evidence/prerequisite-failure.json
+            printf '{"blocked":"LECTRICE_REAL_PDF_CORPUS unset","remedy":"set it in the runner .env (local dir, e.g. /tmp/lectrice-corpus-fixture)","time":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ci-evidence/prerequisite-failure.json
             echo "BLOCKED: LECTRICE_REAL_PDF_CORPUS unset — see ci-evidence/prerequisite-failure.json"
             exit 1
           fi

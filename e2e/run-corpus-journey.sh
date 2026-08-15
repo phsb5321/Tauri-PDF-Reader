@@ -34,11 +34,21 @@ FAILURES="$RESULTS_DIR/failures.tsv"
 : > "$FAILURES"
 echo "==> Results dir: $RESULTS_DIR"
 
+SOURCE_SHA=$(git rev-parse HEAD)
+SOURCE_STATUS=$(git status --porcelain)
+if [ -n "$SOURCE_STATUS" ]; then
+  echo "FATAL: corpus evidence requires a clean exact-head worktree" >&2
+  printf "%s\n" "$SOURCE_STATUS" >&2
+  exit 2
+fi
+printf '{"sourceSha":"%s","worktree":"clean"}\n' "$SOURCE_SHA" > "$RESULTS_DIR/source.json"
+echo "==> Exact source: $SOURCE_SHA (clean)"
+
 export CI=true
 source ./scripts/e2e-profile.sh
 source ./scripts/e2e-toolchain.sh
 export LECTRICE_REAL_PDF_CORPUS
-export RESULTS_DIR FAILURES E2E_REPO_ROOT
+export RESULTS_DIR FAILURES E2E_REPO_ROOT SOURCE_SHA
 
 toolchain_exec '
   set -euo pipefail
@@ -75,11 +85,12 @@ toolchain_exec '
   CORPUS_JSON="$(LECTRICE_REAL_PDF_CORPUS="$LECTRICE_REAL_PDF_CORPUS" node scripts/corpus-enumerate.mjs)"
   echo "$CORPUS_JSON" | jq -r ".pdfs[] | \"pdf  \(.basename)  \(.size) B  sha \(.sha256[0:12])…\"" 2>/dev/null || echo "$CORPUS_JSON" | head -20
 
-  # Join the committed metadata manifest (basename → pages) for the page-count
-  # assertion (Codex gate #4). Fail loudly if a corpus member is unknown.
-  META_MANIFEST="docs/corpus/manifest-2026-08-13.json"
+  # The identity manifest is private acceptance input beside the corpus, not
+  # public repository metadata. It supplies basename → SHA/page-count without
+  # ever printing its absolute path.
+  META_MANIFEST="$LECTRICE_REAL_PDF_CORPUS/.lectrice-manifest.json"
   if [ ! -f "$META_MANIFEST" ]; then
-    echo "FATAL: metadata manifest missing: $META_MANIFEST" >&2
+    echo "FATAL: external corpus identity manifest missing" >&2
     exit 3
   fi
 
@@ -148,7 +159,7 @@ toolchain_exec '
     BASENAME=$(echo "$CORPUS_JSON" | jq -r ".pdfs[$i].basename")
     SHA=$(echo "$CORPUS_JSON" | jq -r ".pdfs[$i].sha256")
     PATH_=$(echo "$CORPUS_JSON" | jq -r ".pdfs[$i].path")
-    # Codex gate #4: expected page count from the committed metadata manifest.
+    # Codex gate #4: expected page count from the external identity manifest.
     PAGES=$(jq -r --arg b "$BASENAME" ".pdfs[] | select(.basename == \$b) | .pages" "$META_MANIFEST")
     if [ -z "$PAGES" ] || [ "$PAGES" = "null" ]; then
       echo "FATAL: no pages entry for $BASENAME in $META_MANIFEST" >&2

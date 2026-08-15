@@ -6,7 +6,7 @@
  * PDFs deterministically (sorted, no hidden files, no symlinks escaping the
  * root, size-capped) and flags EPUB files as the unsupported-format negative
  * control. Streams each file once for its SHA-256 (the runner validates it
- * against the committed metadata manifest — an unmanifested binary is
+ * against the external private identity manifest — an unmanifested binary is
  * refused). Prints a JSON document: { root, pdfs: [{basename,path,size,
  * sha256}], epub: [...], skipped: [...] }. NEVER writes or copies book bytes
  * anywhere — digest-only streaming.
