@@ -197,15 +197,15 @@ jobs:
           fi
           [ -d "$LECTRICE_REAL_PDF_CORPUS" ] || {
             mkdir -p ci-evidence
-            printf '{"blocked":"LECTRICE_REAL_PDF_CORPUS is not a directory","path":"%s","time":"%s"}\n' "$LECTRICE_REAL_PDF_CORPUS" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ci-evidence/prerequisite-failure.json
-            echo "BLOCKED: LECTRICE_REAL_PDF_CORPUS=$LECTRICE_REAL_PDF_CORPUS is not a directory — see ci-evidence/prerequisite-failure.json"; exit 1; }
+            printf '{"blocked":"LECTRICE_REAL_PDF_CORPUS is not a directory","time":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ci-evidence/prerequisite-failure.json
+            echo "BLOCKED: external corpus directory is unavailable — see ci-evidence/prerequisite-failure.json"; exit 1; }
 
       - name: Run the real-corpus soak (per-book phases, machine-readable summary)
         # Run-scoped evidence dir: $RUNNER_TEMP is per-job. The single
         # canonical command — pinned exactly.
         run: LECTRICE_CORPUS_OUT="$RUNNER_TEMP/lectrice-corpus" bash scripts/e2e-real-corpus.sh
 
-      - name: Copy evidence into the workspace (logs + summary ONLY — never the corpus)
+      - name: Copy identity-free evidence summary (never corpus/logs)
         # ALWAYS runs: after a prerequisite BLOCKED the receipt in ci-evidence
         # must still reach the artifact upload (default success() would skip it).
         if: always()
@@ -213,7 +213,7 @@ jobs:
           mkdir -p ci-evidence/corpus
           cp -r "${RUNNER_TEMP}/lectrice-corpus"/* ci-evidence/corpus/ 2>/dev/null || true
 
-      - name: Upload corpus soak evidence (logs + summary; PDFs never leave the host)
+      - name: Upload identity-free corpus summary
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:

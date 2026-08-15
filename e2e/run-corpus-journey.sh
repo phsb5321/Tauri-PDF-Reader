@@ -28,8 +28,10 @@ if [ -z "${LECTRICE_REAL_PDF_CORPUS:-}" ]; then
 fi
 [ -d "$LECTRICE_REAL_PDF_CORPUS" ] || { echo "FATAL: external corpus dir missing" >&2; exit 2; }
 
+umask 077
 RESULTS_DIR="${CORPUS_RESULTS_DIR:-/tmp/lectrice-corpus-results-$(date +%Y%m%d-%H%M%S)}"
 mkdir -p "$RESULTS_DIR"
+chmod 700 "$RESULTS_DIR"
 FAILURES="$RESULTS_DIR/failures.tsv"
 : > "$FAILURES"
 echo "==> Results dir: $RESULTS_DIR"
