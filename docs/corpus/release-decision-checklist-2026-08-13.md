@@ -1,6 +1,6 @@
 # Release decision checklist — v0.2.0
 
-Last reconciled: 15/08/2026 03:18 BRT, main `4f74f4b`.
+Last reconciled: 15/08/2026 07:07 BRT, main `3747f5d`.
 
 ## Decision
 
@@ -22,12 +22,14 @@ and adversarial-audit evidence.
 
 ## Required at `FINAL_SHA`
 
-- [ ] Clean exact-SHA corpus run: `source.json` matches `FINAL_SHA`, 23/23
+- [x] Clean exact-SHA corpus at `3747f5d`: `source.json` matches, 23/23
       controls, five PDFs pass open/card-open/verify, five distinct cover ties,
       corrupt/EPUB controls pass, `failures.tsv` empty, temp profile and `dist/`
-      absent after exit.
-- [ ] Exact-SHA Sonar run succeeds and authenticated quality gate is `OK`.
-- [ ] Exact-SHA CodeQL has no open PR/new alerts.
+      absent after exit (`/tmp/lectrice-corpus-final-main-3747f5d.log`).
+- [x] Exact-SHA Sonar run `31876592457` succeeded; authenticated quality gate
+      is `OK` with no failing conditions.
+- [x] Exact-SHA CodeQL run `31876592453` succeeded; high alert #4 is fixed and
+      the repository has zero open code-scanning alerts.
 - [ ] Exact-SHA macOS build/install/open/render/restart proof records one app
       instance, executable path/PID/SHA, and a real private PDF rendered.
 - [ ] `v0.2.0-rc.0` release-pipeline dry run succeeds and produces AppImage +
@@ -58,8 +60,7 @@ No tag or release is authorized by this checklist.
 
 ## Current exact-SHA history
 
-At `4f74f4b`, post-merge Sonar is green and the PR source head had green CI and
-CodeQL. The final audit correctly returned `NOT CUTTABLE` because the clean
-exact-SHA corpus receipt, current release records, RC dry run, and macOS proof
-were missing. This document resolves the stale-record portion only; it does not
-turn prior evidence into final-SHA evidence.
+At `3747f5d`, clean exact-SHA corpus, Sonar, and CodeQL evidence are green, and
+CodeQL alert #4 is fixed. The remaining sequence is human-gated RC dry run and
+exact-SHA macOS proof, followed by a final different-family audit on that same
+post-gate SHA. Until then the verdict remains `NOT CUTTABLE`.
