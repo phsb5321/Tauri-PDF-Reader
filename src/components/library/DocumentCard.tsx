@@ -139,7 +139,7 @@ export function DocumentCard({
         <button
           type="button"
           className="document-card-open"
-          aria-label={`Open ${document.title || fileName}`}
+          aria-label={`Select ${document.title || fileName}; press Enter or double-click to open`}
           onClick={onClick}
           onDoubleClick={onDoubleClick}
           onKeyDown={handlePrimaryKeyDown}
@@ -205,7 +205,7 @@ export function DocumentCard({
       <button
         type="button"
         className="document-card-open"
-        aria-label={`Open ${document.title || fileName}`}
+        aria-label={`Select ${document.title || fileName}; press Enter or double-click to open`}
         onClick={onClick}
         onDoubleClick={onDoubleClick}
         onKeyDown={handlePrimaryKeyDown}

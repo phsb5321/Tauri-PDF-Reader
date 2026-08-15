@@ -25,7 +25,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, waitFor, act } from "@testing-library/react";
+import { render, waitFor, act, fireEvent } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -526,24 +526,31 @@ describe("cover pipeline contract (121)", () => {
     );
   });
 
-  it("grid card: the open button keeps working with the cover inside", async () => {
+  it("grid card: the named button tells the truth about select and open", async () => {
     const onClick = vi.fn();
+    const onOpen = vi.fn();
     const { getByRole } = render(
       <DocumentCard
         document={DOC}
         isSelected={false}
         viewMode={"grid" as ViewMode}
         onClick={onClick}
-        onDoubleClick={vi.fn()}
+        onDoubleClick={onOpen}
         onDelete={vi.fn()}
       />,
     );
-    const open = getByRole("button", { name: "Open Paper One" });
+    const open = getByRole("button", {
+      name: "Select Paper One; press Enter or double-click to open",
+    });
     open.click();
     expect(onClick).toHaveBeenCalled();
     // The button already has the title; its cover is decorative, so the name
-    // is announced exactly once.
-    expect(open).toHaveAccessibleName("Open Paper One");
+    // is announced exactly once and describes both pointer actions truthfully.
+    expect(open).toHaveAccessibleName(
+      "Select Paper One; press Enter or double-click to open",
+    );
+    fireEvent.keyDown(open, { key: "Enter" });
+    expect(onOpen).toHaveBeenCalled();
   });
 
   it("list card: the named button does not double-announce its cover", () => {
@@ -558,8 +565,12 @@ describe("cover pipeline contract (121)", () => {
       />,
     );
     expect(
-      getByRole("button", { name: "Open Paper One" }),
-    ).toHaveAccessibleName("Open Paper One");
+      getByRole("button", {
+        name: "Select Paper One; press Enter or double-click to open",
+      }),
+    ).toHaveAccessibleName(
+      "Select Paper One; press Enter or double-click to open",
+    );
     expect(queryByRole("img", { name: "Paper One" })).not.toBeInTheDocument();
   });
 });

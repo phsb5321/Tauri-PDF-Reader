@@ -52,7 +52,11 @@ async function coverHash(title) {
   return browser.execute(async (t) => {
     const openButton = Array.from(
       document.querySelectorAll("button.document-card-open"),
-    ).find((el) => el.getAttribute("aria-label") === `Open ${t}`);
+    ).find(
+      (el) =>
+        el.getAttribute("aria-label") ===
+        `Select ${t}; press Enter or double-click to open`,
+    );
     const cover = openButton?.querySelector(".document-cover");
     const img = cover?.querySelector("img.document-cover-img");
     if (!img || !(img instanceof HTMLImageElement)) return null;
@@ -80,7 +84,11 @@ async function coverState(title) {
   return browser.execute((t) => {
     const openButton = Array.from(
       document.querySelectorAll("button.document-card-open"),
-    ).find((el) => el.getAttribute("aria-label") === `Open ${t}`);
+    ).find(
+      (el) =>
+        el.getAttribute("aria-label") ===
+        `Select ${t}; press Enter or double-click to open`,
+    );
     const cover = openButton?.querySelector(".document-cover");
     return cover
       ? { state: cover.getAttribute("data-state"), seed: cover.getAttribute("data-seed") }
@@ -101,12 +109,19 @@ describe("Packaged cover journey (slice 121: real first-page covers)", () => {
 
     // 1. The three seeded cards are on the grid. The cover is decorative
     //    inside each named control, avoiding a duplicate title announcement.
-    const cardA = await $('button[aria-label="Open E2E Resume Fixture A"]');
-    await cardA.waitForExist({ timeout: 15000 });
-    const cardB = await $('button[aria-label="Open E2E Resume Fixture B"]');
-    await cardB.waitForExist({ timeout: 15000 });
-    const cardC = await $('button[aria-label="Open E2E Coverless"]');
-    await cardC.waitForExist({ timeout: 15000 });
+    const cardA = await $(
+      'button[aria-label="Select E2E Resume Fixture A; press Enter or double-click to open"]',
+    );
+    const cardB = await $(
+      'button[aria-label="Select E2E Resume Fixture B; press Enter or double-click to open"]',
+    );
+    const cardC = await $(
+      'button[aria-label="Select E2E Coverless; press Enter or double-click to open"]',
+    );
+    for (const card of [cardA, cardB, cardC]) {
+      await card.waitForDisplayed({ timeout: 15000 });
+      await card.waitForClickable({ timeout: 15000 });
+    }
 
     if (PHASE === "first") {
       // 2. Real rasters: BOTH A and B must reach "ready" before either hash
@@ -166,11 +181,7 @@ describe("Packaged cover journey (slice 121: real first-page covers)", () => {
       // The card's open button, located by its ACCESSIBLE TEXT via XPath —
       // no element enumeration, no injected DOM events: a real WebDriver
       // double-click on the visible control (Codex gate 121).
-      const openButton = await $(
-        "//button[contains(@class, 'document-card-open')][contains(., 'E2E Resume Fixture A')]",
-      );
-      await openButton.waitForClickable({ timeout: 10000 });
-      await openButton.doubleClick();
+      await cardA.doubleClick();
       await browser.waitUntil(
         async () =>
           (await $('input[aria-label="Current page"]').getValue()) === "2",
