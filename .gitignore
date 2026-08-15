@@ -58,9 +58,8 @@ public/cmaps/
 # M2.4 verify receipt (run artifact, never committed)
 verify-receipt.json
 
-# Private real-book corpus — NEVER commit book bytes or local corpus paths.
-# The runner reads LECTRICE_REAL_PDF_CORPUS externally; only the hashed
-# manifest in docs/corpus/ is committed.
+# Private real-book corpus — NEVER commit bytes, paths, or identity metadata.
+# The runner reads the corpus and its .lectrice-manifest.json externally.
 corpus-local/
 /LECTRICE_REAL_PDF_CORPUS
 /lectrice-corpus-results*

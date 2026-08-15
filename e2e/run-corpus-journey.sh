@@ -26,7 +26,7 @@ if [ -z "${LECTRICE_REAL_PDF_CORPUS:-}" ]; then
   echo "FATAL: LECTRICE_REAL_PDF_CORPUS must point at the private corpus dir" >&2
   exit 2
 fi
-[ -d "$LECTRICE_REAL_PDF_CORPUS" ] || { echo "FATAL: corpus dir missing: $LECTRICE_REAL_PDF_CORPUS" >&2; exit 2; }
+[ -d "$LECTRICE_REAL_PDF_CORPUS" ] || { echo "FATAL: external corpus dir missing" >&2; exit 2; }
 
 RESULTS_DIR="${CORPUS_RESULTS_DIR:-/tmp/lectrice-corpus-results-$(date +%Y%m%d-%H%M%S)}"
 mkdir -p "$RESULTS_DIR"
@@ -44,13 +44,45 @@ fi
 printf '{"sourceSha":"%s","worktree":"clean"}\n' "$SOURCE_SHA" > "$RESULTS_DIR/source.json"
 echo "==> Exact source: $SOURCE_SHA (clean)"
 
+if [ -n "${E2E_PROFILE_DIR:-}" ]; then
+  echo "FATAL: corpus runner refuses a caller-owned E2E_PROFILE_DIR" >&2
+  exit 2
+fi
+
 export CI=true
 source ./scripts/e2e-profile.sh
 source ./scripts/e2e-toolchain.sh
+CORPUS_PROFILE_ROOT="$E2E_PROFILE_DIR"
+PROFILE_MARKER="$CORPUS_PROFILE_ROOT/.lectrice-corpus-owned"
+: > "$PROFILE_MARKER"
+cleanup_outer() {
+  local status=$?
+  trap - EXIT
+  case "$CORPUS_PROFILE_ROOT" in
+    /tmp/tmp.*)
+      if [ -f "$PROFILE_MARKER" ] && [ "$CORPUS_PROFILE_ROOT" = "$E2E_PROFILE_DIR" ]; then
+        rm -rf -- "$CORPUS_PROFILE_ROOT" || status=3
+        [ ! -e "$CORPUS_PROFILE_ROOT" ] || status=3
+      else
+        echo "cleanup FAILED: ownership marker missing" >&2
+        status=3
+      fi
+      ;;
+    *)
+      echo "cleanup FAILED: unexpected profile root" >&2
+      status=3
+      ;;
+  esac
+  # Vite embeds the temporary selected path. The build output is generated;
+  # remove it so no corpus basename/path survives the acceptance run.
+  rm -rf -- "$E2E_REPO_ROOT/dist" || status=3
+  exit "$status"
+}
+trap cleanup_outer EXIT
 export LECTRICE_REAL_PDF_CORPUS
 export RESULTS_DIR FAILURES E2E_REPO_ROOT SOURCE_SHA
 
-toolchain_exec '
+toolchain_run '
   set -euo pipefail
   export WEBKIT_WEBDRIVER="$(command -v WebKitWebDriver)"
   export WEBKIT_DISABLE_COMPOSITING_MODE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1 LIBGL_ALWAYS_SOFTWARE=1
@@ -63,20 +95,14 @@ toolchain_exec '
   DISPNUM_FILE=$(mktemp)
   Xvfb -displayfd 3 -screen 0 1280x1024x24 3>$DISPNUM_FILE >/tmp/lectrice-e2e-corpus-xvfb.log 2>&1 &
   XVFB_PID=$!
-  CORPUS_PROFILE_ROOT="$E2E_PROFILE_DIR"
-  cleanup() {
+  cleanup_inner() {
+    local status=$?
+    trap - EXIT
     kill "$XVFB_PID" 2>/dev/null || true
-    case "$CORPUS_PROFILE_ROOT" in
-      /tmp/tmp.*)
-        [ "$CORPUS_PROFILE_ROOT" = "$E2E_PROFILE_DIR" ] && rm -rf -- "$CORPUS_PROFILE_ROOT"
-        ;;
-      *) echo "cleanup REFUSED unexpected profile root" >&2 ;;
-    esac
-    # Vite embeds the temporary selected path. The build output is generated;
-    # remove it so no corpus basename/path survives the acceptance run.
-    rm -rf -- "$E2E_REPO_ROOT/dist"
+    rm -f -- "$DISPNUM_FILE"
+    exit "$status"
   }
-  trap cleanup EXIT
+  trap cleanup_inner EXIT
   for _ in $(seq 1 100); do [ -s "$DISPNUM_FILE" ] && break; sleep 0.1; done
   export DISPLAY=:$(cat "$DISPNUM_FILE")
   echo "Xvfb ready on DISPLAY=$DISPLAY profile=$XDG_DATA_HOME"
@@ -158,11 +184,12 @@ toolchain_exec '
   for i in $(seq 0 $((PDF_COUNT - 1))); do
     BASENAME=$(echo "$CORPUS_JSON" | jq -r ".pdfs[$i].basename")
     SHA=$(echo "$CORPUS_JSON" | jq -r ".pdfs[$i].sha256")
+    SIZE=$(echo "$CORPUS_JSON" | jq -r ".pdfs[$i].size")
     PATH_=$(echo "$CORPUS_JSON" | jq -r ".pdfs[$i].path")
     # Codex gate #4: expected page count from the external identity manifest.
     PAGES=$(jq -r --arg b "$BASENAME" ".pdfs[] | select(.basename == \$b) | .pages" "$META_MANIFEST")
     if [ -z "$PAGES" ] || [ "$PAGES" = "null" ]; then
-      echo "FATAL: no pages entry for $BASENAME in $META_MANIFEST" >&2
+      echo "FATAL: no pages entry for $BASENAME in external manifest" >&2
       exit 3
     fi
     # Codex gate (sha validation): the enumerated file must BE the manifest
@@ -173,8 +200,9 @@ toolchain_exec '
       echo "FATAL: no sha256 entry for $BASENAME in $META_MANIFEST" >&2
       exit 3
     fi
-    if [ "$SHA" != "$MANIFEST_SHA" ]; then
-      echo "FATAL: enumerated sha256 for $BASENAME ($SHA) != manifest ($MANIFEST_SHA) — unmanifested binary, refusing to test" >&2
+    MANIFEST_SIZE=$(jq -r --arg b "$BASENAME" ".pdfs[] | select(.basename == \$b) | .size" "$META_MANIFEST")
+    if [ "$SHA" != "$MANIFEST_SHA" ] || [ "$SIZE" != "$MANIFEST_SIZE" ]; then
+      echo "FATAL: identity mismatch for $BASENAME — refusing unmanifested bytes" >&2
       exit 3
     fi
     # Fix 4: per-book FRESH hermetic profile (no residue from a failed book).
@@ -329,12 +357,18 @@ toolchain_exec '
   if [ "$EPUB_COUNT" -gt 0 ]; then
     EPUB_PATH=$(echo "$CORPUS_JSON" | jq -r ".epub[0].path")
     EPUB_SHA=$(echo "$CORPUS_JSON" | jq -r ".epub[0].sha256")
+    EPUB_SIZE=$(echo "$CORPUS_JSON" | jq -r ".epub[0].size")
     EPUB_NAME=$(basename "$EPUB_PATH")
     # Codex gate: the enumerated EPUB must match the manifest (same basename
     # AND sha256) — a swapped/edited EPUB must refuse to run the control.
     # Delegates to the shared guard (NC2 tests this exact path).
     EPUB_MANIFEST_SHA=$(jq -r --arg b "$EPUB_NAME" ".epub[] | select(.basename == \$b) | .sha256" "$META_MANIFEST")
+    EPUB_MANIFEST_SIZE=$(jq -r --arg b "$EPUB_NAME" ".epub[] | select(.basename == \$b) | .size" "$META_MANIFEST")
     guard_epub_manifest "$EPUB_SHA" "$EPUB_MANIFEST_SHA" "$EPUB_NAME" || exit 3
+    [ "$EPUB_SIZE" = "$EPUB_MANIFEST_SIZE" ] || {
+      echo "FATAL: EPUB size differs from external manifest" >&2
+      exit 3
+    }
     echo "==> EPUB negative control: $EPUB_NAME (manifest sha verified)"
     EPUB_INPUT="$CONTROL_APP_DIR/$EPUB_NAME"
     cp -- "$EPUB_PATH" "$EPUB_INPUT"
