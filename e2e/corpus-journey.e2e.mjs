@@ -49,6 +49,13 @@ const BOOK = { basename: BASENAME, sha: SHA, pages: PAGES };
 // is "Resume {title}, page …". The runner passes the full basename, so the
 // stem is derived here — same rule the backend applies.
 const TITLE = BASENAME.replace(/\.pdf$/i, "");
+
+function xpathLiteral(value) {
+  if (!value.includes("'")) return `'${value}'`;
+  const parts = value.split("'").map((part) => `'${part}'`);
+  return `concat(${parts.join(`, "'", `)})`;
+}
+
 async function renderedPageRaster(pageNum) {
   // GPU-backed PDF canvases are intentionally unreadable in WebKitGTK. Bind
   // the oracle to the target page root, non-zero production canvas backing
@@ -610,7 +617,7 @@ describe(`Packaged corpus journey — ${BASENAME}`, () => {
     // CLAIM 4: the library row persisted page 2 of N (the autosave), and
     // resuming lands on the RENDERED page 2.
     const resume = await $(
-      `button[aria-label^="Resume ${TITLE.replace(/"/g, '\\"')}"]`,
+      `//button[starts-with(@aria-label, ${xpathLiteral(`Resume ${TITLE}`)})]`,
     );
     await resume.waitForExist({ timeout: 30000 });
     const resumeLabel = await resume.getAttribute("aria-label");
@@ -679,8 +686,10 @@ describe(`Packaged corpus journey — ${BASENAME}`, () => {
           const cardHasTitle = cards.some((c) =>
             (c.textContent || "").includes(title),
           );
-          const resumeHasTitle = !!document.querySelector(
-            `button[aria-label^="Resume ${title.replace(/"/g, '\\"')}"]`,
+          const resumeHasTitle = Array.from(
+            document.querySelectorAll("button[aria-label]"),
+          ).some((button) =>
+            button.getAttribute("aria-label")?.startsWith(`Resume ${title}`),
           );
           return !cardHasTitle && !resumeHasTitle;
         }, TITLE),
