@@ -2,6 +2,13 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #65 — 15/08/2026 (release truth, reproducible corpus evidence)
+
+- **Merged baseline:** `4f74f4b` (#130). Open PRs were zero; authenticated post-merge Sonar was `OK`. The five-PDF private corpus run passed all open/card-open/verify phases, five displayed-to-cache RGBA ties, cleanup, and corrupt/EPUB controls, but the run preceded the final commits and therefore was not exact-SHA release evidence.
+- **Release verdict:** different-family exact-main audit returned **NOT CUTTABLE**. Remaining hard gates are a clean SHA-recording corpus rerun, current CodeQL/Sonar, Pedro-gated RC tag/dry run, and Pedro-gated exact-SHA macOS install/open/render/restart proof.
+- **This slice (`131-release-truth`):** repair the pinned `tauri-driver` Nix closure (`cargoHash` verified by a real `nix develop` build); make the corpus runner refuse dirty source and write `source.json`; move concrete corpus identity metadata out of git to the private external `.lectrice-manifest.json`; remove generated `dist/` and temp private copies on every exit; remove the synthetic `/home/notroot/...` fixture path; delete obsolete pre-merge watcher scripts; reconcile run order, checklist, known limitations, and this handoff.
+- **No release action:** no RC/tag/release or Mac hardware action is authorized by this slice.
+
 ## Iteration #63 — 13/08/2026 (122-dl2-close-owned: the fast-close page revert, root-caused and fixed at the source)
 
 - **Branch:** `122-dl2-close-owned` (off `origin/main` 8848fc3 post-#121 rebase; worktree `../tauri-pdf-reader-122-dl2-close-owned`). D1: a genuine native close <500ms after page 2→3 left the row and the relaunch at page 2.

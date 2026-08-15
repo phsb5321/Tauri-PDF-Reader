@@ -36,7 +36,7 @@ guard_build_status() {
   return 0
 }
 
-# NC2: an EPUB whose enumerated sha256 differs from the committed manifest is
+# NC2: an EPUB whose enumerated sha256 differs from the external manifest is
 # a FATAL (exit 3) — an unmanifested/mutated negative control refuses to run.
 # Usage: guard_epub_manifest <enumerated_sha> <manifest_sha> <basename>
 guard_epub_manifest() {

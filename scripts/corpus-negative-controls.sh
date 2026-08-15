@@ -58,8 +58,15 @@ if grep -q 'source "$E2E_REPO_ROOT/scripts/corpus-guards.sh"' e2e/run-corpus-jou
   && grep -q 'guard_missing_oracle' e2e/run-corpus-journey.sh \
   && grep -q 'rm -rf -- "$CORPUS_PROFILE_ROOT"' e2e/run-corpus-journey.sh \
   && grep -q 'confirmCalls() === 1' e2e/corpus-journey.e2e.mjs \
-  && grep -q 'confirmCallCount += 1' src/e2e-native-bootstrap.ts; then
-  echo "  ✓ NC0 wiring (guards + private-profile cleanup + confirm invocation)"
+  && grep -q 'confirmCallCount += 1' src/e2e-native-bootstrap.ts \
+  && grep -q 'git status --porcelain' e2e/run-corpus-journey.sh \
+  && grep -q '"sourceSha"' e2e/run-corpus-journey.sh \
+  && grep -q 'refuses a caller-owned E2E_PROFILE_DIR' e2e/run-corpus-journey.sh \
+  && grep -q 'ownership marker missing' e2e/run-corpus-journey.sh \
+  && grep -q 'refuses a pre-existing generated dist' e2e/run-corpus-journey.sh \
+  && grep -q 'dist ownership marker missing' e2e/run-corpus-journey.sh \
+  && grep -q 'canonical.log.*2>&1' scripts/e2e-real-corpus.sh; then
+  echo "  ✓ NC0 wiring (guards + owned cleanup + private wrapper + exact SHA)"
   PASS=$((PASS + 1))
 else
   echo "  ✗ NC0 wiring — runner does not use the tested guards"

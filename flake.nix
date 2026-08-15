@@ -74,13 +74,21 @@
             version = "2.0.6";
             sha256 = "sha256-fTCkEs4NLBW0khaHL4jpVNkrbQg22YPsRMjfJNqnCWA=";
           };
-          # Pinned dependency closure (68 packages) instead of an opaque
-          # cargoHash — the lockfile documents the exact versions the gate
-          # runs against and makes the build reproducible without a
-          # first-pass hash computation.
-          cargoLock = {
-            lockFile = ./tauri-driver-Cargo.lock;
-          };
+          # Pinned dependency closure instead of a first-pass hash: the
+          # lockfile documents the exact versions the gate runs against.
+          # cargoHash below is the SRI hash of the vendored closure the
+          # cargo 1.97 in the flake's nixpkgs (rev 624af66) resolves for
+          # tauri-driver 2.0.6 against the CURRENT crates.io index — the
+          # cargoLock.lockFile form broke when the vendored resolution
+          # diverged from the crate tarball's shipped v3 lockfile (the
+          # tarball locks 95 dev-inclusive packages at windows-sys 0.52;
+          # cargo 1.97 vendors 68 packages at windows-sys 0.61), which no
+          # lockfile content could reconcile: the vendor pass re-resolves
+          # and the consistency check compares against the tarball's lock.
+          # Regenerate by `nix hash path --type sha256 $(nix build
+          # '.#devShells.x86_64-linux.default' --no-link ...)` after any
+          # deliberate bump; bump deliberately, never by default.
+          cargoHash = "sha256-MThAcU+U8PyBGauh3dy7ZRvRX9INmOEeghIlQEGLAPs=";
           doCheck = false;
         };
 

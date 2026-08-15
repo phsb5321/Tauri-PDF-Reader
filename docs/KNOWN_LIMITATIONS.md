@@ -4,34 +4,24 @@ Truthful inventory of what the current tree does **not** do, and what is not
 yet proven. Every item names its evidence. If a release note claims a
 platform or a feature, it must not contradict this page.
 
-Last reviewed: 13/08/2026, during the `120-release-docs` slice (PR #117),
-against `main` at commit `260e0b4`.
+Last reviewed: 15/08/2026, after the stabilization and corpus train,
+against `main` at commit `4f74f4b`.
 
-## Fast-close verification position (track A)
+## Fast-close verification position
 
-The close-flush protocol is **shipped** ([#113]): the backend's
-`CloseRequested` handler prevents the close, asks the renderer to flush both
-debounced writers (highlights + reading position) and ack with a 3s timeout.
+The close-flush protocol and deterministic packaged close lane are **shipped**
+([#113], [#125]). The backend prevents close, requests both debounced writers
+(highlights + reading position), waits for acknowledgement, and then closes.
 
-What is proven, separately (they are different facts):
+Exact packaged evidence from #125 proves both data-loss paths together:
 
-- The **protocol itself** has direct jsdom test coverage (the ack is emitted).
-- **DL-1 (highlights)** survives a genuine, driver-mediated window close
-  inside the save debounce — `dl1-verify` PASS ([#115]).
-- **DL-2 (reading position) is an open defect on that path**: `dl2-verify`
-  FAIL — after a genuine close inside the autosave debounce, relaunch lands
-  on page 2 instead of the page the user was on ([#115]'s lane summary:
-  `dl2-create PASS · dl2-verify FAIL, rowPage=2, landedPage=2`).
+- **DL-1 (highlights):** close marker 49 ms, deliberately delayed IPC 250 ms,
+  actual window disappearance 387 ms, highlight present after restart.
+- **DL-2 (reading position):** actual window disappearance 401 ms (<500 ms),
+  persisted row and restarted reader both at page 3.
 
-On top of that, the E2E **harness** has its own nondeterminism: it cannot
-reliably deliver `CloseRequested` to the app in every environment (tao's
-delete-event fires but the runtime does not deliver it to
-`on_window_event`; documented in `docs/agent-backlog-state.md`, iteration
-#61/#62).
-
-What that means in practice: a release note must claim **DL-1 fixed** and
-**DL-2 still failing**, not "close loses no work". A track-A fix is expected
-to close DL-2 and make the lane deterministic.
+This closes the stale #115 defect. The evidence is Linux/X11/WebKitGTK scoped;
+final exact-SHA macOS install/open/render/restart proof is still pending.
 
 ## Fixture-vs-live TTS
 
@@ -76,3 +66,4 @@ something changed.
 [#97]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/97
 [#113]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/113
 [#115]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/115
+[#125]: https://github.com/phsb5321/Tauri-PDF-Reader/pull/125
