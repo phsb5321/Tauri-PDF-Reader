@@ -40,7 +40,7 @@ const FRONTEND_MARKERS = [
   /XMLHttpRequest/,
   /new WebSocket/,
   /EventSource\(/,
-  /https:\/\/cdn\.jsdelivr\.net/,
+  "https://cdn.jsdelivr.net/",
 ];
 const BACKEND_MARKERS = [/reqwest::/];
 
@@ -69,10 +69,13 @@ function productionFiles(
   });
 }
 
-function egressFiles(files: string[], markers: RegExp[]): string[] {
-  return files.filter((file) =>
-    markers.some((marker) => marker.test(readFileSync(file, "utf8"))),
-  );
+function egressFiles(files: string[], markers: (RegExp | string)[]): string[] {
+  return files.filter((file) => {
+    const source = readFileSync(file, "utf8");
+    return markers.some((marker) =>
+      typeof marker === "string" ? source.includes(marker) : marker.test(source),
+    );
+  });
 }
 
 describe("SECURITY.md dataflow map", () => {
