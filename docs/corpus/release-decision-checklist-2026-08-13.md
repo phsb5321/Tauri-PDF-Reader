@@ -22,19 +22,13 @@ and adversarial-audit evidence.
 
 ## Required at `FINAL_SHA`
 
-- [x] Clean exact-SHA corpus at `3747f5d`: `source.json` matches, 23/23
-      controls, five PDFs pass open/card-open/verify, five distinct cover ties,
+- [ ] Clean corpus run at `FINAL_SHA`: `source.json` matches, 23/23 controls,
+      five PDFs pass open/card-open/verify, five distinct cover ties,
       corrupt/EPUB controls pass, `failures.tsv` empty, temp profile and `dist/`
-      absent after exit (`/tmp/lectrice-corpus-final-main-3747f5d.log`).
-- [x] Exact-SHA Sonar run `31876592457` succeeded; authenticated quality gate
-      is `OK` with no failing conditions.
-- [x] Exact-SHA CodeQL run `31876592453` succeeded; high alert #4 is fixed and
-      the repository has zero open code-scanning alerts.
-
-The three boxes above were re-run green at `9b13a1f` as well (corpus
-`/tmp/lectrice-corpus-final-main-9b13a1f.log`, Sonar `31880371934`, CodeQL
-`31880371936`); they must be re-run once more at whatever `FINAL_SHA` the tag
-is cut from, since this slice moves the head.
+      absent after exit.
+- [ ] Sonar run at `FINAL_SHA` succeeds; authenticated quality gate is `OK`
+      with no failing conditions.
+- [ ] CodeQL run at `FINAL_SHA` succeeds with zero open code-scanning alerts.
 - [ ] Exact-SHA macOS build/install/open/render/restart proof records one app
       instance, executable path/PID/SHA, and a real private PDF rendered.
 - [ ] `v0.2.0-rc.0` release-pipeline dry run succeeds and produces AppImage +
@@ -42,6 +36,14 @@ is cut from, since this slice moves the head.
       procedure.
 - [ ] A different-family adversarial audit reviews all evidence above and
       returns `CUTTABLE` for that same SHA.
+
+Those three boxes have been satisfied twice on earlier heads — at `3747f5d`
+(corpus `/tmp/lectrice-corpus-final-main-3747f5d.log`, Sonar `31876592457`,
+CodeQL `31876592453`) and at `9b13a1f` (corpus
+`/tmp/lectrice-corpus-final-main-9b13a1f.log`, Sonar `31880371934`, CodeQL
+`31880371936`), with CodeQL alert #4 fixed. That history is why the release is
+expected to pass; it is **not** evidence for the tag, because this slice moves
+the head. The boxes stay unchecked until they are re-run at `FINAL_SHA`.
 
 ## Remaining infrastructure/documentation evidence
 
