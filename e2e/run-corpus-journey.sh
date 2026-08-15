@@ -80,7 +80,7 @@ cleanup_outer() {
 }
 trap cleanup_outer EXIT
 export LECTRICE_REAL_PDF_CORPUS
-export RESULTS_DIR FAILURES E2E_REPO_ROOT SOURCE_SHA
+export RESULTS_DIR FAILURES E2E_REPO_ROOT SOURCE_SHA CORPUS_PROFILE_ROOT
 
 toolchain_run '
   set -euo pipefail
