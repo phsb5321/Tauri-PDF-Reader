@@ -95,10 +95,10 @@ export function DocumentCard({
         onDelete();
       } else {
         setConfirmingDelete(true);
-        confirmDeleteTimer.current = window.setTimeout(
-          () => setConfirmingDelete(false),
-          3000,
-        );
+        confirmDeleteTimer.current = window.setTimeout(() => {
+          confirmDeleteTimer.current = null;
+          setConfirmingDelete(false);
+        }, 3000);
       }
     },
     [confirmingDelete, onDelete, handleCloseContextMenu],

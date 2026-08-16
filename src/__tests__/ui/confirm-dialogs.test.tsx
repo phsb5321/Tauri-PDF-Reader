@@ -56,7 +56,16 @@ describe("confirm dialogs (146)", () => {
       "components/library/LibraryView.tsx",
       "components/library/ShelfSidebar.tsx",
     ];
-    const markers = [/window\.confirm/, /window\.prompt/];
+    // Covers the literal forms AND dynamic access (globalThis["confirm"])
+    // and bare confirm()/prompt() calls — a shim bypass must fail the scan.
+    const markers = [
+      /window\.confirm/,
+      /window\.prompt/,
+      /globalThis\[["']confirm["']\]/,
+      /globalThis\[["']prompt["']\]/,
+      /\bconfirm\(/,
+      /\bprompt\(/,
+    ];
     for (const file of files) {
       const text = readFileSync(join(SRC, file), "utf8");
       for (const marker of markers) {

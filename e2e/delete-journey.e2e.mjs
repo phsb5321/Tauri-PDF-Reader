@@ -37,7 +37,7 @@
  *
  * Run with:  E2E_SPEC=./e2e/delete-journey.e2e.mjs  DELETE_PHASE=seed|delete
  * against a binary built `--features e2e-tts-fixture` and a frontend built
- * `VITE_E2E_NATIVE=true VITE_E2E_CONFIRM=accept` — see
+ * `VITE_E2E_NATIVE=true` — see
  * e2e/run-delete-journey.sh.
  */
 

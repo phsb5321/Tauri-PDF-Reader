@@ -81,11 +81,17 @@ export function ShelfSidebar({
       setConfirmingDeleteId(null);
       onDelete(shelf.id);
     } else {
+      // Arming a DIFFERENT shelf must clear the previous pending timer —
+      // otherwise the old timer fires mid-confirm and disarms the new one.
+      if (confirmDeleteTimer.current !== null) {
+        window.clearTimeout(confirmDeleteTimer.current);
+        confirmDeleteTimer.current = null;
+      }
       setConfirmingDeleteId(shelf.id);
-      confirmDeleteTimer.current = window.setTimeout(
-        () => setConfirmingDeleteId(null),
-        3000,
-      );
+      confirmDeleteTimer.current = window.setTimeout(() => {
+        confirmDeleteTimer.current = null;
+        setConfirmingDeleteId(null);
+      }, 3000);
     }
   };
 
