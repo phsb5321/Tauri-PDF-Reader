@@ -2,11 +2,20 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #67 — 15/08/2026 (v0.2.0 preparation, RC dry run, platform truth)
+
+- **Version cut:** #134 → `233e8c6` moved `package.json`, `Cargo.toml`, `Cargo.lock` and `tauri.conf.json` to `0.2.0` and turned the stale "Unreleased" changelog into a prepared v0.2.0 entry. #135 → `3d68d0e`, #136 → `8c31cfc`.
+- **RC dry run (done, not pending):** tag `v0.2.0-rc.0` at `3d68d0e`, run `31911698292`, prerelease with AppImage + deb. Both assets verified inside a clean Ubuntu 24.04 container by an ownership-checked window (`WM_CLASS "tauri-pdf-reader"`, 1200x800), not on the NixOS host. Receipts: `docs/corpus/rc-evidence-2026-08-15.md`.
+- **macOS reframed from "pending gate" to measured truth:** builds and launches at `3d68d0e` (bundle `0.2.0`, one instance, 1176x784 Quartz window; the link needs `SDKROOT`/`LIBRARY_PATH`). The open/render/restart journey is **BLOCKED** — no AX windows, no file-association or open-event path, no macOS WebDriver for `tauri-driver` to proxy. macOS is not shipped and no release note claims it, so it gates the macOS claim, not the Linux release.
+- **CodeQL toolcache eviction root-caused** (#135): the host `_tool` prune aged extracted files whose mtimes are upstream, deleting fresh installs and leaving the `.complete` marker. Host fix ages the marker instead; falsifier 4/4.
+- **EPUB negative control de-flaked** (#136): the control now settles on the document store's load flag instead of a flat 8 s clock, after one clock-decided FAIL at `3d68d0e`.
+- **Remaining before the tag:** re-run corpus + Sonar + CodeQL at `FINAL_SHA`, then a different-family audit on that same SHA.
+
 ## Iteration #66 — 15/08/2026 (CodeQL alert closure + vm103 cleanup rotation)
 
 - **Main:** #132 merged as `3747f5d`; exact-main CodeQL run `31876592453` succeeded and high alert #4 is `fixed`. Exact-main Sonar run `31876592457` succeeded with authenticated quality gate `OK`. Clean exact-main corpus receipt `/tmp/lectrice-corpus-final-main-3747f5d.log`: five PDFs, failures 0 bytes, covers 5/5 distinct/tied, all phases/controls green, profile/dist absent.
 - **Runner host:** root cause of the persistent line-192 warning was directory creation, not log ownership: `notroot` owned `/var/log/runner-cleanup.log` but could not create `/var/log/runner-cleanup.log.tmp`. Host-local hook now uses `mktemp /tmp`, `tail` + `cat` into the owned log, and removes the temp. Scoped validation: rc 0, 7747→500 lines, stderr 0, no residue. Revert backup: `/usr/local/bin/runner-cleanup-hook.sh.bak-20260815`.
-- **Release state:** no non-gated code/quality blocker is known. `v0.2.0` remains NOT CUTTABLE solely pending Pedro-gated RC tag/dry run and exact-SHA macOS install/open/render/restart proof, followed by one final exact-SHA audit.
+- **Release state (superseded by iteration #67):** no non-gated code/quality blocker was known. The RC dry run has since run, and the macOS journey is recorded as BLOCKED with reasons rather than pending — see iteration #67.
 
 ## Iteration #65 — 15/08/2026 (release truth, reproducible corpus evidence)
 
