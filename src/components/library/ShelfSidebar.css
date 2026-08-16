@@ -132,6 +132,11 @@
   border: 1px solid var(--border-color, #ddd);
   border-radius: 6px;
   background: var(--bg-secondary, #fff);
+  /* Without an explicit colour the WebKitGTK UA default (a 40% black under
+     the Xvfb theme) paints this button — dark-on-dark on the dark theme
+     (contrast-sweep: ratio 1.09). Bind it to the primary text token so it
+     tracks the theme like every other control. */
+  color: var(--color-text-primary);
   font-size: 0.8125rem;
   cursor: pointer;
 }
