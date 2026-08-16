@@ -6,8 +6,10 @@ that a claim about behavior is backed by a runnable assertion, not a glance.
 
 ## v0.2.0 — 16/08/2026
 
-Everything between `v0.1.0` (21/06/2026) and this entry, each change landed by
-a squash-merged PR. The three version fields (`package.json`,
+What version 0.2.0 contains. Everything between `v0.1.0` (21/06/2026) and this
+entry, each change landed by a squash-merged PR. The published artifacts are
+built from whichever commit carries the `v0.2.0` tag, which is the commit that
+passed the checks in `docs/corpus/release-decision-checklist-2026-08-13.md`. The three version fields (`package.json`,
 `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`) read `0.2.0`, so artifacts
 built from this tree identify as 0.2.0, and the `v0.2.0-rc.0` dry run built and
 verified exactly those artifacts first

@@ -104,7 +104,7 @@ exists, for the reason given under "Decision rule".
 | `3747f5d` | `…-final-main-3747f5d.log` ✓ | `31876592457` ✓ | `31876592453` ✓ | — | NOT CUTTABLE | superseded by later merges |
 | `9b13a1f` | `…-final-main-9b13a1f.log` ✓ | `31880371934` ✓ | `31880371936` ✓ | — | NOT CUTTABLE | superseded by later merges |
 | `3da0320` | `…-FINAL-3da0320.log` ✓ | `31928286389` ✓ | `31928286434` ✓ | `31928286378` **cancelled** | NOT CUTTABLE (red CI) | rejected — cache ate the 10m wall (#138) |
-| `8d951e5` | `…-FINAL-8d951e5.log` ✓ | `31934817422` ✓ | `31934817376` ✓ | `31934817394` **failure** | not audited | rejected — both Rust jobs died in the cache step (#139) |
+| `8d951e5` | `…-FINAL-8d951e5.log` ✓ | `31934817422` ✓ | `31934817376` ✓ | `31934817394` **failure** | not audited | rejected — Contract Tests failed inside the cache step; Backend Checks cancelled with no steps recorded (#139) |
 | `01d9952` | `…-FINAL-01d9952.log` ✓ | `31941343176` ✓ | `31941343177` ✓ | `31941343164` ✓ | NOT CUTTABLE (docs) | rejected — tree claimed its own tag/verdict, fixed by #140 |
 
 Corpus logs live under `/tmp` on the machine that ran them; the names above are
@@ -116,3 +116,8 @@ carries zero open code-scanning alerts. The `v0.2.0-rc.0` dry run ran at
 No row is a qualifying one yet: each was rejected for the reason in its last
 column. The commit that lands this table is itself unmeasured by construction,
 and has to earn its own row before it can be tagged.
+
+The version fields and the changelog entry read `0.2.0` on every candidate,
+because the artifacts must identify as 0.2.0 for the RC and the release alike.
+That is a statement about the version this tree builds, not a claim that this
+particular commit is the tagged one.
