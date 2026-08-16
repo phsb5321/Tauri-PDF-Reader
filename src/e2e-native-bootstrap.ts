@@ -73,6 +73,8 @@ export interface E2ENativeRead {
   storeHighlights: () => unknown[];
   /** Document-store error (read-only; the failed-open oracle). */
   storeError: () => string | null;
+  /** Document-store load flag (read-only; the open flow's settle oracle). */
+  storeLoading: () => boolean;
   /** Library row page for the seeded document (read-only IPC probe). */
   ipcDocumentPage: () => Promise<number | null>;
   /** Library row page for any library document, by title (read-only IPC probe). */
@@ -214,6 +216,7 @@ export async function installE2ENativeBootstrap(): Promise<void> {
     currentPage: () => useDocumentStore.getState().currentPage,
     storeHighlights: () => useDocumentStore.getState().highlights,
     storeError: () => useDocumentStore.getState().error,
+    storeLoading: () => useDocumentStore.getState().isLoading,
     ipcDocumentPage: async () => {
       if (!seededDocId) return null;
       const res = await commands.libraryGetDocument(seededDocId);

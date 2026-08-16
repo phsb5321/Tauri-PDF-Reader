@@ -371,13 +371,28 @@ if (PHASE === "corrupt-control") {
         document.querySelector("button.open-button")?.click(),
       );
 
-      // ── BOUNDED SETTLE (Fix 2): the open is async — a refusal must be
-      //    observed after the open flow settles, never at t≈0. Wait up to
-      //    8s for one of: reader mounted (FAIL), explicit error surfaced
-      //    (PASS with the message), or settle timeout (FAIL — no verdict).
+      // ── SETTLE ON THE STATE MACHINE, NOT THE CLOCK: the open is async, so
+      //    a refusal must be read after the flow settles, never at t≈0. The
+      //    first version waited a flat 8s, which made the verdict a race
+      //    against machine load — it produced one "no verdict" FAIL on a
+      //    loaded host (15/08/2026) that three immediate reruns passed, i.e.
+      //    a result decided by timing rather than by the product. The wait is
+      //    now bounded by the store's own load flag: keep polling while the
+      //    document store still reports `isLoading`, up to a generous ceiling.
+      //    A refusal that never arrives still FAILS — the diagnostic below
+      //    distinguishes "settled without refusing" from "never settled".
+      const SETTLE_FLOOR_MS = 8000;
+      const SETTLE_CEILING_MS = 45000;
       const settleStart = Date.now();
       let verdict = null;
-      while (Date.now() - settleStart < 8000) {
+      let sawLoading = false;
+      let stillLoading = false;
+      while (Date.now() - settleStart < SETTLE_CEILING_MS) {
+        const elapsed = Date.now() - settleStart;
+        stillLoading = await browser.execute(
+          () => window.__E2E_READ__.storeLoading(),
+        );
+        if (stillLoading) sawLoading = true;
         verdict = await browser.execute(([beforeTitle, logStart]) => {
           const err = document.querySelector(
             ".pdf-viewer-error, [class*='error']:not([class*='error-hidden'])",
@@ -399,6 +414,10 @@ if (PHASE === "corrupt-control") {
           return null;
         }, [initialTitle, initialLogCount]);
         if (verdict) break;
+        // The verdict is read BEFORE this check, so a refusal landing in the
+        // same tick as the settle is still captured. Past the floor, only an
+        // open still in flight earns more time.
+        if (elapsed >= SETTLE_FLOOR_MS && !stillLoading) break;
         await browser.pause(500);
       }
 
@@ -407,15 +426,15 @@ if (PHASE === "corrupt-control") {
       //    surfaced message must indicate the file/format was rejected —
       //    PDF_INVALID or an equivalent unsupported/format text.
       if (!verdict) {
+        const waited = Date.now() - settleStart;
+        const status = stillLoading
+          ? `FAIL — open still loading after ${waited}ms; flow never settled`
+          : `FAIL — open settled after ${waited}ms (sawLoading=${sawLoading}) with neither reader mount nor refusal`;
         console.log(
           "DIAG epub-control:",
-          JSON.stringify({
-            ...BOOK,
-            phase: "epub-control",
-            status: "FAIL — no verdict after 8s settle; open flow neither mounted nor errored",
-          }),
+          JSON.stringify({ ...BOOK, phase: "epub-control", status }),
         );
-        throw new Error("epub open flow did not settle: no refusal surfaced");
+        throw new Error(`epub open flow produced no refusal: ${status}`);
       }
       // Codex gate (epub): the surfaced error must be the app's stable
       // open-failure code — pdf-service throws "PDF_INVALID: The file is not
