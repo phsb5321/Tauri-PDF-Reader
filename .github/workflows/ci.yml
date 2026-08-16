@@ -121,15 +121,11 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Cache cargo registry
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            src-tauri/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
+      # See the note on the same step in contract-tests below: on a persistent
+      # single-slot runner the cargo cache round-trip cost more than the work
+      # it saved, so the artifacts live outside the workspace instead.
+      - name: Persist cargo artifacts outside the workspace
+        run: echo "CARGO_TARGET_DIR=$HOME/ci-cargo/lectrice/target" >> "$GITHUB_ENV"
 
       - name: Stub frontend dist (tauri generate_context! reads frontendDist)
         run: |
@@ -195,15 +191,24 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Cache cargo registry
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            src-tauri/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
+      # The cargo cache is GONE, not moved. `~/.cargo/registry`, `~/.cargo/git`
+      # and this target dir all live in $HOME on a PERSISTENT runner, so they
+      # already survive between jobs; `actions/cache` was uploading and
+      # restoring a multi-gigabyte `src-tauri/target` that never needed to
+      # travel. It was not free: the restore alone took 5m39s of a 10m wall on
+      # run 31928286378, and on run 31934817394 both Rust jobs DIED inside the
+      # cache step (Contract Tests failed mid-restore; Backend Checks burned
+      # its whole 15m wall and was cancelled with no steps recorded).
+      #
+      # `target/` had to be cached only because it sat INSIDE the workspace,
+      # which `actions/checkout` cleans. Moving it out removes the reason.
+      # The path is `.../lectrice/target` on purpose: the host's runner-gc
+      # prunes directories NAMED `target` that have been idle >6h, so a quiet
+      # week reclaims the disk and a busy one keeps the artifacts warm.
+      # This is the fix docs/ci-runner-ops.md asked for after #52 did the same
+      # for the pnpm store.
+      - name: Persist cargo artifacts outside the workspace
+        run: echo "CARGO_TARGET_DIR=$HOME/ci-cargo/lectrice/target" >> "$GITHUB_ENV"
 
       - name: Stub frontend dist (tauri generate_context! reads frontendDist)
         run: |

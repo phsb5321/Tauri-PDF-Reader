@@ -140,14 +140,25 @@ exit 0) and that the rerun's test step passed — which rules out a deterministi
 failure, not a flaky test or a one-off environment fault. If it recurs with
 logs intact, read them; do not assume this section explains it.
 
-**For the `cancelled`-with-everything-green shape, do not read the diff.** The wall is now 20 minutes (`ci.yml`), which is the
-small fix. The real one is to stop round-tripping a multi-gigabyte
-`src-tauri/target` through `actions/cache` on a persistent single-slot runner
-— either by moving `CARGO_TARGET_DIR` outside the workspace so it survives
-`actions/checkout` (note the host `runner-gc` prunes directories *named*
-`target`, so a differently-named path is not reclaimed and needs its own size
-watch), or by dropping the cache for these jobs and measuring the cold cost.
-Measure before choosing; #52 removed the pnpm cache for exactly this reason.
+**For the `cancelled`-with-everything-green shape, do not read the diff.** The
+wall went to 20 minutes first, which bought one green run and no more: on run
+`31934817394` both Rust jobs died *inside* the cache step — Contract Tests
+failed mid-restore at ~6 min, and Backend Checks burned its entire 15-minute
+wall and was cancelled with **no steps recorded at all**.
+
+So the cargo cache is now **gone** from both Rust jobs. `~/.cargo/registry`,
+`~/.cargo/git` and the target dir all live in `$HOME` on a persistent runner
+and already survive between jobs; `src-tauri/target` needed caching only
+because it sat inside the workspace that `actions/checkout` cleans. Both jobs
+now set `CARGO_TARGET_DIR=$HOME/ci-cargo/lectrice/target`, which removes the
+reason to cache it. Same move as #52's pnpm-store deletion.
+
+The directory is named `target` deliberately: `runner-gc.sh` prunes
+directories named `target` idle for >6h, so a quiet week reclaims the disk
+while a busy one keeps the artifacts warm. An in-use directory has a fresh
+mtime and is not a candidate. If Rust CI ever starts rebuilding from scratch
+every run, check whether that GC pass is firing between runs before suspecting
+the workflow.
 
 ## CodeQL "Unable to locate executable file" — root-caused 15/08/2026
 
