@@ -167,7 +167,20 @@ jobs:
   contract-tests:
     name: Contract Tests
     runs-on: [self-hosted, Linux, X64, vm103]
-    timeout-minutes: 10
+    # 20, not 10, because the wall was being spent on the cache and not on the
+    # tests. Measured on run 31928286378 at 3da0320, where every step reported
+    # success and the job still ended `cancelled`:
+    #   Set up runner            2m56s
+    #   Cache cargo registry     5m39s   <- restoring ~/.cargo + src-tauri/target
+    #   Run contract tests         59s   <- the actual subject of this job
+    #   everything else            ~36s
+    #                            ------
+    #                            10m10s  against a 10m wall
+    # Same class as the Frontend Checks cache stall documented above, on the
+    # restore side rather than the save side. Raising the wall is the small
+    # fix; the real one is to stop round-tripping a multi-GB `src-tauri/target`
+    # through the cache on a persistent single-slot runner (docs/ci-runner-ops.md).
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4

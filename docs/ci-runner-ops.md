@@ -117,6 +117,34 @@ vm103 processes them **serially** (1 slot). A merge that triggers 2 CI runs + 1 
 4. **`##[error]The operation was canceled.` in Frontend Checks means the job timed out, not that a human cancelled it.** Read the last timestamp before the error and compare it to when the tests finished; an eight-minute gap of identical `Sent …` lines is the cache upload, not your diff.
 5. **Cancel superseded runs by hand.** `ci.yml` has no `concurrency` group, so pushing to a branch queues a _second_ run rather than replacing the first, and on a one-slot runner the stale one is charged real minutes ahead of the live one. `gh run cancel <id>` on the run whose `headSha` no longer matches the PR head.
 
+## Contract Tests `cancelled` with every step green — 16/08/2026
+
+Same family as the Frontend Checks stall above, on the **restore** side. Run
+`31928286378` at `3da0320` reported `cancelled` while every single step,
+including `Run contract tests` and all post steps, reported success:
+
+```
+Set up runner            2m56s
+Cache cargo registry     5m39s   <- restore of ~/.cargo + src-tauri/target
+Run contract tests         59s
+everything else            ~36s
+                         ------
+                         10m10s  against timeout-minutes: 10
+```
+
+The first attempt on the same SHA reported `failure` with its logs already
+expired (`BlobNotFound`), which reads like a test failure and is not one: the
+suite passes locally at that exact SHA (62 tests, 6 binaries, exit 0).
+
+**Do not read the diff.** The wall is now 20 minutes (`ci.yml`), which is the
+small fix. The real one is to stop round-tripping a multi-gigabyte
+`src-tauri/target` through `actions/cache` on a persistent single-slot runner
+— either by moving `CARGO_TARGET_DIR` outside the workspace so it survives
+`actions/checkout` (note the host `runner-gc` prunes directories *named*
+`target`, so a differently-named path is not reclaimed and needs its own size
+watch), or by dropping the cache for these jobs and measuring the cold cost.
+Measure before choosing; #52 removed the pnpm cache for exactly this reason.
+
 ## CodeQL "Unable to locate executable file" — root-caused 15/08/2026
 
 The symptom is a red `Analyze (javascript-typescript)` whose only error is:
