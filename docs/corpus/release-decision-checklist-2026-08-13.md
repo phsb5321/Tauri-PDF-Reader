@@ -4,11 +4,16 @@ Last reconciled: 16/08/2026, main `01d9952`.
 
 ## Decision rule
 
-This page states the **criteria**, not a verdict about itself. A commit cannot
-carry evidence about its own SHA — the corpus run, CI, Sonar, CodeQL and the
-adversarial audit all run against a merged commit, so the receipt for the
-tagged SHA is necessarily recorded *after* the tag, in the verification log
-below.
+This page states the **criteria**, not a verdict about itself. Separate the two
+things a "receipt" means here:
+
+- **The checks run BEFORE the tag.** Corpus, CI, Sonar, CodeQL and the
+  different-family audit all execute against the merged candidate commit, and
+  every one must be green for that exact commit before it may be tagged. No
+  commit is ever tagged ahead of its evidence.
+- **The written row lands AFTER the tag.** A commit cannot contain a table row
+  citing runs against itself, so the log entry below is committed afterwards.
+  What lags is the bookkeeping, never the verification.
 
 **Cut `v0.2.0` only when every box under "Required at the tagged SHA" is green
 for one clean commit, and tag that exact commit.** Any later merge starts the
@@ -96,8 +101,8 @@ Risk acceptance for a remaining limitation is still Pedro's alone.
 
 Every candidate commit that was measured, passed or not. A row is a record of
 what was run, not a claim that the commit qualified — the `Result` column says
-which. The row for the commit that gets tagged is appended after the tag
-exists, for the reason given under "Decision rule".
+which. The tagged commit's checks all pass before it is tagged; only its row is
+written afterwards, for the reason given under "Decision rule".
 
 | Commit | Corpus | Sonar | CodeQL | CI | Audit | Result |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -114,8 +119,9 @@ carries zero open code-scanning alerts. The `v0.2.0-rc.0` dry run ran at
 `docs/corpus/rc-evidence-2026-08-15.md`.
 
 No row is a qualifying one yet: each was rejected for the reason in its last
-column. The commit that lands this table is itself unmeasured by construction,
-and has to earn its own row before it can be tagged.
+column. The commit that lands this table is unmeasured *at the moment it is
+written*; it must pass the same checks, green, before anyone tags it — its row
+is then added on top.
 
 The version fields and the changelog entry read `0.2.0` on every candidate,
 because the artifacts must identify as 0.2.0 for the RC and the release alike.
