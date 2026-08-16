@@ -174,6 +174,20 @@ describe("ShelfSidebar", () => {
     expect(onDelete).toHaveBeenCalledWith("shelf-reread");
   });
 
+  it("returns focus to the Rename trigger when the dialog closes (unmount-while-active)", () => {
+    const { onRename } = renderSidebar();
+    const renameBtn = screen.getByRole("button", { name: "Rename Philosophy" });
+    fireEvent.click(renameBtn);
+    const input = screen.getByLabelText("Shelf name");
+    fireEvent.change(input, { target: { value: "Ethics" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(onRename).toHaveBeenCalledWith("shelf-philosophy", "Ethics");
+    // Keyboard focus returns to the triggering control (slice 146 — the
+    // trap's own snapshot is the dialog's autoFocused input).
+    expect(document.activeElement).toBe(renameBtn);
+  });
+
   it("auto-dismisses the delete confirmation after the timeout", () => {
     vi.useFakeTimers();
     try {

@@ -11,9 +11,9 @@
 #                  `$XDG_CACHE_HOME/com.lectrice.reader/tts_cache/`).
 #   phase delete — the app RELAUNCHES on the same profile (the seeded row
 #                  and file must survive it); the actor clicks the card's
-#                  public delete button; the build-time seam accepts the
-#                  WebDriver-impossible native confirm; the lane asserts the
-#                  card leaves the surface and the library row is gone.
+#                  public delete button twice (the in-app click-again
+#                  confirm); the lane asserts the card leaves the surface
+#                  and the library row is gone.
 #                  The RUNNER then asserts the file and metadata halves:
 #                  documents row gone, tts_cache_metadata row gone, the
 #                  seeded .mp3 gone from disk.

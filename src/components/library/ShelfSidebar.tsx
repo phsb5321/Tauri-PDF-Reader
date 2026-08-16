@@ -37,6 +37,9 @@ export function ShelfSidebar({
   // it).
   const [renameTarget, setRenameTarget] = useState<Collection | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  // The Rename trigger — keyboard focus must return to it when the dialog
+  // closes (the trap's own snapshot can be the dialog's autoFocused input).
+  const renameTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(
     () => () => {
@@ -55,7 +58,8 @@ export function ShelfSidebar({
     setDraftName("");
   };
 
-  const handleRename = (shelf: Collection) => {
+  const handleRename = (shelf: Collection, event: React.MouseEvent<HTMLButtonElement>) => {
+    renameTriggerRef.current = event.currentTarget;
     setRenameValue(shelf.name);
     setRenameTarget(shelf);
   };
@@ -138,7 +142,7 @@ export function ShelfSidebar({
               <button
                 type="button"
                 className="shelf-action"
-                onClick={() => handleRename(shelf)}
+                onClick={(event) => handleRename(shelf, event)}
                 aria-label={`Rename ${shelf.name}`}
                 title="Rename"
               >
@@ -188,6 +192,7 @@ export function ShelfSidebar({
         <Dialog
           open
           onClose={() => setRenameTarget(null)}
+          returnFocus={renameTriggerRef}
           title="Rename shelf"
           description={`Rename "${renameTarget.name}" — the books keep their shelf.`}
           size="sm"

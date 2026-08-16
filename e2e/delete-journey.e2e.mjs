@@ -20,11 +20,10 @@
  *     observer then pre-seeds ONE real cache entry: a metadata row + .mp3 in
  *     the app cache dir, the exact shape repo.store writes).
  *   DELETE_PHASE=delete — boot on the same profile (row + file must survive
- *     the relaunch), click the card's public delete button
- *     (`.document-card-delete`, aria-label "Remove from library"); the
- *     build-time seam accepts the WebDriver-impossible native confirm; assert
- *     the card disappears from the library surface AND the library row is
- *     gone via the read-only observer probe.
+ *     the relaunch), click the card's public delete button twice (the
+ *     in-app click-again confirm — the native confirm was a Promise shim);
+ *     assert the card disappears from the library surface AND the library
+ *     row is gone via the read-only observer probe.
  *
  * The file/metadata half of the oracle is asserted by the RUNNER (post-phase
  * sqlite3 + fs checks), because the observer cannot touch the filesystem.
@@ -95,9 +94,9 @@ describe("Packaged delete journey (UI delete removes the row and its cached audi
     //    verdict; native-play.e2e.mjs documents the same class), while
     //    `element.click()` fires the SAME React onClick as a real click.
     //    The waitForClickable() above already proved the button is
-    //    genuinely visible/enabled/unobscured. The build-time seam accepts
-    //    the native confirm; the real removeDocument chain (cache clear
-    //    FIRST, then row delete) runs below it. ─────────────────────────────
+    //    genuinely visible/enabled/unobscured. The in-app click-again
+    //    confirm fires the real removeDocument chain (cache clear FIRST,
+    //    then row delete). ─────────────────────────────────────────────────
     const card = await $(".document-card");
     await card.waitForExist({ timeout: 15000 });
     await card.moveTo();
