@@ -116,18 +116,21 @@ describe("Packaged delete journey (UI delete removes the row and its cached audi
     );
     await deleteBtn.waitForClickable({ timeout: 15000 });
 
-    // ── Observer pre-flight, ASSERTED: the confirm seam must be active, or
-    //    the native GTK dialog blocks the chain below it and the lane must
-    //    fail HERE (named), never click into a modal it cannot dismiss. ────
-    const seamDiag = await browser.execute(() => ({
-      confirmSeamed: window.__E2E_READ__.confirmSeamed(),
-      confirmKind: typeof window.confirm,
-      confirmSrc: String(window.confirm).slice(0, 48),
-    }));
-    console.log("DIAG delete-seam:", JSON.stringify(seamDiag));
-    expect(seamDiag.confirmSeamed).toBe(true);
+    // ── Slice 146: the delete is click-again-to-confirm INSIDE the app (the
+    //    native confirm is a Promise shim in packaged WebKitGTK — always
+    //    truthy — so the real confirmation must be a visible in-app control
+    //    the driver can operate). First click arms the confirmation; the
+    //    second fires the real removeDocument chain. ────────────────────────
     await browser.execute(() =>
       document.querySelector(".document-card-delete")?.click(),
+    );
+    const confirmBtn = await $('[aria-label="Click again to confirm remove"]');
+    await confirmBtn.waitForExist({ timeout: 5000 });
+    await confirmBtn.waitForClickable({ timeout: 5000 });
+    await browser.execute(() =>
+      document
+        .querySelector('[aria-label="Click again to confirm remove"]')
+        ?.click(),
     );
 
     // ── THE CLAIM (UI half): the card leaves the library surface. ──────────
@@ -152,7 +155,6 @@ describe("Packaged delete journey (UI delete removes the row and its cached audi
               document.querySelectorAll(".library-view, .library-body"),
             ).some((el) => (el.textContent || "").includes(t)),
             title: t,
-            confirmSeamed: window.__E2E_READ__.confirmSeamed(),
             logs: window.__E2E_READ__.logs().slice(-20),
           }), TITLE),
         ),

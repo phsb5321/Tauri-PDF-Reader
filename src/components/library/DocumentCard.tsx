@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import type { Document } from "../../lib/schemas";
 import type { ViewMode } from "../../stores/library-store";
 import { DocumentCover } from "./DocumentCover";
@@ -31,6 +31,13 @@ export function DocumentCard({
 }: DocumentCardProps) {
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [fileExists] = useState<boolean | null>(null);
+  // Click-again-to-confirm (the SessionMenu precedent, slice 146): the
+  // packaged WebKitGTK app shims the NATIVE confirm into a PROMISE, so it is
+  // always truthy — a book would be deleted without the user ever answering.
+  // The destructive action fires only on the SECOND click, inside the
+  // window; the first click arms a 3s auto-dismiss.
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const confirmDeleteTimer = useRef<number | null>(null);
 
   // Calculate progress percentage
   const progress = useMemo(() => {
@@ -78,10 +85,34 @@ export function DocumentCard({
   const handleDelete = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
-      handleCloseContextMenu();
-      onDelete();
+      if (confirmingDelete) {
+        if (confirmDeleteTimer.current !== null) {
+          window.clearTimeout(confirmDeleteTimer.current);
+          confirmDeleteTimer.current = null;
+        }
+        setConfirmingDelete(false);
+        handleCloseContextMenu();
+        onDelete();
+      } else {
+        setConfirmingDelete(true);
+        confirmDeleteTimer.current = window.setTimeout(
+          () => setConfirmingDelete(false),
+          3000,
+        );
+      }
     },
-    [onDelete, handleCloseContextMenu],
+    [confirmingDelete, onDelete, handleCloseContextMenu],
+  );
+
+  // Clear the pending-confirm timer on unmount (a dismissed card must not
+  // mutate state on a timer after it is gone).
+  useEffect(
+    () => () => {
+      if (confirmDeleteTimer.current !== null) {
+        window.clearTimeout(confirmDeleteTimer.current);
+      }
+    },
+    [],
   );
 
   // Get file name from path
@@ -122,7 +153,7 @@ export function DocumentCard({
         </fieldset>
       )}
       <button type="button" onClick={handleDelete}>
-        Remove from Library
+        {confirmingDelete ? "Click again to confirm remove" : "Remove from Library"}
       </button>
       <button type="button" onClick={handleCloseContextMenu}>
         Cancel
@@ -185,10 +216,10 @@ export function DocumentCard({
         </button>
         <button
           type="button"
-          className="document-card-delete"
+          className={`document-card-delete ${confirmingDelete ? "document-card-delete--confirming" : ""}`}
           onClick={handleDelete}
-          title="Remove from library"
-          aria-label="Remove from library"
+          title={confirmingDelete ? "Click again to confirm remove" : "Remove from library"}
+          aria-label={confirmingDelete ? "Click again to confirm remove" : "Remove from library"}
         >
           <DeleteIcon />
         </button>
@@ -255,10 +286,10 @@ export function DocumentCard({
       </button>
       <button
         type="button"
-        className="document-card-delete"
+        className={`document-card-delete ${confirmingDelete ? "document-card-delete--confirming" : ""}`}
         onClick={handleDelete}
-        title="Remove from library"
-        aria-label="Remove from library"
+        title={confirmingDelete ? "Click again to confirm remove" : "Remove from library"}
+        aria-label={confirmingDelete ? "Click again to confirm remove" : "Remove from library"}
       >
         <DeleteIcon />
       </button>

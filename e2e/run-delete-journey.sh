@@ -42,7 +42,7 @@ node scripts/gen-e2e-fixtures.mjs "$APP_DIR" >/dev/null
 echo "==> Building frontend (VITE_E2E_NATIVE=true, seed=single, confirm=accept) once — the flags are identical for both phases"
 export CI=true
 CI=true VITE_E2E_NATIVE=true VITE_E2E_NATIVE_TTS=none VITE_E2E_NATIVE_SEED=single \
-  VITE_E2E_CONFIRM=accept VITE_E2E_PROFILE_DIR="$APP_DIR" pnpm build >/dev/null
+  VITE_E2E_PROFILE_DIR="$APP_DIR" pnpm build >/dev/null
 touch src-tauri/src/lib.rs
 
 toolchain_exec '
