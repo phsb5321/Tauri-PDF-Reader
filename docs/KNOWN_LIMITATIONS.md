@@ -4,8 +4,8 @@ Truthful inventory of what the current tree does **not** do, and what is not
 yet proven. Every item names its evidence. If a release note claims a
 platform or a feature, it must not contradict this page.
 
-Last reviewed: 15/08/2026, after the stabilization and corpus train,
-against `main` at commit `4f74f4b`.
+Last reviewed: 15/08/2026, after the release-preparation train, against `main`
+at commit `8c31cfc`.
 
 ## Fast-close verification position
 
@@ -20,8 +20,9 @@ Exact packaged evidence from #125 proves both data-loss paths together:
 - **DL-2 (reading position):** actual window disappearance 401 ms (<500 ms),
   persisted row and restarted reader both at page 3.
 
-This closes the stale #115 defect. The evidence is Linux/X11/WebKitGTK scoped;
-final exact-SHA macOS install/open/render/restart proof is still pending.
+This closes the stale #115 defect. The evidence is Linux/X11/WebKitGTK scoped —
+see "macOS is buildable but not drivable" below for why the same journey has no
+macOS receipt.
 
 ## Fixture-vs-live TTS
 
@@ -42,6 +43,42 @@ final exact-SHA macOS install/open/render/restart proof is still pending.
   repository.** The app is Tauri 2.x and the upstream prerequisites are
   documented in the README, but "works on macOS/Windows" is **not a claim this
   repo can back** today. Cutting a tag produces Linux artifacts only.
+
+The published Linux artifacts are verified on the platform they target rather
+than on the NixOS build host: for `v0.2.0-rc.0`, the `.deb` installed into a
+clean Ubuntu 24.04 container (`Version: 0.2.0`), and both the `.deb` binary and
+the AppImage launched there and mapped a window owned by the app process
+(`WM_CLASS "tauri-pdf-reader"`, 1200x800). On a NixOS host under Xvfb the
+AppImage instead aborts with `EGL_BAD_PARAMETER`, because the app enables GPU
+compositing on Linux and Xvfb offers no EGL display — an environment mismatch,
+not an artifact defect.
+
+## macOS is buildable but not drivable
+
+macOS is **not a shipped artifact** and no release note claims it. What has
+been measured, on macOS 26.6.1 / arm64 at commit `3d68d0e`:
+
+- The app **builds** (`pnpm tauri build --bundles app`) once `SDKROOT` and
+  `LIBRARY_PATH` point at the Command Line Tools SDK; without them the link
+  fails on `-liconv`.
+- The bundle **launches**: `Lectrice.app` version `0.2.0`, bundle id
+  `com.lectrice.reader`, exactly one process, and a real 1176x784 window in
+  the Quartz window list.
+
+What is **not** proven on macOS, and why it is not merely "pending":
+
+- The wry/WKWebView window exposes **no AX windows** (`count of windows` is 0;
+  only the menu bar is exposed), so an accessibility actor cannot reach the
+  reader's controls.
+- The app registers **no file association and no CLI open path**, so there is
+  no non-GUI way to hand it a document.
+- `tauri-driver` has **no macOS support**, so the packaged lanes cannot run
+  there at all.
+
+That leaves only synthetic keystrokes aimed at whatever is frontmost on a live
+desktop, which is neither a controlled oracle nor a safe action. So the macOS
+open/render/restart journey is **BLOCKED**, not skipped-green, and the three
+reasons above are what would have to change to unblock it.
 
 ## Egress
 

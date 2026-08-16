@@ -41,8 +41,14 @@ What is in the tree today, with the receipt that proved it:
 | Platform               | Packaged build         | Packaged E2E                               | Status                    |
 | ---------------------- | ---------------------- | ------------------------------------------ | ------------------------- |
 | Linux (AppImage + deb) | ✓ ([release workflow]) | ✓ (8 packaged E2E specs, WebKitGTK + Xvfb) | **only supported target** |
-| macOS                  | ✗ not produced         | ✗ not run                                  | not yet covered           |
+| macOS                  | ✗ not published        | ✗ not runnable (see below)                 | builds + launches only    |
 | Windows                | ✗ not produced         | ✗ not run                                  | not yet covered           |
+
+A macOS build has been made and launched by hand (macOS 26.6.1/arm64, bundle
+`0.2.0`), but no macOS journey can be driven: the window exposes no
+accessibility children, the app registers no file association, and
+`tauri-driver` has no macOS support. Details in
+[docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
 
 There is **no packaged evidence for macOS or Windows** in this repository —
 do not assume the app builds or runs there until a packaged artifact and a
