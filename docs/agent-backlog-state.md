@@ -2,6 +2,13 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #68 — 16/08/2026 (CI cache root cause, release consistency)
+
+- **Two CI failures stood between the evidence and the tag, both in the cargo cache, neither in the code.** `3da0320`: Contract Tests reported `cancelled` with every step green — 5m39s cache restore + 59s tests against a 10m wall (#138 raised it to 20). `8d951e5`: both Rust jobs died *inside* the cache step. #139 deleted the cache from both jobs and set `CARGO_TARGET_DIR=$HOME/ci-cargo/lectrice/target`, which is outside the workspace `actions/checkout` cleans and inside `runner-gc`'s idle-`target` prune. Contract Tests went from cancelled-at-10m to **1 minute**.
+- **Runner instability is separate and recurring:** the listener wedges (jobs queued, runner `online`+idle, no journal lines) and needed restarts; one job failed with zero steps recorded. Documented in `docs/ci-runner-ops.md`.
+- **Release docs made self-consistent** so the tagged tree states no falsehood: README drops "prepared", the changelog is a dated release entry, and the checklist states a decision *rule* plus a verification log rather than a verdict about its own commit — a commit cannot carry evidence about its own SHA.
+- **Candidate `01d9952`:** corpus, CI, Sonar and CodeQL all green (log rows in the checklist), zero open alerts, zero open PRs.
+
 ## Iteration #67 — 15/08/2026 (v0.2.0 preparation, RC dry run, platform truth)
 
 - **Version cut:** #134 → `233e8c6` moved `package.json`, `Cargo.toml`, `Cargo.lock` and `tauri.conf.json` to `0.2.0` and turned the stale "Unreleased" changelog into a prepared v0.2.0 entry. #135 → `3d68d0e`, #136 → `8c31cfc`.
@@ -9,7 +16,7 @@
 - **macOS reframed from "pending gate" to measured truth:** builds and launches at `3d68d0e` (bundle `0.2.0`, one instance, 1176x784 Quartz window; the link needs `SDKROOT`/`LIBRARY_PATH`). The open/render/restart journey is **BLOCKED** — no AX windows, no file-association or open-event path, no macOS WebDriver for `tauri-driver` to proxy. macOS is not shipped and no release note claims it, so it gates the macOS claim, not the Linux release.
 - **CodeQL toolcache eviction root-caused** (#135): the host `_tool` prune aged extracted files whose mtimes are upstream, deleting fresh installs and leaving the `.complete` marker. Host fix ages the marker instead; falsifier 4/4.
 - **EPUB negative control de-flaked** (#136): the control now settles on the document store's load flag instead of a flat 8 s clock, after one clock-decided FAIL at `3d68d0e`.
-- **Remaining before the tag:** re-run corpus + Sonar + CodeQL at `FINAL_SHA`, then a different-family audit on that same SHA.
+- **Remaining before the tag:** re-run corpus + Sonar + CodeQL at the candidate commit, then a different-family audit on that same commit. Verified rows live in the checklist's verification log.
 
 ## Iteration #66 — 15/08/2026 (CodeQL alert closure + vm103 cleanup rotation)
 
@@ -20,7 +27,7 @@
 ## Iteration #65 — 15/08/2026 (release truth, reproducible corpus evidence)
 
 - **Merged baseline:** `4f74f4b` (#130). Open PRs were zero; authenticated post-merge Sonar was `OK`. The five-PDF private corpus run passed all open/card-open/verify phases, five displayed-to-cache RGBA ties, cleanup, and corrupt/EPUB controls, but the run preceded the final commits and therefore was not exact-SHA release evidence.
-- **Release verdict:** different-family exact-main audit returned **NOT CUTTABLE**. Remaining hard gates are a clean SHA-recording corpus rerun, current CodeQL/Sonar, Pedro-gated RC tag/dry run, and Pedro-gated exact-SHA macOS install/open/render/restart proof.
+- **Release verdict (superseded):** the audit at that head returned NOT CUTTABLE, with a clean corpus rerun, current CodeQL/Sonar, the RC dry run, and macOS proof outstanding. The RC has since run and macOS is recorded as BLOCKED with reasons — see iteration #67.
 - **This slice (`131-release-truth`):** repair the pinned `tauri-driver` Nix closure (`cargoHash` verified by a real `nix develop` build); make the corpus runner refuse dirty source and write `source.json`; move concrete corpus identity metadata out of git to the private external `.lectrice-manifest.json`; remove generated `dist/` and temp private copies on every exit; remove the synthetic `/home/notroot/...` fixture path; delete obsolete pre-merge watcher scripts; reconcile run order, checklist, known limitations, and this handoff.
 - **No release action:** no RC/tag/release or Mac hardware action is authorized by this slice.
 

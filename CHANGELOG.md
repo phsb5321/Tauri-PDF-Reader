@@ -4,16 +4,14 @@ All dates are the merge date of the PR that landed the change. "Receipt" links
 to the PR body or the test that proved the change — this project's rule is
 that a claim about behavior is backed by a runnable assertion, not a glance.
 
-## v0.2.0 — prepared 15/08/2026
+## v0.2.0 — 16/08/2026
 
 Everything between `v0.1.0` (21/06/2026) and this entry, each change landed by
 a squash-merged PR. The three version fields (`package.json`,
-`src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`) move to `0.2.0` in the
-same slice as this entry, so artifacts built from it identify as 0.2.0.
-
-The `v0.2.0` tag is cut from the commit that lands this entry, after the
-`v0.2.0-rc.0` dry run; until that tag exists this section describes a prepared,
-not a published, release.
+`src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`) read `0.2.0`, so artifacts
+built from this tree identify as 0.2.0, and the `v0.2.0-rc.0` dry run built and
+verified exactly those artifacts first
+(`docs/corpus/rc-evidence-2026-08-15.md`).
 
 > Platform note for the release: packaged builds and packaged E2E exist for
 > **Linux only** (AppImage + deb). Nothing in this changelog claims macOS or
