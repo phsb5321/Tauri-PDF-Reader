@@ -48,16 +48,25 @@ Window 2097155
 DEB_STRICT_PASS
 ```
 
-AppImage — same container, `APPIMAGE_EXTRACT_AND_RUN=1` (no FUSE):
+AppImage — same container, `APPIMAGE_EXTRACT_AND_RUN=1` (no FUSE). Here the
+window's PID cannot equal the launcher's, because extract-and-run execs the
+real binary as a child, so ownership is asserted by walking the window PID's
+parent chain back to the launcher this check started:
 
 ```
 windows_before=1
-OWNED_WINDOW=2097155 window_pid=5869
+LAUNCHER_PID=5855
+OWNED_WINDOW=2097155 window_pid=5869 launcher_pid=5855
+--- ancestry
+    PID    PPID COMMAND
+   5869    5855 tauri-pdf-reade
+    PID    PPID COMMAND
+   5855    5847 lectrice.AppIma
 WM_CLASS(STRING) = "tauri-pdf-reader", "Tauri-pdf-reader"
 Window 2097155
   Position: 0,0 (screen: 0)
   Geometry: 1200x800
-APPIMAGE_UBUNTU_PASS
+APPIMAGE_OWNERSHIP_PASS
 ```
 
 1200x800 is the window size `src-tauri/tauri.conf.json` asks for, so the

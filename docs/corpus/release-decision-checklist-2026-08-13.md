@@ -52,13 +52,10 @@ rather than a passing one.
 - [ ] A different-family adversarial audit reviews all evidence above and
       returns `CUTTABLE` for that same SHA.
 
-The three unchecked boxes above have been satisfied on earlier heads — at `3747f5d`
-(corpus `/tmp/lectrice-corpus-final-main-3747f5d.log`, Sonar `31876592457`,
-CodeQL `31876592453`) and at `9b13a1f` (corpus
-`/tmp/lectrice-corpus-final-main-9b13a1f.log`, Sonar `31880371934`, CodeQL
-`31880371936`), with CodeQL alert #4 fixed. That history is why the release is
-expected to pass; it is **not** evidence for the tag, because this slice moves
-the head. The boxes stay unchecked until they are re-run at `FINAL_SHA`.
+The three unchecked boxes above were satisfied together at two earlier heads,
+`3747f5d` and `9b13a1f` (run ids under "Current exact-SHA history" below). That
+history is why the release is expected to pass; it is **not** evidence for the
+tag. The boxes stay unchecked until they are re-run at `FINAL_SHA`.
 
 ## Remaining infrastructure/documentation evidence
 
@@ -90,10 +87,14 @@ Risk acceptance for a remaining limitation is still Pedro's alone.
 
 ## Current exact-SHA history
 
-Clean exact-SHA corpus, Sonar, and CodeQL evidence has been green on every head
-since `3747f5d`, and CodeQL alert #4 is fixed. The `v0.2.0-rc.0` dry run ran at
-`3d68d0e` and its receipts, together with the macOS measurement, are in
-`docs/corpus/rc-evidence-2026-08-15.md`.
+Clean exact-SHA corpus, Sonar, and CodeQL evidence was green at `3747f5d`
+(corpus `/tmp/lectrice-corpus-final-main-3747f5d.log`, Sonar `31876592457`,
+CodeQL `31876592453`) and at `9b13a1f` (corpus
+`/tmp/lectrice-corpus-final-main-9b13a1f.log`, Sonar `31880371934`, CodeQL
+`31880371936`); CodeQL alert #4 is fixed. Those are the only two heads with a
+full receipt set — later heads carry the corpus run only. The `v0.2.0-rc.0` dry
+run ran at `3d68d0e` and its receipts, together with the macOS measurement, are
+in `docs/corpus/rc-evidence-2026-08-15.md`.
 
 What remains before the tag: re-run the three exact-SHA boxes at `FINAL_SHA`,
 then a different-family adversarial audit on that same SHA. Until both land the
