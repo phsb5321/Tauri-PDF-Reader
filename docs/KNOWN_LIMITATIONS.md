@@ -70,10 +70,13 @@ What is **not** proven on macOS, and why it is not merely "pending":
 - The wry/WKWebView window exposes **no AX windows** (`count of windows` is 0;
   only the menu bar is exposed), so an accessibility actor cannot reach the
   reader's controls.
-- The app registers **no file association and no CLI open path**, so there is
-  no non-GUI way to hand it a document.
-- `tauri-driver` has **no macOS support**, so the packaged lanes cannot run
-  there at all.
+- The app registers **no file association and handles no open event** —
+  `fileAssociations` appears nowhere in `src-tauri/`, and nothing in
+  `src-tauri/src/` matches `RunEvent` — so there is no non-GUI way to hand it
+  a document.
+- The pinned `tauri-driver` proxies to a **platform WebDriver that macOS does
+  not have** (its own `--help` marks the native-host option Linux-only), so
+  the packaged lanes cannot run there at all.
 
 That leaves only synthetic keystrokes aimed at whatever is frontmost on a live
 desktop, which is neither a controlled oracle nor a safe action. So the macOS

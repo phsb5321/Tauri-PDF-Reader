@@ -34,6 +34,6 @@ adversarial-audit evidence together; the `v0.2.0-rc.0` dry run and the macOS
 measurement are stamped at `3d68d0e`.
 
 Every row above is **Linux/X11/WebKitGTK** scoped. On macOS the app builds and
-launches but no journey is drivable — no AX windows, no file-association or CLI
-open path, no macOS `tauri-driver` — so none of these rows may be read as a
+launches but no journey is drivable — no AX windows, no file-association or
+open-event path, no macOS WebDriver for `tauri-driver` to proxy — so none of these rows may be read as a
 macOS claim (`docs/KNOWN_LIMITATIONS.md`).

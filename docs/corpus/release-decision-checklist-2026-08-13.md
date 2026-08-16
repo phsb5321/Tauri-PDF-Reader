@@ -21,7 +21,7 @@ rather than a passing one.
 | Fast-close DL-1/DL-2 | #125 → `03aca59`; 387/401 ms closes, highlight and page 3 survive restart | PASS |
 | Session oracle | #121 → `8848fc3`; create/restart/delete row-wins proof | PASS |
 | Packaged-gate trust anchor | #119 → `e46c4ca`; parsed contract and machine-readable prerequisite receipt | PASS for bootstrap contract |
-| Real-book runner | #130 → `4f74f4b`; five-book run green on every head since | Merged; re-run at `FINAL_SHA` |
+| Real-book runner | #130 → `4f74f4b`; five-book run green at `3747f5d`, `9b13a1f`, `14b43da` | Merged; re-run at `FINAL_SHA` |
 
 ## Required at `FINAL_SHA`
 
@@ -44,8 +44,8 @@ rather than a passing one.
 - [x] macOS scoped truthfully rather than left pending: the app **builds and
       launches** on macOS 26.6.1/arm64 at `3d68d0e` (one instance, bundle
       `0.2.0`, 1176x784 Quartz window), and the interactive open/render/restart
-      journey is **BLOCKED** — no AX windows, no file association or CLI open
-      path, no macOS `tauri-driver`. macOS is not a shipped artifact and no
+      journey is **BLOCKED** — no AX windows, no file-association or open-event
+      path, no macOS WebDriver for `tauri-driver` to proxy. macOS is not a shipped artifact and no
       release note claims it, so this blocks the macOS *claim*, not the Linux
       release. Reasons and reversal conditions: `docs/KNOWN_LIMITATIONS.md`;
       verbatim measurements: `docs/corpus/rc-evidence-2026-08-15.md`.

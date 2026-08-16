@@ -130,12 +130,25 @@ $ osascript -e 'tell application "System Events" to tell process "tauri-pdf-read
 $ … get name of every menu bar item of menu bar 1
 Apple, Lectrice, View, Playback, Help          # only the menu bar is exposed
 
-# 2. no file association and no CLI open path
+# 2. no file association and no open-event handler
 $ jq '.bundle | keys' src-tauri/tauri.conf.json
-["active","icon","targets"]                     # no fileAssociations; no RunEvent::Opened handler
+["active","icon","targets"]                     # no fileAssociations key
+$ grep -rn 'fileAssociations' src-tauri/ ; echo exit=$?
+exit=1                                          # no match anywhere in the crate
+$ grep -rn 'RunEvent' src-tauri/src/ ; echo exit=$?
+exit=1                                          # nothing handles Opened/file events
 
-# 3. tauri-driver has no macOS support
+# 3. the pinned tauri-driver drives Linux/Windows only
+$ nix develop -c tauri-driver --help
+OPTIONS:
+  --native-host HOST    Sets the host of the underlying WebDriver (Linux only)
 ```
+
+On (3): `tauri-driver` proxies to a platform WebDriver — `WebKitWebDriver` on
+Linux, Edge WebDriver on Windows — and macOS has no equivalent, which is why
+upstream documents WebDriver testing as Linux/Windows only. The pinned binary's
+own help text carries the Linux-only qualifier above; there is no macOS driver
+to point `--native-driver` at.
 
 The menu bar alone cannot open a document: `Open PDF…` raises the system open
 panel, and filling that panel needs synthetic keystrokes aimed at whatever is

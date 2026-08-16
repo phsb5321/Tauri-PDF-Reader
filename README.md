@@ -51,7 +51,8 @@ accessibility children, the app registers no file association, and
 [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
 
 There is **no packaged evidence for macOS or Windows** in this repository —
-do not assume the app builds or runs there until a packaged artifact and a
+treat the hand-run macOS build above as exactly that, one manual observation,
+and do not assume a working install there until a published artifact and a
 packaged E2E pass exist for it. The self-hosted release runner is Linux-only.
 The macOS and Windows prerequisites below are the upstream Tauri prerequisites,
 documented for future work, not claims about this app.
