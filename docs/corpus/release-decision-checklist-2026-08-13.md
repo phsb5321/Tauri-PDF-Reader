@@ -39,14 +39,16 @@ rather than a passing one.
       installs (`Version: 0.2.0`) and its binary maps a window owned by the app
       process (`WM_CLASS "tauri-pdf-reader"`, 1200x800), and the AppImage does
       the same under `APPIMAGE_EXTRACT_AND_RUN`. The RC prerelease is retained
-      as the dry-run receipt.
+      as the dry-run receipt. Verbatim receipts:
+      `docs/corpus/rc-evidence-2026-08-15.md`.
 - [x] macOS scoped truthfully rather than left pending: the app **builds and
       launches** on macOS 26.6.1/arm64 at `3d68d0e` (one instance, bundle
       `0.2.0`, 1176x784 Quartz window), and the interactive open/render/restart
       journey is **BLOCKED** — no AX windows, no file association or CLI open
       path, no macOS `tauri-driver`. macOS is not a shipped artifact and no
       release note claims it, so this blocks the macOS *claim*, not the Linux
-      release. Reasons and reversal conditions: `docs/KNOWN_LIMITATIONS.md`.
+      release. Reasons and reversal conditions: `docs/KNOWN_LIMITATIONS.md`;
+      verbatim measurements: `docs/corpus/rc-evidence-2026-08-15.md`.
 - [ ] A different-family adversarial audit reviews all evidence above and
       returns `CUTTABLE` for that same SHA.
 
@@ -88,9 +90,11 @@ Risk acceptance for a remaining limitation is still Pedro's alone.
 
 ## Current exact-SHA history
 
-At `3747f5d` and again at `9b13a1f`, clean exact-SHA corpus, Sonar, and CodeQL
-evidence are green and CodeQL alert #4 is fixed. This slice bumps the version
-fields and release notes, so the remaining sequence runs against the SHA it
-merges to: `v0.2.0-rc.0` dry run, macOS proof, re-run of the three exact-SHA
-boxes, then a different-family audit. Until those land the verdict remains
-`NOT CUTTABLE`.
+Clean exact-SHA corpus, Sonar, and CodeQL evidence has been green on every head
+since `3747f5d`, and CodeQL alert #4 is fixed. The `v0.2.0-rc.0` dry run ran at
+`3d68d0e` and its receipts, together with the macOS measurement, are in
+`docs/corpus/rc-evidence-2026-08-15.md`.
+
+What remains before the tag: re-run the three exact-SHA boxes at `FINAL_SHA`,
+then a different-family adversarial audit on that same SHA. Until both land the
+verdict remains `NOT CUTTABLE`.
