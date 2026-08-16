@@ -2,6 +2,14 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #69 — 16/08/2026 (v0.2.0 published)
+
+- **`v0.2.0` is tagged and published** from `545c377`, run `31946408443`, AppImage + deb, not a prerelease. Full record: `docs/corpus/release-record-v0.2.0.md`.
+- **Green at that exact commit before the tag:** corpus `/tmp/lectrice-corpus-FINAL-545c377.log`, CI `31944798514`, Sonar `31944798503` (gate `OK`), CodeQL `31944798507` (0 open alerts), different-family audit `CUTTABLE`, 0 open PRs.
+- **Published bytes re-verified after the fact** in a clean Ubuntu 24.04 container: both artifacts launch and own a 1200x800 `tauri-pdf-reader` window (deb by PID equality, AppImage by process ancestry).
+- **Five candidates were rejected before this one** — two for red CI caused by the cargo cache (#138, #139), one because the tree made claims about its own tag (#140). The verification log in the checklist keeps every attempt with its verdict.
+- **Next:** nothing is gating a release. The open threads are the macOS journey (BLOCKED with three named reasons) and the recurring vm103 runner-listener wedge, both documented.
+
 ## Iteration #68 — 16/08/2026 (CI cache root cause, release consistency)
 
 - **Two CI failures stood between the evidence and the tag, both in the cargo cache, neither in the code.** `3da0320`: Contract Tests reported `cancelled` with every step green — 5m39s cache restore + 59s tests against a 10m wall (#138 raised it to 20). `8d951e5`: both Rust jobs died *inside* the cache step. #139 deleted the cache from both jobs and set `CARGO_TARGET_DIR=$HOME/ci-cargo/lectrice/target`, which is outside the workspace `actions/checkout` cleans and inside `runner-gc`'s idle-`target` prune. Contract Tests went from cancelled-at-10m to **1 minute**.
