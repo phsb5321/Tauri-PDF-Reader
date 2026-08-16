@@ -40,20 +40,44 @@ tree moved on between `3d68d0e` and `545c377`; the deb also differs in size by
 ## Checked after publication, on the published bytes
 
 Both assets were downloaded from the release and run in a clean
-`ubuntu:24.04` container under Xvfb, with the window attributed by ownership
-rather than by name (the container already has one unrelated window):
+`ubuntu:24.04` container under Xvfb. Two things make the transcript checkable:
+the artifact is hashed **inside the container it is tested in**, so the run is
+bound to the published bytes rather than to a filename, and the window is
+attributed by ownership rather than by name, because the container already has
+one unrelated window (`windows_before=1`).
+
+deb — full log `/tmp/lectrice-v0.2.0-deb-verify.log`:
 
 ```
-deb       Version: 0.2.0
-          OWNED_WINDOW=2097155 pid=5867 app_pid=5867
-          WM_CLASS(STRING) = "tauri-pdf-reader", "Tauri-pdf-reader"
-          Geometry: 1200x800                       DEB_STRICT_PASS
-
-AppImage  LAUNCHER_PID=5855  window_pid=5869
-          5869 -> 5855 -> 5847   (ps ancestry back to the launcher)
-          WM_CLASS(STRING) = "tauri-pdf-reader", "Tauri-pdf-reader"
-          Geometry: 1200x800                       APPIMAGE_OWNERSHIP_PASS
+73ef9f620419428aef98a838f5c85b4595ea5ff839084c1f0915505213cc76f4  /tmp/lectrice.deb
+Version: 0.2.0
+windows_before=1
+OWNED_WINDOW=2097155 pid=5868 app_pid=5868
+WM_CLASS(STRING) = "tauri-pdf-reader", "Tauri-pdf-reader"
+  Geometry: 1200x800
+DEB_STRICT_PASS
 ```
+
+AppImage — full log `/tmp/lectrice-v0.2.0-appimage-verify.log`. Extract-and-run
+execs the real binary as a child, so ownership is the window PID's parent chain
+back to the launcher, not PID equality:
+
+```
+8cc2f7cbabe5cb48685c1ead830f5d7e36547fed784616a7a572bf23f6e03e29  /tmp/lectrice.AppImage
+LAUNCHER_PID=5856
+OWNED_WINDOW=2097155 window_pid=5870 launcher_pid=5856
+    PID    PPID COMMAND
+   5870    5856 tauri-pdf-reade
+    PID    PPID COMMAND
+   5856    5848 lectrice.AppIma
+WM_CLASS(STRING) = "tauri-pdf-reader", "Tauri-pdf-reader"
+  Geometry: 1200x800
+APPIMAGE_OWNERSHIP_PASS
+```
+
+Both in-container digests match the published assets listed above. PIDs repeat
+across runs of these containers because the startup sequence is deterministic;
+that is why the digest, not the PID, is what binds a transcript to an artifact.
 
 ## What this release does not claim
 
@@ -68,4 +92,6 @@ AppImage  LAUNCHER_PID=5855  window_pid=5869
 ## Reversal
 
 `gh release delete v0.2.0` and `git push --delete origin v0.2.0` remove the
-published release and tag; the commit stays on `main` and nothing else changes.
+published release and the remote tag. The commit stays on `main`, and so do
+the local tag (`git tag -d v0.2.0`) and the Actions run history, which cannot
+be unpublished. Anyone who already downloaded an asset keeps it.
