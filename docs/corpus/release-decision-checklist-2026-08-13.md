@@ -111,6 +111,7 @@ written afterwards, for the reason given under "Decision rule".
 | `3da0320` | `…-FINAL-3da0320.log` ✓ | `31928286389` ✓ | `31928286434` ✓ | `31928286378` **cancelled** | NOT CUTTABLE (red CI) | rejected — cache ate the 10m wall (#138) |
 | `8d951e5` | `…-FINAL-8d951e5.log` ✓ | `31934817422` ✓ | `31934817376` ✓ | `31934817394` **failure** | not audited | rejected — Contract Tests failed inside the cache step; Backend Checks cancelled with no steps recorded (#139) |
 | `01d9952` | `…-FINAL-01d9952.log` ✓ | `31941343176` ✓ | `31941343177` ✓ | `31941343164` ✓ | NOT CUTTABLE (docs) | rejected — tree claimed its own tag/verdict, fixed by #140 |
+| `545c377` | `…-FINAL-545c377.log` ✓ | `31944798503` ✓ | `31944798507` ✓ | `31944798514` ✓ | **CUTTABLE** | **tagged `v0.2.0`** 16/08/2026 09:11 BRT |
 
 Corpus logs live under `/tmp` on the machine that ran them; the names above are
 abbreviated `lectrice-corpus-*`. CodeQL alert #4 is fixed and the repository
@@ -118,10 +119,11 @@ carries zero open code-scanning alerts. The `v0.2.0-rc.0` dry run ran at
 `3d68d0e`; its receipts and the macOS measurement are in
 `docs/corpus/rc-evidence-2026-08-15.md`.
 
-No row is a qualifying one yet: each was rejected for the reason in its last
-column. The commit that lands this table is unmeasured *at the moment it is
-written*; it must pass the same checks, green, before anyone tags it — its row
-is then added on top.
+`545c377` is the qualifying row: every check green at that exact commit, a
+different-family audit returning `CUTTABLE` for it, and the tag cut from it.
+The rows above it were each rejected for the reason in their last column. Any
+future release repeats the sequence from scratch — a row never transfers to a
+later commit.
 
 The version fields and the changelog entry read `0.2.0` on every candidate,
 because the artifacts must identify as 0.2.0 for the RC and the release alike.
