@@ -96,6 +96,29 @@ async function coverState(title) {
   }, title);
 }
 
+/** Observer-side: the cover's DISPLAY fit. `objectFit` must be `contain`
+ *  (the ENTIRE first page visible, never cropped into the 2:3 skeleton) and
+ *  the raster's natural ratio must be the FULL page — a 2:3 pre-crop would
+ *  report ~0.667 instead of the fixture's US-Letter ratio. */
+async function coverFit(title) {
+  return browser.execute((t) => {
+    const openButton = Array.from(
+      document.querySelectorAll("button.document-card-open"),
+    ).find(
+      (el) =>
+        el.getAttribute("aria-label") ===
+        `Select ${t}; press Enter or double-click to open`,
+    );
+    const cover = openButton?.querySelector(".document-cover");
+    const img = cover?.querySelector("img.document-cover-img");
+    if (!img || !(img instanceof HTMLImageElement)) return null;
+    return {
+      objectFit: getComputedStyle(img).objectFit,
+      naturalRatio: img.naturalWidth / img.naturalHeight,
+    };
+  }, title);
+}
+
 describe("Packaged cover journey (slice 121: real first-page covers)", () => {
   it(`${PHASE} phase: covers render, fall back deterministically, and survive the relaunch`, async () => {
     await browser.waitUntil(
@@ -141,6 +164,15 @@ describe("Packaged cover journey (slice 121: real first-page covers)", () => {
       expect(hashB.naturalWidth).toBeGreaterThan(0);
       // Distinct first pages → distinct pixels. The fixtures differ in text.
       expect(hashA.hash).not.toBe(hashB.hash);
+
+      // 2b. The ENTIRE cover must be visible: `contain` (no crop into the
+      //     2:3 skeleton — the slice 149 fix) and the raster is the FULL
+      //     US-Letter first page (612x792 ≈ 0.7727), not a pre-cropped 2:3
+      //     image (~0.667). A `cover` object-fit regression fails the first
+      //     check; a raster-time crop fails the second.
+      const fitA = await coverFit("E2E Resume Fixture A");
+      expect(fitA.objectFit).toBe("contain");
+      expect(fitA.naturalRatio).toBeCloseTo(612 / 792, 2);
       // The runner captures these for the verify phase's warm-cache oracle.
       // eslint-disable-next-line no-console
       console.log(`COVER_A_HASH=${hashA.hash}`);
