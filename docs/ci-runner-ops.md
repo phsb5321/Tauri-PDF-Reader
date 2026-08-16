@@ -143,8 +143,8 @@ logs intact, read them; do not assume this section explains it.
 **For the `cancelled`-with-everything-green shape, do not read the diff.** The
 wall went to 20 minutes first, which bought one green run and no more: on run
 `31934817394` both Rust jobs died *inside* the cache step — Contract Tests
-failed mid-restore at ~6 min, and Backend Checks burned its entire 15-minute
-wall and was cancelled with **no steps recorded at all**.
+failed mid-restore at ~6 min, and Backend Checks ran 20 minutes and was
+cancelled with **no steps recorded at all**.
 
 So the cargo cache is now **gone** from both Rust jobs. `~/.cargo/registry`,
 `~/.cargo/git` and the target dir all live in `$HOME` on a persistent runner

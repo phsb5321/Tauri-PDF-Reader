@@ -197,8 +197,8 @@ jobs:
       # restoring a multi-gigabyte `src-tauri/target` that never needed to
       # travel. It was not free: the restore alone took 5m39s of a 10m wall on
       # run 31928286378, and on run 31934817394 both Rust jobs DIED inside the
-      # cache step (Contract Tests failed mid-restore; Backend Checks burned
-      # its whole 15m wall and was cancelled with no steps recorded).
+      # cache step (Contract Tests failed mid-restore; Backend Checks ran 20
+      # minutes and was cancelled with no steps recorded at all).
       #
       # `target/` had to be cached only because it sat INSIDE the workspace,
       # which `actions/checkout` cleans. Moving it out removes the reason.
