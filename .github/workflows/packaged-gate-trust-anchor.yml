@@ -1,0 +1,61 @@
+name: Packaged Gate Trust Anchor
+
+on:
+  pull_request_target:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  # ONE fixed runner-wide group: the anchor never runs concurrently with
+  # itself or anything else in the packaged-gate family.
+  group: packaged-gate-trust-anchor
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Trust anchor — base-owned contract vs head execution workflow
+    # Same-repo PRs only — the self-hosted runner never executes fork PRs.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Linux, X64, vm103]
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout BASE tools (never the head — the contract cannot be head-controlled)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+
+      - name: Setup Node.js (the parser-based checker needs node + yaml)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "20"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
+        with:
+          version: 10
+
+      - name: Install dependencies (yaml is an explicit devDependency)
+        run: pnpm install --frozen-lockfile
+
+      - name: Fetch the candidate EXECUTION workflow at the HEAD sha as DATA
+        # The head file is fetched via the GitHub API as DATA only — never
+        # checked out, never executed, no scripts from the head. The head
+        # sha travels via env (no event-payload shell interpolation).
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh api "repos/$REPO/contents/.github/workflows/packaged-user-gate.yml?ref=$HEAD_SHA" \
+            --jq '.content' | base64 -d > /tmp/head-execution-workflow.yml
+
+      - name: Run the BASE checker against the head execution workflow
+        run: ./tools/check-packaged-gate-contract.sh /tmp/head-execution-workflow.yml
+
+      - name: Contract negative-control (base tools, head file)
+        env:
+          PACKAGED_GATE_WF: /tmp/head-execution-workflow.yml
+        run: ./tools/test/packaged-gate-contract-negative-control.sh
