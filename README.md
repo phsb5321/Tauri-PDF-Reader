@@ -9,8 +9,9 @@ Tauri 2.x (React/TypeScript + Rust).
 The name is French for _a person employed to read aloud to someone_ — the app
 is your lectrice. See [`docs/brand/`](docs/brand/) for the full brand system.
 
-> **Status:** v0.2.0 prepared for **Linux (AppImage + deb)** — the tag is cut
-> from the commit that lands this line, after the `v0.2.0-rc.0` dry run; see
+> **Version:** 0.2.0, built for **Linux (AppImage + deb)** — published
+> artifacts come from the tagged commit, listed under
+> [Releases](https://github.com/phsb5321/Tauri-PDF-Reader/releases); see
 > [CHANGELOG.md](CHANGELOG.md) and
 > [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md). macOS and Windows are
 > **not yet covered by packaged builds or packaged tests** — see Platform

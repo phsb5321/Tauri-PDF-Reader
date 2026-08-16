@@ -1,15 +1,29 @@
 # Release decision checklist — v0.2.0
 
-Last reconciled: 15/08/2026 23:25 BRT, main `8c31cfc`.
+Last reconciled: 16/08/2026, main `01d9952`.
 
-## Decision
+## Decision rule
 
-**NOT CUTTABLE.** Cut only when every required item is green at one clean
-`FINAL_SHA`. Any merge invalidates SHA-specific corpus, CodeQL, Sonar, and
-adversarial-audit evidence. The RC dry run and the macOS measurement are
-SHA-stamped at `3d68d0e` and are not re-run per head: the RC proved the
-pipeline and the artifacts, and the macOS entry records a blocked journey
-rather than a passing one.
+This page states the **criteria**, not a verdict about itself. Separate the two
+things a "receipt" means here:
+
+- **The checks run BEFORE the tag.** Corpus, CI, Sonar, CodeQL and the
+  different-family audit all execute against the merged candidate commit, and
+  every one must be green for that exact commit before it may be tagged. No
+  commit is ever tagged ahead of its evidence.
+- **The written row lands AFTER the tag.** A commit cannot contain a table row
+  citing runs against itself, so the log entry below is committed afterwards.
+  What lags is the bookkeeping, never the verification.
+
+**Cut `v0.2.0` only when every box under "Required at the tagged SHA" is green
+for one clean commit, and tag that exact commit.** Any later merge starts the
+sequence over: SHA-specific corpus, CI, Sonar, CodeQL and audit evidence do not
+transfer across heads.
+
+The RC dry run and the macOS measurement are the two exceptions, SHA-stamped at
+`3d68d0e` and not re-run per head: the RC proved the pipeline and the published
+artifacts, and the macOS entry records a blocked journey rather than a passing
+one. Nothing in the shipped tree's version fields has changed since.
 
 ## Merged product evidence
 
@@ -21,17 +35,17 @@ rather than a passing one.
 | Fast-close DL-1/DL-2 | #125 → `03aca59`; 387/401 ms closes, highlight and page 3 survive restart | PASS |
 | Session oracle | #121 → `8848fc3`; create/restart/delete row-wins proof | PASS |
 | Packaged-gate trust anchor | #119 → `e46c4ca`; parsed contract and machine-readable prerequisite receipt | PASS for bootstrap contract |
-| Real-book runner | #130 → `4f74f4b`; five-book run green at `3747f5d`, `9b13a1f`, `14b43da` | Merged; re-run at `FINAL_SHA` |
+| Real-book runner | #130 → `4f74f4b`; five-book run green at `3747f5d`, `9b13a1f`, `14b43da` | Merged; re-run per candidate commit |
 
-## Required at `FINAL_SHA`
+## Required at the tagged SHA
 
-- [ ] Clean corpus run at `FINAL_SHA`: `source.json` matches, 23/23 controls,
+- [ ] Clean corpus run at the candidate commit: `source.json` matches, 23/23 controls,
       five PDFs pass open/card-open/verify, five distinct cover ties,
       corrupt/EPUB controls pass, `failures.tsv` empty, temp profile and `dist/`
       absent after exit.
-- [ ] Sonar run at `FINAL_SHA` succeeds; authenticated quality gate is `OK`
+- [ ] Sonar run at the candidate commit succeeds; authenticated quality gate is `OK`
       with no failing conditions.
-- [ ] CodeQL run at `FINAL_SHA` succeeds with zero open code-scanning alerts.
+- [ ] CodeQL run at the candidate commit succeeds with zero open code-scanning alerts.
 - [x] `v0.2.0-rc.0` release-pipeline dry run succeeded at `3d68d0e` (run
       `31911698292`) and published `Lectrice_0.2.0_amd64.AppImage` +
       `Lectrice_0.2.0_amd64.deb` as a prerelease. Both assets were verified on
@@ -50,12 +64,10 @@ rather than a passing one.
       release. Reasons and reversal conditions: `docs/KNOWN_LIMITATIONS.md`;
       verbatim measurements: `docs/corpus/rc-evidence-2026-08-15.md`.
 - [ ] A different-family adversarial audit reviews all evidence above and
-      returns `CUTTABLE` for that same SHA.
+      returns `CUTTABLE` for that same commit.
 
-The three unchecked boxes above were satisfied together at two earlier heads,
-`3747f5d` and `9b13a1f` (run ids under "Current exact-SHA history" below). That
-history is why the release is expected to pass; it is **not** evidence for the
-tag. The boxes stay unchecked until they are re-run at `FINAL_SHA`.
+Those boxes are unchecked here by construction: they are verified per candidate
+commit and logged below, never pre-declared.
 
 ## Remaining infrastructure/documentation evidence
 
@@ -85,17 +97,33 @@ becoming a green box.
 
 Risk acceptance for a remaining limitation is still Pedro's alone.
 
-## Current exact-SHA history
+## Verification log
 
-Clean exact-SHA corpus, Sonar, and CodeQL evidence was green at `3747f5d`
-(corpus `/tmp/lectrice-corpus-final-main-3747f5d.log`, Sonar `31876592457`,
-CodeQL `31876592453`) and at `9b13a1f` (corpus
-`/tmp/lectrice-corpus-final-main-9b13a1f.log`, Sonar `31880371934`, CodeQL
-`31880371936`); CodeQL alert #4 is fixed. Those are the only two heads with a
-full receipt set — later heads carry the corpus run only. The `v0.2.0-rc.0` dry
-run ran at `3d68d0e` and its receipts, together with the macOS measurement, are
-in `docs/corpus/rc-evidence-2026-08-15.md`.
+Every candidate commit that was measured, passed or not. A row is a record of
+what was run, not a claim that the commit qualified — the `Result` column says
+which. The tagged commit's checks all pass before it is tagged; only its row is
+written afterwards, for the reason given under "Decision rule".
 
-What remains before the tag: re-run the three exact-SHA boxes at `FINAL_SHA`,
-then a different-family adversarial audit on that same SHA. Until both land the
-verdict remains `NOT CUTTABLE`.
+| Commit | Corpus | Sonar | CodeQL | CI | Audit | Result |
+| --- | --- | --- | --- | --- | --- | --- |
+| `3747f5d` | `…-final-main-3747f5d.log` ✓ | `31876592457` ✓ | `31876592453` ✓ | — | NOT CUTTABLE | superseded by later merges |
+| `9b13a1f` | `…-final-main-9b13a1f.log` ✓ | `31880371934` ✓ | `31880371936` ✓ | — | NOT CUTTABLE | superseded by later merges |
+| `3da0320` | `…-FINAL-3da0320.log` ✓ | `31928286389` ✓ | `31928286434` ✓ | `31928286378` **cancelled** | NOT CUTTABLE (red CI) | rejected — cache ate the 10m wall (#138) |
+| `8d951e5` | `…-FINAL-8d951e5.log` ✓ | `31934817422` ✓ | `31934817376` ✓ | `31934817394` **failure** | not audited | rejected — Contract Tests failed inside the cache step; Backend Checks cancelled with no steps recorded (#139) |
+| `01d9952` | `…-FINAL-01d9952.log` ✓ | `31941343176` ✓ | `31941343177` ✓ | `31941343164` ✓ | NOT CUTTABLE (docs) | rejected — tree claimed its own tag/verdict, fixed by #140 |
+
+Corpus logs live under `/tmp` on the machine that ran them; the names above are
+abbreviated `lectrice-corpus-*`. CodeQL alert #4 is fixed and the repository
+carries zero open code-scanning alerts. The `v0.2.0-rc.0` dry run ran at
+`3d68d0e`; its receipts and the macOS measurement are in
+`docs/corpus/rc-evidence-2026-08-15.md`.
+
+No row is a qualifying one yet: each was rejected for the reason in its last
+column. The commit that lands this table is unmeasured *at the moment it is
+written*; it must pass the same checks, green, before anyone tags it — its row
+is then added on top.
+
+The version fields and the changelog entry read `0.2.0` on every candidate,
+because the artifacts must identify as 0.2.0 for the RC and the release alike.
+That is a statement about the version this tree builds, not a claim that this
+particular commit is the tagged one.
