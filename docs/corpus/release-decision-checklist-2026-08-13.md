@@ -94,18 +94,25 @@ Risk acceptance for a remaining limitation is still Pedro's alone.
 
 ## Verification log
 
-One row per candidate commit that carried a full receipt set. The row for the
-commit that gets tagged is appended after the tag exists, for the reason given
-under "Decision rule".
+Every candidate commit that was measured, passed or not. A row is a record of
+what was run, not a claim that the commit qualified — the `Result` column says
+which. The row for the commit that gets tagged is appended after the tag
+exists, for the reason given under "Decision rule".
 
-| Commit | Corpus | Sonar | CodeQL | CI |
-| --- | --- | --- | --- | --- |
-| `3747f5d` | `/tmp/lectrice-corpus-final-main-3747f5d.log` | `31876592457` | `31876592453` | — |
-| `9b13a1f` | `/tmp/lectrice-corpus-final-main-9b13a1f.log` | `31880371934` | `31880371936` | — |
-| `3da0320` | `/tmp/lectrice-corpus-FINAL-3da0320.log` | `31928286389` | `31928286434` | red (cache wall — #138) |
-| `8d951e5` | `/tmp/lectrice-corpus-FINAL-8d951e5.log` | — | — | red (cache stall — #139) |
-| `01d9952` | `/tmp/lectrice-corpus-FINAL-01d9952.log` | `31941343176` | `31941343177` | `31941343164` |
+| Commit | Corpus | Sonar | CodeQL | CI | Audit | Result |
+| --- | --- | --- | --- | --- | --- | --- |
+| `3747f5d` | `…-final-main-3747f5d.log` ✓ | `31876592457` ✓ | `31876592453` ✓ | — | NOT CUTTABLE | superseded by later merges |
+| `9b13a1f` | `…-final-main-9b13a1f.log` ✓ | `31880371934` ✓ | `31880371936` ✓ | — | NOT CUTTABLE | superseded by later merges |
+| `3da0320` | `…-FINAL-3da0320.log` ✓ | `31928286389` ✓ | `31928286434` ✓ | `31928286378` **cancelled** | NOT CUTTABLE (red CI) | rejected — cache ate the 10m wall (#138) |
+| `8d951e5` | `…-FINAL-8d951e5.log` ✓ | `31934817422` ✓ | `31934817376` ✓ | `31934817394` **failure** | not audited | rejected — both Rust jobs died in the cache step (#139) |
+| `01d9952` | `…-FINAL-01d9952.log` ✓ | `31941343176` ✓ | `31941343177` ✓ | `31941343164` ✓ | NOT CUTTABLE (docs) | rejected — tree claimed its own tag/verdict, fixed by #140 |
 
-CodeQL alert #4 is fixed and the repository carries zero open code-scanning
-alerts. The `v0.2.0-rc.0` dry run ran at `3d68d0e`; its receipts and the macOS
-measurement are in `docs/corpus/rc-evidence-2026-08-15.md`.
+Corpus logs live under `/tmp` on the machine that ran them; the names above are
+abbreviated `lectrice-corpus-*`. CodeQL alert #4 is fixed and the repository
+carries zero open code-scanning alerts. The `v0.2.0-rc.0` dry run ran at
+`3d68d0e`; its receipts and the macOS measurement are in
+`docs/corpus/rc-evidence-2026-08-15.md`.
+
+No row is a qualifying one yet: each was rejected for the reason in its last
+column. The commit that lands this table is itself unmeasured by construction,
+and has to earn its own row before it can be tagged.
