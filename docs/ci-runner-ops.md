@@ -132,11 +132,15 @@ everything else            ~36s
                          10m10s  against timeout-minutes: 10
 ```
 
-The first attempt on the same SHA reported `failure` with its logs already
-expired (`BlobNotFound`), which reads like a test failure and is not one: the
-suite passes locally at that exact SHA (62 tests, 6 binaries, exit 0).
+The first attempt on the same SHA is a **separate, unresolved** event: its
+`Run contract tests` step is recorded as `failure`, and its logs are already
+gone (`BlobNotFound`), so the cause cannot be established either way. What is
+known is that the suite passes locally at that exact SHA (62 tests, 6 binaries,
+exit 0) and that the rerun's test step passed — which rules out a deterministic
+failure, not a flaky test or a one-off environment fault. If it recurs with
+logs intact, read them; do not assume this section explains it.
 
-**Do not read the diff.** The wall is now 20 minutes (`ci.yml`), which is the
+**For the `cancelled`-with-everything-green shape, do not read the diff.** The wall is now 20 minutes (`ci.yml`), which is the
 small fix. The real one is to stop round-tripping a multi-gigabyte
 `src-tauri/target` through `actions/cache` on a persistent single-slot runner
 — either by moving `CARGO_TARGET_DIR` outside the workspace so it survives
