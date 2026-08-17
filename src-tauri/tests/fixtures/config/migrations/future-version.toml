@@ -1,0 +1,5 @@
+# A file from a newer Lectrice: unknown keys warn, the file still loads.
+schema_version = 99
+
+[appearance]
+theme = "light"

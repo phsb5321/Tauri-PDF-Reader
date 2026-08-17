@@ -1,0 +1,33 @@
+# A config that names every key, with non-default values throughout.
+schema_version = 1
+
+[appearance]
+theme = "dark"
+
+[highlight]
+default_color = "#4CAF50"
+colors = ["#4CAF50", "#2196F3"]
+
+[tts]
+rate = 1.25
+voice = "com.apple.speech.synthesis.voice.samantha"
+follow_along = false
+
+[telemetry]
+analytics = true
+errors = true
+
+[render]
+quality_mode = "ultra"
+max_megapixels = 32
+hw_acceleration = false
+debug_overlay = true
+
+[cache]
+max_size_bytes = 1073741824
+eviction_policy = "lru"
+
+[ai_tts]
+voice_id = "EXAVITQu4vr4xnSDxMaL"
+speed = 1.75
+auto_page = false

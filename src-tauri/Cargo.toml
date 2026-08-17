@@ -54,6 +54,16 @@ bytes = { version = "1", optional = true }
 base64 = { version = "0.22", optional = true }
 dirs = "6.0.0"
 
+# User config file (spec 078, slice 1: read-only). `toml` carries byte spans on
+# its errors, which is what lets a bad value report file:line:col instead of a
+# bare "invalid type"; `serde_ignored` collects unknown keys so a typo warns
+# instead of bricking the config. `toml_edit` (comment-preserving writer) and
+# `notify-debouncer-mini` (hot reload) belong to slices 2 and 3 — they have no
+# call site yet, and an unused dependency is exactly what the alignment gate
+# should catch.
+toml = "0.8"
+serde_ignored = "0.1"
+
 # Audio export with chapter markers
 id3 = "1.14"
 
@@ -65,6 +75,9 @@ mockall = "0.13"
 tokio = { version = "1", features = ["rt", "macros"] }
 # Spectral assertion for the pitch-preserving time-stretch gate (spec 039).
 rustfft = "6"
+# Config round-trip property (spec 078): Config -> toml -> Config must be the
+# identity, or the slice-2 UI writer would silently corrupt a user's file.
+proptest = "1"
 
 [features]
 default = ["custom-protocol", "elevenlabs-tts"]

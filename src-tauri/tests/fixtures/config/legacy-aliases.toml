@@ -1,0 +1,13 @@
+# The camelCase spellings the SQLite keys used, accepted via #[serde(alias)].
+[tts]
+followAlong = false
+
+[render]
+qualityMode = "performance"
+maxMegapixels = 16
+hwAccelerationEnabled = false
+debugOverlayEnabled = true
+
+[ai_tts]
+selectedVoiceId = "EXAVITQu4vr4xnSDxMaL"
+autoPageEnabled = false

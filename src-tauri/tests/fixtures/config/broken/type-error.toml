@@ -1,0 +1,3 @@
+# tts.rate must be a float; a string is the classic mistake.
+[tts]
+rate = "fast"
