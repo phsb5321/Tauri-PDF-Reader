@@ -115,20 +115,6 @@ describe("the library search empty state", () => {
     ).toBeInTheDocument();
   });
 
-  it("keeps the original copy when there is no query", async () => {
-    mockInvoke.mockImplementation((command: string) => {
-      if (command === "library_list_documents") return Promise.resolve([]);
-      if (
-        command === "collections_list" ||
-        command === "collections_list_memberships"
-      )
-        return Promise.resolve([]);
-      return Promise.resolve(null);
-    });
-
-    renderLibrary();
-  });
-
   it("empty library: the primary action invokes the real open-PDF flow", async () => {
     const onOpenDocument = vi.fn();
     mockInvoke.mockImplementation((command: string) => {
