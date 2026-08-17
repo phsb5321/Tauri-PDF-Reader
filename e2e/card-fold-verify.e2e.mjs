@@ -103,6 +103,24 @@ async function probe() {
               ).toFixed(3)
             : null,
           coverState: cover?.getAttribute("data-state") ?? null,
+          // PR #145 invariant: the whole first-page cover, never cropped.
+          // `contain` letterboxes; `cover` would crop. Measured on the
+          // painted <img>, plus the drawn image box vs its natural ratio.
+          coverImg: (() => {
+            const img = c.querySelector(".document-cover img");
+            if (!img) return null;
+            const b = img.getBoundingClientRect();
+            return {
+              objectFit: getComputedStyle(img).objectFit,
+              natural:
+                img.naturalWidth && img.naturalHeight
+                  ? +(img.naturalWidth / img.naturalHeight).toFixed(3)
+                  : null,
+              boxRatio: b.height ? +(b.width / b.height).toFixed(3) : null,
+              w: Math.round(b.width),
+              h: Math.round(b.height),
+            };
+          })(),
         };
       },
     );
@@ -168,6 +186,11 @@ describe("S1 card-fold verify (card text inside the fold)", () => {
       expect(visible.length).toBeGreaterThan(0);
       for (const card of visible) {
         expect(card.bottom).toBeLessThanOrEqual(gridBottom + 1);
+        // Invariant (b), PR #145 f4316ef: covers render UN-CROPPED. The
+        // painted image must letterbox (contain), never crop (cover).
+        if (card.coverImg) {
+          expect(card.coverImg.objectFit).toBe("contain");
+        }
         for (const part of ["title", "meta", "progress"]) {
           const r = card[part];
           expect(r).not.toBeNull();
