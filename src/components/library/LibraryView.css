@@ -123,6 +123,11 @@
   overflow-y: auto;
   flex: 1;
   padding-bottom: var(--space-6);
+  /* S1 (card fold, home audit gap #1): rows derive from the grid's height
+     so a card fits its row — the first row's text sits inside the fold and
+     scrolling never clips a card mid-card. A single row stretches to fill
+     the grid; the 180px floor keeps multi-row libraries readable. */
+  grid-auto-rows: minmax(180px, 1fr);
 }
 
 .library-grid--grid {

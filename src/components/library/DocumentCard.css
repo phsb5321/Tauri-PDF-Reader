@@ -56,6 +56,9 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  /* S1 (card fold): the card fills its row — the cover height derives from
+     the container, so the card (cover + text) fits the grid's fold. */
+  height: 100%;
 }
 
 .document-card--grid .document-card-open {
@@ -66,13 +69,26 @@
 
 .document-card--grid .document-card-thumbnail {
   position: relative;
-  aspect-ratio: 2 / 3;
-  height: auto;
+  /* S1 (card fold): the thumbnail flexes to the card minus the content —
+     the cover height derives from the container instead of the fixed 2:3
+     skeleton. The image stays UN-CROPPED (object-fit: contain letterboxes
+     inside the flexed box — the PR #145 invariant). */
+  flex: 1 1 0;
+  min-height: 0;
+  aspect-ratio: auto;
   background: var(--bg-tertiary, #f5f5f5);
   display: flex;
   align-items: center;
   justify-content: center;
   border-bottom: 1px solid var(--border-color, #e0e0e0);
+}
+
+/* The 2:3 skeleton is relaxed for the grid card: the cover box fills the
+   flexed thumbnail, and contain keeps the whole first-page raster visible. */
+.document-card--grid .document-cover {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
 }
 
 .document-card--grid .pdf-icon {
