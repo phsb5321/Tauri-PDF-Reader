@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from "react";
+import { useRef, type ReactNode, type RefObject } from "react";
 import { useDialogBackdropClose } from "../../../hooks/useDialogBackdropClose";
 import { useFocusTrap } from "../../../hooks/useFocusTrap";
 import "./Dialog.css";
@@ -22,6 +22,11 @@ export interface DialogProps {
   closeOnEscape?: boolean;
   /** Close on backdrop click (default: true) */
   closeOnBackdrop?: boolean;
+  /** Element to return focus to when the dialog closes (the triggering
+   *  control). Required for a keyboard user's focus context when the dialog
+   *  unmounts (the trap's previously-focused snapshot can be the dialog's
+   *  own autoFocused input — slice 146). */
+  returnFocus?: RefObject<HTMLElement | null>;
 }
 
 export function Dialog({
@@ -34,6 +39,7 @@ export function Dialog({
   footer,
   closeOnEscape = true,
   closeOnBackdrop = true,
+  returnFocus,
 }: DialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -42,6 +48,7 @@ export function Dialog({
     active: open,
     preventScroll: true,
     onEscape: closeOnEscape ? onClose : undefined,
+    returnFocus,
   });
 
   useDialogBackdropClose({

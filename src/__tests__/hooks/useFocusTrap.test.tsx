@@ -29,10 +29,12 @@ function TestDialog({
   initialOpen = false,
   onEscape,
   preventScroll = true,
+  autoFocusInput = false,
 }: {
   initialOpen?: boolean;
   onEscape?: () => void;
   preventScroll?: boolean;
+  autoFocusInput?: boolean;
 }) {
   const [open, setOpen] = useState(initialOpen);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -71,7 +73,16 @@ function TestDialog({
           >
             Close
           </button>
-          <input type="text" data-testid="input" />
+          <input
+            type="text"
+            data-testid="input"
+            data-input-role="plain"
+          />
+          <input
+            type="text"
+            data-testid="inner-input"
+            autoFocus={autoFocusInput}
+          />
           <button type="button" data-testid="save-btn">
             Save
           </button>
@@ -130,6 +141,16 @@ describe("useFocusTrap", () => {
       });
 
       expect(screen.getByTestId("is-active")).toHaveTextContent("true");
+    });
+
+    it("does not steal focus when the active element is already inside the container", async () => {
+      // Slice 146: React's autoFocus on an inner input must win — the trap
+      // must not yank focus to the close button (Enter would dismiss the
+      // dialog without saving).
+      render(<TestDialog initialOpen={true} autoFocusInput />);
+      await waitFor(() => {
+        expect(document.activeElement).toBe(screen.getByTestId("inner-input"));
+      });
     });
   });
 

@@ -155,3 +155,29 @@
   opacity: 0.5;
   cursor: default;
 }
+
+/* Slice 146 — in-app confirmations (the native prompt/confirm are Promise
+   shims in the packaged WebKitGTK app; destructive/renaming actions now
+   happen inside the window). */
+
+.shelf-action--confirming {
+  color: var(--color-accent-text, inherit);
+  font-weight: 600;
+}
+
+.shelf-rename-label {
+  display: block;
+  margin-bottom: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.shelf-rename-input {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-color, #ccc);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  color: var(--color-text-primary);
+  background: var(--color-bg-surface);
+}

@@ -11,9 +11,9 @@
 #                  `$XDG_CACHE_HOME/com.lectrice.reader/tts_cache/`).
 #   phase delete — the app RELAUNCHES on the same profile (the seeded row
 #                  and file must survive it); the actor clicks the card's
-#                  public delete button; the build-time seam accepts the
-#                  WebDriver-impossible native confirm; the lane asserts the
-#                  card leaves the surface and the library row is gone.
+#                  public delete button twice (the in-app click-again
+#                  confirm); the lane asserts the card leaves the surface
+#                  and the library row is gone.
 #                  The RUNNER then asserts the file and metadata halves:
 #                  documents row gone, tts_cache_metadata row gone, the
 #                  seeded .mp3 gone from disk.
@@ -39,10 +39,10 @@ CACHE_DIR="$XDG_CACHE_HOME/com.lectrice.reader/tts_cache"
 mkdir -p "$APP_DIR" "$CACHE_DIR"
 node scripts/gen-e2e-fixtures.mjs "$APP_DIR" >/dev/null
 
-echo "==> Building frontend (VITE_E2E_NATIVE=true, seed=single, confirm=accept) once — the flags are identical for both phases"
+echo "==> Building frontend (VITE_E2E_NATIVE=true, seed=single) once — the flags are identical for both phases"
 export CI=true
 CI=true VITE_E2E_NATIVE=true VITE_E2E_NATIVE_TTS=none VITE_E2E_NATIVE_SEED=single \
-  VITE_E2E_CONFIRM=accept VITE_E2E_PROFILE_DIR="$APP_DIR" pnpm build >/dev/null
+  VITE_E2E_PROFILE_DIR="$APP_DIR" pnpm build >/dev/null
 touch src-tauri/src/lib.rs
 
 toolchain_exec '
@@ -75,7 +75,7 @@ toolchain_exec '
   sqlite3 "$DB" "INSERT INTO tts_cache_metadata (cache_key, document_id, page_number, text_hash, voice_id, settings_hash, file_path, size_bytes, created_at, last_accessed_at, chunk_index, duration_ms) VALUES ('"'"'$KEY'"'"', '"'"'$DOC_ID'"'"', 2, '"'"'delete-lane-seed-hash'"'"', '"'"'fixture-voice'"'"', '"'"'fixture-settings'"'"', '"'"'$CACHE_DIR/$KEY.mp3'"'"', 28, datetime('"'"'now'"'"'), datetime('"'"'now'"'"'), 0, 500);"
   echo "pre-seed: doc=$DOC_ID key=$KEY file=$CACHE_DIR/$KEY.mp3"
 
-  echo "==> PHASE delete (real UI delete; confirm seam accepts)"
+  echo "==> PHASE delete (real UI delete; the in-app click-again confirm)"
   DELETE_STATUS=0
   DELETE_PHASE=delete E2E_SPEC=./e2e/delete-journey.e2e.mjs pnpm test:e2e || DELETE_STATUS=$?
   echo "==> PHASE delete exit: $DELETE_STATUS"
