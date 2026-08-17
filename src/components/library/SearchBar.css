@@ -22,6 +22,10 @@
   border-radius: 20px;
   font-size: var(--text-sm);
   background: var(--bg-secondary, #fff);
+  /* UA-default form-control text (the contrast-sweep defect class): typed
+     search text is engine-painted without an explicit colour — bind it to
+     the primary text token so it tracks the theme. */
+  color: var(--color-text-primary);
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
