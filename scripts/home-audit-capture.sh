@@ -9,20 +9,6 @@
 #
 # Hermetic profile pinned under /tmp (assert_hermetic_profile refuses to boot
 # outside /tmp; this host's default TMPDIR is /var/tmp).
-#
-# Honors the shared flock — REQUIRED, and the script does NOT take it for you
-# (same contract as e2e/run-corpus-journey.sh; no script in this repo self-locks,
-# because the documented callers already wrap it and an inner flock on the same
-# file would deadlock against its own wrapper):
-#
-#   flock /tmp/lectrice-heavy-gate.lock bash scripts/home-audit-capture.sh
-#
-# Run two seeds concurrently WITHOUT the lock and they corrupt each other
-# silently rather than failing: both `pnpm build` into the same dist/ and both
-# rebuild the same debug binary, and VITE_E2E_NATIVE_SEED is baked into that
-# dist — so the binary embeds whichever build finished last, and a seed can
-# capture another seed's frontend while reporting its own name in the filenames.
-#
 # Outputs: /tmp/lectrice-audit-<seed>-<theme>-<width>.png
 set -euo pipefail
 cd "$(dirname "$0")/.."

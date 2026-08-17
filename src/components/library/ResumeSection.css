@@ -13,8 +13,17 @@
 
 .resume-line {
   display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+
+.resume-line-body {
+  display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
 }
 
 .resume-line-title {

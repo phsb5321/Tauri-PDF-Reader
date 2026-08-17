@@ -352,6 +352,7 @@ export function ReaderView() {
                 void handleResumeAndPlay(document);
               }}
               onOpenSettings={() => setShowSettings(true)}
+              onOpenDocument={() => void handleOpen()}
             />
           </div>
         ) : (
