@@ -13,16 +13,26 @@
  * transparent local background is not a verdict):
  *   - an element qualifies if it has a direct non-whitespace text child and
  *     is actually painted (non-zero box, visible, opacity > 0);
+ *   - FORM-CONTROL text is not a text child — placeholders and closed
+ *     select labels are probed explicitly (the exact UA-default defect
+ *     class that produced the reported dark-on-dark bug);
  *   - its colour is composited over the painted ancestor surface when the
- *     text itself is translucent;
+ *     text itself is translucent; the element's OWN opacity folds into the
+ *     ratio (a 0.5-opacity control paints at half strength); ancestor
+ *     opacity is NOT folded (documented limitation — no home node uses it);
+ *   - DISABLED controls are skipped (WCAG 1.4.3's inactive-UI-component
+ *     exception — the user cannot act on them);
  *   - the AA threshold follows WCAG large-text rules: >=24px, or >=18.66px
  *     at weight >=700, needs 3:1; everything else needs 4.5:1.
  *
- * Fail-closed: an empty sweep is a FAILED sweep (it would otherwise pass by
- * finding nothing), and the library must actually have rendered cards before
- * the home surface counts as swept.
+ * SCOPE: the home/library surface only (the seeded library with cards).
+ * The reader and settings surfaces are covered by contrast-capture's
+ * curated list. Fail-closed: an empty sweep is a FAILED sweep (it would
+ * otherwise pass by finding nothing), and the library must actually have
+ * rendered cards before the home surface counts as swept.
  *
- * Run: E2E_SPEC=./e2e/contrast-sweep.e2e.mjs (see run-contrast-sweep.sh)
+ * Run: E2E_SPEC=./e2e/contrast-sweep.e2e.mjs (see
+ * scripts/e2e-contrast-sweep.sh).
  */
 
 /* global browser, $, expect */
@@ -148,12 +158,37 @@ async function sweep(theme) {
     const results = [];
     let painted = 0;
 
+    /** WCAG 1.4.3 has an explicit exception for INACTIVE UI components —
+     * disabled controls are excused from contrast. Skip them (they are
+     * still "visible", so without this the gate would fail on a control the
+     * user cannot act on). */
+    const isInactive = (el) => el.disabled === true;
+
+    /** Effective glyph alpha: the element's own opacity folds into the
+     * ratio (a 0.5-opacity control paints at half strength — measuring it
+     * at full strength would certify an invisible label). Ancestor opacity
+     * is NOT folded (no home node uses it; documented limitation). */
+    const effectiveFg = (fgRaw, surface, elOpacity) => {
+      const alpha = fgRaw.a * elOpacity;
+      return over({ r: fgRaw.r, g: fgRaw.g, b: fgRaw.b, a: alpha }, surface);
+    };
+
+    const verdict = (cs, fgRaw, surface, elOpacity) => {
+      const fg = effectiveFg(fgRaw, surface, elOpacity);
+      const value = ratio(fg, surface);
+      const size = parseFloat(cs.fontSize);
+      const weight = parseInt(cs.fontWeight, 10) || 400;
+      const isLarge = size >= 24 || (size >= 18.66 && weight >= 700);
+      return { value, required: isLarge ? 3 : 4.5 };
+    };
+
     for (const el of document.querySelectorAll("body *")) {
       if (!hasOwnText(el)) continue;
 
       const cs = getComputedStyle(el);
       if (cs.visibility === "hidden" || cs.display === "none") continue;
       if (parseFloat(cs.opacity) === 0) continue;
+      if (isInactive(el)) continue;
 
       const box = el.getBoundingClientRect();
       if (box.width < 1 || box.height < 1) continue;
@@ -166,13 +201,7 @@ async function sweep(theme) {
       painted += 1;
 
       const surface = paintedSurface(el);
-      const fg = fgRaw.a < 1 ? over(fgRaw, surface) : fgRaw;
-      const value = ratio(fg, surface);
-
-      const size = parseFloat(cs.fontSize);
-      const weight = parseInt(cs.fontWeight, 10) || 400;
-      const isLarge = size >= 24 || (size >= 18.66 && weight >= 700);
-      const required = isLarge ? 3 : 4.5;
+      const { value, required } = verdict(cs, fgRaw, surface, parseFloat(cs.opacity));
 
       if (value + 0.01 < required) {
         // Ancestor color chain — pin WHERE the failing colour comes from.
@@ -198,6 +227,67 @@ async function sweep(theme) {
           ratio: Math.round(value * 100) / 100,
           required,
           chain,
+        });
+      }
+    }
+
+    // Form-control text is NOT a text child (the review's MAJOR: the exact
+    // UA-default class that produced the reported bug lives on placeholders
+    // and closed select labels) — probe them explicitly so the class is
+    // gated, not exempt.
+    for (const el of document.querySelectorAll("input, textarea")) {
+      const ph = el.getAttribute("placeholder");
+      if (!ph || !ph.trim()) continue;
+      const cs = getComputedStyle(el);
+      if (cs.visibility === "hidden" || cs.display === "none") continue;
+      if (parseFloat(cs.opacity) === 0) continue;
+      if (isInactive(el)) continue;
+      const box = el.getBoundingClientRect();
+      if (box.width < 1 || box.height < 1) continue;
+      const ps = getComputedStyle(el, "::placeholder");
+      const fgRaw = parseColor(ps.color);
+      if (!fgRaw || fgRaw.a === 0) continue;
+      painted += 1;
+      const surface = paintedSurface(el);
+      const { value, required } = verdict(cs, fgRaw, surface, parseFloat(cs.opacity));
+      if (value + 0.01 < required) {
+        results.push({
+          theme: themeLabel,
+          node: `${describe(el)}::placeholder`,
+          text: ph.trim().slice(0, 40),
+          color: ps.color,
+          surface: `rgba(${Math.round(surface.r)}, ${Math.round(surface.g)}, ${Math.round(surface.b)}, ${surface.a})`,
+          fontSize: cs.fontSize,
+          fontWeight: cs.fontWeight,
+          ratio: Math.round(value * 100) / 100,
+          required,
+        });
+      }
+    }
+
+    for (const el of document.querySelectorAll("select")) {
+      const cs = getComputedStyle(el);
+      if (cs.visibility === "hidden" || cs.display === "none") continue;
+      if (parseFloat(cs.opacity) === 0) continue;
+      if (isInactive(el)) continue;
+      const box = el.getBoundingClientRect();
+      if (box.width < 1 || box.height < 1) continue;
+      const fgRaw = parseColor(cs.color);
+      if (!fgRaw || fgRaw.a === 0) continue;
+      painted += 1;
+      const surface = paintedSurface(el);
+      const { value, required } = verdict(cs, fgRaw, surface, parseFloat(cs.opacity));
+      if (value + 0.01 < required) {
+        results.push({
+          theme: themeLabel,
+          node: describe(el),
+          text: `select:${(el.options[el.selectedIndex]?.textContent || "").trim().slice(0, 40)}`,
+          color: cs.color,
+          surface: `rgba(${Math.round(surface.r)}, ${Math.round(surface.g)}, ${Math.round(surface.b)}, ${surface.a})`,
+          fontSize: cs.fontSize,
+          fontWeight: cs.fontWeight,
+          ratio: Math.round(value * 100) / 100,
+          required,
         });
       }
     }
