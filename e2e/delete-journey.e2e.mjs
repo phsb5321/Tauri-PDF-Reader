@@ -20,11 +20,10 @@
  *     observer then pre-seeds ONE real cache entry: a metadata row + .mp3 in
  *     the app cache dir, the exact shape repo.store writes).
  *   DELETE_PHASE=delete — boot on the same profile (row + file must survive
- *     the relaunch), click the card's public delete button
- *     (`.document-card-delete`, aria-label "Remove from library"); the
- *     build-time seam accepts the WebDriver-impossible native confirm; assert
- *     the card disappears from the library surface AND the library row is
- *     gone via the read-only observer probe.
+ *     the relaunch), click the card's public delete button twice (the
+ *     in-app click-again confirm — the native confirm was a Promise shim);
+ *     assert the card disappears from the library surface AND the library
+ *     row is gone via the read-only observer probe.
  *
  * The file/metadata half of the oracle is asserted by the RUNNER (post-phase
  * sqlite3 + fs checks), because the observer cannot touch the filesystem.
@@ -37,7 +36,7 @@
  *
  * Run with:  E2E_SPEC=./e2e/delete-journey.e2e.mjs  DELETE_PHASE=seed|delete
  * against a binary built `--features e2e-tts-fixture` and a frontend built
- * `VITE_E2E_NATIVE=true VITE_E2E_CONFIRM=accept` — see
+ * `VITE_E2E_NATIVE=true` — see
  * e2e/run-delete-journey.sh.
  */
 
@@ -95,9 +94,9 @@ describe("Packaged delete journey (UI delete removes the row and its cached audi
     //    verdict; native-play.e2e.mjs documents the same class), while
     //    `element.click()` fires the SAME React onClick as a real click.
     //    The waitForClickable() above already proved the button is
-    //    genuinely visible/enabled/unobscured. The build-time seam accepts
-    //    the native confirm; the real removeDocument chain (cache clear
-    //    FIRST, then row delete) runs below it. ─────────────────────────────
+    //    genuinely visible/enabled/unobscured. The in-app click-again
+    //    confirm fires the real removeDocument chain (cache clear FIRST,
+    //    then row delete). ─────────────────────────────────────────────────
     const card = await $(".document-card");
     await card.waitForExist({ timeout: 15000 });
     await card.moveTo();
@@ -116,18 +115,21 @@ describe("Packaged delete journey (UI delete removes the row and its cached audi
     );
     await deleteBtn.waitForClickable({ timeout: 15000 });
 
-    // ── Observer pre-flight, ASSERTED: the confirm seam must be active, or
-    //    the native GTK dialog blocks the chain below it and the lane must
-    //    fail HERE (named), never click into a modal it cannot dismiss. ────
-    const seamDiag = await browser.execute(() => ({
-      confirmSeamed: window.__E2E_READ__.confirmSeamed(),
-      confirmKind: typeof window.confirm,
-      confirmSrc: String(window.confirm).slice(0, 48),
-    }));
-    console.log("DIAG delete-seam:", JSON.stringify(seamDiag));
-    expect(seamDiag.confirmSeamed).toBe(true);
+    // ── Slice 146: the delete is click-again-to-confirm INSIDE the app (the
+    //    native confirm is a Promise shim in packaged WebKitGTK — always
+    //    truthy — so the real confirmation must be a visible in-app control
+    //    the driver can operate). First click arms the confirmation; the
+    //    second fires the real removeDocument chain. ────────────────────────
     await browser.execute(() =>
       document.querySelector(".document-card-delete")?.click(),
+    );
+    const confirmBtn = await $('[aria-label="Click again to confirm remove"]');
+    await confirmBtn.waitForExist({ timeout: 5000 });
+    await confirmBtn.waitForClickable({ timeout: 5000 });
+    await browser.execute(() =>
+      document
+        .querySelector('[aria-label="Click again to confirm remove"]')
+        ?.click(),
     );
 
     // ── THE CLAIM (UI half): the card leaves the library surface. ──────────
@@ -152,7 +154,6 @@ describe("Packaged delete journey (UI delete removes the row and its cached audi
               document.querySelectorAll(".library-view, .library-body"),
             ).some((el) => (el.textContent || "").includes(t)),
             title: t,
-            confirmSeamed: window.__E2E_READ__.confirmSeamed(),
             logs: window.__E2E_READ__.logs().slice(-20),
           }), TITLE),
         ),

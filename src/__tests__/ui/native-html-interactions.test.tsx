@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { HighlightsPanel } from "../../components/highlights/HighlightsPanel";
 import { DocumentCard } from "../../components/library/DocumentCard";
@@ -91,8 +91,19 @@ describe("native HTML interactions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open" }));
     expect(onDoubleClick).toHaveBeenCalledOnce();
 
+    // Slice 146: the menu's remove is click-again-to-confirm — the first
+    // click arms it, the second fires the delete. The card's icon button
+    // swaps the SAME label, so scope the confirm click to the menu.
     fireEvent.click(
       screen.getByRole("button", { name: "Remove from Library" }),
+    );
+    expect(onDelete).not.toHaveBeenCalled();
+    const menu = container.querySelector(".document-card-context-menu");
+    if (!menu) throw new Error("context menu was not rendered");
+    fireEvent.click(
+      within(menu as HTMLElement).getByRole("button", {
+        name: "Click again to confirm remove",
+      }),
     );
     expect(onDelete).toHaveBeenCalledOnce();
     expect(

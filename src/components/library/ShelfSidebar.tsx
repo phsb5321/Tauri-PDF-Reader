@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Button } from "../../ui/components/Button/Button";
+import { Dialog } from "../../ui/components/Dialog/Dialog";
 import { ALL_DOCUMENTS, UNFILED } from "../../domain/library/shelves";
 import type { Collection } from "../../lib/schemas";
 import "./ShelfSidebar.css";
@@ -25,6 +27,28 @@ export function ShelfSidebar({
   onDelete,
 }: Readonly<ShelfSidebarProps>) {
   const [draftName, setDraftName] = useState("");
+  // Click-again-to-confirm delete (the SessionMenu precedent, slice 146):
+  // the packaged WebKitGTK app shims the NATIVE confirm into a PROMISE
+  // (always truthy), so a shelf would be deleted without the user answering.
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  const confirmDeleteTimer = useRef<number | null>(null);
+  // Rename is an in-app modal (the native prompt is a bare text prompt with
+  // no styling or focus management — a proper Dialog with an input replaces
+  // it).
+  const [renameTarget, setRenameTarget] = useState<Collection | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  // The Rename trigger — keyboard focus must return to it when the dialog
+  // closes (the trap's own snapshot can be the dialog's autoFocused input).
+  const renameTriggerRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(
+    () => () => {
+      if (confirmDeleteTimer.current !== null) {
+        window.clearTimeout(confirmDeleteTimer.current);
+      }
+    },
+    [],
+  );
 
   const handleCreate = (event: React.FormEvent) => {
     event.preventDefault();
@@ -34,24 +58,44 @@ export function ShelfSidebar({
     setDraftName("");
   };
 
-  const handleRename = (shelf: Collection) => {
-    const next = window.prompt("Rename shelf", shelf.name);
-    // Cancel gives null; an unchanged name is a no-op round trip.
-    if (next === null) return;
-    const name = next.trim();
-    if (!name || name === shelf.name) return;
-    onRename(shelf.id, name);
+  const handleRename = (shelf: Collection, event: React.MouseEvent<HTMLButtonElement>) => {
+    renameTriggerRef.current = event.currentTarget;
+    setRenameValue(shelf.name);
+    setRenameTarget(shelf);
+  };
+
+  const confirmRename = () => {
+    if (!renameTarget) return;
+    const name = renameValue.trim();
+    // Cancel / blank / unchanged are all no-op round trips.
+    if (name && name !== renameTarget.name) {
+      onRename(renameTarget.id, name);
+    }
+    setRenameTarget(null);
   };
 
   const handleDelete = (shelf: Collection) => {
     // Deleting a shelf drops its memberships, not the books themselves —
     // say so, because "delete" on a library screen reads as destructive.
-    if (
-      window.confirm(
-        `Delete the shelf "${shelf.name}"? The books stay in your library.`,
-      )
-    ) {
+    if (confirmingDeleteId === shelf.id) {
+      if (confirmDeleteTimer.current !== null) {
+        window.clearTimeout(confirmDeleteTimer.current);
+        confirmDeleteTimer.current = null;
+      }
+      setConfirmingDeleteId(null);
       onDelete(shelf.id);
+    } else {
+      // Arming a DIFFERENT shelf must clear the previous pending timer —
+      // otherwise the old timer fires mid-confirm and disarms the new one.
+      if (confirmDeleteTimer.current !== null) {
+        window.clearTimeout(confirmDeleteTimer.current);
+        confirmDeleteTimer.current = null;
+      }
+      setConfirmingDeleteId(shelf.id);
+      confirmDeleteTimer.current = window.setTimeout(() => {
+        confirmDeleteTimer.current = null;
+        setConfirmingDeleteId(null);
+      }, 3000);
     }
   };
 
@@ -98,7 +142,7 @@ export function ShelfSidebar({
               <button
                 type="button"
                 className="shelf-action"
-                onClick={() => handleRename(shelf)}
+                onClick={(event) => handleRename(shelf, event)}
                 aria-label={`Rename ${shelf.name}`}
                 title="Rename"
               >
@@ -106,12 +150,16 @@ export function ShelfSidebar({
               </button>
               <button
                 type="button"
-                className="shelf-action"
+                className={`shelf-action ${confirmingDeleteId === shelf.id ? "shelf-action--confirming" : ""}`}
                 onClick={() => handleDelete(shelf)}
-                aria-label={`Delete ${shelf.name}`}
-                title="Delete"
+                aria-label={
+                  confirmingDeleteId === shelf.id
+                    ? `Click again to confirm delete ${shelf.name}`
+                    : `Delete ${shelf.name}`
+                }
+                title={confirmingDeleteId === shelf.id ? "Click again to confirm" : "Delete"}
               >
-                Delete
+                {confirmingDeleteId === shelf.id ? "Click again to confirm" : "Delete"}
               </button>
             </span>
           </li>
@@ -138,6 +186,40 @@ export function ShelfSidebar({
           Add
         </button>
       </form>
+
+      {/* In-app rename dialog — replaces the native bare prompt (slice 146). */}
+      {renameTarget && (
+        <Dialog
+          open
+          onClose={() => setRenameTarget(null)}
+          returnFocus={renameTriggerRef}
+          title="Rename shelf"
+          description={`Rename "${renameTarget.name}" — the books keep their shelf.`}
+          size="sm"
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setRenameTarget(null)}>
+                Cancel
+              </Button>
+              <Button onClick={confirmRename}>Save</Button>
+            </>
+          }
+        >
+          <label className="shelf-rename-label" htmlFor="shelf-rename-input">
+            Shelf name
+          </label>
+          <input
+            id="shelf-rename-input"
+            className="shelf-rename-input"
+            value={renameValue}
+            onChange={(event) => setRenameValue(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") confirmRename();
+            }}
+            autoFocus
+          />
+        </Dialog>
+      )}
     </nav>
   );
 }

@@ -165,7 +165,7 @@ toolchain_run '
     local basename="$1" path="$2" phase="$3" log="$4"
     echo "==> BUILD ($phase): $basename"
     if ! CI=true VITE_E2E_NATIVE=true VITE_E2E_NATIVE_TTS=fixture \
-      VITE_E2E_CONFIRM=accept VITE_E2E_PROFILE_DIR="$XDG_DATA_HOME/com.lectrice.reader" \
+      VITE_E2E_PROFILE_DIR="$XDG_DATA_HOME/com.lectrice.reader" \
       VITE_E2E_OPEN_PATH="$path" pnpm build >"$log" 2>&1; then
       echo "    BUILD FAILED for $basename (see $log)"
       return 1

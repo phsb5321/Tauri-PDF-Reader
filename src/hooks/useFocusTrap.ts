@@ -176,9 +176,15 @@ export function useFocusTrap({
     // Store currently focused element for later restoration
     previouslyFocusedRef.current = document.activeElement as HTMLElement;
 
-    // Focus initial element or first focusable
+    // Focus initial element or first focusable — unless the active element
+    // is ALREADY inside the container (React's autoFocus on an inner input
+    // must win; stealing focus to the close button would dismiss on Enter —
+    // the rename-dialog finding, slice 146).
     const elementToFocus = initialFocus?.current ?? getFirstFocusable();
-    if (elementToFocus) {
+    if (
+      elementToFocus &&
+      !containerRef.current.contains(document.activeElement as Node)
+    ) {
       elementToFocus.focus();
     }
 
@@ -293,13 +299,25 @@ export function useFocusTrap({
    * Clean up on unmount
    */
   useEffect(() => {
+    // Copy the ref value ONCE — the cleanup may run after the ref changed.
+    const returnFocusAtMount = returnFocus?.current ?? null;
     return () => {
       // Restore body scroll on unmount if trap was active
       if (preventScroll && isActive) {
         document.body.style.overflow = previousOverflowRef.current;
       }
+      // Return focus to the previously focused element on the unmount path
+      // (deactivate only runs on the active flip — a conditionally-rendered
+      // dialog unmounts while active, and focus would fall to <body>).
+      if (isActive) {
+        const elementToFocus =
+          returnFocusAtMount ?? previouslyFocusedRef.current;
+        if (elementToFocus && document.contains(elementToFocus)) {
+          elementToFocus.focus();
+        }
+      }
     };
-  }, [preventScroll, isActive]);
+  }, [preventScroll, isActive, returnFocus]);
 
   return {
     isActive,

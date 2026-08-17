@@ -123,12 +123,13 @@ export function LibraryView({
 
   const handleDocumentDelete = useCallback(
     async (documentId: string) => {
-      if (window.confirm("Remove this document from the library?")) {
-        try {
-          await removeDocument(documentId);
-        } catch (error) {
-          console.error("Failed to remove document:", error);
-        }
+      // Slice 146: the confirmation lives in the card's click-again gate —
+      // the NATIVE confirm is a PROMISE in the packaged WebKitGTK app
+      // (always truthy), so it would delete without the user answering.
+      try {
+        await removeDocument(documentId);
+      } catch (error) {
+        console.error("Failed to remove document:", error);
       }
     },
     [removeDocument],

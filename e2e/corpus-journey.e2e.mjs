@@ -685,14 +685,19 @@ describe(`Packaged corpus journey — ${BASENAME}`, () => {
       { timeout: 5000, timeoutMsg: "delete control never revealed on card hover" },
     );
     await del.waitForClickable({ timeout: 15000 });
-    expect(await browser.execute(() => window.__E2E_READ__.confirmSeamed())).toBe(true);
-    expect(await browser.execute(() => window.__E2E_READ__.confirmCalls())).toBe(0);
+    // Slice 146: the delete is click-again-to-confirm INSIDE the app (the
+    // native confirm was a Promise shim — always truthy). First click arms;
+    // the second fires the real removeDocument chain.
     await browser.execute(() =>
       document.querySelector(".document-card-delete")?.click(),
     );
-    await browser.waitUntil(
-      async () => browser.execute(() => window.__E2E_READ__.confirmCalls() === 1),
-      { timeout: 5000, timeoutMsg: "delete flow never invoked confirmation" },
+    const confirmBtn = await $('[aria-label="Click again to confirm remove"]');
+    await confirmBtn.waitForExist({ timeout: 5000 });
+    await confirmBtn.waitForClickable({ timeout: 5000 });
+    await browser.execute(() =>
+      document
+        .querySelector('[aria-label="Click again to confirm remove"]')
+        ?.click(),
     );
     await browser.waitUntil(
       async () =>

@@ -5,11 +5,15 @@
  * - The two built-in views (all books, unfiled) plus every shelf, with counts
  * - Selecting a shelf reports the shelf id, and the built-ins their sentinels
  * - Creating a shelf trims the name and refuses a blank one
- * - Rename and delete confirm first, and a cancelled prompt changes nothing
+ * - Delete is click-again-to-confirm (slice 146): the destructive action
+ *   fires ONLY on the second click, and never via a native confirm (a
+ *   Promise shim in the packaged WebKitGTK app makes it always truthy).
+ * - Rename is an in-app dialog (the native prompt is a bare text prompt);
+ *   Save with a new name renames, Cancel/blank/unchanged do not.
  */
 
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { ShelfSidebar } from "../../components/library/ShelfSidebar";
 import { UNFILED } from "../../domain/library/shelves";
 import type { Collection } from "../../lib/schemas";
@@ -115,39 +119,91 @@ describe("ShelfSidebar", () => {
     expect(onCreate).not.toHaveBeenCalled();
   });
 
-  it("renames a shelf with the answer given", () => {
-    vi.spyOn(window, "prompt").mockReturnValue("Ethics");
+  it("renames a shelf through the in-app dialog", () => {
     const { onRename } = renderSidebar();
 
     fireEvent.click(screen.getByRole("button", { name: "Rename Philosophy" }));
+    const input = screen.getByLabelText("Shelf name");
+    expect(input).toHaveValue("Philosophy");
+    fireEvent.change(input, { target: { value: "Ethics" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(onRename).toHaveBeenCalledWith("shelf-philosophy", "Ethics");
   });
 
-  it("leaves the shelf alone when the rename prompt is cancelled", () => {
-    vi.spyOn(window, "prompt").mockReturnValue(null);
+  it("leaves the shelf alone when the rename dialog is cancelled", () => {
     const { onRename } = renderSidebar();
 
     fireEvent.click(screen.getByRole("button", { name: "Rename Philosophy" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(onRename).not.toHaveBeenCalled();
   });
 
-  it("deletes a shelf once the warning is accepted", () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+  it("leaves the shelf alone on a blank or unchanged rename", () => {
+    const { onRename } = renderSidebar();
+
+    fireEvent.click(screen.getByRole("button", { name: "Rename Philosophy" }));
+    fireEvent.change(screen.getByLabelText("Shelf name"), {
+      target: { value: "   " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(onRename).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Rename Philosophy" }));
+    fireEvent.change(screen.getByLabelText("Shelf name"), {
+      target: { value: "Philosophy" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(onRename).not.toHaveBeenCalled();
+  });
+
+  it("does NOT delete a shelf on the first click — only the second (click-again)", () => {
     const { onDelete } = renderSidebar();
 
     fireEvent.click(screen.getByRole("button", { name: "Delete Reread" }));
+    expect(onDelete).not.toHaveBeenCalled();
+    // The control now reads as a confirmation.
+    expect(
+      screen.getByRole("button", { name: "Click again to confirm delete Reread" }),
+    ).toBeInTheDocument();
 
+    fireEvent.click(
+      screen.getByRole("button", { name: "Click again to confirm delete Reread" }),
+    );
     expect(onDelete).toHaveBeenCalledWith("shelf-reread");
   });
 
-  it("keeps the shelf when the delete warning is declined", () => {
-    vi.spyOn(window, "confirm").mockReturnValue(false);
-    const { onDelete } = renderSidebar();
+  it("returns focus to the Rename trigger when the dialog closes (unmount-while-active)", () => {
+    const { onRename } = renderSidebar();
+    const renameBtn = screen.getByRole("button", { name: "Rename Philosophy" });
+    fireEvent.click(renameBtn);
+    const input = screen.getByLabelText("Shelf name");
+    fireEvent.change(input, { target: { value: "Ethics" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Delete Reread" }));
+    expect(onRename).toHaveBeenCalledWith("shelf-philosophy", "Ethics");
+    // Keyboard focus returns to the triggering control (slice 146 — the
+    // trap's own snapshot is the dialog's autoFocused input).
+    expect(document.activeElement).toBe(renameBtn);
+  });
 
-    expect(onDelete).not.toHaveBeenCalled();
+  it("auto-dismisses the delete confirmation after the timeout", () => {
+    vi.useFakeTimers();
+    try {
+      const { onDelete } = renderSidebar();
+      fireEvent.click(screen.getByRole("button", { name: "Delete Reread" }));
+      expect(onDelete).not.toHaveBeenCalled();
+
+      act(() => {
+        vi.advanceTimersByTime(3000);
+      });
+      // The confirmation reset: the control reads as plain "Delete" again.
+      expect(
+        screen.getByRole("button", { name: "Delete Reread" }),
+      ).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
