@@ -187,6 +187,30 @@ self-write reload loop.
 - **SC-005**: `--generate-config` output round-trips: parsing it yields exactly
   the built-in defaults.
 
+## Decisions forced by the exact-head review (17/08/2026)
+
+The different-family adversarial gate on `b804b47` returned ALLOW with findings
+that changed the design, not just the code:
+
+1. **A wrong key in an error message is worse than no key.** The key-recovery
+   heuristic must be conservative: anything that could be misread — text inside
+   a `"""`/`'''` multi-line string, an array element that looks like a table
+   header (`["a", "b"],`), a half-quoted fragment (`"aa` from `"aa=bb",`) —
+   yields no key rather than a guess. The position is always reported, so the
+   user is never left without a location.
+2. **The frontend seed may not write `undefined`.** zustand shallow-merges, so
+   an `undefined` in the patch overwrites a stored value. The seed filters its
+   patch locally instead of relying on the Rust serializer emitting every field
+   (an invariant invisible at the TypeScript boundary). `tts.voice`'s explicit
+   `null` is a real value and survives.
+3. **A future `schema_version` is reported, not silently run.** The keys this
+   build understands still apply; the user is told the file came from a newer
+   Lectrice.
+4. **Migration notes are their own warning variant.** Reusing the "clamped"
+   variant would let slice 2's writer misclassify them.
+5. **The error reporter must not panic.** A span landing mid-codepoint would
+   have panicked while formatting the message — a bad config crashing the app.
+
 ## Out of scope
 
 - Per-document overrides; keybinding configuration (no keybinding registry
