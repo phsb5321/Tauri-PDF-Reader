@@ -335,6 +335,13 @@ export function ReaderView() {
           </button>
         </div>
       )}
+      {/* The reading surface and the highlights panel are SIBLINGS IN A ROW.
+          `.app-layout-main` is a flex COLUMN, so mounting the 300px panel
+          directly into it made the panel a column item: it stacked underneath
+          the page and was clipped away by that container's `overflow: hidden`
+          instead of docking. The row wrapper is what makes "beside" possible;
+          the panel's own width is meaningless without it. */}
+      <div className="reader-surface">
       {libraryShowing ? (
         <div className="library-surface">
           <LibraryView
@@ -350,10 +357,6 @@ export function ReaderView() {
       ) : (
         <PdfViewer />
       )}
-      <SettingsPanel
-        isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
-      />
       {showHighlights && currentDocument && (
         <HighlightsPanel
           highlights={highlights}
@@ -363,6 +366,11 @@ export function ReaderView() {
           onClose={() => setShowHighlights(false)}
         />
       )}
+      </div>
+      <SettingsPanel
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+      />
     </AppLayout>
   );
 }
