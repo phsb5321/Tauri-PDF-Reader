@@ -110,7 +110,7 @@ pub fn parse(path: &Path, source: &str) -> LoadOutcome {
     // 2. Migrate the untyped document up to the current schema.
     let migration = migrate::apply(&mut document);
     for note in &migration.notes {
-        warnings.push(Warning::Clamped {
+        warnings.push(Warning::Schema {
             detail: note.clone(),
         });
     }
@@ -197,7 +197,9 @@ pub fn report(outcome: &LoadOutcome) {
                 "config: no config directory on this platform — using built-in defaults"
             );
         }
-        (None, true, None) => {}
+        // `loaded` is only ever set together with a path, so this arm is
+        // unreachable by construction; it exists to keep the match total.
+        (None, true, None) => debug_assert!(false, "loaded outcome without a path"),
     }
 
     for warning in &outcome.warnings {

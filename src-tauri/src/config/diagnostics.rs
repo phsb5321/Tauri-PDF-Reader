@@ -20,7 +20,13 @@ pub struct Position {
 /// Columns are counted in characters rather than bytes, so a key after a
 /// non-ASCII comment still points where the user's editor says it does.
 pub fn position_of(source: &str, byte_offset: usize) -> Position {
-    let clamped = byte_offset.min(source.len());
+    // Walk down to a char boundary before slicing: a span that landed
+    // mid-codepoint would otherwise PANIC inside the error reporter, turning a
+    // bad config into a crash.
+    let mut clamped = byte_offset.min(source.len());
+    while clamped > 0 && !source.is_char_boundary(clamped) {
+        clamped -= 1;
+    }
     let before = &source[..clamped];
     let line = before.matches('\n').count() + 1;
     let line_start = before.rfind('\n').map_or(0, |idx| idx + 1);
@@ -36,6 +42,11 @@ pub enum Warning {
     UnknownKey { path: String },
     /// A value outside the range the app enforces, clamped into it.
     Clamped { detail: String },
+    /// A schema migration ran, or the file declares a version this build does
+    /// not know. Its own variant rather than a reused `Clamped`: the strings
+    /// read the same today, but code that matches on the variant (slice 2's
+    /// writer, tests) must not classify a migration as a clamped value.
+    Schema { detail: String },
 }
 
 impl fmt::Display for Warning {
@@ -45,7 +56,7 @@ impl fmt::Display for Warning {
                 f,
                 "unknown key `{path}` (ignored — check the spelling, or it may be from a newer version)"
             ),
-            Warning::Clamped { detail } => write!(f, "{detail}"),
+            Warning::Clamped { detail } | Warning::Schema { detail } => write!(f, "{detail}"),
         }
     }
 }
@@ -107,6 +118,50 @@ impl ConfigError {
     }
 }
 
+/// Is this line inside a multi-line string, given the state above it?
+///
+/// Counting `"""` / `'''` delimiters from the top of the file is the only way
+/// to know: text inside one is DATA, and reading `foo = bar` out of a quoted
+/// paragraph would name a key that does not exist.
+fn multiline_string_lines(lines: &[&str]) -> Vec<bool> {
+    let mut inside: Option<&'static str> = None;
+    let mut flags = Vec::with_capacity(lines.len());
+
+    for line in lines {
+        // A line that OPENS a multi-line string still carries its own key, so
+        // it is not itself "inside"; the lines after it are.
+        flags.push(inside.is_some());
+
+        let mut rest = *line;
+        while !rest.is_empty() {
+            match inside {
+                Some(delimiter) => match rest.find(delimiter) {
+                    Some(at) => {
+                        inside = None;
+                        rest = &rest[at + delimiter.len()..];
+                    }
+                    None => break,
+                },
+                None => {
+                    let next = ["\"\"\"", "'''"]
+                        .into_iter()
+                        .filter_map(|d| rest.find(d).map(|at| (at, d)))
+                        .min_by_key(|(at, _)| *at);
+                    match next {
+                        Some((at, delimiter)) => {
+                            inside = Some(delimiter);
+                            rest = &rest[at + delimiter.len()..];
+                        }
+                        None => break,
+                    }
+                }
+            }
+        }
+    }
+
+    flags
+}
+
 /// Recover the dotted key for a 1-based line, by reading the user's own file.
 ///
 /// `toml` 0.8 reports a span but not the key path, and the span points at the
@@ -114,48 +169,104 @@ impl ConfigError {
 /// or above it is the leaf, and the first `[section]` above that is its table.
 /// The result is `section.leaf` — the exact string the user can search for.
 ///
-/// ponytail: a text heuristic, not a parse. The ceiling: it names the leaf key
-/// for the ordinary `key = value` and multi-line-array cases, and falls back to
-/// the bare section (or `None`) for inline-table and dotted-key spellings the
-/// template never emits. When it cannot be sure it returns `None` and the
-/// message still carries file:line:col, so the user is never misdirected. The
-/// upgrade path, if those spellings ever matter, is `serde_path_to_error`.
+/// ponytail: a text heuristic, not a parse — but a CONSERVATIVE one. A wrong
+/// key is worse than no key: it sends the user to a line that is not the
+/// problem. So anything that could be misread yields `None`, and the message
+/// still carries file:line:col:
+///   * lines inside a `"""`/`'''` multi-line string are DATA and are skipped
+///     (a quoted `foo = bar` or `[not_a_section]` must never be read as TOML);
+///   * a header must be a WHOLE line — `["a", "b"],` is an array element, not
+///     a table;
+///   * a key candidate must be a bare/quoted key with no `[`, `{` or `,` in it,
+///     so `"aa=bb",` inside an array is not mistaken for `aa = bb`.
+///
+/// The upgrade path, if inline tables ever matter, is `serde_path_to_error`.
 fn key_at(source: &str, line: usize) -> Option<String> {
     let lines: Vec<&str> = source.lines().collect();
     let index = line.checked_sub(1)?.min(lines.len().saturating_sub(1));
+    let in_string = multiline_string_lines(&lines);
 
     let mut leaf: Option<String> = None;
 
     for current in (0..=index).rev() {
+        // Content of a multi-line string is data, not structure.
+        if in_string.get(current).copied().unwrap_or(false) {
+            continue;
+        }
+
         let text = lines[current].trim();
         if text.is_empty() || text.starts_with('#') {
             continue;
         }
 
-        if let Some(section) = text.strip_prefix('[').and_then(|t| t.split(']').next()) {
-            let section = section.trim_start_matches('[').trim();
+        if let Some(section) = whole_line_section(text) {
             return Some(match leaf {
                 Some(leaf) => format!("{section}.{leaf}"),
-                None => section.to_string(),
+                None => section,
             });
         }
 
         if leaf.is_none() {
-            if let Some((candidate, _)) = text.split_once('=') {
-                let candidate = candidate.trim().trim_matches('"');
-                if !candidate.is_empty()
-                    && candidate
-                        .chars()
-                        .all(|c| c.is_alphanumeric() || c == '_' || c == '-' || c == '.')
-                {
-                    leaf = Some(candidate.to_string());
-                }
-            }
+            leaf = bare_key_of(text);
         }
     }
 
     // No enclosing section: a top-level key such as `schema_version`.
     leaf
+}
+
+/// `[section]` or `[[array.of.tables]]` occupying the WHOLE line (a trailing
+/// comment is allowed). `["a", "b"],` — an array element — is not a section.
+fn whole_line_section(text: &str) -> Option<String> {
+    let rest = text.strip_prefix('[')?;
+    let rest = rest.strip_prefix('[').unwrap_or(rest);
+    let (name, after) = rest.split_once(']')?;
+    let after = after.strip_prefix(']').unwrap_or(after).trim();
+    if !after.is_empty() && !after.starts_with('#') {
+        return None;
+    }
+    let name = name.trim().trim_matches('"').trim_matches('\'');
+    if name.is_empty() || !is_key_shaped(name) {
+        return None;
+    }
+    Some(name.to_string())
+}
+
+/// The key of a `key = value` line, when it is unambiguously one.
+fn bare_key_of(text: &str) -> Option<String> {
+    let (candidate, _) = text.split_once('=')?;
+    let candidate = candidate.trim();
+    // Structural characters mean this is a value, not a key.
+    if candidate.contains(['[', '{', ',']) {
+        return None;
+    }
+    // A quoted key must be FULLY quoted. `"aa` — the head of the array element
+    // `"aa=bb",` — opens a quote it never closes, and reading it as a key would
+    // invent `aa`.
+    let candidate = match candidate.chars().next() {
+        Some(quote @ ('"' | '\'')) => {
+            let inner = candidate.strip_prefix(quote)?.strip_suffix(quote)?;
+            if inner.contains(quote) {
+                return None;
+            }
+            inner
+        }
+        _ => {
+            if candidate.contains(['"', '\'']) {
+                return None;
+            }
+            candidate
+        }
+    };
+    if candidate.is_empty() || !is_key_shaped(candidate) {
+        return None;
+    }
+    Some(candidate.to_string())
+}
+
+fn is_key_shaped(text: &str) -> bool {
+    text.chars()
+        .all(|c| c.is_alphanumeric() || c == '_' || c == '-' || c == '.')
 }
 
 #[cfg(test)]
@@ -228,6 +339,45 @@ mod tests {
     fn key_at_reports_the_section_when_the_error_is_the_header_itself() {
         let source = "[render]\n";
         assert_eq!(key_at(source, 1), Some("render".to_string()));
+    }
+
+    #[test]
+    fn key_at_ignores_key_like_text_inside_a_multi_line_string() {
+        // A quoted paragraph is DATA. Reading `foo = bar` out of it would name
+        // a key that does not exist anywhere in the file.
+        let source = "[highlight]\ncolors = [\n  \"\"\"\n  foo = bar\n  \"\"\",\n  42,\n]\n";
+        assert_eq!(key_at(source, 6), Some("highlight.colors".to_string()));
+    }
+
+    #[test]
+    fn key_at_ignores_a_section_header_inside_a_multi_line_string() {
+        let source = "[highlight]\ncolors = [\n  \"\"\"\n  [not_a_section]\n  \"\"\",\n  42,\n]\n";
+        assert_eq!(key_at(source, 6), Some("highlight.colors".to_string()));
+    }
+
+    #[test]
+    fn key_at_does_not_mistake_a_quoted_equals_for_a_key() {
+        // `"aa=bb",` is an array ELEMENT, not `aa = bb`.
+        let source = "[highlight]\ncolors = [\n  \"aa=bb\",\n  42,\n]\n";
+        assert_eq!(key_at(source, 4), Some("highlight.colors".to_string()));
+    }
+
+    #[test]
+    fn key_at_does_not_mistake_a_nested_array_element_for_a_section() {
+        let source = "[render]\ngrid = [\n  [\"a\", \"b\"],\n  42,\n]\n";
+        assert_eq!(key_at(source, 4), Some("render.grid".to_string()));
+    }
+
+    #[test]
+    fn key_at_reads_an_array_of_tables_header() {
+        let source = "[[shelf]]\nname = 12\n";
+        assert_eq!(key_at(source, 2), Some("shelf.name".to_string()));
+    }
+
+    #[test]
+    fn key_at_allows_a_trailing_comment_on_a_section_header() {
+        let source = "[cache]  # audio cache\nmax_size_bytes = \"big\"\n";
+        assert_eq!(key_at(source, 2), Some("cache.max_size_bytes".to_string()));
     }
 
     #[test]

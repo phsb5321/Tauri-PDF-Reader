@@ -270,6 +270,100 @@ fn an_absent_file_yields_defaults_and_creates_nothing() {
 }
 
 #[test]
+fn a_whitespace_only_file_loads_as_defaults() {
+    // Documented semantics: an EMPTY file is a valid config that selects the
+    // defaults. It is distinguishable from an absent file by `loaded`, which is
+    // what lets the frontend seed leave stored settings alone in the absent
+    // case but honour an intentionally-empty file.
+    let outcome = config::parse(Path::new("empty.toml"), "\n  \n\t\n# just a comment\n");
+
+    assert!(outcome.loaded);
+    assert!(outcome.error.is_none());
+    assert!(warnings_of(&outcome).is_empty());
+    assert_eq!(outcome.config, Config::default());
+}
+
+#[test]
+fn a_non_utf8_file_reports_an_io_error_and_falls_back_to_defaults() {
+    let dir = std::env::temp_dir().join(format!(
+        "lectrice-config-fixture-binary-{}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&dir).expect("temp dir");
+    let target = dir.join("config.toml");
+    // 0xFF is not valid UTF-8 anywhere; `read_to_string` rejects it.
+    std::fs::write(&target, [0xFFu8, 0xFE, 0x00, 0x42]).expect("write fixture");
+
+    let outcome = config::load_from(&target);
+
+    assert!(!outcome.loaded);
+    assert_eq!(outcome.config, Config::default());
+    let error = outcome.error.expect("an unreadable file must be reported");
+    assert!(
+        error.to_string().contains("could not read config file"),
+        "{error}"
+    );
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_nonsense_schema_version_does_not_stop_the_file_loading() {
+    // `schema_version` is typed `u32`, so a negative/float/string value is a
+    // type error like any other — but a config must not be bricked by it in a
+    // way the message cannot explain.
+    for bad in ["\"abc\"", "-1", "1.5"] {
+        let source = format!("schema_version = {bad}\n");
+        let outcome = config::parse(Path::new("config.toml"), &source);
+
+        assert!(!outcome.loaded, "schema_version = {bad} must be rejected");
+        assert_eq!(outcome.config, Config::default());
+        let error = outcome
+            .error
+            .unwrap_or_else(|| panic!("schema_version = {bad} must report an error"));
+        assert_eq!(
+            error.key.as_deref(),
+            Some("schema_version"),
+            "the message must name the top-level key: {error}"
+        );
+    }
+}
+
+#[test]
+fn clamped_values_land_in_the_returned_config_not_just_in_the_notes() {
+    // A note about clamping is worthless if the config still carries the
+    // out-of-range value.
+    let outcome = config::parse(
+        Path::new("config.toml"),
+        "[tts]\nrate = 99.0\n\n[ai_tts]\nspeed = 0.01\n\n[render]\nmax_megapixels = 999\n",
+    );
+
+    assert!(outcome.loaded);
+    assert_eq!(outcome.config.tts.rate, 3.0);
+    assert_eq!(outcome.config.ai_tts.speed, 0.5);
+    assert_eq!(outcome.config.render.max_megapixels, 48);
+    assert_eq!(warnings_of(&outcome).len(), 3);
+}
+
+#[test]
+fn exact_range_boundaries_are_not_clamped() {
+    let outcome = config::parse(
+        Path::new("config.toml"),
+        "[tts]\nrate = 0.5\n\n[ai_tts]\nspeed = 4.5\n\n[render]\nmax_megapixels = 8\n",
+    );
+
+    assert!(outcome.loaded);
+    assert!(
+        warnings_of(&outcome).is_empty(),
+        "a value exactly on the bound is legal: {:?}",
+        warnings_of(&outcome)
+    );
+    assert_eq!(outcome.config.tts.rate, 0.5);
+    assert_eq!(outcome.config.ai_tts.speed, 4.5);
+    assert_eq!(outcome.config.render.max_megapixels, 8);
+}
+
+#[test]
 fn the_generated_template_round_trips_to_the_defaults() {
     // SC-005, through the real pipeline rather than a bare `toml::from_str`.
     let rendered = config::template::render();

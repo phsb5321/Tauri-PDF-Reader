@@ -63,6 +63,15 @@ pub fn apply(document: &mut Value) -> MigrationOutcome {
                 "migrated config from schema_version {from_version} to {CURRENT_SCHEMA_VERSION}"
             ));
         }
+    } else if from_version > CURRENT_SCHEMA_VERSION {
+        // Say so instead of running a config this build cannot interpret in
+        // silence. Not an error: the keys it DOES understand still apply, and
+        // anything else is already covered by the unknown-key warnings.
+        notes.push(format!(
+            "config declares schema_version {from_version}, newer than this build's \
+             {CURRENT_SCHEMA_VERSION} — it was written by a newer Lectrice; \
+             unrecognised keys are ignored"
+        ));
     }
 
     MigrationOutcome {
@@ -122,14 +131,19 @@ mod tests {
     }
 
     #[test]
-    fn a_future_version_is_left_alone() {
+    fn a_future_version_is_left_alone_but_reported() {
         let future = CURRENT_SCHEMA_VERSION + 7;
         let mut document = parse(&format!("schema_version = {future}\n"));
         let outcome = apply(&mut document);
 
         assert_eq!(outcome.from_version, future);
-        assert!(!outcome.changed);
+        assert!(!outcome.changed, "a future file must not be rewritten");
         assert_eq!(declared_version(&document), future);
+        assert!(
+            outcome.notes.iter().any(|n| n.contains("newer")),
+            "running a config this build cannot interpret must not be silent: {:?}",
+            outcome.notes
+        );
     }
 
     #[test]

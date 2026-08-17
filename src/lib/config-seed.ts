@@ -20,6 +20,24 @@ import { commands, type EffectiveConfig } from "./bindings";
 import { useSettingsStore, type Theme } from "../stores/settings-store";
 import { useAiTtsStore } from "../stores/ai-tts-store";
 
+/**
+ * Drop `undefined` entries from a zustand patch.
+ *
+ * zustand's `setState` shallow-merges with `Object.assign` semantics, so an
+ * explicit `undefined` OVERWRITES the stored value rather than leaving it
+ * alone. Today the Rust side serializes every field (`#[serde(default)]` plus a
+ * derived `Serialize`), so nothing is ever `undefined` — but that invariant is
+ * invisible in `bindings.ts`, where specta marks every field optional. The day
+ * a field gains `skip_serializing_if`, a blind patch would silently wipe the
+ * user's stored setting. Filtering here makes the guarantee local instead of
+ * depending on a serializer three layers away.
+ */
+function definedOnly<T extends object>(patch: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(patch).filter(([, value]) => value !== undefined),
+  ) as Partial<T>;
+}
+
 /** Log a config finding once, in a form that names the file. */
 function reportFindings(effective: EffectiveConfig): void {
   if (effective.error) {
@@ -52,20 +70,26 @@ export async function seedStoresFromConfigFile(): Promise<void> {
 
   const { config } = effective;
 
-  useSettingsStore.setState({
-    theme: config.appearance?.theme as Theme,
-    highlightDefaultColor: config.highlight?.default_color,
-    highlightColors: config.highlight?.colors,
-    ttsRate: config.tts?.rate,
-    ttsVoice: config.tts?.voice ?? null,
-    ttsFollowAlong: config.tts?.follow_along,
-    telemetryAnalytics: config.telemetry?.analytics,
-    telemetryErrors: config.telemetry?.errors,
-  });
+  useSettingsStore.setState(
+    definedOnly({
+      theme: config.appearance?.theme as Theme | undefined,
+      highlightDefaultColor: config.highlight?.default_color,
+      highlightColors: config.highlight?.colors,
+      ttsRate: config.tts?.rate,
+      // `voice` is genuinely nullable (null = let the platform choose), so an
+      // explicit null must survive; only an ABSENT section is skipped.
+      ttsVoice: config.tts ? (config.tts.voice ?? null) : undefined,
+      ttsFollowAlong: config.tts?.follow_along,
+      telemetryAnalytics: config.telemetry?.analytics,
+      telemetryErrors: config.telemetry?.errors,
+    }),
+  );
 
-  useAiTtsStore.setState({
-    selectedVoiceId: config.ai_tts?.voice_id,
-    speed: config.ai_tts?.speed,
-    autoPageEnabled: config.ai_tts?.auto_page,
-  });
+  useAiTtsStore.setState(
+    definedOnly({
+      selectedVoiceId: config.ai_tts?.voice_id,
+      speed: config.ai_tts?.speed,
+      autoPageEnabled: config.ai_tts?.auto_page,
+    }),
+  );
 }

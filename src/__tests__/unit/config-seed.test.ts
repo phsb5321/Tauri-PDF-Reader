@@ -128,6 +128,52 @@ describe("seedStoresFromConfigFile", () => {
     consoleWarn.mockRestore();
   });
 
+  it("never writes undefined over a stored setting", async () => {
+    // zustand setState shallow-merges, so an explicit `undefined` in the patch
+    // OVERWRITES the stored value. Today Rust always serializes every field, but
+    // that invariant is invisible in bindings.ts — this asserts the seed does
+    // not depend on it.
+    useSettingsStore.setState({ theme: "light", ttsRate: 2.0 });
+    useAiTtsStore.setState({ speed: 3.0, autoPageEnabled: true });
+
+    configGetEffective.mockResolvedValue({
+      // A deliberately sparse payload: only `appearance` is present.
+      config: { schema_version: 1, appearance: { theme: "dark" } },
+      path: "/home/p/.config/lectrice/config.toml",
+      loaded: true,
+      warnings: [],
+      error: null,
+    });
+
+    await seedStoresFromConfigFile();
+
+    expect(useSettingsStore.getState().theme).toBe("dark");
+    expect(useSettingsStore.getState().ttsRate).toBe(2.0);
+    expect(useAiTtsStore.getState().speed).toBe(3.0);
+    expect(useAiTtsStore.getState().autoPageEnabled).toBe(true);
+  });
+
+  it("applies an explicit null tts.voice, which is a real value", async () => {
+    // `null` means "let the platform choose" — it must survive the
+    // undefined-filter, unlike an absent section.
+    useSettingsStore.setState({ ttsVoice: "some-voice" });
+
+    configGetEffective.mockResolvedValue({
+      config: {
+        ...DEFAULT_CONFIG,
+        tts: { rate: 1.0, voice: null, follow_along: true },
+      },
+      path: "/home/p/.config/lectrice/config.toml",
+      loaded: true,
+      warnings: [],
+      error: null,
+    });
+
+    await seedStoresFromConfigFile();
+
+    expect(useSettingsStore.getState().ttsVoice).toBeNull();
+  });
+
   it("never throws when the command itself fails", async () => {
     // A reader that will not start because its config could not be read is a
     // worse bug than any misconfiguration.
