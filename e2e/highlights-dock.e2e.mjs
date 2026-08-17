@@ -117,10 +117,16 @@ describe("Packaged highlights panel docking", () => {
       await window.__E2E__.emitMenu("toggle-highlights");
       return true;
     });
-    expect(
-      emitted,
-      "window.__E2E__.emitMenu is missing — build the frontend with VITE_E2E=true as well as VITE_E2E_NATIVE=true",
-    ).toBe(true);
+    // NOTE: this expect() takes ONE argument. The two-arg `expect(v, "msg")`
+    // form is NOT supported by the expect build these packaged lanes run
+    // against ("Expect takes at most one argument.") and turns a real
+    // assertion into a harness error — the same trap the contrast lane hit.
+    // Context goes in an explicit throw or the probe log instead.
+    if (!emitted) {
+      throw new Error(
+        "window.__E2E__.emitMenu is missing — build the frontend with VITE_E2E=true as well as VITE_E2E_NATIVE=true",
+      );
+    }
 
     const panelEl = await $(".highlights-panel");
     await panelEl.waitForExist({
@@ -142,13 +148,26 @@ describe("Packaged highlights panel docking", () => {
 
     // (a) SIDE BY SIDE, not stacked. A stacked panel shares the page's left
     //     edge; a docked one starts at/after the page's right edge.
-    expect(
-      panel.left,
-      `panel.left ${panel.left} must be at/after page.right ${page.right} — stacked, not docked`,
-    ).toBeGreaterThanOrEqual(page.right - 1);
+    if (panel.left < page.right - 1) {
+      throw new Error(
+        `STACKED, NOT DOCKED: panel.left ${panel.left} is before page.right ${page.right} ` +
+          `(panel ${JSON.stringify(panel)}, page ${JSON.stringify(page)})`,
+      );
+    }
 
-    // (b) NOT CLIPPED: fully inside the window on both axes.
-    expect(panel.right).toBeLessThanOrEqual(viewport.w);
+    // (b) NOT CLIPPED: fully inside its container on both axes.
+    //
+    //     Containment is asserted against the SURFACE, not `window.innerWidth`.
+    //     The document is one pixel wider than `innerWidth` on this platform
+    //     (`.app-layout` is `width: 100vw`) — the 1px artifact recorded as gap
+    //     #5 of docs/audit-home-ui-2026-08-16.md, which predates this change and
+    //     is a separate slice. Measuring the dock against the window would fold
+    //     that unrelated 1px into this assertion and make a docked panel look
+    //     clipped; the surface is the box the panel is actually laid out in.
+    expect(panel.right).toBeLessThanOrEqual(surface.right);
+    expect(panel.bottom).toBeLessThanOrEqual(surface.bottom);
+    //     Vertically the window IS the right oracle — the stacking bug pushed
+    //     the panel past the bottom of the screen, and no artifact applies.
     expect(panel.bottom).toBeLessThanOrEqual(viewport.h);
 
     // (c) The dock keeps its width — not squeezed to nothing by the page.
