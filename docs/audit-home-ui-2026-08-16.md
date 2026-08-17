@@ -42,8 +42,11 @@ This seat's route (deepseek-v4-flash) cannot render image attachments, and the v
 
 ## (1) Numbered gap list
 
-Status column added 17/08/2026; the gap text itself is the 16/08 measurement,
-unedited.
+Status column added 17/08/2026. The gap text is the 16/08 measurement, unedited
+except for one marker: gap #6 carried an unmarked aesthetic gloss ("visually
+disproportionate") while the Vision honesty note promises every judgement call is
+tagged, so `[needs vision]` was added there to honour that promise — the
+measurement it sits on (1104 px span for 40 %) is unchanged.
 
 | # | Gap (measurement/code) | Evidence | Cause (file:line) | Status (17/08/2026) |
 |---|---|---|---|---|
@@ -52,10 +55,10 @@ unedited.
 | 3 | **"Continue reading" resume line has NO cover** — text-only hero (title + full-width bar + buttons). The cover-led home goal (design packets) is not met; the resume section and "Also in progress" rows are text-only. | `lectrice-audit-single-dark-1200.png` (resume y168–292), probe `resumeCoverCount=0` | `ResumeSection.tsx` `ResumeLine` — no `DocumentCover` import (file imports only Button/IconButton/ListRow). | **In flight** — slice S3, branch `152-cover-led-home`. Do not re-fix. |
 | 4 | **Empty-state action mismatch (first-run).** Text: "Open a PDF to add it to your library" — only action: **Open Settings**. Opening a PDF is only reachable from the top toolbar ("Open PDF file", `Toolbar.tsx:92`). | `lectrice-audit-empty-light-1200.png`; probe `emptyState.action=["Open Settings"]` | `LibraryView.tsx` `LibraryEmptyState` (~L248–300) — no `onOpenDocument`; only `onOpenSettings`. | **In flight** — slice S2, branch `152-cover-led-home`. Do not re-fix. |
 | 5 | **1 px horizontal document overflow** (`scrollWidth = innerWidth + 1`) — cosmetic scroll artifact, no content lost. | probe `hScroll=true`, `scrollW=1152/1151` | `AppLayout.css:5` `width:100vw` (or a 1 px sibling). | **Open** — slice S5. Cosmetic; no content lost. |
-| 6 | **Resume progress bar spans the full library width (1104 px)** for a single book's 40 % — visually disproportionate (bar reads as a full-width track, not a book's progress). | `lectrice-audit-single-light-1200.png` (resume line rect w=1104) | `ResumeSection.css` `.resume-line-bar` (~L36–48) width 100 % of the resume line. | **Open** — slice S4. |
+| 6 | **Resume progress bar spans the full library width (1104 px)** for a single book's 40 % — visually disproportionate (bar reads as a full-width track, not a book's progress). `[needs vision]` for that aesthetic read; the 1104 px span at 40 % is measured. | `lectrice-audit-single-light-1200.png` (resume line rect w=1104) | `ResumeSection.css` `.resume-line-bar` (~L36–48) width 100 % of the resume line. | **Open** — slice S4. |
 | 7 | **No true narrow breakpoint** — 640 request yields 767 (hard window min); at 767 the layout holds (2 cols, right 744<767) but dead space rises to 30–35 %. | `lectrice-audit-dual-light-640.png` (dead 35 %) | none (platform min-width). `[needs vision]` for crowding. | **Won't fix** — platform/GTK window floor, not a responsive rule. |
 
-**Not gaps (verified):** covers exact 2:3, load for every card, fallback sane (see §3); heading hierarchy sequential; no gradients, no 3-icon rows, no 100vh hero, no invented copy (grep: no `gradient` in library CSS; raw hex only inside tolerated legacy `var(--x, #fallback)` fallbacks); theme flip correct (histograms: Latte light / Mocha dark); empty state flex-centered (`EmptyState.css`).
+**Not gaps (verified):** covers exact 2:3, load for every card, fallback sane (see §3); heading hierarchy sequential; no gradients, no 3-icon rows, no 100vh hero, no invented copy (grep: no `gradient` in library CSS; raw hex only inside tolerated legacy `var(--x, #fallback)` fallbacks); theme flip correct (histograms: Latte light / Mocha dark — ad-hoc pass, see the provenance note; not harness-reproducible); empty state flex-centered (`EmptyState.css`). All of this is verified **as of `f63818e`** — the code assertions (no gradients, no 100vh hero, no invented copy) are snapshot claims and any later product change can falsify them.
 
 ## (2) First-time user with an EMPTY library
 
