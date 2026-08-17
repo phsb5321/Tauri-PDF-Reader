@@ -25,9 +25,12 @@
   display: block;
   width: 100%;
   height: 100%;
-  /* No stretch, ever: crop to the 2:3 box with a center-TOP bias — a cover's
-     title sits at the top, never crop the middle out of it. */
-  object-fit: cover;
+  /* No stretch AND no crop, ever: show the ENTIRE first-page raster
+     (object-fit: contain), letterboxed on the subtle background when the
+     page's aspect differs from the 2:3 skeleton. object-position keeps the
+     cover top-anchored — the title stays at the top, the empty band falls
+     below it, never cutting a full-bleed cover's edges. */
+  object-fit: contain;
   object-position: 50% 0%;
 }
 
