@@ -219,3 +219,63 @@ temporary file. Live validation with a correctly scoped `RUNNER_WORKSPACE`:
 Backup/reversal: `/usr/local/bin/runner-cleanup-hook.sh.bak-20260815` can be
 restored atomically, then `bash -n` rerun. This is host-local runner
 configuration; no application workflow or gate was weakened.
+
+## Every PR red with "FailedToDownloadActionException" (codeload 429) — 17/08/2026
+
+The symptom is a PR whose every job dies in `Set up job` / `Set up runner`
+before any checkout, with:
+
+```
+System.Net.Http.HttpRequestException: Response status code does not indicate
+success: 429 (Too Many Requests).
+  ... https://codeload.github.com/step-security/harden-runner/tar.gz/...
+FailedToDownloadActionException: Failed to download archive ... after 3 attempts
+```
+
+It is **not** a diff, a workflow, or a GitHub outage. The runner re-downloads
+every action because the host cleanup deleted the downloaded-actions cache.
+
+Root-cause chain: vm103's disk crossed 85% → the `>85%` branch of
+`/usr/local/sbin/runner-cleanup.sh` ran `rm -rf "$W"` over the **entire**
+`_work` of every idle runner, not just the repo checkouts → that wiped
+`_work/_actions` (the on-disk cache of downloaded actions) → the next job had to
+re-fetch every action from `codeload.github.com` → codeload rate-limits the
+shared runner pool and answers `429 Too Many Requests` → every job fails before
+it starts. `_work/_actions` on the tauri runner was empty, and a live `curl` of
+the harden-runner tarball returned 429.
+
+This is the fourth instance of the class the script's own header already
+documents three times — "the cleanup deleted a live cache": cargo target
+(17/07/2026), nix store (25/07/2026), `_temp/setup-*` pnpm cache (01/08/2026),
+and the CodeQL `_tool` eviction (14–15/08/2026) is the same shape one directory
+over. `_actions` is a cache whose loss costs rate-limited re-downloads, not
+disk — the whale is the repo checkouts and their build targets.
+
+**Fixed host-side** (`/usr/local/sbin/runner-cleanup.sh`): the `>85%` prune now
+deletes the repo-checkout directories while **preserving** the caches:
+
+```bash
+find "$W" -mindepth 1 -maxdepth 1 -type d \
+  ! -name "_actions" ! -name "_tool" ! -name "_temp" \
+  -exec rm -rf {} + 2>/dev/null
+find "$W/_temp" -mindepth 1 ! -path "$W/_temp/setup-*" -delete 2>/dev/null
+```
+
+The other `_`-prefixed top-level entries (`_PipelineMapping`, `_github_*`) are
+not exempted and are reclaimed too — per-job bookkeeping the runner recreates,
+not rate-limited caches, so only the three caches above need explicit
+preservation.
+
+Falsifier run on vm103 before deployment (fake `_work` with `_actions`, `_tool`,
+`_temp/setup-*`, a big checkout dir, and a stale `_temp` file): the three caches
+survive, the checkout and the stale temp file are reclaimed, and the pre-fix
+`rm -rf "$W"` form fails the `_actions`-survived assertion — 6/6.
+
+Reversal: `/usr/local/sbin/runner-cleanup.sh.bak-20260817`.
+
+If it recurs: first `ls _work/_actions` on the runner — an empty or missing
+`_actions` means some deleter wiped the downloaded-actions cache and every job
+will 429 until it repopulates. Check `runner-cleanup.log` for a `disk NN%
+(>85)` line in the window before the failures; that line names the prune that
+fired. This prune was the deleter here, but any `rm -rf` over `_work` leaves the
+same shape.

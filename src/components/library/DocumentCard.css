@@ -363,3 +363,8 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Slice 146 — click-again confirm state on the delete control. */
+.document-card-delete--confirming {
+  background: color-mix(in srgb, var(--color-accent-alpha) 45%, var(--color-bg-surface));
+}

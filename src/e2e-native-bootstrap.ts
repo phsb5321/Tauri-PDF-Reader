@@ -81,10 +81,6 @@ export interface E2ENativeRead {
   ipcDocumentRowPageByTitle: (title: string) => Promise<number | null>;
   /** Read IPC result for the seeded document (read-only; data-presence oracle). */
   ipcHighlights: () => Promise<unknown>;
-  /** Whether the VITE_E2E_CONFIRM seam replaced the native confirm (read-only marker). */
-  confirmSeamed: () => boolean;
-  /** Number of times product code invoked the confirm seam (read-only oracle). */
-  confirmCalls: () => number;
   /** Cover-cache negative control: a valid-shaped id that is NOT in the
    *  library must be rejected (the DB-existence gate, slice 121). */
   coverCacheRandomProbe: () => Promise<string>;
@@ -204,7 +200,6 @@ async function seedLibraryProfile(): Promise<void> {
 let seededDocId: string | null = null;
 
 export async function installE2ENativeBootstrap(): Promise<void> {
-  let confirmCallCount = 0;
   const read: E2ENativeRead = {
     ready: false,
     error: null,
@@ -252,8 +247,6 @@ export async function installE2ENativeBootstrap(): Promise<void> {
       ((window as unknown as Record<string, unknown>).__E2E_LOG_BUFFER__ as
         | string[]
         | undefined) ?? [],
-    confirmSeamed: () => CONFIRM_SEAMED,
-    confirmCalls: () => confirmCallCount,
     coverCacheRandomProbe: async () => {
       const res = await commands.coverCache("0".repeat(64), null);
       return res.status === "error" ? res.error : "unexpected-ok";
@@ -267,19 +260,6 @@ export async function installE2ENativeBootstrap(): Promise<void> {
     },
   };
   (window as unknown as { __E2E_READ__: E2ENativeRead }).__E2E_READ__ = read;
-
-  // Observer-placed seam (delete lane): the GTK confirm dialog behind
-  // `window.confirm` is WebDriver-impossible (same class as the GTK file
-  // dialog the open lane seams at build time). Accepting the prompt is the
-  // only thing replaced — the real handleDocumentDelete → removeDocument
-  // chain runs below it. Tree-shaken out unless VITE_E2E_NATIVE=true.
-  const CONFIRM_SEAMED = import.meta.env.VITE_E2E_CONFIRM === "accept";
-  if (CONFIRM_SEAMED) {
-    window.confirm = () => {
-      confirmCallCount += 1;
-      return true;
-    };
-  }
 
   // Observer log buffer: capture console for deterministic failure evidence
   // (read-only — never acts on the app).
