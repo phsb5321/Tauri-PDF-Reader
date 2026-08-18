@@ -112,6 +112,23 @@
 
           # bindgen (used transitively by several -sys crates) needs libclang.
           LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
+
+          # Headless GL on a NON-NixOS lane host (143). The nix-built WebKit
+          # resolves GL through libglvnd, which looks for drivers in
+          # /run/opengl-driver — a NixOS-only path that does not exist on the
+          # Ubuntu CI runner, and the host's own /usr/share/glvnd vendor JSON
+          # points at host drivers the nix libEGL will not load. WebKit then
+          # aborts at launch ("Could not create default EGL display:
+          # EGL_BAD_PARAMETER. Aborting...") and every packaged-lane session
+          # dies mid-spec with "invalid session id" — observed 18/08/2026 on
+          # the pr-fast lane, run 32172435260. These are libglvnd's and mesa's
+          # own documented lookup overrides, pointing at the flake's pinned
+          # mesa (swrast/llvmpipe), so the lanes get software GL from the same
+          # rev as the rest of the toolchain. LIBGL_ALWAYS_SOFTWARE (exported
+          # by the lane runners) selects that driver; it cannot help while the
+          # loader finds no driver directory at all.
+          LIBGL_DRIVERS_PATH = "${pkgs.mesa}/lib/dri";
+          __EGL_VENDOR_LIBRARY_FILENAMES = "${pkgs.mesa}/share/glvnd/egl_vendor.d/50_mesa.json";
         };
 
         packages.tauri-driver = tauri-driver;
