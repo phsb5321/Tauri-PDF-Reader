@@ -11,7 +11,15 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const APP = path.resolve(__dirname, "src-tauri/target/debug/tauri-pdf-reader");
+// Launch the binary cargo WROTE: the CI lanes redirect CARGO_TARGET_DIR (see
+// scripts/e2e-toolchain.sh — nix-devShell artifacts must not share a target
+// dir with the host-toolchain jobs), and the in-workspace path then holds no
+// binary at all. Relative values resolve against the repo root, as cargo
+// resolves them; unset keeps the plain src-tauri/target default.
+const TARGET_DIR = process.env.CARGO_TARGET_DIR
+  ? path.resolve(__dirname, process.env.CARGO_TARGET_DIR)
+  : path.resolve(__dirname, "src-tauri/target");
+const APP = path.join(TARGET_DIR, "debug/tauri-pdf-reader");
 // tauri-driver lookup: PATH first (the flake devShell now ships the pinned
 // build, and a `nix profile install` on the CI runner lands in
 // ~/.nix-profile/bin), then the legacy hardcoded path as fallback. An
