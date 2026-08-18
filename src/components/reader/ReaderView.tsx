@@ -342,30 +342,30 @@ export function ReaderView() {
           instead of docking. The row wrapper is what makes "beside" possible;
           the panel's own width is meaningless without it. */}
       <div className="reader-surface">
-      {libraryShowing ? (
-        <div className="library-surface">
-          <LibraryView
-            onDocumentSelect={(document) => {
-              void handleResume(document);
-            }}
-            onResumeAndPlay={(document) => {
-              void handleResumeAndPlay(document);
-            }}
-            onOpenSettings={() => setShowSettings(true)}
+        {libraryShowing ? (
+          <div className="library-surface">
+            <LibraryView
+              onDocumentSelect={(document) => {
+                void handleResume(document);
+              }}
+              onResumeAndPlay={(document) => {
+                void handleResumeAndPlay(document);
+              }}
+              onOpenSettings={() => setShowSettings(true)}
+            />
+          </div>
+        ) : (
+          <PdfViewer />
+        )}
+        {showHighlights && currentDocument && (
+          <HighlightsPanel
+            highlights={highlights}
+            selectedHighlightId={selectedHighlightId}
+            onHighlightClick={handleHighlightClick}
+            onHighlightDelete={handleHighlightDelete}
+            onClose={() => setShowHighlights(false)}
           />
-        </div>
-      ) : (
-        <PdfViewer />
-      )}
-      {showHighlights && currentDocument && (
-        <HighlightsPanel
-          highlights={highlights}
-          selectedHighlightId={selectedHighlightId}
-          onHighlightClick={handleHighlightClick}
-          onHighlightDelete={handleHighlightDelete}
-          onClose={() => setShowHighlights(false)}
-        />
-      )}
+        )}
       </div>
       <SettingsPanel
         isOpen={showSettings}

@@ -9,10 +9,12 @@
  *
  *   - the panel and the page are SIDE BY SIDE: panel.left >= page.right - 1
  *     (a real dock; a stacked panel has its left edge at the page's left);
- *   - the panel is INSIDE the viewport: right <= innerWidth, bottom <=
- *     innerHeight (the clipping half of the bug);
+ *   - the panel AND the surface are INSIDE the window (+1px for the known
+ *     `100vw` artifact) — the clipping half of the bug;
  *   - the panel is TALL: it stretches the reading row rather than collapsing to
  *     content height;
+ *   - the PAGE is still tall: pre-fix it was crushed to h:32, and every
+ *     panel-side assertion would happily pass while it stayed that way;
  *   - the page KEEPS its width: page.right <= panel.left (the dock takes its
  *     own 300px instead of overlaying the page);
  *   - the panel is actually 300px wide and not squeezed by the page.
@@ -63,11 +65,11 @@ function readLayout() {
       };
     };
     const surface = document.querySelector(".reader-surface");
+    const surfaceStyle = surface ? getComputedStyle(surface) : null;
     return {
       viewport: { w: window.innerWidth, h: window.innerHeight },
-      surfaceDirection: surface
-        ? getComputedStyle(surface).flexDirection
-        : null,
+      surfaceDisplay: surfaceStyle ? surfaceStyle.display : null,
+      surfaceDirection: surfaceStyle ? surfaceStyle.flexDirection : null,
       panel: box(".highlights-panel"),
       page: box(".pdf-viewer"),
       surface: box(".reader-surface"),
@@ -96,11 +98,14 @@ describe("Packaged highlights panel docking", () => {
     await resume.waitForClickable({ timeout: 15000 });
     await browser.execute(() =>
       document
-        .querySelector('button[aria-label^="Resume E2E Resume Fixture A, page"]')
+        .querySelector(
+          'button[aria-label^="Resume E2E Resume Fixture A, page"]',
+        )
         ?.click(),
     );
     await browser.waitUntil(
-      async () => browser.execute(() => !!document.querySelector(".pdf-viewer")),
+      async () =>
+        browser.execute(() => !!document.querySelector(".pdf-viewer")),
       { timeout: 20000, timeoutMsg: "reader never mounted" },
     );
 
@@ -138,12 +143,17 @@ describe("Packaged highlights panel docking", () => {
     const after = await readLayout();
     console.log(`DOCK_AFTER ${JSON.stringify(after)}`);
 
-    const { panel, page, viewport, surface, surfaceDirection } = after;
+    const { panel, page, viewport, surface, surfaceDisplay, surfaceDirection } =
+      after;
     expect(panel).not.toBeNull();
     expect(page).not.toBeNull();
 
-    // The dock only exists because the surface is a row; assert the mechanism,
-    // so a regression names its own cause instead of just moving a rectangle.
+    // The dock only exists because the surface is a FLEX row; assert the
+    // mechanism, so a regression names its own cause instead of just moving a
+    // rectangle. `display` is checked too: `flex-direction`'s initial value is
+    // already `row`, so a `.reader-surface` that lost `display: flex` entirely
+    // would still report "row" and this check alone would not notice.
+    expect(surfaceDisplay).toBe("flex");
     expect(surfaceDirection).toBe("row");
 
     // (a) SIDE BY SIDE, not stacked. A stacked panel shares the page's left
@@ -155,19 +165,21 @@ describe("Packaged highlights panel docking", () => {
       );
     }
 
-    // (b) NOT CLIPPED: fully inside its container on both axes.
+    // (b) NOT CLIPPED: fully inside the WINDOW, with an explicit 1px tolerance.
     //
-    //     Containment is asserted against the SURFACE, not `window.innerWidth`.
-    //     The document is one pixel wider than `innerWidth` on this platform
-    //     (`.app-layout` is `width: 100vw`) — the 1px artifact recorded as gap
-    //     #5 of docs/audit-home-ui-2026-08-16.md, which predates this change and
-    //     is a separate slice. Measuring the dock against the window would fold
-    //     that unrelated 1px into this assertion and make a docked panel look
-    //     clipped; the surface is the box the panel is actually laid out in.
-    expect(panel.right).toBeLessThanOrEqual(surface.right);
-    expect(panel.bottom).toBeLessThanOrEqual(surface.bottom);
-    //     Vertically the window IS the right oracle — the stacking bug pushed
-    //     the panel past the bottom of the screen, and no artifact applies.
+    //     Asserting containment against `.reader-surface` alone would be nearly
+    //     tautological — the panel is its child, so it says little more than
+    //     "flexbox laid the child out inside its parent", and a surface itself
+    //     pushed past the window (panel at left:1700 of a 2000px surface) would
+    //     sail through. The window is the oracle that can actually fail.
+    //
+    //     The +1 is the pre-existing `width: 100vw` artifact: the document is
+    //     one pixel wider than `innerWidth` on this platform, recorded as gap
+    //     #5 of docs/audit-home-ui-2026-08-16.md. It predates this change and is
+    //     its own slice; the tolerance keeps that 1px from masquerading as
+    //     clipping while leaving any real overflow (>= 2px) falsifiable.
+    expect(panel.right).toBeLessThanOrEqual(viewport.w + 1);
+    expect(surface.right).toBeLessThanOrEqual(viewport.w + 1);
     expect(panel.bottom).toBeLessThanOrEqual(viewport.h);
 
     // (c) The dock keeps its width — not squeezed to nothing by the page.
@@ -177,6 +189,16 @@ describe("Packaged highlights panel docking", () => {
     //     Compared against the surface, so this holds at any window size.
     expect(panel.h).toBe(surface.h);
     expect(panel.h).toBeGreaterThan(viewport.h / 2);
+
+    // (d2) THE PAGE STAYS FULL HEIGHT — the other half of the red symptom.
+    //      Pre-fix the page was crushed to h:32 while the panel took the rest
+    //      of the column. Every assertion above is about the PANEL, so a layout
+    //      that docked the panel correctly but stopped stretching the page
+    //      (e.g. `align-self: flex-start` on `.pdf-viewer`) would reproduce
+    //      h:32 and still pass. This is what pins the vertical half of the bug.
+    expect(page.h).toBe(surface.h);
+    expect(page.h).toBeGreaterThan(viewport.h / 2);
+    expect(page.h).toBe(before.page.h);
 
     // (e) The page yielded exactly the dock's width and kept the rest — the
     //     panel docks BESIDE it rather than overlaying it.
