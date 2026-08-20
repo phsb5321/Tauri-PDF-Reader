@@ -20,12 +20,15 @@ interface LibraryViewProps {
   onResumeAndPlay: (document: Document) => void;
   /** Opens the app-wide settings panel (the home's TTS-setup signal). */
   onOpenSettings: () => void;
+  /** The real open-PDF flow (the toolbar's useOpenPdf path). */
+  onOpenDocument: () => void;
 }
 
 export function LibraryView({
   onDocumentSelect,
   onResumeAndPlay,
   onOpenSettings,
+  onOpenDocument,
 }: Readonly<LibraryViewProps>) {
   const {
     documents: allDocuments,
@@ -224,6 +227,7 @@ export function LibraryView({
             selectedShelfId={selectedShelfId}
             onClearSearch={() => setSearchQuery("")}
             onOpenSettings={onOpenSettings}
+            onOpenDocument={onOpenDocument}
           />
         ) : (
           <div className={`library-grid library-grid--${viewMode}`}>
@@ -270,6 +274,7 @@ interface LibraryEmptyStateProps {
   selectedShelfId: string | null;
   onClearSearch: () => void;
   onOpenSettings: () => void;
+  onOpenDocument: () => void;
 }
 
 function LibraryEmptyState({
@@ -277,6 +282,7 @@ function LibraryEmptyState({
   selectedShelfId,
   onClearSearch,
   onOpenSettings,
+  onOpenDocument,
 }: Readonly<LibraryEmptyStateProps>) {
   if (searchQuery.trim() === "") {
     return (
@@ -292,6 +298,14 @@ function LibraryEmptyState({
             : "Right-click a book to file it here"
         }
         action={
+          selectedShelfId === null
+            ? {
+                label: "Open a PDF",
+                onClick: onOpenDocument,
+              }
+            : undefined
+        }
+        secondaryAction={
           selectedShelfId === null
             ? {
                 label: "Open Settings",
