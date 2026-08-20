@@ -220,6 +220,7 @@ awk -F'|' '/^\| *(local|remote) *\|/ {gsub(/^ +| +$/,"",$8); print $8}' \
 - `161-alignment-recovery-state` is the only active recovery ref in this snapshot. PR #158 and #159 were deliberately closed as overlapping/blocked recovery attempts; their exact heads and post-close fixes are remotely preserved. PR #156, #157, and #160 are merged; their exact reviewed heads remain remotely contained and are not replayed.
 - Spec 080 head `56b5cb39194ed759098f9849e16e63a1797f2101` is preserved after its out-of-sequence reopen. It stays deferred until the recovery row reaches review.
 - Remote preservation covers commit tips only. Worktree-local modified/untracked files require a separate cleanliness decision before any cleanup.
+- **Post-snapshot addendum:** publishing this state slice added `origin/161-alignment-recovery-state`; review then created `origin/preserve/20260820-160-north-star-reviewed-head` at `cc83a7184bf6b424afb22ef744dd2f79b0b8acd5` and `origin/preserve/20260820-147-reviewed-head` at `511f70dce5010b51ff8a7fff7a7f133f89f751c9`. They are deliberately named outside the immutable 19:36 table instead of rewriting its point-in-time claim; all three are remotely preserved and must appear in the receipt's final disposition/state evidence.
 
 ## Recovery authority and terminal evidence
 
