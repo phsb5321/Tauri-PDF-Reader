@@ -1,0 +1,291 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/phsb5321/Tauri-PDF-Reader/blob/main/docs/alignment-recovery-receipt.schema.json",
+  "title": "Lectrice alignment recovery receipt",
+  "description": "Two-phase evidence envelope. The receipt records accepted main A and is added by a receipt-only child R; it never records R's self-referential SHA.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "program_id",
+    "accepted_main_sha",
+    "receipt_commit_parent",
+    "receipt_envelope",
+    "spec_artifacts",
+    "dispositions",
+    "journey",
+    "checks",
+    "reviews",
+    "state_refs",
+    "generated_at"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "program_id": { "const": "lectrice-alignment-recovery" },
+    "accepted_main_sha": { "$ref": "#/$defs/sha" },
+    "receipt_commit_parent": { "$ref": "#/$defs/sha" },
+    "receipt_envelope": {
+      "const": ["docs/alignment-recovery-receipt.json"]
+    },
+    "spec_artifacts": {
+      "type": "array",
+      "minItems": 3,
+      "items": { "$ref": "#/$defs/repositoryArtifact" }
+    },
+    "dispositions": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "$ref": "#/$defs/disposition" }
+    },
+    "journey": { "$ref": "#/$defs/journey" },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/check" }
+    },
+    "reviews": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/review" }
+    },
+    "state_refs": {
+      "type": "array",
+      "minItems": 3,
+      "items": { "$ref": "#/$defs/stateRef" }
+    },
+    "generated_at": { "$ref": "#/$defs/timestamp" }
+  },
+  "$defs": {
+    "sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "repositoryArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^/]"
+        },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "disposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "item_id",
+        "observed_sha",
+        "category",
+        "immutable_evidence",
+        "owner",
+        "next_action",
+        "falsifier",
+        "preservation_state",
+        "terminal_state"
+      ],
+      "properties": {
+        "item_id": { "type": "string", "minLength": 1 },
+        "observed_sha": { "$ref": "#/$defs/sha" },
+        "category": {
+          "enum": [
+            "north-star-blocking",
+            "worthwhile-post-release-polish",
+            "duplicate",
+            "stale"
+          ]
+        },
+        "immutable_evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "owner": { "type": "string", "minLength": 1 },
+        "next_action": { "type": "string", "minLength": 1 },
+        "falsifier": { "type": "string", "minLength": 1 },
+        "preservation_state": {
+          "enum": [
+            "not-required",
+            "local-only",
+            "remote-preserved",
+            "merged-content-preserved"
+          ]
+        },
+        "terminal_state": {
+          "enum": [
+            "open",
+            "merged",
+            "closed-with-reason",
+            "preserved-only"
+          ]
+        }
+      }
+    },
+    "journeyArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "uri", "sha256"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "uri": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "journeyStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "actor_action",
+        "oracle_observation",
+        "elapsed_ms",
+        "failure_reason",
+        "result"
+      ],
+      "properties": {
+        "name": {
+          "enum": [
+            "fresh_profile",
+            "open_pdf",
+            "no_key_setup_visible",
+            "start_narration",
+            "mutate_acknowledged_state",
+            "normal_close_process_ended",
+            "relaunch_new_process",
+            "resume_same_document_page",
+            "highlight_present"
+          ]
+        },
+        "actor_action": { "type": "string", "minLength": 1 },
+        "oracle_observation": { "type": "string", "minLength": 1 },
+        "elapsed_ms": { "type": "integer", "minimum": 0 },
+        "failure_reason": { "type": ["string", "null"] },
+        "result": { "enum": ["pass", "fail"] }
+      }
+    },
+    "journey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_sha",
+        "platform_scope",
+        "profile_id",
+        "fixture_id",
+        "started_at",
+        "finished_at",
+        "steps",
+        "artifacts",
+        "result"
+      ],
+      "properties": {
+        "source_sha": { "$ref": "#/$defs/sha" },
+        "platform_scope": { "type": "string", "minLength": 1 },
+        "profile_id": { "type": "string", "minLength": 1 },
+        "fixture_id": { "type": "string", "minLength": 1 },
+        "started_at": { "$ref": "#/$defs/timestamp" },
+        "finished_at": { "$ref": "#/$defs/timestamp" },
+        "steps": {
+          "type": "array",
+          "minItems": 9,
+          "maxItems": 9,
+          "items": { "$ref": "#/$defs/journeyStep" }
+        },
+        "artifacts": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/journeyArtifact" }
+        },
+        "result": { "enum": ["pass", "fail"] }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "run_id",
+        "subject",
+        "head_sha",
+        "conclusion",
+        "evidence_ref"
+      ],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "run_id": { "type": "integer", "minimum": 1 },
+        "subject": {
+          "type": "string",
+          "pattern": "^(accepted-main|pr:[0-9]+)$"
+        },
+        "head_sha": { "$ref": "#/$defs/sha" },
+        "conclusion": { "enum": ["success", "failure", "cancelled", "skipped"] },
+        "evidence_ref": { "type": "string", "minLength": 1 }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reviewer",
+        "generator_family",
+        "provider_family",
+        "subject",
+        "head_sha",
+        "verdict",
+        "evidence_ref"
+      ],
+      "properties": {
+        "reviewer": { "type": "string", "minLength": 1 },
+        "generator_family": {
+          "enum": ["anthropic", "openai", "chinese-frontier"]
+        },
+        "provider_family": {
+          "enum": ["anthropic", "openai", "chinese-frontier"]
+        },
+        "subject": {
+          "type": "string",
+          "pattern": "^(accepted-main|pr:[0-9]+)$"
+        },
+        "head_sha": { "$ref": "#/$defs/sha" },
+        "verdict": { "enum": ["ALLOW", "BLOCK"] },
+        "evidence_ref": { "type": "string", "minLength": 1 }
+      }
+    },
+    "stateRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "repository",
+        "path",
+        "revision",
+        "sha256",
+        "observed_main_sha",
+        "observed_at"
+      ],
+      "properties": {
+        "id": {
+          "enum": ["repo-backlog", "repo-branch-ledger", "vault-save-state"]
+        },
+        "kind": { "enum": ["repository", "vault"] },
+        "repository": { "enum": ["lectrice", "vault"] },
+        "path": { "type": "string", "minLength": 1, "pattern": "^[^/]" },
+        "revision": { "$ref": "#/$defs/sha" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "observed_main_sha": { "$ref": "#/$defs/sha" },
+        "observed_at": { "$ref": "#/$defs/timestamp" }
+      }
+    }
+  }
+}
