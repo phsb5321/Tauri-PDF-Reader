@@ -1,6 +1,6 @@
 # User-journey evidence matrix
 
-Last reconciled: 20/08/2026, Spec 079 candidate preparation.
+Last reconciled: 20/08/2026, Spec 079 candidate preparation on baseline main `a8768a2f273bb99bc5343a83e5b07cf92cfbba8c`.
 
 `PROVEN` means a packaged Tauri actor reaches the public control and a separate
 oracle checks the outcome. `PARTIAL` means deterministic unit/component evidence
