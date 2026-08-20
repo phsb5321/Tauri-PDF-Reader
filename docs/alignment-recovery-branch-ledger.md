@@ -13,14 +13,33 @@ model verdict is not evidence and none is used as such.
 
 ## 1. Preservation (T001 correction input, re-verified)
 
-`$ git for-each-ref --format='%(refname:short)' 'refs/remotes/origin/preserve/20260820-*' | wc -l`
+The refs are remote branches — `refs/heads/preserve/20260820-*` **on the remote**, which is
+`refs/remotes/origin/preserve/20260820-*` locally. Running the local form against
+`refs/heads/` returns 0 and means nothing.
+
+```bash
+$ git ls-remote --heads origin 'refs/heads/preserve/20260820-*' | wc -l
+29
+```
 
 | Snapshot (20/08/2026) | Count |
 |---|---|
-| ~17:4x, first scan | 25 — the contract's 23 plus `20260820-151-card-fold` and `20260820-080-goal-speckit-enforcement-reopened`, added as #152/#155 reached terminal state |
+| ~17:4x | 25 |
 | ~18:0x, after the §2 orphan was preserved | 26 |
-| **18:29, latest re-measure** | **27** |
-| Tip inventory input | `/tmp/lectrice-local-only-tips-20260820.tsv`, 19 tips (+122/125/143 and deleted local 145) |
+| 18:29 | 27 |
+| **18:45, latest re-measure** | **29** |
+
+Composition, measured rather than described (`comm` of the preserve names against the tip
+inventory `/tmp/lectrice-local-only-tips-20260820.tsv`):
+
+- **All 19 inventory tips have a preserve ref** — `comm -13` returns nothing.
+- The contract's baseline of 23 = those 19 **including `151-card-fold`, which is inventory
+  row 17** (an earlier draft of this table double-counted it) + `122-dl2-close-owned`,
+  `125-contrast-aa`, `143-fix-targetdir` + the deleted local `145-home-ui`.
+- The six beyond that baseline, each added as a head reached terminal or in-flight state:
+  `079-alignment-implementation`, `079-alignment-implementation-final`,
+  `080-goal-speckit-enforcement`, `080-goal-speckit-enforcement-reopened`,
+  `156-contrast-oracle-false-green`, `158-north-star-journey-local`.
 
 **Every count here is a point-in-time snapshot of a live graph, not a steady state.** Seats
 are pushing while this runs, so a bare number without its timestamp is not a fact. What is
@@ -54,13 +73,15 @@ finding, not noise:
 | Scan (20/08/2026) | Branches | Uncontained tip |
 |---|---|---|
 | ~17:5x | 62 | `079-alignment-implementation` @ `3878643`, 5 commits ahead of `origin/main`, clean worktree |
-| **18:29** | 62 | `158-north-star-journey` @ `c85ae76` (`test(079): compose first-reader journey`) |
+| 18:29 | 62 | `158-north-star-journey` @ `c85ae76` (`test(079): compose first-reader journey`) |
+| **18:45, latest** | 62 | **none — `zero-container=0`, 62 of 62 contained** |
 
 - The first orphan was preserved at `origin/preserve/20260820-079-alignment-implementation`;
   by 18:29 that branch had **advanced to `1cfe931a`** and is contained by
   `refs/remotes/origin/079-alignment-implementation` (its seat pushed it).
 - `158-north-star-journey` @ `c85ae76` was contained by **no** remote ref at 18:29 — an
-  active seat's in-flight T023 work, seconds old, not abandoned.
+  active seat's in-flight T023 work, seconds old, not abandoned. By 18:45 it was preserved
+  (`origin/preserve/20260820-158-north-star-journey-local`) and the scan was clean.
 
 Both are **active sibling seats' work**. Their worktrees were not touched, and **no content
 classification is recorded for either** — containment is a graph fact; disposition needs
@@ -75,25 +96,34 @@ $ git diff --quiet 03aca59 6594d40; echo $?
 0
 ```
 
-| item_id | observed_sha | Test + result | category | owner | falsifier | preservation_state | terminal_state |
-|---|---|---|---|---|---|---|---|
-| `122-dl2-close-owned` | `6594d40` | `git diff --quiet 03aca59 6594d40` → exit **0** ⇒ tree-identical to PR #125's squash | `duplicate` | Graph | any file differing between `03aca59` and `6594d40` | preserved (`origin/preserve/20260820-*`) | not replayed; content on main |
-| `125-contrast-aa` | `26939d9` | common-base `44a95d62`; combined patch-ids `2e3eb5e10f7c` (branch) ≠ `0e9800dc79a3` (`6b3fa9e`) ⇒ **not** equivalent | `stale` — its premise (pre-#147 contrast approach) is superseded by the merged `6b3fa9e` + #156 repair, and no accepted equivalent outcome is claimed for its unique content | Graph | equal combined patch-ids, or a file in it with no accepted equivalent on main, would move it out of `stale` | preserved | closed to replay; re-specify rather than resurrect |
+Column values use the receipt schema's exact tokens (`category`, `preservation_state`,
+`terminal_state` enums; `observed_sha` 40-hex) so a T024 receipt can copy them without
+translation. Justification lives in the evidence column, never inside a state token.
+
+| item_id | observed_sha | immutable_evidence | category | owner | next_action | falsifier | preservation_state | terminal_state |
+|---|---|---|---|---|---|---|---|---|
+| `122-dl2-close-owned` | `6594d40a8120d0ae66f304e24ace69aec1170141` | `git diff --quiet 03aca59 6594d40` → exit **0**: tree-identical to PR #125's squash | `duplicate` | Graph | none; do not replay | any file differing between `03aca59` and `6594d40` | `remote-preserved` | `preserved-only` |
+| `125-contrast-aa` | `26939d9f405771926ba1236405f261778bd4013d` | **`git diff ecefd016 26939d9` → 0 lines, `git diff --quiet` exit 0**: byte-identical to PR #123's squash `ecefd016` | `duplicate` | Graph | none; do not replay | `git diff ecefd016 26939d9f` becomes non-empty | `remote-preserved` | `preserved-only` |
 
 ### Stale-base 143 — combined patch-id / range-diff, never whole-tree identity
 
+**Correction.** An earlier revision of this section compared `git diff 17bfa6a 8745d17`
+against the branch and reported the combined patch-ids as *differing*. That comparison is
+wrong: its squash-side range carries six intervening merged PRs, so it measures the branch's
+feature patch against "feature + six unrelated merges". The accepted spec baseline states
+the equality from **the shared pre-feature base**, and measured that way it holds exactly:
+
 ```bash
-$ git merge-base 143-fix-targetdir 8745d17
-17bfa6a7…
-$ git diff 17bfa6a 143-fix-targetdir | git patch-id --stable
+$ git diff 17bfa6a 143-fix-targetdir | git patch-id --stable   # branch feature patch
 e4e065676d0d449a4dfeaf7c01eebc38a34855e4 0000000000000000000000000000000000000000
-$ git diff 17bfa6a 8745d17 | git patch-id --stable
-971873117e6fddef89675b49d1c286114a826ca0 0000000000000000000000000000000000000000
+$ git diff 8745d17^ 8745d17 | git patch-id --stable            # squash's own patch
+e4e065676d0d449a4dfeaf7c01eebc38a34855e4 0000000000000000000000000000000000000000
 ```
 
-The combined patch-ids **differ** and the raw whole-tree delta is 25 files — both expected on
-a stale base, and neither proves anything on its own. The discriminating evidence is per-file
-identity plus the range-diff:
+**The combined feature patch-ids are equal** — `e4e065676d0d449a4dfeaf7c01eebc38a34855e4` on
+both sides — confirming the spec's classification rather than contradicting it. The raw
+whole-tree delta is 25 files, which is expected on a stale base and is explicitly not a
+falsifier. Corroborating per-file evidence:
 
 - **9 of the 10 files** `143-fix-targetdir` touches are **byte-identical to `origin/main`**:
   `.github/workflows/packaged-user-gate.yml`, `flake.nix`, `scripts/e2e-toolchain.sh`,
@@ -101,18 +131,18 @@ identity plus the range-diff:
   `src/__tests__/integration/wdio-app-path-contract.test.ts`, `src/e2e-bridge.ts`,
   `src/services/pdf-service.e2e-seam.test.ts`, `src/services/pdf-service.ts`,
   `wdio.conf.mjs`.
-- The tenth, `docs/agent-backlog-state.md`, is the branch's own checkpoint commit `3c5a421`.
-  **No equivalence is claimed for it** — it is a backlog checkpoint, this PR supersedes its
-  content, and neither tree nor patch equivalence was measured for that one file.
+- The tenth, `docs/agent-backlog-state.md`, is the branch's own checkpoint commit `3c5a421`,
+  superseded by iteration #71 in this PR. The patch-id equality above already covers the item;
+  this file is called out only so nobody reads "9 of 10" as a gap.
 - `git range-diff 17bfa6a..143-fix-targetdir 17bfa6a..8745d17` lists six commits present only
   on the squash side — `b98bb97` (#144), `f63818e` (#142), `f4316ef` (#145), `b4b7404` (#150),
-  `7904fa6` (#149), `6191228` (#146) — and, for the one paired commit
-  (`cd91cf3` ↔ `8745d17`), an author-identity difference in the metadata block. Those
-  intervening merges are what the combined patch-id difference measures.
+  `7904fa6` (#149), `6191228` (#146) — plus an author-identity difference in the one paired
+  commit (`cd91cf3` ↔ `8745d17`). Those merges are exactly what the *wrong* comparison was
+  measuring.
 
-| item_id | observed_sha | category | evidence | owner | falsifier | preservation_state | terminal_state |
-|---|---|---|---|---|---|---|---|
-| `143-fix-targetdir` | `64248ad` | `duplicate` **for its nine source files only** | 9/10 files byte-identical to `origin/main`; range-diff attributes the residual to six intervening merges + author identity | Graph | any of the nine differing from main, or a range-diff commit that is neither paired nor an intervening merge | preserved | not replayed; the doc-checkpoint file is superseded here, not proven equivalent |
+| item_id | observed_sha | immutable_evidence | category | owner | next_action | falsifier | preservation_state | terminal_state |
+|---|---|---|---|---|---|---|---|---|
+| `143-fix-targetdir` | `64248ad61cb13d7ec4798f4c5dcd8d757d13ca30` | combined feature patch-ids equal (`e4e0656…55e4` both sides, above); corroborated by 9/10 files byte-identical to `origin/main` | `duplicate` | Graph | none; do not replay onto main | a common-base combined patch-id or range-diff that no longer matches the #143 squash patch (a raw whole-tree delta is **not** a falsifier) | `remote-preserved` | `preserved-only` |
 
 ### Sibling-worktree dirt — independent classification blockers (unclassified by design)
 
@@ -143,7 +173,8 @@ merge conflict** — it was closed on its own acceptance harness (§3).
 | Early refreshed head `2c525f96` | `git merge-base --is-ancestor 6b3fa9e 2c525f96` → **contains #147's squash** |
 | Final exact head `fe4725a9` | `git merge-base --is-ancestor ed0e838 fe4725a9` → exit **0**: its base is `ed0e838`, which *was* `origin/main` when it was closed, so it was **not behind at close time** and needed no further update. `git rev-list --count fe4725a9..origin/main` → **2** today: main has since advanced by #157 `6294ed1` and #156 `4548cef` |
 | Terminal state | **CLOSED** 20/08/2026 19:54:19Z, per T017's "merge **or** close with the failed-harness reason". T017 also requires green exact-head checks and independent review before that decision; **this lane did not observe review evidence** and does not certify that half — the recorded basis for the close is the harness result below |
-| Preserved topology | `origin/151-card-fold` (exact PR head) + `origin/preserve/20260820-151-card-fold` (pre-refresh tip) |
+| Preserved topology | measured, not assumed: `gh pr view 152 --json headRefOid` → `fe4725a9e6b09992f4e62c97579782b2ceb2b9c6`; `git rev-parse origin/151-card-fold` → the **same** SHA, and `git for-each-ref --contains fe4725a9` returns `refs/remotes/origin/151-card-fold`. The pre-refresh tip `f2609fc` is at `origin/preserve/20260820-151-card-fold`. Both the closed head and the pre-refresh tip are remote-preserved |
+| #152 disposition | item_id `151-card-fold` · observed_sha `fe4725a9e6b09992f4e62c97579782b2ceb2b9c6` · category `worthwhile-post-release-polish` · owner QA · next_action re-specify against a current base if the fold behaviour is still wanted · falsifier a `card-fold-verify.sh` dual PASS at `fe4725a9` · preservation_state `remote-preserved` · terminal_state `closed-with-reason` |
 
 **T016 is NOT marked complete, and the numbers below are attributed, not asserted.** The
 closing seat *reports* that `scripts/card-fold-verify.sh` at `fe4725a9` gave `single` PASS
@@ -158,10 +189,11 @@ close, nothing more. Closing T016 needs QA's artifact-backed re-run at the exact
 
 | Task | State | Basis |
 |---|---|---|
-| T002 | **done** | §2 — 62/62 tips contained after preservation, tree/patch-id/range-diff results, dirt inventory, merge-tree |
+| T002 | **done** | §2 — three timestamped scans (last: 18:45, `zero-container=0`, 62 of 62); each uncontained tip found was preserved *before* anything reconciled it, which is the invariant the task protects. Containment is asserted **with its timestamp**, never as a standing property, plus tree/patch-id/range-diff results, dirt inventory, merge-tree |
+| T007 | **done** | `docs/agent-backlog-state.md` iteration #71 — #147's pre-079 merge `511f70d` → `6b3fa9e`, the accepted post-merge oracle finding and no-revert decision, and #152's early refresh to `2c525f96` while OPEN/UNSTABLE |
 | T015 | **done** | §3 containment measurements |
 | T016 | **open** | §3 — needs QA's artifact-backed re-run, not a PR comment |
-| T017 | **done** | §3 terminal state + preserved heads |
+| T017 | **open** | §3 records the terminal state and preserved heads, but T017 also requires green exact-head checks **and independent review** before the close decision. This lane did not observe review evidence, so it does not check the box — same rule as T016 |
 | T018 | **done** | `docs/agent-backlog-state.md` iteration #71 — gaps #2/#5/#6, spec 078 slices 2–3, credential-free Kokoro, each with class + falsifier |
 | T019 | **done — vacuous at this head** | No north-star fix is proposed at this head, so there is no candidate to evaluate and **no `TargetedFixEligibility` record is claimed or pre-granted**. T019 must be re-run against any future fix proposal, which must satisfy every field (`failed_scenario`, `root_cause_scope`, `fail_before`, `pass_after`, `new_user_outcome=false`, `new_dependency=false`, `persisted_data_change=false`, `authority_or_security_widening=false`, `single_owner_worktree=true`) before it may skip a spec |
 | T020 | **done** | Iteration #71 — live open-PR state, classifications, ownership, sequence deviation, next priority, written before `A` is frozen |

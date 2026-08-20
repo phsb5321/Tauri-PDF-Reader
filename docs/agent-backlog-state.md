@@ -28,10 +28,13 @@ Nothing here supplies an accepted head.
   dark-on-dark control at the exact head, instead of silently skipping it.
 - **#152 `fix(library): card text inside the grid fold — covers derive from the container`** —
   refreshed **early to `2c525f96` while still OPEN and UNSTABLE** (before 079 froze), then
-  re-measured post-079 at exact head **`fe4725a9`** with the contract-owned oracle
-  `scripts/card-fold-verify.sh`: `single` PASS in light/dark at 1200 and 640; **`dual` FAIL**
-  before theme/width completion — both cards ended at `y=745` while the grid fold ended at
-  `y=699`, so `visible.length` was 0 (`e2e/card-fold-verify.e2e.mjs:186`).
+  re-measured post-079 at exact head **`fe4725a9`**. **The closing seat reports** that the
+  contract-owned oracle `scripts/card-fold-verify.sh` gave `single` PASS in light/dark at 1200
+  and 640 and **`dual` FAIL** before theme/width completion — both cards ending at `y=745`
+  while the grid fold ended at `y=699`, so `visible.length` was 0
+  (`e2e/card-fold-verify.e2e.mjs:186`). **This lane did not run it and does not vouch for
+  those values**; they are recorded as the stated reason for the close, and T016 stays open
+  until QA re-runs it with an artifact.
 - Per **T017** (merge **or** close with the failed-harness reason) #152 was **CLOSED**
   20/08 19:54:19Z. Topology preserved: exact PR head on `origin/151-card-fold`, pre-refresh
   tip at `origin/preserve/20260820-151-card-fold`. The slice closes **without** claiming its
@@ -62,11 +65,13 @@ Nothing here supplies an accepted head.
   `56b5cb3` cancelled #156's exact-head global checks and cost a serialized-runner cycle. New
   head preserved at `origin/preserve/20260820-080-goal-speckit-enforcement-reopened`. Do not
   reopen or push it until `lectrice-alignment-recovery` reaches review.
-- **Preservation:** `refs/heads/preserve/20260820-*` counted **25 → 26 → 27** across three
-  scans on 20/08 as terminal PRs and in-flight tips were preserved; the graph is live, so the
-  count is only meaningful with its timestamp (see the branch ledger §1–§2). The invariant is
-  the ordering: no local-only tip is reconciled before it is preserved — the work-disposition
-  contract's falsifier, not a nicety.
+- **Preservation:** the refs are remote branches — `refs/heads/preserve/20260820-*` **on the
+  remote** (`refs/remotes/origin/preserve/*` locally; the local `refs/heads/` form returns 0
+  and means nothing). They counted **25 → 26 → 27 → 29** across four scans on 20/08 as
+  terminal PRs and in-flight tips were preserved, and all 19 inventory tips are covered
+  (branch ledger §1 shows the `comm` composition). The graph is live, so a count without its
+  timestamp is not a fact. The invariant is the ordering: no local-only tip is reconciled
+  before it is preserved — the work-disposition contract's falsifier, not a nicety.
 - **Ownership:** Orch sequences; Product owns the 079 contract; Graph owns preservation and
   containment; QA judges exact heads; Control owns `scripts/oracle-alignment-recovery.sh` +
   the receipt; Knowledge (this entry) owns `docs/agent-backlog-state.md`; the Obsidian seat

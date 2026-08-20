@@ -27,7 +27,7 @@
 
 - [ ] T005 Implement distinguishable fail-closed checks for 079 artifacts, ten Pi prompts, Constitution hash, complete dispositions, seat goals, PR terminal state, state references, receipt schema, and the `A -> R` invariant in `scripts/oracle-alignment-recovery.sh`
 - [ ] T006 Run `scripts/test-oracle-alignment-recovery.sh` and record each negative control's non-zero result plus the clean-fixture pass in `docs/alignment-recovery-branch-ledger.md`
-- [ ] T007 Record #147's pre-079 merge (`511f70d` -> `6b3fa9e`), its later accepted oracle findings/no-revert decision, and #152's early refresh to `2c525f96` while still OPEN/UNSTABLE in `docs/agent-backlog-state.md`
+- [x] T007 Record #147's pre-079 merge (`511f70d` -> `6b3fa9e`), its later accepted oracle findings/no-revert decision, and #152's early refresh to `2c525f96` while still OPEN/UNSTABLE in `docs/agent-backlog-state.md`
 - [ ] T008 Set and machine-verify role-specific durable goals for Product, Orch, QA, and Control, then record only their identifiers/status (not transcript prose) in `docs/alignment-recovery-branch-ledger.md`
 
 **Checkpoint**: Recovery authority is executable. No model-authored PASS can mark done.
@@ -64,7 +64,7 @@
 - [x] T014 [US2] Repair the merged #147 contrast oracle in `e2e/contrast-sweep.e2e.mjs`: exercise active input value text and enabled shelf submit, and parse `color(srgb)`/`color-mix()` or fail closed instead of silently skipping; retain exact-head negative controls and do not revert token-correct CSS — `CI=true bash scripts/e2e-contrast-sweep.sh`: light/dark 85 painted states, 0 violations, 0 unparseable; embedded active-value/submit negative controls passed
 - [x] T015 [US2] Verify early-refreshed #152 head `2c525f96` contains `6b3fa9e`, normally update again after 079 only if behind, and record exact head/base SHAs in `docs/alignment-recovery-branch-ledger.md`
 - [ ] T016 [US2] Run `scripts/card-fold-verify.sh` on the refreshed exact #152 head and record all fold/uncropped seed-theme-width results in `docs/alignment-recovery-branch-ledger.md`
-- [x] T017 [US2] Require green exact-head checks and independent review, then merge #152 or close it with the failed-harness reason; record terminal state and squash/closed head in `docs/alignment-recovery-branch-ledger.md`
+- [ ] T017 [US2] Require green exact-head checks and independent review, then merge #152 or close it with the failed-harness reason; record terminal state and squash/closed head in `docs/alignment-recovery-branch-ledger.md`
 - [x] T018 [US2] Re-evaluate audit gaps #2/#5/#6, spec 078 follow-ons, and credential-free Kokoro against the north star; preserve post-release classifications and falsifiers in `docs/agent-backlog-state.md`
 - [x] T019 [US2] Validate any proposed north-star fix against every targeted-fix exemption field and record `eligible` or `requires-new-spec` with evidence in `docs/alignment-recovery-branch-ledger.md`
 
