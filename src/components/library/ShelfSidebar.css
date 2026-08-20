@@ -125,6 +125,16 @@
   border-radius: 6px;
   font-size: 0.8125rem;
   background: var(--bg-secondary, #fff);
+  /* Same UA-default defect class the sweep caught on the submit button:
+     without an explicit colour, WebKitGTK paints form-control text with the
+     engine default (40% black under the Xvfb theme) — dark-on-dark on the
+     dark theme. Bind the typed text and the placeholder to the text tokens
+     (the SearchBar pattern). */
+  color: var(--color-text-primary);
+}
+
+.shelf-new-input::placeholder {
+  color: var(--text-secondary);
 }
 
 .shelf-new-submit {
@@ -132,6 +142,11 @@
   border: 1px solid var(--border-color, #ddd);
   border-radius: 6px;
   background: var(--bg-secondary, #fff);
+  /* Without an explicit colour the WebKitGTK UA default (a 40% black under
+     the Xvfb theme) paints this button — dark-on-dark on the dark theme
+     (contrast-sweep: ratio 1.09). Bind it to the primary text token so it
+     tracks the theme like every other control. */
+  color: var(--color-text-primary);
   font-size: 0.8125rem;
   cursor: pointer;
 }
