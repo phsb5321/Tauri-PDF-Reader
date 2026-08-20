@@ -42,14 +42,14 @@
 
 ### Fail-first tests for User Story 1
 
-- [ ] T009 [US1] Add a composed packaged actor that uses only public reader controls and observer-only instrumentation in `e2e/north-star-journey.e2e.mjs`
-- [ ] T010 [US1] Add negative controls for silent no-key state, Play not crossing the fixture boundary, lingering original process, wrong resumed page/document, and missing highlight in `e2e/north-star-journey.e2e.mjs`
+- [x] T009 [US1] Add a composed packaged actor that uses only public reader controls and observer-only instrumentation in `e2e/north-star-journey.e2e.mjs`
+- [x] T010 [US1] Add negative controls for silent no-key state, Play not crossing the fixture boundary, lingering original process, wrong resumed page/document, and missing highlight in `e2e/north-star-journey.e2e.mjs`
 
 ### Implementation for User Story 1
 
-- [ ] T011 [US1] Add the hermetic, lock-serialized, exact-SHA-reporting runner with fail-closed phase sequencing in `e2e/run-north-star-journey.sh`
-- [ ] T012 [US1] Reuse existing open/native-play/close/home fixture setup without duplicating product state or allowing observer actions in `e2e/north-star-journey.e2e.mjs`
-- [ ] T013 [US1] Prove the no-key setup branch and configured fixture Play branch in the same run, preserving intentional session-only key behavior, in `e2e/north-star-journey.e2e.mjs`
+- [x] T011 [US1] Add the hermetic, lock-serialized, exact-SHA-reporting runner with fail-closed phase sequencing in `e2e/run-north-star-journey.sh`
+- [x] T012 [US1] Reuse existing open/native-play/close/home fixture setup without duplicating product state or allowing observer actions in `e2e/north-star-journey.e2e.mjs`
+- [x] T013 [US1] Prove the no-key setup branch and configured fixture Play branch in the same run, preserving intentional session-only key behavior, in `e2e/north-star-journey.e2e.mjs`
 
 **Checkpoint**: The composed actor discriminates every north-star boundary. Its final exact-`A` run occurs at T023 in Phase 5 after all non-receipt changes land.
 

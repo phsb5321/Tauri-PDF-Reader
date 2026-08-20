@@ -91,3 +91,57 @@ The anchor itself is validated by `tools/check-packaged-gate-trust-anchor.mjs`
 (trigger set, one job, same-repo guard, base checkout, API-only head fetch,
 no event-payload shell interpolation, no head execution, SHA pins, deep
 equality) plus review — it is the trust root by construction.
+
+## Bounded one-off recovery actor — `north-star-journey` (20/08, spec 079)
+
+**This lane is NOT part of the deterministic matrix above and holds no matrix
+authority.** It is a bounded one-off composed for the 079 alignment recovery:
+it proves the first-reader journey end to end at one exact source SHA, and it
+is invoked deliberately, never on `pull_request`. The eight deterministic
+lanes and the real-corpus tier remain the standing catalogue; nothing here
+adds, replaces or reorders them.
+
+```bash
+pnpm test:e2e:north-star          # = bash e2e/run-north-star-journey.sh
+```
+
+Landed by **PR #160 → `a8768a2`** (`e2e/north-star-journey.e2e.mjs` +
+`e2e/run-north-star-journey.sh`).
+
+**Shape.** Three ordered phases on ONE hermetic profile
+(`mktemp -d /tmp/lectrice-north-star-profile.XXXXXX`, seeded through the
+existing `scripts/e2e-profile.sh`): `no-key-open` → `configured-close` →
+`resume-verify`. The actor drives only public reader controls; the
+instrumentation observes and never acts. Between phases the runner asserts the
+persisted state directly (one opened document, acknowledged page 3, at least
+one surviving highlight) and exits non-zero the moment one fails — a later
+phase can never paper over an earlier one.
+
+**Fail-closed inputs.** `set -euo pipefail`; the phase name must be one of the
+three; `NORTH_STAR_SOURCE_SHA` must be a full 40-hex SHA; and
+`git diff --quiet HEAD --` refuses to run against uncommitted build inputs, so
+a result can always be tied to an exact committed tree.
+
+**Nested-lock invocation — read this before wrapping it.** The lane serializes
+on `/tmp/lectrice-heavy-gate.lock`, the same lock the other heavy gates take.
+The documented caller shape is:
+
+```bash
+flock /tmp/lectrice-heavy-gate.lock bash e2e/run-north-star-journey.sh
+```
+
+That child **inherits the already-held lock fd**. The runner detects this
+(it resolves its inherited descriptors against `LOCK_PATH`) and does **not**
+re-acquire on fd 9 — a second `flock` on the same file from the same process
+tree would deadlock against itself, with the 1200 s timeout as the only exit.
+When it is *not* inherited the runner takes the lock itself, so both the bare
+and the wrapped invocation are correct and neither double-locks. To check
+which path a given invocation took without running the journey:
+
+```bash
+NORTH_STAR_LOCK_PROBE=1 bash e2e/run-north-star-journey.sh   # prints inherited=true|false
+```
+
+**Scope rule (unchanged).** Missing driver, missing display or a dirty tree is
+a BLOCKED red, never a skip-green. Do not wire this lane to `pull_request`,
+and do not cite it as authority for what the packaged matrix covers.

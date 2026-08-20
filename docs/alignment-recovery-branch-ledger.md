@@ -185,6 +185,47 @@ values**; their only surviving provenance is a PR comment, which the work-dispos
 contract excludes as immutable evidence. They are recorded as the stated reason for the
 close, nothing more. Closing T016 needs QA's artifact-backed re-run at the exact head.
 
+## 3b. US1 actor — PR #160 terminal state and evidence (T009–T013)
+
+**#160 `test(079): compose first-reader journey` — MERGED** 20/08/2026 22:36:08Z, head
+`cc83a7184bf6b424afb22ef744dd2f79b0b8acd5`, squash **`a8768a2f273bb99bc5343a83e5b07cf92cfbba8c`**,
+landing `e2e/north-star-journey.e2e.mjs` (+609) and `e2e/run-north-star-journey.sh` (+251).
+Exact-head checks at `cc83a71`: Alignment Gate, Analyze (javascript-typescript), Trust anchor,
+Packaged PR-fast lane, Frontend, Backend, Contract Tests, CodeQL and GitGuardian all
+**SUCCESS**; the full packaged matrix and real-corpus soak **SKIPPED** by design. Its second
+commit (`fix(e2e): harden north-star invocation`) reused inherited heavy-gate locks, rejected
+uncommitted build inputs, preserved caller `CI` semantics and asserted the disclosed
+text-egress boundary. Recorded review on the PR: `github-advanced-security` (COMMENTED); this
+lane records that fact and does not restate a verdict it did not produce.
+
+T009–T013 are **implementation** tasks — their acceptance is what the composed actor contains,
+verified below by reading the merged files. **The exact-`A` run is T023 and has not happened;
+nothing here claims a journey pass.**
+
+| Task | Verified in the merged files |
+|---|---|
+| T009 actor uses only public controls + observer-only instrumentation | `publicDomClick` / `publicButtonByText` drive the app; `recordStep(name, actor_action, oracle_observation, …)` only records. Three ordered phases `no-key-open` → `configured-close` → `resume-verify`; a phase outside that set and a `NORTH_STAR_SOURCE_SHA` that is not full 40-hex both throw at load |
+| T010 five negative controls | `proveNegativeControls()` runs `silent_no_key`, `play_not_crossing_boundary`, `lingering_original_process`, `wrong_resumed_document_page`, `missing_highlight` at module load and **throws `negative control did not reject: <name>` if any control fails to reject** — fail-first by construction, not by comment |
+| T011 hermetic, lock-serialized, exact-SHA, fail-closed | `set -euo pipefail`; profile `mktemp -d /tmp/lectrice-north-star-profile.XXXXXX`; `SOURCE_SHA="$(git rev-parse HEAD)"` with `git diff --quiet HEAD --` refusing a dirty tree; between phases it asserts one opened document, acknowledged page `3` and ≥1 surviving highlight, each `exit 1` on failure |
+| T012 reuses existing fixture setup | `source ./scripts/e2e-profile.sh` seeds the one profile; no duplicated product state, no observer actions |
+| T013 both branches in one run | `no-key-open` asserts an *actionable* setup (message, form, key field, provider link, egress disclosure) — the `silent_no_key` control proves a silent state is rejected — and `configured-close` exercises the configured fixture Play, session-only key behaviour preserved |
+
+### Nested-lock invocation — measured, not assumed
+
+The runner serializes on `/tmp/lectrice-heavy-gate.lock` and detects an **inherited** lock fd
+so a `flock … bash runner` caller cannot deadlock against itself. Both paths were exercised
+with the runner's own probe (no journey executed):
+
+```bash
+$ NORTH_STAR_LOCK_PROBE=1 bash e2e/run-north-star-journey.sh
+north-star: lock ready inherited=false
+$ flock /tmp/lectrice-heavy-gate.lock env NORTH_STAR_LOCK_PROBE=1 bash e2e/run-north-star-journey.sh
+north-star: lock ready inherited=true
+```
+
+Documented in `docs/packaged-lanes.md` as a **bounded one-off recovery actor with no matrix
+authority**, invoked via `pnpm test:e2e:north-star`, never wired to `pull_request`.
+
 ## 4. Task status recorded by this lane
 
 | Task | State | Basis |
@@ -192,6 +233,8 @@ close, nothing more. Closing T016 needs QA's artifact-backed re-run at the exact
 | T002 | **done** | §2 — three timestamped scans (last: 18:45, `zero-container=0`, 62 of 62); each uncontained tip found was preserved *before* anything reconciled it, which is the invariant the task protects. Containment is asserted **with its timestamp**, never as a standing property, plus tree/patch-id/range-diff results, dirt inventory, merge-tree |
 | T007 | **done** | `docs/agent-backlog-state.md` iteration #71 — #147's pre-079 merge `511f70d` → `6b3fa9e`, the accepted post-merge oracle finding and no-revert decision, and #152's early refresh to `2c525f96` while OPEN/UNSTABLE |
 | T015 | **done** | §3 containment measurements |
+| T009–T013 | **done** | §3b — verified in the merged `a8768a2` files; the exact-`A` run stays T023 |
+| T014 | **done** (other lane) | contrast-sweep repair merged `4548cef` |
 | T016 | **open** | §3 — needs QA's artifact-backed re-run, not a PR comment |
 | T017 | **open** | §3 records the terminal state and preserved heads, but T017 also requires green exact-head checks **and independent review** before the close decision. This lane did not observe review evidence, so it does not check the box — same rule as T016 |
 | T018 | **done** | `docs/agent-backlog-state.md` iteration #71 — gaps #2/#5/#6, spec 078 slices 2–3, credential-free Kokoro, each with class + falsifier |
