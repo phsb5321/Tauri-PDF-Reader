@@ -4,8 +4,27 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # Heavy packaged lanes share native-driver and global display/evidence surfaces.
-exec 9>/tmp/lectrice-heavy-gate.lock
-flock 9
+# The documented caller shape is `flock LOCK bash runner`; that child inherits
+# the already-held lock fd. Re-acquiring on fd 9 would deadlock against itself.
+LOCK_PATH=/tmp/lectrice-heavy-gate.lock
+LOCK_INHERITED=false
+for fd in /proc/$$/fd/*; do
+  if [ "$(readlink "$fd" 2>/dev/null || true)" = "$LOCK_PATH" ]; then
+    LOCK_INHERITED=true
+    break
+  fi
+done
+if [ "$LOCK_INHERITED" = false ]; then
+  exec 9>"$LOCK_PATH"
+  flock -w 1200 9 || {
+    echo "north-star: timed out waiting for $LOCK_PATH" >&2
+    exit 1
+  }
+fi
+if [ "${NORTH_STAR_LOCK_PROBE:-0}" = 1 ]; then
+  echo "north-star: lock ready inherited=$LOCK_INHERITED"
+  exit 0
+fi
 
 # Pin under /tmp before entering the Nix toolchain: its TMPDIR changes to a
 # nix-shell path, and the hermetic boot guard correctly rejects a sibling
@@ -13,7 +32,6 @@ flock 9
 E2E_PROFILE_DIR="$(mktemp -d /tmp/lectrice-north-star-profile.XXXXXX)"
 export E2E_PROFILE_DIR
 source ./scripts/e2e-profile.sh
-export CI=true
 source ./scripts/e2e-toolchain.sh
 
 APP_DIR="$E2E_PROFILE_DIR/com.lectrice.reader"
@@ -27,7 +45,7 @@ SOURCE_SHA="$(git rev-parse HEAD)"
   echo "north-star: cannot resolve an exact source SHA" >&2
   exit 2
 }
-# A source-bound receipt cannot describe uncommitted product/test code.
+# A source-bound receipt cannot describe build inputs outside the commit.
 git diff --quiet HEAD -- || {
   echo "north-star: tracked worktree changes make source_sha dishonest" >&2
   exit 2
@@ -36,6 +54,18 @@ git diff --cached --quiet -- || {
   echo "north-star: staged changes make source_sha dishonest" >&2
   exit 2
 }
+[ -z "$(git status --porcelain --untracked-files=all)" ] || {
+  echo "north-star: untracked files make source_sha dishonest" >&2
+  exit 2
+}
+[ -z "$(git ls-files --others --ignored --exclude-standard -- '.env*')" ] || {
+  echo "north-star: ignored .env build input makes source_sha dishonest" >&2
+  exit 2
+}
+if env | grep -q '^VITE_'; then
+  echo "north-star: caller-supplied VITE_* makes source_sha dishonest" >&2
+  exit 2
+fi
 
 node scripts/gen-e2e-fixtures.mjs "$APP_DIR" >/dev/null
 GOOD="$APP_DIR/e2e-resume-fixture-a.pdf"

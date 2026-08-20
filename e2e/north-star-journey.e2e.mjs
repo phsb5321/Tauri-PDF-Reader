@@ -42,12 +42,19 @@ if (!RESULT_DIR || !APP_PATH || !/^[0-9a-f]{40}$/.test(SOURCE_SHA || "")) {
 const phasePath = `${RESULT_DIR}/${PHASE}.json`;
 const expectedPath = `${RESULT_DIR}/expected-document.json`;
 
-function assertSetupActionable({ message, form, keyField, providerLink }) {
+function assertSetupActionable({
+  message,
+  form,
+  keyField,
+  providerLink,
+  egressDisclosure,
+}) {
   if (
     !message.includes("requires an ElevenLabs API key") ||
     !form ||
     !keyField ||
-    !providerLink
+    !providerLink ||
+    !egressDisclosure
   ) {
     throw new Error("no-key state has no actionable credential setup");
   }
@@ -90,6 +97,7 @@ function proveNegativeControls() {
           form: false,
           keyField: false,
           providerLink: false,
+          egressDisclosure: false,
         }),
     ],
     [
@@ -419,6 +427,7 @@ describe("Spec 079 packaged north-star journey", () => {
       await publicDomClick("button.ai-playback-setup-btn");
       const form = await $('form[aria-label="Connect ElevenLabs"]');
       await form.waitForExist({ timeout: 10000 });
+      const normalizedFormText = (await form.getText()).replace(/\s+/g, " ");
       assertSetupActionable({
         message: setupMessage,
         form: await form.isExisting(),
@@ -426,6 +435,9 @@ describe("Spec 079 packaged north-star journey", () => {
         providerLink: await form
           .$('a[href="https://elevenlabs.io"]')
           .isExisting(),
+        egressDisclosure: normalizedFormText.includes(
+          "Requested PDF-derived text leaves this device and is sent to ElevenLabs for speech generation.",
+        ),
       });
       steps.push(
         recordStep(
