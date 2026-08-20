@@ -30,7 +30,12 @@ async function readFileFromTauri(filePath: string): Promise<Uint8Array> {
     import.meta.env.VITE_E2E === "true" &&
     fixtureBytes instanceof Uint8Array
   ) {
-    return fixtureBytes;
+    // A COPY per read, like the fs read this stands in for: pdf.js transfers
+    // the buffer it is handed to its worker, which detaches it. Returning the
+    // stored array by reference emptied it on the first parse, so the open
+    // path's final hash-bound read saw 0 bytes and refused the book it had
+    // just verified (PDF_HASH_MISMATCH). Pinned by pdf-service.e2e-seam.test.
+    return new Uint8Array(fixtureBytes);
   }
   if (!isTauriAvailable()) {
     throw new Error(

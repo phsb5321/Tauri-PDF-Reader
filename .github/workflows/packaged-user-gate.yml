@@ -1,0 +1,225 @@
+name: Packaged User Gate
+
+on:
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+  schedule:
+    - cron: "23 4 * * *" # nightly full matrix
+
+permissions:
+  contents: read
+
+concurrency:
+  # ONE fixed runner-wide group (never github.ref): the lane scripts write
+  # global /tmp evidence paths, so only one packaged-user-gate run may ever
+  # execute at a time. The single-slot runner serializes anyway; the group
+  # makes it structural and cancels superseded heads.
+  group: packaged-user-gate
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+  CI: "true"
+
+jobs:
+  pr-fast:
+    # Same-repo PRs only: the self-hosted runner never executes fork PRs.
+    # This execution workflow is validated by the base-owned trust anchor
+    # (packaged-gate-trust-anchor.yml) BEFORE any head code reaches the
+    # runner — the anchor is a required check.
+    name: Packaged PR-fast lane (critical-loop)
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Linux, X64, vm103]
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "20"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
+        with:
+          version: 10
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Assert tauri-driver inside the PINNED flake devShell (BLOCKED if missing)
+        # The flake devShell is the ONE pinned toolchain place (#101): it ships
+        # tauri-driver (packages.tauri-driver, fetchCrate 2.0.6 + cargoLock) and
+        # the pinned rust. No host provisioning, no runtime cargo install.
+        run: |
+          if ! nix develop -c bash -c 'command -v tauri-driver' >/dev/null 2>&1; then
+            mkdir -p ci-evidence
+            printf '{"blocked":"tauri-driver not provided by the pinned flake devShell","remedy":"the flake packages.tauri-driver must build (nix build .#tauri-driver); no host provisioning is required","time":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ci-evidence/prerequisite-failure.json
+            echo "BLOCKED: tauri-driver not in the pinned devShell — see ci-evidence/prerequisite-failure.json"
+            exit 1
+          fi
+
+      - name: Prerequisite receipt enforced (a blocked assert without its receipt fails)
+        if: failure()
+        run: |
+          [ -f ci-evidence/prerequisite-failure.json ] || { echo "FAIL: BLOCKED prerequisite without its machine-readable receipt — evidence discipline broken"; exit 1; }
+
+      - name: Packaged PR-fast lane — hermetic profile, X11 pin, Xvfb
+        # The single canonical command — the contract pins this step's run
+        # exactly. Stale-evidence clearing lives in the runner script.
+        run: bash e2e/run-critical-loop.sh
+
+      - name: Copy failure evidence into the workspace (upload-artifact cannot read /tmp)
+        if: failure()
+        run: |
+          mkdir -p ci-evidence
+          cp /tmp/lectrice-e2e-critical-loop-xvfb.log ci-evidence/ 2>/dev/null || true
+          cp /tmp/lectrice-matrix-critical-loop.log ci-evidence/ 2>/dev/null || true
+
+      - name: Upload failure artifacts (honest evidence, never skipped-green)
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pr-fast-failure-evidence
+          path: ci-evidence/
+          if-no-files-found: warn
+          retention-days: 7
+
+  full-matrix:
+    name: Full packaged matrix (all lanes, strictly serial)
+    if: github.event_name != 'pull_request'
+    runs-on: [self-hosted, Linux, X64, vm103]
+    timeout-minutes: 240
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "20"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
+        with:
+          version: 10
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Assert tauri-driver inside the PINNED flake devShell (BLOCKED if missing)
+        run: |
+          if ! nix develop -c bash -c 'command -v tauri-driver' >/dev/null 2>&1; then
+            mkdir -p ci-evidence
+            printf '{"blocked":"tauri-driver not provided by the pinned flake devShell","remedy":"the flake packages.tauri-driver must build (nix build .#tauri-driver); no host provisioning is required","time":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ci-evidence/prerequisite-failure.json
+            echo "BLOCKED: tauri-driver not in the pinned devShell — see ci-evidence/prerequisite-failure.json"
+            exit 1
+          fi
+
+      - name: Prerequisite receipt enforced (a blocked assert without its receipt fails)
+        if: failure()
+        run: |
+          [ -f ci-evidence/prerequisite-failure.json ] || { echo "FAIL: BLOCKED prerequisite without its machine-readable receipt — evidence discipline broken"; exit 1; }
+
+      - name: Run all packaged lanes — one at a time
+        # Serial by construction: one job loops the eight self-contained lane
+        # runners. The single canonical command — pinned exactly.
+        run: bash scripts/e2e-matrix.sh
+
+      - name: Copy failure evidence into the workspace (upload-artifact cannot read /tmp)
+        if: failure()
+        run: |
+          mkdir -p ci-evidence
+          cp /tmp/lectrice-matrix-*.log ci-evidence/ 2>/dev/null || true
+          cp /tmp/lectrice-e2e-*-xvfb.log ci-evidence/ 2>/dev/null || true
+
+      - name: Upload failure artifacts (per-lane evidence)
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: full-matrix-failure-evidence
+          path: ci-evidence/
+          if-no-files-found: warn
+          retention-days: 7
+
+  real-corpus:
+    # Post-merge/manual REAL-corpus soak (docs/packaged-lanes.md). NEVER on
+    # pull_request — PR-fast stays deterministic fixtures. Consumes
+    # LECTRICE_REAL_PDF_CORPUS (a LOCAL dir on the runner; the five-book Data
+    # Engineering corpus). Copyright boundary: the hook stages a TRANSIENT
+    # copy inside the hermetic profile (fs scope) and the artifact upload
+    # below carries ONLY logs + summary — never PDFs or derived renders.
+    name: Real-corpus soak (real PDFs, post-merge/manual)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: [self-hosted, Linux, X64, vm103]
+    timeout-minutes: 240
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "20"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
+        with:
+          version: 10
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Assert tauri-driver inside the PINNED flake devShell (BLOCKED if missing)
+        run: |
+          if ! nix develop -c bash -c 'command -v tauri-driver' >/dev/null 2>&1; then
+            mkdir -p ci-evidence
+            printf '{"blocked":"tauri-driver not provided by the pinned flake devShell","remedy":"the flake packages.tauri-driver must build (nix build .#tauri-driver); no host provisioning is required","time":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ci-evidence/prerequisite-failure.json
+            echo "BLOCKED: tauri-driver not in the pinned devShell — see ci-evidence/prerequisite-failure.json"
+            exit 1
+          fi
+
+      - name: Prerequisite receipt enforced (a blocked assert without its receipt fails)
+        if: failure()
+        run: |
+          [ -f ci-evidence/prerequisite-failure.json ] || { echo "FAIL: BLOCKED prerequisite without its machine-readable receipt — evidence discipline broken"; exit 1; }
+
+      - name: Assert the real corpus is provisioned locally (BLOCKED if missing)
+        run: |
+          if [ -z "$LECTRICE_REAL_PDF_CORPUS" ]; then
+            mkdir -p ci-evidence
+            printf '{"blocked":"LECTRICE_REAL_PDF_CORPUS unset","remedy":"set it in the runner .env (local dir, e.g. /tmp/lectrice-corpus-fixture)","time":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ci-evidence/prerequisite-failure.json
+            echo "BLOCKED: LECTRICE_REAL_PDF_CORPUS unset — see ci-evidence/prerequisite-failure.json"
+            exit 1
+          fi
+          [ -d "$LECTRICE_REAL_PDF_CORPUS" ] || {
+            mkdir -p ci-evidence
+            printf '{"blocked":"LECTRICE_REAL_PDF_CORPUS is not a directory","time":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ci-evidence/prerequisite-failure.json
+            echo "BLOCKED: external corpus directory is unavailable — see ci-evidence/prerequisite-failure.json"; exit 1; }
+
+      - name: Run the real-corpus soak (per-book phases, machine-readable summary)
+        # Run-scoped evidence dir: $RUNNER_TEMP is per-job. The single
+        # canonical command — pinned exactly.
+        run: LECTRICE_CORPUS_OUT="$RUNNER_TEMP/lectrice-corpus" bash scripts/e2e-real-corpus.sh
+
+      - name: Copy identity-free evidence summary (never corpus/logs)
+        # ALWAYS runs: after a prerequisite BLOCKED the receipt in ci-evidence
+        # must still reach the artifact upload (default success() would skip it).
+        if: always()
+        run: |
+          mkdir -p ci-evidence/corpus
+          cp -r "${RUNNER_TEMP}/lectrice-corpus"/* ci-evidence/corpus/ 2>/dev/null || true
+
+      - name: Upload identity-free corpus summary
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: real-corpus-evidence
+          path: |
+            ci-evidence/corpus/
+            ci-evidence/prerequisite-failure.json
+          if-no-files-found: warn
+          retention-days: 7

@@ -69,6 +69,16 @@ export interface E2EBridge {
   ready: true;
 }
 
+/**
+ * The fixture as the BACKEND must see it: relative to the APP's process cwd,
+ * which wdio.conf.mjs pins to <repo>/src-tauri — the same base src-tauri/src/
+ * lib.rs resolves BINDINGS_PATH ("../src/lib/bindings.ts") against. A repo-
+ * root-relative path silently stopped resolving when PR #124 moved the spawn
+ * cwd, and every packaged open then failed with FILE_NOT_FOUND. Pinned by
+ * src/__tests__/integration/e2e-fixture-path-contract.test.ts.
+ */
+const FIXTURE_PATH = "../public/e2e-fixture.pdf";
+
 export function installE2EBridge(): void {
   const bridge: E2EBridge = {
     async loadFixture() {
@@ -117,7 +127,7 @@ export function installE2EBridge(): void {
       const response = await fetch("/e2e-fixture.pdf");
       const bytes = new Uint8Array(await response.arrayBuffer());
       (globalThis as Record<string, unknown>).__E2E_DIALOG_FIXTURE__ =
-        "public/e2e-fixture.pdf";
+        FIXTURE_PATH;
       (globalThis as Record<string, unknown>).__E2E_FS_FIXTURE_BYTES__ = bytes;
       return true;
     },
@@ -126,7 +136,7 @@ export function installE2EBridge(): void {
       // toolbar open must fail visibly on the library surface instead of
       // silently.
       (globalThis as Record<string, unknown>).__E2E_DIALOG_FIXTURE__ =
-        "public/e2e-fixture.pdf";
+        FIXTURE_PATH;
       (globalThis as Record<string, unknown>).__E2E_FS_FIXTURE_BYTES__ =
         new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x00, 0x00, 0x00]);
       return true;
