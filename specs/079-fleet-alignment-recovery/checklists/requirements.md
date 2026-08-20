@@ -33,6 +33,6 @@
 
 - Validation pass 1 on 20/08/2026 found no unresolved marker.
 - The initial graph report's three-tip count was false; an all-local-ref scan found 19 additional tips, and 23 exact remote preservation refs now cover all 22 zero-remote-containing tips plus deleted local 145. Future inventory is all-ref, never named-worktree scoped.
-- Tree/combined-patch controls establish local 145/151 equivalence and merged-squash equivalence for 122/125/143; preservation alone does not decide the other tips' categories.
+- Tree controls establish local 145/151 and 122/125 equivalence; 143 is a duplicate **feature patch on a stale base**, proven only by common-base combined patch-id/range-diff—its whole tree is expected to differ.
 - Credential-required narration is explicit product scope, not a persistence bug: the key remains intentionally session-only; no-key acceptance requires an actionable setup path, while offline voice remains post-release work.
 - PR #147 merged out of order as `6b3fa9e`; later accepted review found two contrast-oracle false-greens, so a post-079 test-only repair precedes final acceptance without reverting token-correct CSS.

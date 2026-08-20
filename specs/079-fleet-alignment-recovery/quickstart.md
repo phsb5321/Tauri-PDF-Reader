@@ -33,7 +33,7 @@ test "$(git for-each-ref --format='%(refname)' refs/remotes/origin/preserve/2026
 # For every local tip, prove at least one remote ref contains it; never scan only named worktrees.
 ```
 
-The 23 refs preserve the 19 TSV tips plus 122/125/143 and deleted local 145. Re-run tree/combined-patch equivalence before any later cleanup. Preservation is complete, but untracked/modified files in sibling worktrees remain independent classification blockers.
+The 23 refs preserve the 19 TSV tips plus 122/125/143 and deleted local 145. Re-run tree equality for 122/125 and **common-base combined patch-id/range-diff** for stale-base 143; a raw 143 whole-tree delta is expected. Preservation is complete, but untracked/modified files in sibling worktrees remain independent classification blockers.
 
 ## 3. Reconcile frozen #152 only after 079
 

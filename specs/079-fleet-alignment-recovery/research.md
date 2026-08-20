@@ -73,13 +73,14 @@ No clarification question was required. The brief fixes the user outcome; live r
 - Local 145/151 feature patches equal their remote PR-head patches; file-tree diffs are empty.
 - `6594d40` tree equals merged #125 squash `03aca597`.
 - `26939d9` tree equals merged #123 squash `ecefd016`.
-- Combined `143-fix-targetdir` diff has the same stable patch-id as merged #143 squash `8745d17e`.
+- From their shared pre-feature base, the combined `143-fix-targetdir` feature diff has the same stable patch-id as merged #143 squash `8745d17e`. The branch is on a stale base, so its whole tree differs from the squash/current main; no tree-identity claim is made.
 - Preservation protects provenance; it does not make an omitted tip duplicate or stale without a complete-ref disposition.
 
 **Alternatives considered**:
 
 - Keep the three-tip ledger: rejected by the held-out all-ref scan.
 - Use ancestry or per-commit `git cherry` alone: rejected because squash merges erase direct ancestry and can change per-commit patch matching.
+- Use a raw whole-tree diff to falsify 143 equivalence: rejected because base drift produces expected unrelated deltas; compare the common-base combined feature patch-id/range-diff.
 - Replay preserved tips: rejected unless the durable complete-ref inventory proves an unsuperseded current outcome.
 - Delete because tree content exists: rejected until topology and untracked/dirty work are both classified.
 

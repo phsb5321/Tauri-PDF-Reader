@@ -32,7 +32,7 @@ A title, commit message, ancestry result, task label, PR body, or model verdict 
 - #147: accepted post-release polish, merged out of sequence as `6b3fa9e`; no revert churn.
 - #152: post-release polish, frozen pending 079; refresh and re-measure after #147.
 - Local 145/151 representations: duplicate of remote PR heads.
-- Local-only 122/125/143 content: duplicate of merged squashes, but topology requires remote preservation before cleanup.
+- Formerly local-only 122/125 trees: duplicate of merged squashes. 143: duplicate **feature patch on a stale base**, proven by common-base combined patch-id/range-diff, never raw whole-tree identity. All topology is preserved remotely.
 - Credential-free offline narration: post-release work; current no-key actionable setup plus configured/fixture Play remains the north-star contract.
 
 ## Targeted-fix exemption
