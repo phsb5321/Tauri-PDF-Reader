@@ -10,6 +10,21 @@ This file exists because the numbers stopped matching: spec directories end at
 their own. That gap was either a rule nobody wrote down or a chain nobody ran.
 It was mostly the former. Here is the rule.
 
+## Executable boundary
+
+`tools/harness-policy.sh` is the single implementation. Pi settlement, `make
+harness-check`, `pnpm harness:check`, Husky, `scripts/verify.sh`, and the existing
+required Alignment Gate all call it. A branch touching product code across at
+least three changed files must be named `NNN-slug` and carry non-template
+`specs/NNN-slug/{spec,plan,tasks}.md`. The count includes committed branch work,
+working changes, and untracked files, so committing before settlement or
+splitting work across commits does not bypass it.
+
+In a Pi process the same command also requires the current seat's durable goal.
+It never blocks tools: `pi goal set "<measurable outcome>"` remains the recovery
+command. Ordinary human shells and CI have no Pi seat identity, so they enforce
+the branch-bound specification half only.
+
 ## Needs a spec directory
 
 Anything that changes what the application does for the person using it:
@@ -50,7 +65,7 @@ mechanical, not a judgement call:
 > called.
 
 A refactor that is genuinely mechanical leaves the existing suite passing
-unchanged — that is what makes it mechanical. New tests over *existing*
+unchanged — that is what makes it mechanical. New tests over _existing_
 behaviour are the "test infrastructure" class and stay spec-less; a new test
 that would have failed before the change is the definition of a behaviour delta,
 and no label removes it. Reviewers check this by reading the test diff, not the
@@ -61,18 +76,18 @@ costs nothing to apply and cannot be satisfied by assertion.
 
 ## What actually happened to #56–#65
 
-| PR   | Class                                          | Correct? |
-| ---- | ---------------------------------------------- | -------- |
-| #56  | `feat(library)` — relocating a moved book       | **No** — user-visible behaviour, should have had a spec |
-| #57  | sonar: stop indexing the test root as source    | Yes — gate repair |
-| #58  | docs: record the merge train                    | Yes — documentation |
-| #59  | sonar: native semantics + command contracts     | Yes — gate repair |
-| #60  | sonar: quality-gate conditions (CLOSED)         | Yes — gate repair, superseded |
-| #61  | contracts: return-shape guard                   | Yes — test infrastructure |
-| #62  | db-init coverage + floor ratchet                | Yes — test infrastructure |
-| #63  | bindings gate against the Rust command list     | Yes — test infrastructure |
-| #64  | ratchet the 63 untyped registered commands      | Yes — test infrastructure |
-| #65  | session commands onto the typed surface         | Yes — mechanical refactor, no behaviour delta |
+| PR  | Class                                        | Correct?                                                |
+| --- | -------------------------------------------- | ------------------------------------------------------- |
+| #56 | `feat(library)` — relocating a moved book    | **No** — user-visible behaviour, should have had a spec |
+| #57 | sonar: stop indexing the test root as source | Yes — gate repair                                       |
+| #58 | docs: record the merge train                 | Yes — documentation                                     |
+| #59 | sonar: native semantics + command contracts  | Yes — gate repair                                       |
+| #60 | sonar: quality-gate conditions (CLOSED)      | Yes — gate repair, superseded                           |
+| #61 | contracts: return-shape guard                | Yes — test infrastructure                               |
+| #62 | db-init coverage + floor ratchet             | Yes — test infrastructure                               |
+| #63 | bindings gate against the Rust command list  | Yes — test infrastructure                               |
+| #64 | ratchet the 63 untyped registered commands   | Yes — test infrastructure                               |
+| #65 | session commands onto the typed surface      | Yes — mechanical refactor, no behaviour delta           |
 
 One miss in ten, and it is named rather than backfilled: writing a spec for #56
 today would be fiction dated after the fact, and the behaviour it added is
