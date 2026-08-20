@@ -2,11 +2,139 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #71 — 20/08/2026 (fleet alignment recovery: dispositions, terminal PRs, pre-freeze state)
+
+**Scope:** spec `079-fleet-alignment-recovery` tasks **T007**, **T018**, **T020** — the
+backlog-reconciliation lane. Written **before** accepted main `A` is frozen (T022), so this
+entry states rules and *other* commits' SHAs and never asserts a verdict about the commit
+that carries it — the same discipline iteration #68 adopted for the release checklist. The
+machine-accepted head lives in `docs/alignment-recovery-receipt.json` at the receipt-only
+child `R` (`R^ == A`), not here.
+
+### T007 — #147 and #152, exactly as they happened
+
+- **#147 `fix(contrast): exhaustive text sweep + fix the dark-on-dark 'Add' shelf button`** —
+  head `511f70d`, squash-merged **`6b3fa9e`** 20/08 18:39:57Z, **before** the 079 contract
+  froze. That is a **sequence deviation**, recorded rather than smoothed over: the accepted
+  work-disposition classifies it `worthwhile-post-release-polish` and rules **no revert
+  churn**, because the CSS it landed is token-correct.
+- Its acceptance oracle was **not** sound at merge time: `e2e/contrast-sweep.e2e.mjs` skipped
+  silently instead of failing closed (active input value text and the enabled shelf submit
+  went unexercised; `color(srgb)`/`color-mix()` were unparsed). The finding was **accepted
+  after** the merge and repaired **forward** by T014 — **PR #156 `test(contrast): close sweep
+  false-greens`, merged `4548cef`** 20/08 21:14:16Z — never by reverting correct tokens. The
+  repair's falsifier: the sweep must fail closed on an unparsed colour form and on a planted
+  dark-on-dark control at the exact head, instead of silently skipping it.
+- **#152 `fix(library): card text inside the grid fold — covers derive from the container`** —
+  refreshed **early to `2c525f96` while still OPEN and UNSTABLE** (before 079 froze), then
+  re-measured post-079 at exact head **`fe4725a9`** with the contract-owned oracle
+  `scripts/card-fold-verify.sh`: `single` PASS in light/dark at 1200 and 640; **`dual` FAIL**
+  before theme/width completion — both cards ended at `y=745` while the grid fold ended at
+  `y=699`, so `visible.length` was 0 (`e2e/card-fold-verify.e2e.mjs:186`).
+- Per **T017** (merge **or** close with the failed-harness reason) #152 was **CLOSED**
+  20/08 19:54:19Z. Topology preserved: exact PR head on `origin/151-card-fold`, pre-refresh
+  tip at `origin/preserve/20260820-151-card-fold`. The slice closes **without** claiming its
+  acceptance oracle passed.
+
+### T020 — live state at the time of writing (pre-freeze)
+
+- **`docs/agent-backlog-state.md` is the delivery ledger; the recovery ledger is
+  `docs/alignment-recovery-branch-ledger.md`.** Preservation/containment proofs, per-seat goal
+  identifiers, oracle negative-control results and the frozen `A` candidate belong **there**
+  — this entry routes to it and does not restate it. This lane created it with the T002
+  complete-ref enumeration (62 local branches, **one unpreserved orphan found and preserved**
+  before any reconciliation), the T015/T017 #152 containment and terminal-state record, and
+  the T028–T031 polish gates. T003–T006, T008 and T022–T027 stay with Control/Graph/QA.
+- **Open PRs: none.** Every non-receipt recovery change is terminal; what remains is the
+  receipt phase (T022 freeze `A` → T023 exact-`A` journey/checks → T024/T025 receipt-only
+  child `R` → T026 oracle at `R`).
+- **The executable oracle is on main:** `scripts/oracle-alignment-recovery.sh` with its
+  fail-first fixtures `scripts/test-oracle-alignment-recovery.sh` and the dependency-free
+  `docs/alignment-recovery-receipt.schema.json` (**PR #157 → `6294ed1`**). Before `R` exists
+  it is *expected* to fail closed — that is the contract working, not a defect.
+- **Terminal recovery PRs:** #147 MERGED `6b3fa9e` · #152 CLOSED (above) · **#154 MERGED
+  `ed0e838`** — the frozen 079 contract, its Spec Kit artifacts, `.specify/` and the ten
+  `.pi/prompts/speckit.*` prompts · **#155 CLOSED twice** — spec 080 (goal/Spec-Kit harness
+  enforcement) is **outside** the frozen recovery sequence; its unauthorized reopen/push at
+  `56b5cb3` cancelled #156's exact-head global checks and cost a serialized-runner cycle. New
+  head preserved at `origin/preserve/20260820-080-goal-speckit-enforcement-reopened`. Do not
+  reopen or push it until `lectrice-alignment-recovery` reaches review.
+- **Preservation:** 25 `refs/heads/preserve/20260820-*` branches on the remote. No local-only
+  tip is reconciled before it is preserved — that ordering is the work-disposition contract's
+  falsifier, not a nicety.
+- **Ownership:** Orch sequences; Product owns the 079 contract; Graph owns preservation and
+  containment; QA judges exact heads; Control owns `scripts/oracle-alignment-recovery.sh` +
+  the receipt; Knowledge (this entry) owns `docs/agent-backlog-state.md`; the Obsidian seat
+  owns the vault SAVE-STATE (T021) in its own worktree/PR.
+- **Next priority after the receipt lands:** the north-star journey is the gate — a first-time
+  reader opens a PDF, starts narration, closes/restarts without data loss, and resumes.
+  Everything below is ranked *after* it.
+
+### T018 — re-evaluated against the north star (classification + falsifier preserved)
+
+| Item | Class | Falsifier |
+|---|---|---|
+| Home audit gap **#2** — seeded homes are 24–35 % dead space (grid 214–317 px of a 767 px viewport) | `worthwhile-post-release-polish` (slice S6) | measured dead fraction at a fixed window size; deliberately sequenced after the composition slices |
+| Home audit gap **#5** — 1 px horizontal overflow (`scrollWidth = innerWidth + 1`, `AppLayout.css:5` `width:100vw`) | `worthwhile-post-release-polish` (slice S5) | cosmetic; probe `hScroll=true` with no content lost |
+| Home audit gap **#6** — resume progress bar spans the full 1104 px library width for one book at 40 % | `worthwhile-post-release-polish` (slice S4) | measured 1104 px span at 40 %; the aesthetic read is `[needs vision]`, the geometry is not |
+| **Spec 078** slices 2–3 — Settings UI writes the file via `toml_edit` with comments surviving; hot reload (`notify-debouncer-mini`, 150 ms) | `worthwhile-post-release-polish` | slice 1 (`$XDG_CONFIG_HOME/lectrice/config.toml` at startup) merged `1906cd0`; the journey never requires editing a config file |
+| **Credential-free offline narration (Kokoro, spec 055)** | `worthwhile-post-release-polish` | the north-star contract is a **no-key actionable setup** plus a configured/fixture Play; a first reader must never need an API key to reach an honest narration state |
+
+None of the five is `north-star-blocking`: each is measured, none breaks or silently drops
+acknowledged state in the first-reader journey. Anything promoted later must arrive with
+executable evidence on a current exact head, not with a title.
+
+### Corrections to earlier entries
+
+- **Iteration #70's open action is DONE.** It left the wdio APP-path bug "DIAGNOSED, NOT YET
+  FIXED"; the fix landed with **PR #143 → `8745d17`**. `wdio.conf.mjs:19-22` now resolves
+  `TARGET_DIR = process.env.CARGO_TARGET_DIR ? … : src-tauri/target` and launches
+  `TARGET_DIR/debug/tauri-pdf-reader`, so the lane finds the binary the CI build actually
+  wrote. #143 was Pedro-gated (`.github/workflows/**`) and was **not** self-merged.
+- **#70's "bonus infra debt" is a standing blocker, not a footnote:** GitHub Actions artifact
+  storage on this repo is **full**, so `Upload failure artifacts` fails on every red run and
+  failure evidence never uploads.
+- **Merged between iterations #69 and #71 with no entry of their own** (each recorded by its
+  own PR body/docs): #141 `17bfa6a` v0.2.0 publication record · #142 `f63818e` base-owned
+  trust anchor · #144 `b98bb97` #125 merge record · #145 `f4316ef` uncropped cover · #146
+  `6191228` in-app confirm/prompt (the native ones were Promise shims) · #148 `1906cd0` 078
+  slice 1 · #149 `7904fa6` fourth cleanup-deleted-a-live-cache incident · #150 `b4b7404` home
+  UI audit + packaged-capture harness · #151 `31b47c1` cover-led resume line · #153 `b193093`
+  highlights panel docked beside the page.
+- **Standing context was stale:** it claimed main `a5c2957` (01/08) and two open worktrees
+  (`-042-android-target`, `-053-delivery-harness`). Live: ten feature worktrees under
+  `~/Documents/Code/personal/tauri-pdf-reader-*`, several of whose branch tips are **behind**
+  their remote PR heads — treat a worktree you did not create as read-only and never assume
+  its tip is the PR head.
+- **CodeQL is no longer a standing blocker.** Its 04/08–15/08 red streak was root-caused in
+  #135 (the host `_tool` prune aged extracted files whose mtimes are upstream, deleting fresh
+  installs while leaving the `.complete` marker); the v0.2.0 candidate ran clean with **0 open
+  alerts** (run `31944798507`), and CodeQL passed on PR checks since.
+- **"### Next command — None scheduled" is superseded.** The frozen 079 contract governs: no
+  new feature slice until `specs/079-fleet-alignment-recovery/{spec,plan,tasks}.md` passes
+  Spec Kit analysis, and completion is decided by `scripts/oracle-alignment-recovery.sh`
+  exiting 0 at `R`, never by a seat's verdict.
+
+### Standing blockers (real, current)
+
+1. **vm103 is the binding constraint** — one runner slot, serialized jobs, 124 G disk that
+   cannot hold two Rust builds. Growing it (Proxmox `qm resize`) is Pedro-gated. Every
+   cancelled-then-requeued push costs a full cycle; #155's unauthorized reopen proved it.
+2. **GitHub Actions artifact storage is full** — failure artifacts do not upload.
+3. **macOS journey BLOCKED** (measured 15/08, not a pending gate): no AX windows, no
+   file-association/open-event path, and no macOS WebDriver for `tauri-driver` to proxy.
+   macOS is not shipped and no release note claims it.
+
+### Revert
+
+`git revert <squash>` — this entry is documentation-only in `docs/agent-backlog-state.md`,
+one file, no service.
+
 ## Iteration #70 — 18/08/2026 (PR #143 pr-fast: CARGO_TARGET_DIR fix landed, follow-on APP-path bug diagnosed — LOSSLESS CONTEXT-GUARD CHECKPOINT)
 
 - **Worktree:** `~/Documents/Code/personal/tauri-pdf-reader-143-execution-workflow`, branch `143-fix-targetdir` off PR #143's base (`125-execution-workflow`), clean at `d86bbbf`. PR #143 = "ci(gate): land the packaged-user-gate execution workflow (follow-up B)" — the 3-stage trust-anchor architecture's execution workflow, gated by PR #142 (trust anchor, already **MERGED** into main `f63818e`).
 - **Root cause #1 (FIXED, `d86bbbf`):** the shared CI `CARGO_HOME=/var/cache/ci/cargo` on vm103 pins the HOST toolchain (linker=/usr/bin/cc, mold, -C target-cpu=x86-64-v3) for every Rust build on the box, so the pr-fast lane's nix-devShell rustc linked objects against host gcc/glibc — SIGSEGV in build scripts (serde/proc-macro2/quote/libc), then bindgen "GLIBC_ABI_GNU2_TLS not found". Reproduced directly on the runner (identical checkout+devShell, only CARGO_HOME differing). Fix: `scripts/e2e-toolchain.sh` now exports `CARGO_TARGET_DIR=$HOME/ci-cargo/lectrice/packaged-nix-target` + neutralises the two host linker/rustflags env vars, but ONLY when `CI=true` — local runs untouched. This fix is CORRECT and land-ready.
-- **Root cause #2 (DIAGNOSED, NOT YET FIXED) — the actual next action:** `wdio.conf.mjs:14` hardcodes `const APP = path.resolve(__dirname, "src-tauri/target/debug/tauri-pdf-reader")`. After the #1 fix, the CI build now lands the binary at `$HOME/ci-cargo/lectrice/packaged-nix-target/debug/tauri-pdf-reader` instead — so cargo build now SUCCEEDS (verified: `Finished \`dev\` profile … in 1m 27s`, fast because deps were pre-cached) but wdio can't find the binary → `WebDriverError: Failed to execute child process … (No such file or directory)`. Two consecutive CI runs (job 95798257551 orig, job 95805868264 re-run) both failed this exact way post-fix.
+- **Root cause #2 (DIAGNOSED here, FIXED since — see iteration #71: the fix landed with PR #143 → `8745d17`):** `wdio.conf.mjs:14` hardcodes `const APP = path.resolve(__dirname, "src-tauri/target/debug/tauri-pdf-reader")`. After the #1 fix, the CI build now lands the binary at `$HOME/ci-cargo/lectrice/packaged-nix-target/debug/tauri-pdf-reader` instead — so cargo build now SUCCEEDS (verified: `Finished \`dev\` profile … in 1m 27s`, fast because deps were pre-cached) but wdio can't find the binary → `WebDriverError: Failed to execute child process … (No such file or directory)`. Two consecutive CI runs (job 95798257551 orig, job 95805868264 re-run) both failed this exact way post-fix.
   - **Exact next action:** make `wdio.conf.mjs`'s APP path CI-aware, honoring the same `CARGO_TARGET_DIR` env var the toolchain script now sets (fall back to the existing `src-tauri/target/debug/...` when unset, so local dev is untouched) — e.g. `const APP = path.resolve(process.env.CARGO_TARGET_DIR || path.join(__dirname, "src-tauri/target"), "debug/tauri-pdf-reader")`. Verify `e2e/run-critical-loop.sh` / `scripts/e2e-toolchain.sh` don't ALSO hardcode a `src-tauri/target/debug` path elsewhere (grep the repo for `target/debug/tauri-pdf-reader` and `target-dir` before committing — other lane runners may have the same assumption baked in).
   - Commit on this same worktree/branch, push, verify PR #143 pr-fast goes green, confirm `state=MERGED` per Merge Ownership discipline (`.github/workflows/**` is Pedro-gated — do NOT self-merge #143; it needs Pedro's `[pending]` sign-off same as #142 was).
 - **Bonus infra debt found, NOT yet actioned:** `Upload failure artifacts` step on every red pr-fast run also fails: `Failed to CreateArtifact: Artifact storage quota has been hit.` — GitHub Actions artifact storage on this repo is full. Not blocking the fix above, but flag/clear old artifacts (`gh api` list+delete, or Settings → Actions → storage) once #143 is green, so future failure evidence actually uploads.
@@ -1190,4 +1318,7 @@ Driven by a request from the Pearson knowledge-gap work, not by the backlog: `an
 
 ### Next command
 
-None scheduled. Pick up from the "next cheap wins" line in iteration #27, or drive a slice with `/goal`.
+**Superseded by the frozen 079 recovery contract (see iteration #71).** No new feature slice
+until `specs/079-fleet-alignment-recovery/{spec,plan,tasks}.md` passes Spec Kit analysis, and
+completion is decided by `scripts/oracle-alignment-recovery.sh` exiting 0 at the receipt
+commit `R` — never by a seat's verdict. Historical note: Pick up from the "next cheap wins" line in iteration #27, or drive a slice with `/goal`.

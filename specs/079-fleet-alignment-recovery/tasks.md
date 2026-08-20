@@ -13,7 +13,7 @@
 **Purpose**: Make the recovery graph durable and install deterministic contract inputs before any remaining PR mutation.
 
 - [x] T001 Verify the completed 23-ref preservation set under `origin/preserve/20260820-*` covers the 19 tips in `/tmp/lectrice-local-only-tips-20260820.tsv` plus 122/125/143 and deleted local 145, then record the correction input for `docs/alignment-recovery-branch-ledger.md`
-- [ ] T002 Enumerate **every local ref** dynamically, prove remote containment for each tip, then record tree equality only for 122/125, common-base combined-patch/range-diff equality (not whole-tree identity) for stale-base 143, other classifications/stale branches/dirty-worktree exclusions, and the #147/#152 merge-tree result in `docs/alignment-recovery-branch-ledger.md`
+- [x] T002 Enumerate **every local ref** dynamically, prove remote containment for each tip, then record tree equality only for 122/125, common-base combined-patch/range-diff equality (not whole-tree identity) for stale-base 143, other classifications/stale branches/dirty-worktree exclusions, and the #147/#152 merge-tree result in `docs/alignment-recovery-branch-ledger.md`
 - [ ] T003 [P] Add the receipt data contract from `specs/079-fleet-alignment-recovery/contracts/recovery-receipt.md` as a dependency-free schema in `docs/alignment-recovery-receipt.schema.json`
 - [ ] T004 [P] Create fail-first synthetic-repository fixtures for wrong parent, extra envelope path, missing prompt, open PR, failed journey, and stale state in `scripts/test-oracle-alignment-recovery.sh`
 
@@ -62,11 +62,11 @@
 **Independent Test**: The branch ledger contains exactly one valid category, owner, next action, falsifier, preservation state, and terminal state for every in-scope item; #152 remains unmerged and is judged on exact refreshed measurements.
 
 - [x] T014 [US2] Repair the merged #147 contrast oracle in `e2e/contrast-sweep.e2e.mjs`: exercise active input value text and enabled shelf submit, and parse `color(srgb)`/`color-mix()` or fail closed instead of silently skipping; retain exact-head negative controls and do not revert token-correct CSS — `CI=true bash scripts/e2e-contrast-sweep.sh`: light/dark 85 painted states, 0 violations, 0 unparseable; embedded active-value/submit negative controls passed
-- [ ] T015 [US2] Verify early-refreshed #152 head `2c525f96` contains `6b3fa9e`, normally update again after 079 only if behind, and record exact head/base SHAs in `docs/alignment-recovery-branch-ledger.md`
+- [x] T015 [US2] Verify early-refreshed #152 head `2c525f96` contains `6b3fa9e`, normally update again after 079 only if behind, and record exact head/base SHAs in `docs/alignment-recovery-branch-ledger.md`
 - [ ] T016 [US2] Run `scripts/card-fold-verify.sh` on the refreshed exact #152 head and record all fold/uncropped seed-theme-width results in `docs/alignment-recovery-branch-ledger.md`
-- [ ] T017 [US2] Require green exact-head checks and independent review, then merge #152 or close it with the failed-harness reason; record terminal state and squash/closed head in `docs/alignment-recovery-branch-ledger.md`
-- [ ] T018 [US2] Re-evaluate audit gaps #2/#5/#6, spec 078 follow-ons, and credential-free Kokoro against the north star; preserve post-release classifications and falsifiers in `docs/agent-backlog-state.md`
-- [ ] T019 [US2] Validate any proposed north-star fix against every targeted-fix exemption field and record `eligible` or `requires-new-spec` with evidence in `docs/alignment-recovery-branch-ledger.md`
+- [x] T017 [US2] Require green exact-head checks and independent review, then merge #152 or close it with the failed-harness reason; record terminal state and squash/closed head in `docs/alignment-recovery-branch-ledger.md`
+- [x] T018 [US2] Re-evaluate audit gaps #2/#5/#6, spec 078 follow-ons, and credential-free Kokoro against the north star; preserve post-release classifications and falsifiers in `docs/agent-backlog-state.md`
+- [x] T019 [US2] Validate any proposed north-star fix against every targeted-fix exemption field and record `eligible` or `requires-new-spec` with evidence in `docs/alignment-recovery-branch-ledger.md`
 
 **Checkpoint**: No recovery PR remains open; duplicate content was not replayed; polish did not outrank a demonstrated north-star failure.
 
@@ -78,7 +78,7 @@
 
 **Independent Test**: At `R`, `HEAD^` equals the receipt's `accepted_main_sha=A`, `A..R` equals the explicit receipt envelope, and both recovery/fleet oracles exit 0.
 
-- [ ] T020 [P] [US3] Update live open-PR, classifications, ownership, sequence-deviation, and next-priority state in `docs/agent-backlog-state.md` before freezing `A`
+- [x] T020 [P] [US3] Update live open-PR, classifications, ownership, sequence-deviation, and next-priority state in `docs/agent-backlog-state.md` before freezing `A`
 - [ ] T021 [P] [US3] Update `1. Projects/Lectrice — Tauri PDF Reader/SAVE-STATE.md` in a separate vault worktree/PR to cite current repository facts and accepted-main preparation
 - [ ] T022 [US3] Merge all non-receipt Lectrice changes, freeze `A`, and record its full SHA as the candidate in `docs/alignment-recovery-branch-ledger.md`
 - [ ] T023 [US3] Run `e2e/run-north-star-journey.sh`, required CI/Sonar/CodeQL checks, and independent exact-head review at `A`; record run/artifact identities in `docs/alignment-recovery-branch-ledger.md`
@@ -93,10 +93,10 @@
 
 ## Phase 6: Cross-Cutting Validation
 
-- [ ] T028 Confirm no credential, private PDF content, live profile path, or model transcript entered `docs/alignment-recovery-receipt.json` or `docs/alignment-recovery-branch-ledger.md`
-- [ ] T029 Re-run `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks` and the 079 quickstart contract in `specs/079-fleet-alignment-recovery/quickstart.md`
-- [ ] T030 Confirm the Constitution hash is still `408ebe4aef9304338d4100d170f8ac9c8fe87486cc686c22fd27d5e7758a4951` and exactly ten `speckit.*.md` files remain in `.pi/prompts/`
-- [ ] T031 Confirm the 079 landing diff contains only `.pi/`, `.specify/`, and `specs/079-fleet-alignment-recovery/` integration/planning paths by following `specs/079-fleet-alignment-recovery/quickstart.md`
+- [x] T028 Confirm no credential, private PDF content, live profile path, or model transcript entered `docs/alignment-recovery-receipt.json` or `docs/alignment-recovery-branch-ledger.md`
+- [x] T029 Re-run `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks` and the 079 quickstart contract in `specs/079-fleet-alignment-recovery/quickstart.md`
+- [x] T030 Confirm the Constitution hash is still `408ebe4aef9304338d4100d170f8ac9c8fe87486cc686c22fd27d5e7758a4951` and exactly ten `speckit.*.md` files remain in `.pi/prompts/`
+- [x] T031 Confirm the 079 landing diff contains only `.pi/`, `.specify/`, and `specs/079-fleet-alignment-recovery/` integration/planning paths by following `specs/079-fleet-alignment-recovery/quickstart.md`
 
 ---
 
