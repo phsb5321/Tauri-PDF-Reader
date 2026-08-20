@@ -88,17 +88,81 @@ async function waitForTheme(expected) {
   );
 }
 
+async function driveFormControls(active) {
+  const search = await $(".search-input");
+  const shelf = await $(".shelf-new-input");
+  const submit = await $(".shelf-new-submit");
+  if (active) {
+    await search.setValue("E2E");
+    await shelf.setValue("Contrast probe");
+  } else {
+    for (const input of [search, shelf]) {
+      await input.click();
+      await browser.keys(["Control", "a"]);
+      await browser.keys("Backspace");
+    }
+  }
+  await browser.waitUntil(async () => (await submit.isEnabled()) === active, {
+    timeout: 5000,
+    timeoutMsg: `shelf submit never became ${active ? "enabled" : "disabled"}`,
+  });
+  await browser.waitUntil(
+    async () =>
+      browser.execute(
+        () => document.querySelectorAll(".document-card").length > 0,
+      ),
+    { timeout: 5000, timeoutMsg: "search state hid every seeded card" },
+  );
+}
+
 /** Walk every painted text-bearing element and return its contrast verdict. */
 async function sweep(theme) {
   return browser.execute((themeLabel) => {
+    // Reuse the modern WebKit colour shape already handled by
+    // contrast-capture's delete-button oracle. Unknown computed syntax is
+    // recorded below and makes the sweep red; it is never a silent skip.
     const parseColor = (str) => {
       if (!str) return null;
-      const m = /rgba?\(([^)]+)\)/.exec(str);
-      if (!m) return null;
-      const p = m[1].split(",").map((s) => parseFloat(s.trim()));
-      if (p.length < 3 || p.some((n) => Number.isNaN(n))) return null;
-      return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 };
+      const value = String(str).trim();
+      const srgb =
+        /^color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*(?:\/\s*([\d.]+))?\)$/.exec(
+          value,
+        );
+      if (srgb) {
+        return {
+          r: Number(srgb[1]) * 255,
+          g: Number(srgb[2]) * 255,
+          b: Number(srgb[3]) * 255,
+          a: srgb[4] === undefined ? 1 : Number(srgb[4]),
+        };
+      }
+      const rgb = /^rgba?\(([^)]+)\)$/.exec(value);
+      if (!rgb) return null;
+      const comma = rgb[1].split(",").map((s) => parseFloat(s.trim()));
+      if (comma.length >= 3 && !comma.some((n) => Number.isNaN(n))) {
+        return {
+          r: comma[0],
+          g: comma[1],
+          b: comma[2],
+          a: comma.length > 3 ? comma[3] : 1,
+        };
+      }
+      return null;
     };
+
+    // A nested parseable color must not make an unsupported outer function
+    // look valid. Unknown computed syntax belongs in `unparseable` below.
+    if (
+      parseColor(
+        "color-mix(in srgb, rgb(255, 0, 0) 50%, rgb(255, 255, 255))",
+      ) !== null
+    ) {
+      throw new Error(
+        "color parser accepted a nested function as a full color",
+      );
+    }
+
+    const unparseable = [];
 
     const over = (top, bottom) => {
       if (top.a >= 1) return top;
@@ -114,8 +178,17 @@ async function sweep(theme) {
       let acc = { r: 0, g: 0, b: 0, a: 0 };
       let node = el;
       while (node) {
-        const bg = parseColor(getComputedStyle(node).backgroundColor);
-        if (bg && bg.a > 0) acc = over(acc, bg);
+        const raw = getComputedStyle(node).backgroundColor;
+        const bg = parseColor(raw);
+        if (!bg) {
+          unparseable.push({
+            kind: "background",
+            node: node.tagName,
+            color: raw,
+          });
+        } else if (bg.a > 0) {
+          acc = over(acc, bg);
+        }
         if (acc.a >= 1) return acc;
         node = node.parentElement;
       }
@@ -194,14 +267,22 @@ async function sweep(theme) {
       if (box.width < 1 || box.height < 1) continue;
 
       const fgRaw = parseColor(cs.color);
-      if (!fgRaw) continue;
+      if (!fgRaw) {
+        unparseable.push({ kind: "text", node: describe(el), color: cs.color });
+        continue;
+      }
       // A fully transparent glyph paints nothing — not a contrast question.
       if (fgRaw.a === 0) continue;
 
       painted += 1;
 
       const surface = paintedSurface(el);
-      const { value, required } = verdict(cs, fgRaw, surface, parseFloat(cs.opacity));
+      const { value, required } = verdict(
+        cs,
+        fgRaw,
+        surface,
+        parseFloat(cs.opacity),
+      );
 
       if (value + 0.01 < required) {
         // Ancestor color chain — pin WHERE the failing colour comes from.
@@ -231,31 +312,45 @@ async function sweep(theme) {
       }
     }
 
-    // Form-control text is NOT a text child (the review's MAJOR: the exact
-    // UA-default class that produced the reported bug lives on placeholders
-    // and closed select labels) — probe them explicitly so the class is
-    // gated, not exempt.
+    // Form-control value text is a property, not a text child. Measure the
+    // value while populated and the placeholder while empty; both states are
+    // driven below through the real controls.
     for (const el of document.querySelectorAll("input, textarea")) {
-      const ph = el.getAttribute("placeholder");
-      if (!ph || !ph.trim()) continue;
       const cs = getComputedStyle(el);
       if (cs.visibility === "hidden" || cs.display === "none") continue;
-      if (parseFloat(cs.opacity) === 0) continue;
-      if (isInactive(el)) continue;
+      if (parseFloat(cs.opacity) === 0 || isInactive(el)) continue;
       const box = el.getBoundingClientRect();
       if (box.width < 1 || box.height < 1) continue;
-      const ps = getComputedStyle(el, "::placeholder");
-      const fgRaw = parseColor(ps.color);
-      if (!fgRaw || fgRaw.a === 0) continue;
+
+      const valueText = el.value?.trim();
+      const placeholder = el.getAttribute("placeholder")?.trim();
+      const text = valueText || placeholder;
+      if (!text) continue;
+      const textStyle = valueText ? cs : getComputedStyle(el, "::placeholder");
+      const fgRaw = parseColor(textStyle.color);
+      if (!fgRaw) {
+        unparseable.push({
+          kind: valueText ? "input-value" : "placeholder",
+          node: describe(el),
+          color: textStyle.color,
+        });
+        continue;
+      }
+      if (fgRaw.a === 0) continue;
       painted += 1;
       const surface = paintedSurface(el);
-      const { value, required } = verdict(cs, fgRaw, surface, parseFloat(cs.opacity));
+      const { value, required } = verdict(
+        cs,
+        fgRaw,
+        surface,
+        parseFloat(cs.opacity),
+      );
       if (value + 0.01 < required) {
         results.push({
           theme: themeLabel,
-          node: `${describe(el)}::placeholder`,
-          text: ph.trim().slice(0, 40),
-          color: ps.color,
+          node: `${describe(el)}::${valueText ? "value" : "placeholder"}`,
+          text: text.slice(0, 40),
+          color: textStyle.color,
           surface: `rgba(${Math.round(surface.r)}, ${Math.round(surface.g)}, ${Math.round(surface.b)}, ${surface.a})`,
           fontSize: cs.fontSize,
           fontWeight: cs.fontWeight,
@@ -273,10 +368,23 @@ async function sweep(theme) {
       const box = el.getBoundingClientRect();
       if (box.width < 1 || box.height < 1) continue;
       const fgRaw = parseColor(cs.color);
-      if (!fgRaw || fgRaw.a === 0) continue;
+      if (!fgRaw) {
+        unparseable.push({
+          kind: "select",
+          node: describe(el),
+          color: cs.color,
+        });
+        continue;
+      }
+      if (fgRaw.a === 0) continue;
       painted += 1;
       const surface = paintedSurface(el);
-      const { value, required } = verdict(cs, fgRaw, surface, parseFloat(cs.opacity));
+      const { value, required } = verdict(
+        cs,
+        fgRaw,
+        surface,
+        parseFloat(cs.opacity),
+      );
       if (value + 0.01 < required) {
         results.push({
           theme: themeLabel,
@@ -292,7 +400,7 @@ async function sweep(theme) {
       }
     }
 
-    return { theme: themeLabel, painted, violations: results };
+    return { theme: themeLabel, painted, violations: results, unparseable };
   }, theme);
 }
 
@@ -325,22 +433,99 @@ describe("Exhaustive contrast sweep (every painted text node, both themes)", () 
       // Let the theme transition settle before reading computed styles.
       await browser.pause(400);
 
-      const result = await sweep(theme);
+      // Both states are user-reachable and paint different text: empty inputs
+      // paint placeholders; populated inputs paint their values and enable Add.
+      await driveFormControls(false);
+      const placeholderResult = await sweep(`${theme}:placeholder`);
+      await driveFormControls(true);
+      const activeResult = await sweep(`${theme}:active`);
+
+      // Required negative controls: the gate must observe an active value in
+      // modern WebKit color(srgb) syntax AND the now-enabled submit label.
+      const previous = await browser.execute(() => {
+        const search = document.querySelector(".search-input");
+        const submit = document.querySelector(".shelf-new-submit");
+        const saved = {
+          searchColor: search.style.color,
+          searchBackground: search.style.backgroundColor,
+          submitColor: submit.style.color,
+          submitBackground: submit.style.backgroundColor,
+        };
+        search.style.color = "color(srgb 1 1 1)";
+        search.style.backgroundColor = "color(srgb 1 1 1)";
+        submit.style.color = "rgb(255, 255, 255)";
+        submit.style.backgroundColor = "rgb(255, 255, 255)";
+        return saved;
+      });
+      let negative;
+      try {
+        negative = await sweep(`${theme}:negative-control`);
+      } finally {
+        await browser.execute((saved) => {
+          const search = document.querySelector(".search-input");
+          const submit = document.querySelector(".shelf-new-submit");
+          search.style.color = saved.searchColor;
+          search.style.backgroundColor = saved.searchBackground;
+          submit.style.color = saved.submitColor;
+          submit.style.backgroundColor = saved.submitBackground;
+        }, previous);
+      }
+      if (negative.unparseable.length > 0) {
+        throw new Error(
+          `negative control silently lost a color: ${JSON.stringify(negative.unparseable)}`,
+        );
+      }
+      if (
+        !negative.violations.some((v) =>
+          v.node.includes(".search-input::value"),
+        )
+      ) {
+        throw new Error(
+          "negative control: active search value escaped the sweep",
+        );
+      }
+      if (
+        !negative.violations.some((v) => v.node.includes(".shelf-new-submit"))
+      ) {
+        throw new Error(
+          "negative control: enabled shelf submit escaped the sweep",
+        );
+      }
+
+      const result = {
+        theme,
+        painted: placeholderResult.painted + activeResult.painted,
+        violations: [
+          ...placeholderResult.violations,
+          ...activeResult.violations,
+        ],
+        unparseable: [
+          ...placeholderResult.unparseable,
+          ...activeResult.unparseable,
+        ],
+      };
       console.log(
         `DIAG sweep ${theme}:`,
         JSON.stringify({
           painted: result.painted,
           violations: result.violations.length,
+          unparseable: result.unparseable.length,
         }),
       );
-      for (const v of result.violations) {
+      for (const v of result.violations)
         console.log("DIAG violation:", JSON.stringify(v));
-      }
+      for (const u of result.unparseable)
+        console.log("DIAG unparseable:", JSON.stringify(u));
 
-      // An empty sweep proves nothing — fail rather than pass by vacuum.
-      if (result.painted < 5) {
+      // Empty or unparseable is unknown, never green.
+      if (result.painted < 10) {
         throw new Error(
-          `sweep found only ${result.painted} painted text nodes in ${theme} — the surface never rendered`,
+          `sweep found only ${result.painted} painted text states in ${theme} — the surface never rendered`,
+        );
+      }
+      if (result.unparseable.length > 0) {
+        throw new Error(
+          `sweep could not parse ${result.unparseable.length} painted color(s) in ${theme}`,
         );
       }
       all.push(result);

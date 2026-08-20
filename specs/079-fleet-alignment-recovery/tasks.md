@@ -61,7 +61,7 @@
 
 **Independent Test**: The branch ledger contains exactly one valid category, owner, next action, falsifier, preservation state, and terminal state for every in-scope item; #152 remains unmerged and is judged on exact refreshed measurements.
 
-- [ ] T014 [US2] Repair the merged #147 contrast oracle in `e2e/contrast-sweep.e2e.mjs`: exercise active input value text and enabled shelf submit, and parse `color(srgb)`/`color-mix()` or fail closed instead of silently skipping; retain exact-head negative controls and do not revert token-correct CSS
+- [x] T014 [US2] Repair the merged #147 contrast oracle in `e2e/contrast-sweep.e2e.mjs`: exercise active input value text and enabled shelf submit, and parse `color(srgb)`/`color-mix()` or fail closed instead of silently skipping; retain exact-head negative controls and do not revert token-correct CSS — `CI=true bash scripts/e2e-contrast-sweep.sh`: light/dark 85 painted states, 0 violations, 0 unparseable; embedded active-value/submit negative controls passed
 - [ ] T015 [US2] Verify early-refreshed #152 head `2c525f96` contains `6b3fa9e`, normally update again after 079 only if behind, and record exact head/base SHAs in `docs/alignment-recovery-branch-ledger.md`
 - [ ] T016 [US2] Run `scripts/card-fold-verify.sh` on the refreshed exact #152 head and record all fold/uncropped seed-theme-width results in `docs/alignment-recovery-branch-ledger.md`
 - [ ] T017 [US2] Require green exact-head checks and independent review, then merge #152 or close it with the failed-harness reason; record terminal state and squash/closed head in `docs/alignment-recovery-branch-ledger.md`
@@ -128,17 +128,17 @@
 
 ## Requirement Coverage
 
-| Requirements | Tasks |
-|---|---|
-| FR-001–FR-005; SC-001 | T009–T013, T023 |
-| FR-006–FR-009; SC-002–SC-003 | T001–T002, T007, T014–T019 |
-| FR-010–FR-011; SC-004 | T005, T029–T030 |
-| FR-012–FR-013; SC-007 | T007–T008, T020–T022, T027 |
-| FR-014–FR-015 | T019 |
-| FR-016 | T001–T002, T007, T020–T024 |
-| FR-017 | T031 |
-| FR-018; SC-006 | T003–T006, T022–T026 |
-| SC-005 | Spec Kit analysis before this task plan is accepted; T029 revalidates lifecycle artifacts |
+| Requirements                 | Tasks                                                                                     |
+| ---------------------------- | ----------------------------------------------------------------------------------------- |
+| FR-001–FR-005; SC-001        | T009–T013, T023                                                                           |
+| FR-006–FR-009; SC-002–SC-003 | T001–T002, T007, T014–T019                                                                |
+| FR-010–FR-011; SC-004        | T005, T029–T030                                                                           |
+| FR-012–FR-013; SC-007        | T007–T008, T020–T022, T027                                                                |
+| FR-014–FR-015                | T019                                                                                      |
+| FR-016                       | T001–T002, T007, T020–T024                                                                |
+| FR-017                       | T031                                                                                      |
+| FR-018; SC-006               | T003–T006, T022–T026                                                                      |
+| SC-005                       | Spec Kit analysis before this task plan is accepted; T029 revalidates lifecycle artifacts |
 
 ## Implementation Strategy
 
