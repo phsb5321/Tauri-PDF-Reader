@@ -338,7 +338,11 @@ describe("Spec 079 packaged north-star journey", () => {
       const form = await $('form[aria-label="Connect ElevenLabs"]');
       await form.waitForExist({ timeout: 10000 });
       expect(await $("#api-key").isExisting()).toBe(true);
-      expect(await form.getText()).toContain("elevenlabs.io");
+      const setupText = await form.getText();
+      expect(setupText).toContain("elevenlabs.io");
+      expect(setupText).toContain(
+        "Requested PDF-derived text leaves this device and is sent to ElevenLabs",
+      );
       steps.push(
         recordStep(
           "no_key_setup_visible",

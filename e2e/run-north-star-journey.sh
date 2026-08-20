@@ -4,15 +4,36 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # Heavy packaged lanes share native-driver and global display/evidence surfaces.
-exec 9>/tmp/lectrice-heavy-gate.lock
-flock 9
+# `flock LOCK bash this-script` passes its lock fd to this process. Reuse that
+# inherited ownership instead of recursively acquiring the same lock; direct
+# callers acquire it here with a bounded wait rather than hanging forever.
+LOCK_PATH=/tmp/lectrice-heavy-gate.lock
+lock_inherited=0
+for fd in /proc/$$/fd/*; do
+  if [ "$(readlink -f "$fd" 2>/dev/null || true)" = "$LOCK_PATH" ]; then
+    lock_inherited=1
+    break
+  fi
+done
+if [ "$lock_inherited" -eq 0 ]; then
+  exec 9>"$LOCK_PATH"
+  flock -w 900 9 || {
+    echo "north-star: timed out waiting 900s for the packaged-lane lock" >&2
+    exit 2
+  }
+fi
 
 source ./scripts/e2e-profile.sh
-export CI=true
 source ./scripts/e2e-toolchain.sh
 
 APP_DIR="$E2E_PROFILE_DIR/com.lectrice.reader"
 RESULT_DIR="${NORTH_STAR_RESULT_DIR:-$E2E_PROFILE_DIR/north-star-result}"
+case "$(realpath -m "$RESULT_DIR")" in
+  "$PWD"|"$PWD"/*)
+    echo "north-star: result directory must be outside the source worktree" >&2
+    exit 2
+    ;;
+esac
 mkdir -p "$APP_DIR"
 rm -rf "$RESULT_DIR"
 mkdir -p "$RESULT_DIR"
@@ -31,6 +52,24 @@ git diff --cached --quiet -- || {
   echo "north-star: staged changes make source_sha dishonest" >&2
   exit 2
 }
+if git ls-files --others --exclude-standard | grep -q .; then
+  echo "north-star: untracked source files make source_sha dishonest" >&2
+  exit 2
+fi
+# Vite implicitly reads ignored .env* files and caller VITE_* variables. Both
+# can alter built bytes without changing HEAD, so exact-source acceptance
+# refuses them; the two lane builds set their complete VITE contract below.
+while IFS= read -r env_file; do
+  [ -z "$env_file" ] && continue
+  git ls-files --error-unmatch -- "$env_file" >/dev/null 2>&1 || {
+    echo "north-star: untracked/ignored $env_file can alter the Vite build" >&2
+    exit 2
+  }
+done < <(find . -maxdepth 1 -type f -name '.env*' -printf '%P\n')
+if env | grep -q '^VITE_'; then
+  echo "north-star: caller-supplied VITE_* variables can alter the source-bound build" >&2
+  exit 2
+fi
 
 node scripts/gen-e2e-fixtures.mjs "$APP_DIR" >/dev/null
 GOOD="$APP_DIR/e2e-resume-fixture-a.pdf"
