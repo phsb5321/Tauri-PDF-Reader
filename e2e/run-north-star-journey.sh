@@ -136,7 +136,8 @@ toolchain_exec '
   [ -f "$DB" ] || { echo "north-star: profile database is absent" >&2; exit 1; }
   DOC_COUNT="$(sqlite3 "$DB" "SELECT count(*) FROM documents;")"
   PAGE="$(sqlite3 "$DB" "SELECT current_page FROM documents ORDER BY last_opened_at DESC LIMIT 1;")"
-  HIGHLIGHT_COUNT="$(sqlite3 "$DB" "SELECT count(*) FROM v_highlight_citations WHERE page_number=2 AND text_content LIKE '%lectrice fixture page two%';")"
+  # char(...) avoids nesting a shell quote inside the delegated script.
+  HIGHLIGHT_COUNT="$(sqlite3 "$DB" "SELECT count(*) FROM v_highlight_citations WHERE page_number=2 AND instr(text_content,char(108,101,99,116,114,105,99,101,32,102,105,120,116,117,114,101,32,112,97,103,101,32,116,119,111))>0;")"
   [ "$DOC_COUNT" -eq 1 ] || { echo "north-star: expected one opened document, observed $DOC_COUNT" >&2; exit 1; }
   [ "$PAGE" -eq 3 ] || { echo "north-star: acknowledged page did not persist (observed $PAGE)" >&2; exit 1; }
   [ "$HIGHLIGHT_COUNT" -ge 1 ] || { echo "north-star: acknowledged highlight did not persist" >&2; exit 1; }
@@ -203,7 +204,7 @@ toolchain_exec '
       result: \"pass\"
     }" >"$NORTH_STAR_RESULT_DIR/journey.json"
 
-  EXPECTED_STEPS='"'"'["fresh_profile","open_pdf","no_key_setup_visible","start_narration","mutate_acknowledged_state","normal_close_process_ended","relaunch_new_process","resume_same_document_page","highlight_present"]'"'"'
+  EXPECTED_STEPS="[\"fresh_profile\",\"open_pdf\",\"no_key_setup_visible\",\"start_narration\",\"mutate_acknowledged_state\",\"normal_close_process_ended\",\"relaunch_new_process\",\"resume_same_document_page\",\"highlight_present\"]"
   jq -e --arg sha "$NORTH_STAR_SOURCE_SHA" --argjson expected "$EXPECTED_STEPS" \
     ".source_sha == \$sha and .result == \"pass\" and [.steps[].name] == \$expected and all(.steps[]; .result == \"pass\")" \
     "$NORTH_STAR_RESULT_DIR/journey.json" >/dev/null
