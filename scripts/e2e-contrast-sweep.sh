@@ -43,7 +43,8 @@ toolchain_exec '
   XVFB_PID=$!
   trap "kill $XVFB_PID 2>/dev/null || true" EXIT
   for _ in $(seq 1 100); do [ -s $DISPNUM_FILE ] && break; sleep 0.1; done
-  export DISPLAY=:$(cat $DISPNUM_FILE)
+  [ -s "$DISPNUM_FILE" ] || { cat /tmp/lectrice-sweep-xvfb.log >&2; exit 1; }
+  export DISPLAY=:$(cat "$DISPNUM_FILE")
   echo "Xvfb ready on DISPLAY=$DISPLAY profile=$XDG_DATA_HOME"
   E2E_SPEC=./e2e/contrast-sweep.e2e.mjs pnpm test:e2e
 '
