@@ -462,6 +462,11 @@ describe("Spec 079 packaged north-star journey", () => {
     );
 
     started = Date.now();
+    // Highlights are page-scoped. Resume is first proven at the persisted
+    // page 3; the actor then returns through the public Previous control to
+    // page 2, where the acknowledged mark must render without recreation.
+    await publicDomClick('button[title="Previous page (Left Arrow)"]');
+    await waitPage(2);
     await browser.waitUntil(
       async () =>
         browser.execute(
@@ -479,8 +484,8 @@ describe("Spec 079 packaged north-star journey", () => {
     steps.push(
       recordStep(
         "highlight_present",
-        "Observe the resumed page without creating another highlight",
-        `Persisted highlight containing ${expected.highlight} is rendered`,
+        "Return through Previous to the highlight page without creating another mark",
+        `Persisted highlight containing ${expected.highlight} is rendered on page 2`,
         started,
       ),
     );
