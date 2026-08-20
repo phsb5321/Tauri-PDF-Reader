@@ -7,9 +7,10 @@
 **Scope:** spec `079-fleet-alignment-recovery` tasks **T007**, **T018**, **T020** — the
 backlog-reconciliation lane. Written **before** accepted main `A` is frozen (T022), so this
 entry states rules and *other* commits' SHAs and never asserts a verdict about the commit
-that carries it — the same discipline iteration #68 adopted for the release checklist. The
-machine-accepted head lives in `docs/alignment-recovery-receipt.json` at the receipt-only
-child `R` (`R^ == A`), not here.
+that carries it — the same discipline iteration #68 adopted for the release checklist.
+**`A` is not frozen and no receipt exists yet.** When T022 freezes `A`, T024/T025 will record
+it in `docs/alignment-recovery-receipt.json` at a receipt-only child `R` with `R^ == A`.
+Nothing here supplies an accepted head.
 
 ### T007 — #147 and #152, exactly as they happened
 
@@ -45,9 +46,11 @@ child `R` (`R^ == A`), not here.
   complete-ref enumeration (62 local branches, **one unpreserved orphan found and preserved**
   before any reconciliation), the T015/T017 #152 containment and terminal-state record, and
   the T028–T031 polish gates. T003–T006, T008 and T022–T027 stay with Control/Graph/QA.
-- **Open PRs: none.** Every non-receipt recovery change is terminal; what remains is the
-  receipt phase (T022 freeze `A` → T023 exact-`A` journey/checks → T024/T025 receipt-only
-  child `R` → T026 oracle at `R`).
+- **Open PRs at the time of writing: #158 — the PR carrying this entry — and nothing else.**
+  Every other non-receipt recovery change is terminal. What remains is the receipt phase
+  (T022 freeze `A` → T023 exact-`A` journey/checks → T024/T025 receipt-only child `R` → T026
+  oracle at `R`). A seat reading this later must re-measure rather than trust the sentence:
+  `gh pr list --state open`.
 - **The executable oracle is on main:** `scripts/oracle-alignment-recovery.sh` with its
   fail-first fixtures `scripts/test-oracle-alignment-recovery.sh` and the dependency-free
   `docs/alignment-recovery-receipt.schema.json` (**PR #157 → `6294ed1`**). Before `R` exists
@@ -59,9 +62,11 @@ child `R` (`R^ == A`), not here.
   `56b5cb3` cancelled #156's exact-head global checks and cost a serialized-runner cycle. New
   head preserved at `origin/preserve/20260820-080-goal-speckit-enforcement-reopened`. Do not
   reopen or push it until `lectrice-alignment-recovery` reaches review.
-- **Preservation:** 25 `refs/heads/preserve/20260820-*` branches on the remote. No local-only
-  tip is reconciled before it is preserved — that ordering is the work-disposition contract's
-  falsifier, not a nicety.
+- **Preservation:** `refs/heads/preserve/20260820-*` counted **25 → 26 → 27** across three
+  scans on 20/08 as terminal PRs and in-flight tips were preserved; the graph is live, so the
+  count is only meaningful with its timestamp (see the branch ledger §1–§2). The invariant is
+  the ordering: no local-only tip is reconciled before it is preserved — the work-disposition
+  contract's falsifier, not a nicety.
 - **Ownership:** Orch sequences; Product owns the 079 contract; Graph owns preservation and
   containment; QA judges exact heads; Control owns `scripts/oracle-alignment-recovery.sh` +
   the receipt; Knowledge (this entry) owns `docs/agent-backlog-state.md`; the Obsidian seat
@@ -72,17 +77,21 @@ child `R` (`R^ == A`), not here.
 
 ### T018 — re-evaluated against the north star (classification + falsifier preserved)
 
-| Item | Class | Falsifier |
-|---|---|---|
-| Home audit gap **#2** — seeded homes are 24–35 % dead space (grid 214–317 px of a 767 px viewport) | `worthwhile-post-release-polish` (slice S6) | measured dead fraction at a fixed window size; deliberately sequenced after the composition slices |
-| Home audit gap **#5** — 1 px horizontal overflow (`scrollWidth = innerWidth + 1`, `AppLayout.css:5` `width:100vw`) | `worthwhile-post-release-polish` (slice S5) | cosmetic; probe `hScroll=true` with no content lost |
-| Home audit gap **#6** — resume progress bar spans the full 1104 px library width for one book at 40 % | `worthwhile-post-release-polish` (slice S4) | measured 1104 px span at 40 %; the aesthetic read is `[needs vision]`, the geometry is not |
-| **Spec 078** slices 2–3 — Settings UI writes the file via `toml_edit` with comments surviving; hot reload (`notify-debouncer-mini`, 150 ms) | `worthwhile-post-release-polish` | slice 1 (`$XDG_CONFIG_HOME/lectrice/config.toml` at startup) merged `1906cd0`; the journey never requires editing a config file |
-| **Credential-free offline narration (Kokoro, spec 055)** | `worthwhile-post-release-polish` | the north-star contract is a **no-key actionable setup** plus a configured/fixture Play; a first reader must never need an API key to reach an honest narration state |
+Every row is `worthwhile-post-release-polish`; all five carry owner, next action and
+falsifier, and none is claimed to be more than its evidence supports.
 
-None of the five is `north-star-blocking`: each is measured, none breaks or silently drops
-acknowledged state in the first-reader journey. Anything promoted later must arrive with
-executable evidence on a current exact head, not with a title.
+| item_id | Evidence | Owner | Next action | Falsifier |
+|---|---|---|---|---|
+| Home audit gap **#2** — seeded homes are 24–35 % dead space (grid 214–317 px of a 767 px viewport) | measured rects in `docs/audit-home-ui-2026-08-16.md` (`lectrice-audit-single-dark-1200.png`, `-cover-light-1200.png`) | UX | slice S6, after the composition slices change the layout | a first-reader step that cannot complete because of dead space would promote it to `north-star-blocking` |
+| Home audit gap **#5** — 1 px horizontal overflow (`scrollWidth = innerWidth + 1`, `AppLayout.css:5` `width:100vw`) | probe `hScroll=true`, `scrollW=1152/1151` | UX | slice S5 | any content actually lost or unreachable at the overflow |
+| Home audit gap **#6** — resume progress bar spans the full 1104 px library width for one book at 40 % | measured resume-line rect `w=1104` | UX | slice S4 | the bar misreporting progress, rather than merely reading wide |
+| **Spec 078** slices 2–3 — Settings UI writes the file via `toml_edit` (comments survive); hot reload (`notify-debouncer-mini`, 150 ms) | **product argument, not a measurement**: slice 1 (`$XDG_CONFIG_HOME/lectrice/config.toml` at startup) merged `1906cd0` and the journey never requires editing a config file | Product | rank after the north-star journey | a first-reader step that requires hand-editing config would promote it |
+| **Credential-free offline narration (Kokoro, spec 055)** | **product argument, not a measurement**: the contract is a no-key *actionable setup* plus a configured/fixture Play | Product | rank after the north-star journey | a first reader unable to reach an honest narration state without an API key |
+
+None of the five is `north-star-blocking` on the evidence available: the three audit gaps are
+measured geometry, and the 078/Kokoro rows rest on the product contract rather than on a
+measurement — stated plainly so neither is mistaken for a receipt. Anything promoted later
+must arrive with executable evidence on a current exact head, not with a title.
 
 ### Corrections to earlier entries
 
