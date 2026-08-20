@@ -14,7 +14,7 @@ make harness-check
 
 # Frontend checks via lint-staged
 echo "📦 Running lint-staged (TypeScript)..."
-pnpm lint-staged
+pnpm lint-staged --no-stash
 
 # TypeScript type checking
 echo "📝 Running TypeScript check..."
