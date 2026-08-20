@@ -312,7 +312,12 @@ describe("Spec 079 packaged north-star journey", () => {
       started = Date.now();
       await publicButtonByText("Open a PDF");
       await renderedParagraph();
-      const title = await $(".document-title").getText();
+      // WebKit getText() drops the ellipsis-clipped toolbar title; the DOM
+      // text is also its accessible text and remains the public identity.
+      const title = await browser.execute(
+        () =>
+          document.querySelector(".document-title")?.textContent?.trim() ?? "",
+      );
       expect(title.length).toBeGreaterThan(0);
       steps.push(
         recordStep(
@@ -364,7 +369,13 @@ describe("Spec 079 packaged north-star journey", () => {
         'button[aria-label^="Resume "][aria-label*=", page "]';
       await publicDomClick(resumeSelector);
       await waitPage(2);
-      expect(await $(".document-title").getText()).toBe(expected.title);
+      expect(
+        await browser.execute(
+          () =>
+            document.querySelector(".document-title")?.textContent?.trim() ??
+            "",
+        ),
+      ).toBe(expected.title);
       await publicDomClick("button.ai-playback-button");
       await browser.waitUntil(
         async () =>
@@ -436,7 +447,10 @@ describe("Spec 079 packaged north-star journey", () => {
       'button[aria-label^="Resume "][aria-label*=", page 3"]';
     await publicDomClick(resumeSelector);
     await waitPage(3);
-    const title = await $(".document-title").getText();
+    const title = await browser.execute(
+      () =>
+        document.querySelector(".document-title")?.textContent?.trim() ?? "",
+    );
     expect(title).toBe(expected.title);
     steps.push(
       recordStep(
