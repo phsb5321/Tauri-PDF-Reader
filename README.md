@@ -105,6 +105,58 @@ by default** and not part of any shipped build yet. The packaged E2E suites use
 a deterministic fixture engine ([#101]); the live ElevenLabs path is not
 exercised in CI.
 
+## Configuration file
+
+Lectrice reads an optional TOML config file at startup:
+
+```
+$XDG_CONFIG_HOME/lectrice/config.toml     # usually ~/.config/lectrice/config.toml
+```
+
+Set `LECTRICE_CONFIG=/path/to/file.toml` to override the path entirely.
+
+The file is **optional and never created for you** — with no file present,
+Lectrice uses its built-in defaults and writes nothing. To start from a
+commented template covering every key:
+
+```bash
+lectrice --generate-config > ~/.config/lectrice/config.toml
+```
+
+Every key is optional, so a two-line file is valid:
+
+```toml
+[appearance]
+theme = "dark"
+```
+
+Behaviour worth knowing:
+
+- **An unknown key warns, it never fails.** A typo (or a key from a newer
+  Lectrice) is reported by name and ignored; the app still starts.
+- **A type error names the key and the position** — and the whole file is
+  skipped in favour of the built-in defaults, so you never get a half-applied
+  config:
+
+  ```
+  config.toml:3:8: key `tts.rate`: invalid type: string "fast", expected f64
+  ```
+- **Out-of-range values are clamped, with a warning**, to the same bounds the
+  UI enforces.
+- **Secrets do not belong here.** The ElevenLabs API key is entered at runtime
+  and is deliberately not a config key.
+
+The file composes with `home-manager`:
+
+```nix
+xdg.configFile."lectrice/config.toml".source = ./lectrice.toml;
+```
+
+Slice 1 (this release) is **read-only**: the file is applied at startup. The
+Settings UI still writes its own store; making the UI a comment-preserving
+writer of this file, and hot-reloading it on change, are the next two slices.
+See [`specs/078-config-file/spec.md`](specs/078-config-file/spec.md).
+
 ## Development
 
 ```bash

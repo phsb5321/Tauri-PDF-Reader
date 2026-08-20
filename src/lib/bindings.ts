@@ -464,6 +464,12 @@ async sessionTouch(sessionId: string) : Promise<Result<null, string>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+/**
+ * Get the effective user configuration.
+ */
+async configGetEffective() : Promise<EffectiveConfig> {
+    return await TAURI_INVOKE("config_get_effective");
 }
 }
 
@@ -477,7 +483,45 @@ async sessionTouch(sessionId: string) : Promise<Result<null, string>> {
 
 /** user-defined types **/
 
+export type AiTts = { 
+/**
+ * localStorage `ai-tts-storage.selectedVoiceId`.
+ * 
+ * NOT an `Option`, unlike `tts.voice`, and the round-trip property is why:
+ * TOML has no null, so an absent key and a `None` are the same three bytes
+ * of nothing. A field whose DEFAULT is `Some(rachel)` therefore cannot
+ * express `None` in a file — writing `None` and reading it back yields
+ * Rachel. `proptest` found exactly that asymmetry, and a type that cannot
+ * represent the unrepresentable is the fix; the slice-2 writer would
+ * otherwise silently "revert" a cleared voice.
+ * 
+ * (`tts.voice` keeps its `Option` legitimately: its default IS `None`, so
+ * absent and `None` agree and the round-trip holds.)
+ */
+voice_id?: string; 
+/**
+ * localStorage `ai-tts-storage.speed` — clamped to 0.5..=4.5.
+ */
+speed?: number; 
+/**
+ * localStorage `ai-tts-storage.autoPageEnabled`
+ */
+auto_page?: boolean }
+export type Appearance = { 
+/**
+ * SQLite `theme`
+ */
+theme?: Theme }
 export type BatchCreateResponse = { highlights: Highlight[]; created: number }
+export type Cache = { 
+/**
+ * SQLite `cache_settings.max_size_bytes`
+ */
+max_size_bytes?: number; 
+/**
+ * SQLite `cache_settings.eviction_policy`
+ */
+eviction_policy?: EvictionPolicy }
 /**
  * A shelf — a named collection of documents.
  * 
@@ -493,6 +537,14 @@ export type Collection = { id: string; name: string; documentCount: number; crea
  */
 export type CollectionMembership = { documentId: string; collectionId: string }
 /**
+ * The whole config file.
+ * 
+ * The ElevenLabs API key is deliberately absent: it is a secret, it is entered
+ * at runtime today, and a config file is version-controlled (and world-readable
+ * in a Nix store). Secrets do not belong here.
+ */
+export type Config = { schema_version?: number; appearance?: Appearance; highlight?: HighlightConfig; tts?: Tts; telemetry?: Telemetry; render?: Render; cache?: Cache; ai_tts?: AiTts }
+/**
  * Input for creating a new highlight
  */
 export type CreateHighlightInput = { documentId: string; pageNumber: number; rects: Rect[]; color: string; textContent: string | null }
@@ -501,6 +553,36 @@ export type DeleteResponse = { success: boolean; deleted: number | null }
  * Represents a PDF document in the user's library
  */
 export type Document = { id: string; filePath: string; title: string | null; pageCount: number | null; currentPage: number; scrollPosition: number; lastTtsChunkId: string | null; lastOpenedAt: string | null; fileHash: string | null; createdAt: string }
+/**
+ * The config Lectrice is actually running with, plus how it got there.
+ * 
+ * `warnings` and `error` are carried to the frontend so the UI can surface a
+ * bad config to the user instead of leaving the finding in a log file nobody
+ * reads. Slice 1 does not render them yet — the data is here so slice 2's UI
+ * does not need a new command.
+ */
+export type EffectiveConfig = { 
+/**
+ * The effective settings (defaults when no file was loaded).
+ */
+config: Config; 
+/**
+ * Path consulted, if the platform had one.
+ */
+path: string | null; 
+/**
+ * True when a file was found AND successfully applied.
+ */
+loaded: boolean; 
+/**
+ * Non-fatal findings: unknown keys, clamped values, migration notes.
+ */
+warnings: string[]; 
+/**
+ * Set when a file existed but could not be used; `config` is the defaults.
+ */
+error: string | null }
+export type EvictionPolicy = "lru"
 export type ExportResponse = { content: string; filename: string }
 export type FileExistsResponse = { exists: boolean; filePath: string }
 /**
@@ -508,9 +590,26 @@ export type FileExistsResponse = { exists: boolean; filePath: string }
  */
 export type Highlight = { id: string; documentId: string; pageNumber: number; rects: Rect[]; color: string; textContent: string | null; note: string | null; createdAt: string; updatedAt: string | null }
 /**
+ * Named `HighlightConfig`, not `Highlight`: specta flattens every exported
+ * type into ONE TypeScript namespace, and `db::models::Highlight` (the
+ * highlight entity) already owns that name. Two `export type Highlight`
+ * declarations do not compile. The TOML section is still `[highlight]` —
+ * that comes from the FIELD name, not the struct name.
+ */
+export type HighlightConfig = { 
+/**
+ * SQLite `highlight.defaultColor`
+ */
+default_color?: string; 
+/**
+ * SQLite `highlight.colors`
+ */
+colors?: string[] }
+/**
  * Response types for commands
  */
 export type ListHighlightsResponse = { highlights: Highlight[] }
+export type QualityMode = "performance" | "balanced" | "ultra"
 /**
  * A reading session containing multiple documents with saved positions
  */
@@ -519,6 +618,24 @@ export type ReadingSession = { id: string; name: string; documents: SessionDocum
  * Represents a rectangle for highlight positioning (page coordinates)
  */
 export type Rect = { x: number; y: number; width: number; height: number }
+export type Render = { 
+/**
+ * SQLite `render.qualityMode`
+ */
+quality_mode?: QualityMode; 
+/**
+ * SQLite `render.maxMegapixels` — clamped to 8..=48, the range the write
+ * path already enforces.
+ */
+max_megapixels?: number; 
+/**
+ * SQLite `render.hwAccelerationEnabled`
+ */
+hw_acceleration?: boolean; 
+/**
+ * SQLite `render.debugOverlayEnabled`
+ */
+debug_overlay?: boolean }
 /**
  * A document within a reading session with saved position
  */
@@ -535,6 +652,34 @@ export type SessionRestoreResponse = { success: boolean; session: ReadingSession
  * Summary of a session for list operations
  */
 export type SessionSummary = { id: string; name: string; documentCount: number; lastAccessedAt: string; createdAt: string }
+/**
+ * Both fields default to `false`, which is exactly `#[derive(Default)]` — the
+ * only section whose defaults are the type's own, so it is the only one that
+ * does not need a hand-written impl.
+ */
+export type Telemetry = { 
+/**
+ * SQLite `telemetry.analytics`
+ */
+analytics?: boolean; 
+/**
+ * SQLite `telemetry.errors`
+ */
+errors?: boolean }
+export type Theme = "light" | "dark" | "system"
+export type Tts = { 
+/**
+ * SQLite `tts.rate` — clamped to 0.5..=3.0, as the settings store does.
+ */
+rate?: number; 
+/**
+ * SQLite `tts.voice` — `null` means "let the platform choose".
+ */
+voice?: string | null; 
+/**
+ * SQLite `tts.followAlong`
+ */
+follow_along?: boolean }
 
 /** tauri-specta globals **/
 

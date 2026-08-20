@@ -1,0 +1,11 @@
+# Two typos and a key from an imagined future version. None may be fatal.
+[tts]
+rate = 1.5
+ratee = 2.0
+
+[appearance]
+theme = "dark"
+colour_scheme = "gruvbox"
+
+[future_section]
+something_new = true
