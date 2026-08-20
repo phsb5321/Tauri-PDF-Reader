@@ -8,10 +8,10 @@
  * `LibraryView` with the real `SearchBar` and asserts the query-aware copy.
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { mockInvoke } from "../../../tests/setup";
-import { LibraryView } from "../../components/library/LibraryView";
+import { LibraryView, type LibraryViewProps } from "../../components/library/LibraryView";
 import { useLibraryStore } from "../../stores/library-store";
 import { useCollectionsStore } from "../../stores/collections-store";
 import type { Document } from "../../lib/schemas";
@@ -45,12 +45,14 @@ beforeEach(() => {
   });
 });
 
-function renderLibrary() {
+function renderLibrary(overrides: Partial<LibraryViewProps> = {}) {
   return render(
     <LibraryView
       onDocumentSelect={() => {}}
       onResumeAndPlay={() => {}}
       onOpenSettings={() => {}}
+      onOpenDocument={() => {}}
+      {...overrides}
     />,
   );
 }
@@ -113,22 +115,35 @@ describe("the library search empty state", () => {
     ).toBeInTheDocument();
   });
 
-  it("keeps the original copy when there is no query", async () => {
+  it("empty library: the primary action invokes the real open-PDF flow", async () => {
+    const onOpenDocument = vi.fn();
     mockInvoke.mockImplementation((command: string) => {
-      if (command === "library_list_documents") return Promise.resolve([]);
-      if (
-        command === "collections_list" ||
-        command === "collections_list_memberships"
-      )
-        return Promise.resolve([]);
-      return Promise.resolve(null);
+      switch (command) {
+        case "library_list_documents":
+          return Promise.resolve([]);
+        case "collections_list":
+        case "collections_list_memberships":
+          return Promise.resolve([]);
+        default:
+          return Promise.resolve(null);
+      }
     });
+    renderLibrary({ onOpenDocument });
 
-    renderLibrary();
-
-    expect(await screen.findByText("No recent documents")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "No recent documents" }),
+    ).toBeInTheDocument();
     expect(
       screen.getByText("Open a PDF to add it to your library"),
+    ).toBeInTheDocument();
+
+    // The primary action is the real open flow, not Settings.
+    fireEvent.click(screen.getByRole("button", { name: "Open a PDF" }));
+    expect(onOpenDocument).toHaveBeenCalledTimes(1);
+
+    // Settings is demoted to a secondary action but still reachable.
+    expect(
+      screen.getByRole("button", { name: "Open Settings" }),
     ).toBeInTheDocument();
   });
 });

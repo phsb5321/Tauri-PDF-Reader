@@ -21,6 +21,12 @@
   flex: none;
 }
 
+/* Large book-sized variant (resume line): fixed 2:3 box beside the text. */
+.document-cover--lg {
+  width: 120px;
+  flex: none;
+}
+
 .document-cover-img {
   display: block;
   width: 100%;

@@ -335,34 +335,43 @@ export function ReaderView() {
           </button>
         </div>
       )}
-      {libraryShowing ? (
-        <div className="library-surface">
-          <LibraryView
-            onDocumentSelect={(document) => {
-              void handleResume(document);
-            }}
-            onResumeAndPlay={(document) => {
-              void handleResumeAndPlay(document);
-            }}
-            onOpenSettings={() => setShowSettings(true)}
+      {/* The reading surface and the highlights panel are SIBLINGS IN A ROW.
+          `.app-layout-main` is a flex COLUMN, so mounting the 300px panel
+          directly into it made the panel a column item: it stacked underneath
+          the page and was clipped away by that container's `overflow: hidden`
+          instead of docking. The row wrapper is what makes "beside" possible;
+          the panel's own width is meaningless without it. */}
+      <div className="reader-surface">
+        {libraryShowing ? (
+          <div className="library-surface">
+            <LibraryView
+              onDocumentSelect={(document) => {
+                void handleResume(document);
+              }}
+              onResumeAndPlay={(document) => {
+                void handleResumeAndPlay(document);
+              }}
+              onOpenSettings={() => setShowSettings(true)}
+              onOpenDocument={() => void handleOpen()}
+            />
+          </div>
+        ) : (
+          <PdfViewer />
+        )}
+        {showHighlights && currentDocument && (
+          <HighlightsPanel
+            highlights={highlights}
+            selectedHighlightId={selectedHighlightId}
+            onHighlightClick={handleHighlightClick}
+            onHighlightDelete={handleHighlightDelete}
+            onClose={() => setShowHighlights(false)}
           />
-        </div>
-      ) : (
-        <PdfViewer />
-      )}
+        )}
+      </div>
       <SettingsPanel
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
       />
-      {showHighlights && currentDocument && (
-        <HighlightsPanel
-          highlights={highlights}
-          selectedHighlightId={selectedHighlightId}
-          onHighlightClick={handleHighlightClick}
-          onHighlightDelete={handleHighlightDelete}
-          onClose={() => setShowHighlights(false)}
-        />
-      )}
     </AppLayout>
   );
 }

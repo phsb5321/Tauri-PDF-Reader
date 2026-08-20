@@ -4,6 +4,7 @@ import App from "./App";
 import { RepositoryProvider } from "./adapters/context/repository-context";
 import { createRepositories } from "./adapters/create-repositories";
 import { initDatabase } from "./lib/db-init";
+import { seedStoresFromConfigFile } from "./lib/config-seed";
 import "./styles/index.css";
 // PDF.js text layer CSS for selectable text
 import "pdfjs-dist/web/pdf_viewer.css";
@@ -15,6 +16,11 @@ async function bootstrap() {
   } catch (error) {
     console.error("Failed to initialize database:", error);
   }
+
+  // Apply the user config file BEFORE the first render (spec 078): painting
+  // with the persisted theme and then snapping to the configured one is a
+  // visible flash. A no-op when the user has no config file.
+  await seedStoresFromConfigFile();
 
   const repositories = createRepositories();
 

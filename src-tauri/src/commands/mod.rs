@@ -1,6 +1,7 @@
 pub mod audio_cache;
 pub mod audio_export;
 pub mod collections;
+pub mod config;
 pub mod cover;
 pub mod highlights;
 pub mod library;

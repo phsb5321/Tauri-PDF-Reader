@@ -50,6 +50,49 @@ describe("ResumeSection", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("renders the resume-line cover with the document's accessible name", () => {
+    render(
+      <ResumeSection
+        documents={[doc({ title: "Covered Book", currentPage: 2 })]}
+        onResume={noop}
+        onResumeAndPlay={noop}
+        onOpenSettings={noop}
+      />,
+    );
+
+    // The resume line is cover-led: a cover named by the document renders
+    // beside the text (the also-in-progress rows are decorative and must
+    // not duplicate the name).
+    expect(
+      screen.getByRole("img", { name: "Covered Book" }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders decorative covers on the 'also in progress' rows", () => {
+    render(
+      <ResumeSection
+        documents={[
+          doc({ id: "primary", title: "Primary", currentPage: 2, lastOpenedAt: "2026-08-10T10:00:00Z" }),
+          doc({ id: "row", title: "Row Book", currentPage: 3, lastOpenedAt: "2026-08-09T10:00:00Z" }),
+        ]}
+        onResume={noop}
+        onResumeAndPlay={noop}
+        onOpenSettings={noop}
+      />,
+    );
+
+    // Exactly ONE named img (the resume line's cover); the row cover is
+    // decorative (aria-hidden) — the row's ListRow already names the book.
+    const named = screen.getAllByRole("img");
+    expect(named).toHaveLength(1);
+    expect(screen.getByRole("img", { name: "Primary" })).toBeInTheDocument();
+    const rowGlyph = document.querySelector(
+      ".also-in-progress-row .cover-fallback-glyph",
+    );
+    expect(rowGlyph).not.toBeNull();
+    expect(rowGlyph?.getAttribute("aria-hidden")).toBe("true");
+  });
+
   it("lists only the documents in flight", () => {
     render(
       <ResumeSection

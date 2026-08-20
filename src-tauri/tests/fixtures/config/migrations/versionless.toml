@@ -1,0 +1,3 @@
+# No schema_version at all — a hand-written file must not need one.
+[tts]
+rate = 2.0

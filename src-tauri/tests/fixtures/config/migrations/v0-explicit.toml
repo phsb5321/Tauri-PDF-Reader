@@ -1,0 +1,5 @@
+# An explicitly versioned old file: must migrate and keep its values.
+schema_version = 0
+
+[appearance]
+theme = "dark"

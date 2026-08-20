@@ -1,6 +1,24 @@
 /* ReaderView inherits layout from AppLayout */
 /* Additional reader-specific styles can be added here */
 
+/* The reading surface + the docked highlights panel, side by side.
+
+   `.app-layout-main` is a flex COLUMN. Mounting the 300px-wide panel straight
+   into it made the panel a column item stacked BELOW the page, then clipped by
+   that container's `overflow: hidden` — the docking defect. This row is the
+   dock: the page grows, the panel keeps its width beside it.
+
+   `min-height: 0` is load-bearing: without it this flex item takes its
+   automatic minimum (content height) instead of the parent's height, and the
+   page's own scroll container grows past the viewport rather than scrolling. */
+.reader-surface {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
 /* Slice 109 B4: a failed open (corrupt/password PDF) must be visible on the
    library surface — PdfViewer's own error UI only mounts once a document is
    open, which is never for a failed open. */
@@ -9,6 +27,9 @@
   flex-direction: column;
   min-height: 0;
   flex: 1;
+  /* Row sibling of the panel now: without this the library's own content sets
+     an automatic minimum width and refuses to yield the panel's 300px. */
+  min-width: 0;
 }
 
 .library-error-banner {

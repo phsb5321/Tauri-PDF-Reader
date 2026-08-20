@@ -55,6 +55,10 @@
   border-radius: 6px;
   font-size: var(--text-sm);
   background: var(--bg-secondary, #fff);
+  /* UA-default form-control text (the contrast-sweep defect class): the
+     closed select label is engine-painted without an explicit colour — bind
+     it to the primary text token so it tracks the theme. */
+  color: var(--color-text-primary);
   cursor: pointer;
 }
 

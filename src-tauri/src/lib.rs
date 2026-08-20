@@ -14,6 +14,11 @@ pub mod domain;
 pub mod ports;
 pub mod tauri_api;
 
+/// User config file (`config.toml`) — spec 078. Read-only in slice 1: the file
+/// is parsed at startup and seeds the effective settings. A leaf module: it
+/// depends on serde/toml/dirs only, never on the db or a Tauri context.
+pub mod config;
+
 // Legacy modules (to be migrated)
 mod commands;
 mod db;
@@ -190,6 +195,7 @@ use commands::audio_export::{
     audio_export_cancel, audio_export_check_ready, audio_export_document, ExportState,
 };
 use commands::collections::*;
+use commands::config::{config_get_effective, ConfigState, EffectiveConfig};
 use commands::cover::{cover_cache, cover_source_size};
 use commands::highlights::*;
 use commands::library::*;
@@ -398,6 +404,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
         session_remove_document,
         session_update_document,
         session_touch,
+        // User config file (spec 078, slice 1: read-only)
+        config_get_effective,
     ])
 }
 
@@ -437,11 +445,40 @@ fn assert_hermetic_profile() {
     }
 }
 
+/// Handle the CLI flags that must answer without starting a GUI.
+///
+/// `--generate-config` prints the commented template to stdout and exits.
+/// Lectrice never writes the config file itself (spec 078: a config file the
+/// app authored is a file the user did not, and it would fight a home-manager
+/// symlink), so the user redirects it:
+///
+/// ```sh
+/// lectrice --generate-config > ~/.config/lectrice/config.toml
+/// ```
+///
+/// Returns true when the process has done its job and should exit.
+fn handle_cli_flags<I: IntoIterator<Item = String>>(args: I) -> bool {
+    for arg in args {
+        if arg == "--generate-config" {
+            print!("{}", config::template::render());
+            return true;
+        }
+    }
+    false
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Fail-closed before ANY state is written (crash flags, sqlite, settings).
     #[cfg(feature = "e2e-tts-fixture")]
     assert_hermetic_profile();
+
+    // Answer --generate-config before the logger, the crash flag, or any other
+    // startup side effect: it is a pure stdout query, and a user piping it into
+    // their config must not get tracing output mixed into the file.
+    if handle_cli_flags(std::env::args().skip(1)) {
+        return;
+    }
 
     tracing_subscriber::registry()
         .with(
@@ -456,6 +493,14 @@ pub fn run() {
     if crashed_last_time {
         tracing::warn!("Application crashed on last startup - entering safe mode");
     }
+
+    // Resolve the user config BEFORE the WebView exists: `render.hw_acceleration`
+    // has to be known this early, and a config error must be on the log before
+    // anything reads a setting. An absent file is the normal case — defaults
+    // apply and nothing is written to disk.
+    let config_outcome = config::load();
+    config::report(&config_outcome);
+    let effective_config = EffectiveConfig::from(config_outcome);
 
     // Apply Linux-specific environment variables before WebView creation
     hw_accel::apply_linux_env();
@@ -501,6 +546,7 @@ pub fn run() {
         .plugin(tauri_plugin_persisted_scope::init())
         .plugin(tauri_plugin_shell::init())
         .manage(ExportState::new())
+        .manage(ConfigState(effective_config))
         // Slice 112 DL-1/DL-2: debounced writes (highlights at 500ms,
         // reading position at 500ms) can be lost when the window closes —
         // the user was told they were saved. Handle the close request:
@@ -604,6 +650,8 @@ pub fn run() {
             collections_add_document,
             collections_remove_document,
             collections_list_memberships,
+            // User config file (spec 078, slice 1: read-only)
+            config_get_effective,
             // Settings commands (legacy)
             settings_get,
             settings_set,

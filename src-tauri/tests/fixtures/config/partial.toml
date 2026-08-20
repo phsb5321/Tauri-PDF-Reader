@@ -1,0 +1,6 @@
+# The realistic case: a user changes two things and leaves the rest alone.
+[appearance]
+theme = "light"
+
+[tts]
+rate = 1.5

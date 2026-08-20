@@ -6,6 +6,7 @@ import { formatRelativeReadTime } from "../../domain/library/relative-time";
 import { Button } from "../../ui/components/Button/Button";
 import { ListRow } from "../../ui/components/ListRow/ListRow";
 import { IconButton } from "../../ui/components/IconButton/IconButton";
+import { DocumentCover } from "./DocumentCover";
 import { useAiTtsStore, selectNeedsApiKey } from "../../stores/ai-tts-store";
 import { AI_TTS_SETUP_MESSAGE } from "../../lib/constants";
 import type { Document } from "../../lib/schemas";
@@ -109,57 +110,70 @@ function ResumeLine({
 
   return (
     <div className="resume-line">
-      <span className="resume-line-title">{label}</span>
-      <p className="resume-line-meta">
-        {/* The place text is its own leaf node on purpose: the reading-home
-            test finds "Page N of M" as an exact standalone string. */}
-        <span>{placeText(document)}</span>
-        <span aria-hidden="true"> · </span>
-        <span>{percent}%</span>
-        {relative && (
-          <>
-            <span aria-hidden="true"> · </span>
-            <span>last read {relative}</span>
-          </>
-        )}
-      </p>
-      {/* Native <progress> carries the semantics; the bar next to it is
-          decoration — same sr-only + decorative-span pattern ContinueReading
-          used, reused rather than reinvented. */}
-      <progress
-        className="sr-only"
-        value={percent}
-        max={100}
-        aria-label={`${label} progress`}
+      {/* The cover-led moment: the resume line shows the book, not just its
+          title. Named by the document (not decorative) — the same accessible
+          name the card grid uses, so assistive tech sees the book twice at
+          most, never a nameless box. */}
+      <DocumentCover
+        documentId={document.id}
+        title={document.title}
+        filePath={document.filePath}
+        fileHash={document.fileHash}
+        size="lg"
       />
-      <span className="resume-line-bar" aria-hidden="true">
-        <span
-          className="resume-line-bar-fill"
-          style={{ width: `${percent}%` }}
+      <div className="resume-line-body">
+        <span className="resume-line-title">{label}</span>
+        <p className="resume-line-meta">
+          {/* The place text is its own leaf node on purpose: the reading-home
+              test finds "Page N of M" as an exact standalone string. */}
+          <span>{placeText(document)}</span>
+          <span aria-hidden="true"> · </span>
+          <span>{percent}%</span>
+          {relative && (
+            <>
+              <span aria-hidden="true"> · </span>
+              <span>last read {relative}</span>
+            </>
+          )}
+        </p>
+        {/* Native <progress> carries the semantics; the bar next to it is
+            decoration — same sr-only + decorative-span pattern ContinueReading
+            used, reused rather than reinvented. */}
+        <progress
+          className="sr-only"
+          value={percent}
+          max={100}
+          aria-label={`${label} progress`}
         />
-      </span>
-      <div className="resume-line-actions">
-        {/* The accessible name keeps the exact "Resume {label}, page …"
-            shape the shelf rows shipped with — tests and screen readers
-            depend on it. */}
-        <Button
-          variant="primary"
-          aria-label={`Resume ${label}, page ${document.currentPage}${
-            document.pageCount ? ` of ${document.pageCount}` : ""
-          }, ${percent}%`}
-          onClick={() => onResume(document)}
-        >
-          Resume
-        </Button>
-        <IconButton
-          label={`Resume ${label} and start reading aloud`}
-          variant="ghost"
-          size="sm"
-          className="resume-line-play"
-          onClick={() => onResumeAndPlay(document)}
-        >
-          <PlayIcon />
-        </IconButton>
+        <span className="resume-line-bar" aria-hidden="true">
+          <span
+            className="resume-line-bar-fill"
+            style={{ width: `${percent}%` }}
+          />
+        </span>
+        <div className="resume-line-actions">
+          {/* The accessible name keeps the exact "Resume {label}, page …"
+              shape the shelf rows shipped with — tests and screen readers
+              depend on it. */}
+          <Button
+            variant="primary"
+            aria-label={`Resume ${label}, page ${document.currentPage}${
+              document.pageCount ? ` of ${document.pageCount}` : ""
+            }, ${percent}%`}
+            onClick={() => onResume(document)}
+          >
+            Resume
+          </Button>
+          <IconButton
+            label={`Resume ${label} and start reading aloud`}
+            variant="ghost"
+            size="sm"
+            className="resume-line-play"
+            onClick={() => onResumeAndPlay(document)}
+          >
+            <PlayIcon />
+          </IconButton>
+        </div>
       </div>
     </div>
   );
@@ -184,6 +198,16 @@ function AlsoInProgress({
           const label = document.title || document.filePath;
           return (
             <li key={document.id} className="also-in-progress-row">
+              {/* Small cover before the row text — decorative, the ListRow's
+                  primary text already names the book. */}
+              <DocumentCover
+                documentId={document.id}
+                title={document.title}
+                filePath={document.filePath}
+                fileHash={document.fileHash}
+                size="sm"
+                decorative
+              />
               <ListRow
                 className="also-in-progress-row-main"
                 primary={label}
