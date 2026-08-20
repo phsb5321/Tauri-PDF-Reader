@@ -27,6 +27,17 @@ git commit -qm 'targeted product change'
 "$subject" --base main --spec-only >"$output" 2>&1
 grep -q 'harness-policy: PASS' "$output"
 
+printf 'staged\n' >>src/a.ts
+git add src/a.ts
+printf 'unstaged\n' >>src/a.ts
+if "$subject" --base main --spec-only >"$output" 2>&1; then
+  echo "negative-control: FAIL — partially staged file passed" >&2
+  exit 1
+fi
+grep -q 'partially staged files are unsafe' "$output"
+grep -q 'unstaged' src/a.ts
+git restore --staged --worktree src/a.ts
+
 git checkout -q main
 git checkout -qb 080-negative-control
 rm -rf src
@@ -56,4 +67,4 @@ printf '# Tasks\n- [ ] T001 Prove the gate\n' >specs/080-negative-control/tasks.
 "$subject" --base main --spec-only >"$output" 2>&1
 grep -q 'harness-policy: PASS' "$output"
 
-echo 'negative-control: PASS — targeted allowed; no spec refused; partial refused; complete branch-bound chain allowed'
+echo 'negative-control: PASS — targeted allowed; partial-stage refused without loss; no/partial spec refused; complete chain allowed'

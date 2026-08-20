@@ -2,7 +2,9 @@
 # One Lectrice policy, called by Pi settlement, Make, Husky, verify.sh and CI.
 set -euo pipefail
 
-threshold="${LECTRICE_SPEC_FILE_THRESHOLD:-3}"
+# Policy, not a caller-controlled tuning knob: environment overrides would let a
+# committing process raise the threshold and turn enforcement off.
+threshold=3
 mode=base
 base=origin/main
 spec_only=0
@@ -26,11 +28,6 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-case "$threshold" in
-  ''|*[!0-9]*) echo "harness-policy: LECTRICE_SPEC_FILE_THRESHOLD must be an integer >= 1" >&2; exit 2 ;;
-esac
-[ "$threshold" -ge 1 ] || { echo "harness-policy: threshold must be >= 1" >&2; exit 2; }
-
 git rev-parse --show-toplevel >/dev/null 2>&1 || { echo "harness-policy: not a Git repository" >&2; exit 2; }
 root="$(git rev-parse --show-toplevel)"
 cd "$root"
@@ -44,27 +41,42 @@ if [ "$spec_only" -eq 0 ] && [ -n "${PI_SESSION_ID:-}${PI_AGENT_NAME:-}" ]; then
   fi
 fi
 
-tmp="$(mktemp)"
-trap 'rm -f "$tmp"' EXIT
+work="$(mktemp -d)"
+tmp="$work/changed"
+trap 'rm -rf "$work"' EXIT
 case "$mode" in
   base)
     git rev-parse --verify --quiet "$base" >/dev/null || { echo "harness-policy: base ref '$base' is unavailable" >&2; exit 2; }
     {
-      git diff --name-only --diff-filter=ACMRT "$base...HEAD"
-      git diff --name-only --diff-filter=ACMRT HEAD
+      git diff --name-only --diff-filter=ACMRTDU "$base...HEAD"
+      git diff --name-only --diff-filter=ACMRTDU HEAD
       git ls-files --others --exclude-standard
     } >"$tmp"
     ;;
-  staged) git diff --cached --name-only --diff-filter=ACMRT >"$tmp" ;;
+  staged) git diff --cached --name-only --diff-filter=ACMRTDU >"$tmp" ;;
   worktree)
-    { git diff --name-only --diff-filter=ACMRT HEAD; git ls-files --others --exclude-standard; } >"$tmp"
+    { git diff --name-only --diff-filter=ACMRTDU HEAD; git ls-files --others --exclude-standard; } >"$tmp"
     ;;
 esac
 sort -u -o "$tmp" "$tmp"
 
+# lint-staged cannot safely format a partially staged file without either using
+# the repository-global stash or risking unstaged hunks. Refuse that ambiguous
+# state before lint-staged runs; staging whole files is the recovery path.
+git diff --cached --name-only | sort -u >"$work/staged"
+git diff --name-only | sort -u >"$work/unstaged"
+comm -12 "$work/staged" "$work/unstaged" >"$work/partial"
+if [ -s "$work/partial" ]; then
+  failures+=("partially staged files are unsafe with the no-stash hook; stage or unstage each whole file: $(tr '\n' ' ' <"$work/partial")")
+fi
+if git diff --name-only --diff-filter=U | grep -q .; then
+  failures+=("unmerged paths are present; resolve the index before running the harness")
+fi
+
 changed_count="$(grep -c . "$tmp" || true)"
 product_count="$(grep -Ec '^(src/|src-tauri/src/)' "$tmp" || true)"
-branch="${PI_SPEC_FEATURE:-${GITHUB_HEAD_REF:-$(git branch --show-current)}}"
+branch="$(git branch --show-current)"
+[ -n "$branch" ] || branch="${GITHUB_HEAD_REF:-}"
 feature="${branch##*/}"
 spec_dir="specs/$feature"
 required=(spec.md plan.md tasks.md)
@@ -83,8 +95,9 @@ if [ "$product_count" -gt 0 ] && [ "$changed_count" -ge "$threshold" ]; then
       grep -Fq '## User Scenarios & Testing' "$spec_dir/spec.md" || failures+=("$spec_dir/spec.md is not a completed Spec Kit specification")
       grep -Fq '## Technical Context' "$spec_dir/plan.md" || failures+=("$spec_dir/plan.md is not a completed Spec Kit plan")
       grep -Eq '^- \[[ xX]\] T[0-9]+' "$spec_dir/tasks.md" || failures+=("$spec_dir/tasks.md has no executable Txxx tasks")
-      if grep -Rqs '\[NEEDS CLARIFICATION\]' "$spec_dir/spec.md" "$spec_dir/plan.md" "$spec_dir/tasks.md"; then
-        failures+=("$spec_dir still contains [NEEDS CLARIFICATION]")
+      if grep -REiq '\[(FEATURE NAME|DATE|BRIEF DESCRIPTION|TASK DESCRIPTION|STORY|NEEDS CLARIFICATION)\]|\$ARGUMENTS|REPLACE THIS' \
+          "$spec_dir/spec.md" "$spec_dir/plan.md" "$spec_dir/tasks.md"; then
+        failures+=("$spec_dir still contains Spec Kit template/clarification markers")
       fi
     fi
   fi
