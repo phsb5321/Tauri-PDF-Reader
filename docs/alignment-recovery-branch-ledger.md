@@ -22,10 +22,23 @@ gh pr list --state all --limit 500 --json number,state,headRefName,headRefOid
 
 | Disposition                    | Ref rows |
 | ------------------------------ | -------: |
-| north-star blocking            |        2 |
-| worthwhile post-release polish |        7 |
+| north-star blocking            |        1 |
+| worthwhile post-release polish |        8 |
 | duplicate                      |      130 |
-| stale                          |       17 |
+| stale                          |       22 |
+| **Total**                      |  **161** |
+
+The total is the inventory itself: 62 local + 99 remote = 161 rows, matching the scope
+paragraph above. Recount from the table rather than trusting this block:
+
+```bash
+awk -F'|' '/^\| *(local|remote) *\|/ {gsub(/^ +| +$/,"",$8); print $8}' \
+  docs/alignment-recovery-branch-ledger.md | sort | uniq -c | sort -rn
+#     130 duplicate
+#      22 stale
+#       8 worthwhile post-release polish
+#       1 north-star blocking
+```
 
 ## Complete inventory
 
