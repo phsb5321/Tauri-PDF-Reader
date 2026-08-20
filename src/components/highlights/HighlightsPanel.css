@@ -1,8 +1,23 @@
+/* Docked to the right of the reading surface (see `.reader-surface`), which is
+   a flex ROW. `flex-shrink: 0` keeps the 300px dock from being squeezed to
+   nothing by the page beside it.
+
+   `height` is deliberately NOT set: as a row flex item the panel already
+   stretches to the row's full height (`align-items: stretch`), whereas the old
+   `height: 100%` resolved against a COLUMN parent and was part of why the panel
+   overflowed instead of docking. The list scrolls inside that stretched box via
+   `.highlights-panel-content { flex: 1; overflow-y: auto }` — no `min-height`
+   is involved: the content-based automatic minimum applies to the MAIN axis,
+   which for a row item is the width, not the height.
+
+   The 300px dock is fixed against `tauri.conf.json`'s `minWidth: 800`, which
+   leaves the page ~500px at the smallest allowed window. Lowering that minimum
+   without adding a breakpoint here would start squeezing the page toward zero. */
 .highlights-panel {
   display: flex;
   flex-direction: column;
   width: 300px;
-  height: 100%;
+  flex-shrink: 0;
   background: var(--bg-primary);
   border-left: 1px solid var(--border-color);
 }
