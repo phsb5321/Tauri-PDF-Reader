@@ -27,6 +27,17 @@ serial (single-slot vm103 — the matrix exists in time, never in parallel
 jobs). `tools/check-packaged-gate-contract.sh` proves the workflow cannot
 silently drop any of the eight.
 
+## Recovery exact-head composition lane (manual)
+
+| Lane                    | Runner                                                       | User risk it gates                                                                                   | Key assertions                                                                                                                                                                                                                                                     | Scheduling                                                                                                                                                                                                                                                                                                                      |
+| ----------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| first-reader north star | `pnpm test:e2e:north-star` → `e2e/run-north-star-journey.sh` | Individual green lanes compose into a broken first-user loop; close/restart loses acknowledged state | Fresh empty profile; public Open; actionable no-key setup; deterministic fixture Play crosses native word timing; page/highlight acknowledged; genuine WM close and original-process death; new process resumes same book/page and renders the persisted highlight | Required manually at Spec 079 candidate `A`; caller or runner takes `/tmp/lectrice-heavy-gate.lock`, and inherited lock ownership is reused. Not added to the standing eight-lane nightly matrix because it composes those surfaces for one bounded recovery decision rather than creating a second permanent matrix authority. |
+
+The lane refuses tracked, staged, ordinary untracked, ignored `.env*`, and
+caller `VITE_*` source drift before binding evidence to `HEAD`. Its result is
+machine-readable phase evidence; a model verdict or a successful component
+lane cannot substitute for it.
+
 ## The real-corpus tier (post-merge/manual — `real-corpus` job)
 
 **Why:** every fixture lane runs generated 3-page PDFs. The risk that no
