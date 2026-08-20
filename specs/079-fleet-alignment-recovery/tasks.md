@@ -13,7 +13,7 @@
 **Purpose**: Make the recovery graph durable and install deterministic contract inputs before any remaining PR mutation.
 
 - [x] T001 Verify the completed 23-ref preservation set under `origin/preserve/20260820-*` covers the 19 tips in `/tmp/lectrice-local-only-tips-20260820.tsv` plus 122/125/143 and deleted local 145, then record the correction input for `docs/alignment-recovery-branch-ledger.md`
-- [ ] T002 Enumerate **every local ref** dynamically, prove remote containment for each tip, then record tree equality only for 122/125, common-base combined-patch/range-diff equality (not whole-tree identity) for stale-base 143, other classifications/stale branches/dirty-worktree exclusions, and the #147/#152 merge-tree result in `docs/alignment-recovery-branch-ledger.md`
+- [X] T002 Enumerate **every local ref** dynamically, prove remote containment for each tip, then record tree equality only for 122/125, common-base combined-patch/range-diff equality (not whole-tree identity) for stale-base 143, other classifications/stale branches/dirty-worktree exclusions, and the #147/#152 merge-tree result in `docs/alignment-recovery-branch-ledger.md`
 - [ ] T003 [P] Add the receipt data contract from `specs/079-fleet-alignment-recovery/contracts/recovery-receipt.md` as a dependency-free schema in `docs/alignment-recovery-receipt.schema.json`
 - [ ] T004 [P] Create fail-first synthetic-repository fixtures for wrong parent, extra envelope path, missing prompt, open PR, failed journey, and stale state in `scripts/test-oracle-alignment-recovery.sh`
 
