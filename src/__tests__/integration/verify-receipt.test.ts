@@ -15,12 +15,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import {
-  readFileSync,
-  mkdtempSync,
-  writeFileSync,
-  chmodSync,
-} from "node:fs";
+import { readFileSync, mkdtempSync, writeFileSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -34,7 +29,14 @@ function runVerify(env: Record<string, string>): { status: number } {
   try {
     execFileSync("bash", [VERIFY], {
       cwd: REPO_ROOT,
-      env: { ...process.env, ...env },
+      env: {
+        ...process.env,
+        // Receipt tests exercise verify.sh, not durable seat discovery inherited
+        // from the self-hosted runner. Policy behavior has its own falsifiers.
+        PI_SESSION_ID: "",
+        PI_AGENT_NAME: "",
+        ...env,
+      },
       stdio: "pipe",
       timeout: 60_000,
     });
@@ -48,7 +50,10 @@ function runVerify(env: Record<string, string>): { status: number } {
 
 describe("the verify receipt (M2.4)", () => {
   it("records the failing gate when a gate fails", () => {
-    const receipt = join(mkdtempSync(join(tmpdir(), "verify-receipt-")), "r.json");
+    const receipt = join(
+      mkdtempSync(join(tmpdir(), "verify-receipt-")),
+      "r.json",
+    );
 
     const { status } = runVerify({
       VERIFY_GATES: "typecheck|false",
@@ -68,7 +73,10 @@ describe("the verify receipt (M2.4)", () => {
   });
 
   it("emits a passing receipt when every gate passes", () => {
-    const receipt = join(mkdtempSync(join(tmpdir(), "verify-receipt-")), "r.json");
+    const receipt = join(
+      mkdtempSync(join(tmpdir(), "verify-receipt-")),
+      "r.json",
+    );
 
     const { status } = runVerify({
       VERIFY_GATES: "typecheck|true\nlint|true",
@@ -93,7 +101,10 @@ describe("the verify receipt (M2.4)", () => {
     writeFileSync(join(fakeBin, "pnpm"), "#!/bin/sh\nexit 1\n");
     chmodSync(join(fakeBin, "pnpm"), 0o755);
 
-    const receipt = join(mkdtempSync(join(tmpdir(), "verify-receipt-")), "r.json");
+    const receipt = join(
+      mkdtempSync(join(tmpdir(), "verify-receipt-")),
+      "r.json",
+    );
 
     const { status } = runVerify({
       VERIFY_RECEIPT_PATH: receipt,
