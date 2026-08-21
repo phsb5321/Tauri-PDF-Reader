@@ -32,6 +32,15 @@ cd src-tauri && cargo test specific_test_name --features test-mocks
 pnpm verify
 ```
 
+## Harness Goal + Spec Kit Boundary
+
+Set one durable outcome per seat before work: `pi goal set "<measurable
+outcome>"`. Run `make harness-status` to see the composed goal/spec decision.
+Broad product changes (three or more changed files) use a matching `NNN-slug`
+branch and complete `specs/NNN-slug/{spec,plan,tasks}.md`; targeted fixes and
+non-product-only changes retain the lightweight path. `make harness-check` is
+the same executable policy called by Pi settlement, Husky, verification, and CI.
+
 ## Merge Ownership (NON-NEGOTIABLE)
 
 **Done = MERGED, not PR-opened.** Self-merge the SAFE class — CI-green AND
@@ -67,6 +76,8 @@ pnpm install                 # Install dependencies
 pnpm tauri dev               # Start dev server + Tauri
 
 # Verification (run before committing)
+make harness-status          # Goal + branch-bound Spec Kit status
+make harness-check           # Same policy used by Pi/Husky/CI
 pnpm verify                  # All CI checks (resource intensive - run sparingly)
 pnpm lint                    # ESLint + architecture boundaries
 pnpm typecheck               # TypeScript check

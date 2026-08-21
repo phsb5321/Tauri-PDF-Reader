@@ -115,6 +115,8 @@ fi
 echo -e "${BLUE}── Frontend Checks ──${NC}"
 echo ""
 
+run_gate "harness-policy" ./tools/harness-policy.sh --base origin/main
+
 run_gate "dependencies" pnpm install --frozen-lockfile
 
 run_gate "typecheck" pnpm typecheck

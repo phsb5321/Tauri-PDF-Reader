@@ -134,5 +134,19 @@ if [ "${errs:-0}" -gt 0 ]; then
   echo "✗ FAIL — finish the work / tighten scope before claiming done."
   exit 1
 fi
-echo "✓ PASS — no completion-theater or scope violations over threshold."
+# Compose the repository's goal/Spec Kit policy into the existing required
+# check instead of duplicating that decision here. CI has no Pi seat, so only
+# the branch-bound specification half applies at this boundary.
+case "$mode" in
+  staged)  harness_args=(--staged --spec-only) ;;
+  worktree) harness_args=(--worktree --spec-only) ;;
+  changes) harness_args=(--base "$base" --spec-only) ;;
+  path)    harness_args=() ;;
+esac
+if [ "${#harness_args[@]}" -gt 0 ] && ! "$SCRIPT_DIR/harness-policy.sh" "${harness_args[@]}"; then
+  echo "✗ FAIL — harness goal/Spec Kit policy refused this change."
+  exit 1
+fi
+
+echo "✓ PASS — no completion-theater, scope, goal, or Spec Kit violations."
 exit 0
