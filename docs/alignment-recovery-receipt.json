@@ -1,0 +1,269 @@
+{
+  "schema_version": 1,
+  "program_id": "lectrice-alignment-recovery",
+  "accepted_main_sha": "ce3dd8a90142b8df0fc1cd67c1ad85f183c35ef0",
+  "receipt_commit_parent": "ce3dd8a90142b8df0fc1cd67c1ad85f183c35ef0",
+  "receipt_envelope": [
+    "docs/alignment-recovery-receipt.json"
+  ],
+  "spec_artifacts": [
+    {
+      "path": "specs/079-fleet-alignment-recovery/spec.md",
+      "sha256": "c0f18deafbf69b9f676a3deee4ec17dad8dc651c364b5d0be3d25ce3da6d7801"
+    },
+    {
+      "path": "specs/079-fleet-alignment-recovery/plan.md",
+      "sha256": "283bd108f7be5a457c5b24125f6a272395bd20a9477a998d39cb3510ba8652e3"
+    },
+    {
+      "path": "specs/079-fleet-alignment-recovery/tasks.md",
+      "sha256": "29488ba6f1ad4fbf488b12e8f6c2c00eab6137c38d631e75c329b92485e7542d"
+    }
+  ],
+  "dispositions": [
+    {
+      "item_id": "PR #147",
+      "observed_sha": "511f70dce5010b51ff8a7fff7a7f133f89f751c9",
+      "category": "worthwhile-post-release-polish",
+      "immutable_evidence": [
+        "https://github.com/phsb5321/Tauri-PDF-Reader/pull/147",
+        "repository://ce3dd8a90142b8df0fc1cd67c1ad85f183c35ef0/docs/alignment-recovery-branch-ledger.md#reconciliation-decisions"
+      ],
+      "owner": "Product/QA",
+      "next_action": "Retain the merged contrast outcome and preserved reviewed head; do not replay or revert.",
+      "falsifier": "An exact packaged north-star failure is caused by the merged contrast outcome.",
+      "preservation_state": "remote-preserved",
+      "terminal_state": "merged"
+    },
+    {
+      "item_id": "PR #152",
+      "observed_sha": "fe4725a9e6b09992f4e62c97579782b2ceb2b9c6",
+      "category": "worthwhile-post-release-polish",
+      "immutable_evidence": [
+        "https://github.com/phsb5321/Tauri-PDF-Reader/pull/152",
+        "repository://ce3dd8a90142b8df0fc1cd67c1ad85f183c35ef0/docs/evidence/card-fold-fe4725a9.txt"
+      ],
+      "owner": "Product/QA",
+      "next_action": "Keep the failed card-fold outcome closed and re-specify geometry only after recovery.",
+      "falsifier": "A current packaged north-star failure is caused by card geometry.",
+      "preservation_state": "remote-preserved",
+      "terminal_state": "closed-with-reason"
+    },
+    {
+      "item_id": "branch:161-alignment-recovery-state",
+      "observed_sha": "c7f3edd6b974e283423bc03f99305f97fe9b3a35",
+      "category": "duplicate",
+      "immutable_evidence": [
+        "https://github.com/phsb5321/Tauri-PDF-Reader/tree/161-alignment-recovery-state",
+        "https://github.com/phsb5321/Tauri-PDF-Reader/pull/161"
+      ],
+      "owner": "Graph/Knowledge",
+      "next_action": "Retain the remote state-slice tip as evidence; do not replay content already accepted at A3.",
+      "falsifier": "The preserved tip contains a unique accepted outcome absent from A3.",
+      "preservation_state": "remote-preserved",
+      "terminal_state": "preserved-only"
+    },
+    {
+      "item_id": "preserve:20260820-160-north-star-reviewed-head",
+      "observed_sha": "cc83a7184bf6b424afb22ef744dd2f79b0b8acd5",
+      "category": "duplicate",
+      "immutable_evidence": [
+        "https://github.com/phsb5321/Tauri-PDF-Reader/tree/preserve/20260820-160-north-star-reviewed-head",
+        "https://github.com/phsb5321/Tauri-PDF-Reader/pull/160"
+      ],
+      "owner": "Graph/QA",
+      "next_action": "Retain the exact reviewed actor head as evidence; do not replay its merged outcome.",
+      "falsifier": "The A3 tree omits an accepted north-star actor outcome from this reviewed head.",
+      "preservation_state": "remote-preserved",
+      "terminal_state": "preserved-only"
+    },
+    {
+      "item_id": "preserve:20260820-147-reviewed-head",
+      "observed_sha": "511f70dce5010b51ff8a7fff7a7f133f89f751c9",
+      "category": "duplicate",
+      "immutable_evidence": [
+        "https://github.com/phsb5321/Tauri-PDF-Reader/tree/preserve/20260820-147-reviewed-head",
+        "https://github.com/phsb5321/Tauri-PDF-Reader/pull/147"
+      ],
+      "owner": "Graph/QA",
+      "next_action": "Retain the exact reviewed contrast head as evidence; do not replay its merged outcome.",
+      "falsifier": "The A3 tree omits an accepted contrast outcome from this reviewed head.",
+      "preservation_state": "remote-preserved",
+      "terminal_state": "preserved-only"
+    },
+    {
+      "item_id": "preserve:20260820-079-backlog-reconcile-item5",
+      "observed_sha": "ce77e7f07a976f7e856a299e9adaba809a9f88ff",
+      "category": "stale",
+      "immutable_evidence": [
+        "https://github.com/phsb5321/Tauri-PDF-Reader/tree/preserve/20260820-079-backlog-reconcile-item5",
+        "https://github.com/phsb5321/Tauri-PDF-Reader/commit/ce77e7f07a976f7e856a299e9adaba809a9f88ff"
+      ],
+      "owner": "Graph/Knowledge",
+      "next_action": "Preserve only; require a fresh current-base contract before selecting any superseded correction.",
+      "falsifier": "A unique accepted outcome absent from A3 is demonstrated from a current-base contract.",
+      "preservation_state": "remote-preserved",
+      "terminal_state": "preserved-only"
+    }
+  ],
+  "journey": {
+    "source_sha": "ce3dd8a90142b8df0fc1cd67c1ad85f183c35ef0",
+    "platform_scope": "Linux/X11/WebKitGTK packaged debug binary",
+    "profile_id": "lectrice-north-star-profile.6EL2is",
+    "fixture_id": "e2e-resume-fixture-a:e9ad038b6046c47ef8cbfce52ebb71542b7137b69a4359977b6f91c90df59bb7",
+    "started_at": "2026-08-20T22:09:08-03:00",
+    "finished_at": "2026-08-20T22:11:29-03:00",
+    "steps": [
+      {
+        "name": "fresh_profile",
+        "actor_action": "Launch the packaged app with a new profile",
+        "oracle_observation": "Library has zero document cards and exposes the Open a PDF control",
+        "elapsed_ms": 25,
+        "failure_reason": null,
+        "result": "pass"
+      },
+      {
+        "name": "open_pdf",
+        "actor_action": "Activate the empty-state Open a PDF control and choose the deterministic picker fixture",
+        "oracle_observation": "Rendered PDF text layer and document title e2e-resume-fixture-a",
+        "elapsed_ms": 1216,
+        "failure_reason": null,
+        "result": "pass"
+      },
+      {
+        "name": "no_key_setup_visible",
+        "actor_action": "Activate Configure from the no-key playback message",
+        "oracle_observation": "Connect ElevenLabs form, API-key field, provider link, and egress disclosure are visible",
+        "elapsed_ms": 497,
+        "failure_reason": null,
+        "result": "pass"
+      },
+      {
+        "name": "start_narration",
+        "actor_action": "Activate Play after deterministic supported setup",
+        "oracle_observation": "Native fixture playback is playing with word timings and an advanced word index",
+        "elapsed_ms": 1232,
+        "failure_reason": null,
+        "result": "pass"
+      },
+      {
+        "name": "mutate_acknowledged_state",
+        "actor_action": "Create a Yellow highlight through the public selection toolbar and navigate to page 3",
+        "oracle_observation": "Reader acknowledges page 3 and Highlight: alpha lectrice fixture page two the catch-up resu",
+        "elapsed_ms": 1055,
+        "failure_reason": null,
+        "result": "pass"
+      },
+      {
+        "name": "normal_close_process_ended",
+        "actor_action": "Close the window through WM_DELETE_WINDOW",
+        "oracle_observation": "Window closed in 221ms and original process ended in 211ms",
+        "elapsed_ms": 430,
+        "failure_reason": null,
+        "result": "pass"
+      },
+      {
+        "name": "relaunch_new_process",
+        "actor_action": "Launch a new packaged application process on the same hermetic profile",
+        "oracle_observation": "Fresh WebDriver session reached a new native bootstrap on the existing profile",
+        "elapsed_ms": 151,
+        "failure_reason": null,
+        "result": "pass"
+      },
+      {
+        "name": "resume_same_document_page",
+        "actor_action": "Activate the public Resume control for page 3",
+        "oracle_observation": "Reader reopened e2e-resume-fixture-a at page 3",
+        "elapsed_ms": 797,
+        "failure_reason": null,
+        "result": "pass"
+      },
+      {
+        "name": "highlight_present",
+        "actor_action": "Return through Previous to the highlight page without creating another mark",
+        "oracle_observation": "Persisted highlight containing lectrice fixture page two is rendered on page 2",
+        "elapsed_ms": 678,
+        "failure_reason": null,
+        "result": "pass"
+      }
+    ],
+    "artifacts": [
+      {
+        "id": "north-star-phase-evidence",
+        "uri": "artifact://north-star/ce3dd8a90142b8df0fc1cd67c1ad85f183c35ef0/phase-evidence.json",
+        "sha256": "d5643359c6a9373c31a9ac47ec9716973a2a25b4daf074fb44252252d0de8693"
+      }
+    ],
+    "result": "pass"
+  },
+  "checks": [
+    {
+      "name": "main CI",
+      "run_id": 32435252582,
+      "subject": "accepted-main",
+      "head_sha": "ce3dd8a90142b8df0fc1cd67c1ad85f183c35ef0",
+      "conclusion": "success",
+      "evidence_ref": "https://github.com/phsb5321/Tauri-PDF-Reader/actions/runs/32435252582"
+    },
+    {
+      "name": "CodeQL",
+      "run_id": 32435252580,
+      "subject": "accepted-main",
+      "head_sha": "ce3dd8a90142b8df0fc1cd67c1ad85f183c35ef0",
+      "conclusion": "success",
+      "evidence_ref": "https://github.com/phsb5321/Tauri-PDF-Reader/actions/runs/32435252580"
+    },
+    {
+      "name": "Sonar quality gate",
+      "run_id": 32435252621,
+      "subject": "accepted-main",
+      "head_sha": "ce3dd8a90142b8df0fc1cd67c1ad85f183c35ef0",
+      "conclusion": "success",
+      "evidence_ref": "https://github.com/phsb5321/Tauri-PDF-Reader/actions/runs/32435252621"
+    }
+  ],
+  "reviews": [
+    {
+      "reviewer": "codex-openai-a3-adversarial",
+      "generator_family": "anthropic",
+      "provider_family": "openai",
+      "subject": "accepted-main",
+      "head_sha": "ce3dd8a90142b8df0fc1cd67c1ad85f183c35ef0",
+      "verdict": "ALLOW",
+      "evidence_ref": "https://github.com/phsb5321/Tauri-PDF-Reader/pull/163#issuecomment-5364091138"
+    }
+  ],
+  "state_refs": [
+    {
+      "id": "repo-backlog",
+      "kind": "repository",
+      "repository": "lectrice",
+      "path": "docs/agent-backlog-state.md",
+      "revision": "ce3dd8a90142b8df0fc1cd67c1ad85f183c35ef0",
+      "sha256": "fcc4e013dbbabbeb74955cce532b499dfaa7d6447ed323ac4edb06c986251615",
+      "observed_main_sha": "ce3dd8a90142b8df0fc1cd67c1ad85f183c35ef0",
+      "observed_at": "2026-08-20T22:30:55-03:00"
+    },
+    {
+      "id": "repo-branch-ledger",
+      "kind": "repository",
+      "repository": "lectrice",
+      "path": "docs/alignment-recovery-branch-ledger.md",
+      "revision": "ce3dd8a90142b8df0fc1cd67c1ad85f183c35ef0",
+      "sha256": "ce7f72d640f19df9d54a66fa2ac1549c75d4a566848a72a7f21c6d00d42566fd",
+      "observed_main_sha": "ce3dd8a90142b8df0fc1cd67c1ad85f183c35ef0",
+      "observed_at": "2026-08-20T22:30:55-03:00"
+    },
+    {
+      "id": "vault-save-state",
+      "kind": "vault",
+      "repository": "vault",
+      "path": "1. Projects/Lectrice — Tauri PDF Reader/SAVE-STATE.md",
+      "revision": "83d08be62eb198872eb38aed9974fe6e63229235",
+      "sha256": "5aa49dbb47f698f868806a7464b944156f0f63c8ef42f5450a24b8ec699b00a3",
+      "observed_main_sha": "ce3dd8a90142b8df0fc1cd67c1ad85f183c35ef0",
+      "observed_at": "2026-08-20T22:30:55-03:00"
+    }
+  ],
+  "generated_at": "2026-08-20T22:30:55-03:00"
+}
