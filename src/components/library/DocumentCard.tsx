@@ -18,6 +18,21 @@ interface DocumentCardProps {
   onToggleShelf?: (shelfId: string, filed: boolean) => void;
 }
 
+function formatLastOpened(lastOpenedAt: string | null | undefined): string {
+  if (!lastOpenedAt) return "Never";
+  try {
+    const date = new Date(lastOpenedAt);
+    return date.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year:
+        date.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
+    });
+  } catch {
+    return "Unknown";
+  }
+}
+
 export function DocumentCard({
   document,
   isSelected,
@@ -45,23 +60,11 @@ export function DocumentCard({
     return Math.round((document.currentPage / document.pageCount) * 100);
   }, [document.currentPage, document.pageCount]);
 
-  // Format date for display
-  const lastOpened = useMemo(() => {
-    if (!document.lastOpenedAt) return "Never";
-    try {
-      const date = new Date(document.lastOpenedAt);
-      return date.toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-        year:
-          date.getFullYear() === new Date().getFullYear()
-            ? undefined
-            : "numeric",
-      });
-    } catch {
-      return "Unknown";
-    }
-  }, [document.lastOpenedAt]);
+  // Format date for display outside the component's interaction branches.
+  const lastOpened = useMemo(
+    () => formatLastOpened(document.lastOpenedAt),
+    [document.lastOpenedAt],
+  );
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -153,7 +156,9 @@ export function DocumentCard({
         </fieldset>
       )}
       <button type="button" onClick={handleDelete}>
-        {confirmingDelete ? "Click again to confirm remove" : "Remove from Library"}
+        {confirmingDelete
+          ? "Click again to confirm remove"
+          : "Remove from Library"}
       </button>
       <button type="button" onClick={handleCloseContextMenu}>
         Cancel
@@ -218,8 +223,16 @@ export function DocumentCard({
           type="button"
           className={`document-card-delete ${confirmingDelete ? "document-card-delete--confirming" : ""}`}
           onClick={handleDelete}
-          title={confirmingDelete ? "Click again to confirm remove" : "Remove from library"}
-          aria-label={confirmingDelete ? "Click again to confirm remove" : "Remove from library"}
+          title={
+            confirmingDelete
+              ? "Click again to confirm remove"
+              : "Remove from library"
+          }
+          aria-label={
+            confirmingDelete
+              ? "Click again to confirm remove"
+              : "Remove from library"
+          }
         >
           <DeleteIcon />
         </button>
@@ -288,8 +301,16 @@ export function DocumentCard({
         type="button"
         className={`document-card-delete ${confirmingDelete ? "document-card-delete--confirming" : ""}`}
         onClick={handleDelete}
-        title={confirmingDelete ? "Click again to confirm remove" : "Remove from library"}
-        aria-label={confirmingDelete ? "Click again to confirm remove" : "Remove from library"}
+        title={
+          confirmingDelete
+            ? "Click again to confirm remove"
+            : "Remove from library"
+        }
+        aria-label={
+          confirmingDelete
+            ? "Click again to confirm remove"
+            : "Remove from library"
+        }
       >
         <DeleteIcon />
       </button>
