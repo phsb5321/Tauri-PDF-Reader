@@ -33,6 +33,68 @@ function formatLastOpened(lastOpenedAt: string | null | undefined): string {
   }
 }
 
+interface DocumentContextMenuProps {
+  open: boolean;
+  confirmingDelete: boolean;
+  shelves?: readonly { id: string; name: string }[];
+  shelfIds?: ReadonlySet<string>;
+  onOpen: () => void;
+  onDelete: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  onClose: () => void;
+  onToggleShelf?: (shelfId: string, filed: boolean) => void;
+}
+
+function DocumentContextMenu({
+  open,
+  confirmingDelete,
+  shelves,
+  shelfIds,
+  onOpen,
+  onDelete,
+  onClose,
+  onToggleShelf,
+}: Readonly<DocumentContextMenuProps>) {
+  if (!open) return null;
+  return (
+    <div className="document-card-context-menu">
+      <button type="button" onClick={onOpen}>
+        Open
+      </button>
+      {shelves && shelves.length > 0 && (
+        <fieldset className="document-card-shelves">
+          {/* Named by a hidden legend rather than aria-label: a fieldset is
+              the native grouping element for a set of checkboxes, and the
+              menu has no room for a visible heading. */}
+          <legend className="sr-only">Shelves</legend>
+          {shelves.map((shelf) => {
+            const filed = shelfIds?.has(shelf.id) ?? false;
+            return (
+              <label key={shelf.id} className="document-card-shelf">
+                <input
+                  type="checkbox"
+                  checked={filed}
+                  // Menu stays open: filing a book on several shelves in one
+                  // pass is the common case.
+                  onChange={() => onToggleShelf?.(shelf.id, filed)}
+                />
+                <span>{shelf.name}</span>
+              </label>
+            );
+          })}
+        </fieldset>
+      )}
+      <button type="button" onClick={onDelete}>
+        {confirmingDelete
+          ? "Click again to confirm remove"
+          : "Remove from Library"}
+      </button>
+      <button type="button" onClick={onClose}>
+        Cancel
+      </button>
+    </div>
+  );
+}
+
 export function DocumentCard({
   document,
   isSelected,
@@ -127,43 +189,17 @@ export function DocumentCard({
   // Same menu in both view modes: filing a book is the reason the menu exists
   // now, and it was previously unreachable in list view — the handler set the
   // flag but the list branch returned before anything rendered it.
-  const contextMenu = showContextMenu && (
-    <div className="document-card-context-menu">
-      <button type="button" onClick={onDoubleClick}>
-        Open
-      </button>
-      {shelves && shelves.length > 0 && (
-        <fieldset className="document-card-shelves">
-          {/* Named by a hidden legend rather than aria-label: a fieldset is
-              the native grouping element for a set of checkboxes, and the
-              menu has no room for a visible heading. */}
-          <legend className="sr-only">Shelves</legend>
-          {shelves.map((shelf) => {
-            const filed = shelfIds?.has(shelf.id) ?? false;
-            return (
-              <label key={shelf.id} className="document-card-shelf">
-                <input
-                  type="checkbox"
-                  checked={filed}
-                  // Menu stays open: filing a book on several shelves in one
-                  // pass is the common case.
-                  onChange={() => onToggleShelf?.(shelf.id, filed)}
-                />
-                <span>{shelf.name}</span>
-              </label>
-            );
-          })}
-        </fieldset>
-      )}
-      <button type="button" onClick={handleDelete}>
-        {confirmingDelete
-          ? "Click again to confirm remove"
-          : "Remove from Library"}
-      </button>
-      <button type="button" onClick={handleCloseContextMenu}>
-        Cancel
-      </button>
-    </div>
+  const contextMenu = (
+    <DocumentContextMenu
+      open={showContextMenu}
+      confirmingDelete={confirmingDelete}
+      shelves={shelves}
+      shelfIds={shelfIds}
+      onOpen={onDoubleClick}
+      onDelete={handleDelete}
+      onClose={handleCloseContextMenu}
+      onToggleShelf={onToggleShelf}
+    />
   );
 
   if (viewMode === "list") {
