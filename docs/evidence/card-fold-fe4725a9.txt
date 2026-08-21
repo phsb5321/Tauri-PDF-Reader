@@ -1,0 +1,101 @@
+source_sha=fe4725a9e6b09992f4e62c97579782b2ceb2b9c6
+command=TMPDIR=/tmp bash scripts/card-fold-verify.sh
+==> [single] Building frontend (VITE_E2E_NATIVE=true)
+! Corepack is about to download https://registry.npmjs.org/pnpm/-/pnpm-11.22.0.tgz
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+$ tsc && vite build
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+==> debug binary rebuilt (seed frontend embedded)
+Xvfb ready on DISPLAY=:1 profile=<HERMETIC_PROFILE>
+
+> lectrice@0.2.0 test:e2e <WORKTREE>
+> wdio run wdio.conf.mjs
+
+
+Execution of 1 workers started at 2026-08-20T21:47:37.468Z
+
+[0-0] RUNNING in undefined - file:///e2e/card-fold-verify.e2e.mjs
+[0-0] PROBE light-1200 {"cards":[{"title":{"left":253,"right":437,"top":605,"w":184,"h":20,"bottom":625},"coverState":"ready","coverImg":{"boxRatio":1.369,"objectFit":"contain","w":208,"natural":0.773,"h":152},"top":439,"coverRatio":1.369,"w":210,"meta":{"left":253,"right":437,"top":633,"w":184,"h":17,"bottom":651},"cover":{"left":241,"right":449,"top":440,"w":208,"h":152,"bottom":592},"bottom":675,"progress":{"left":253,"right":437,"top":658,"w":184,"h":4,"bottom":662}}],"grid":{"left":240,"right":1128,"top":439,"w":888,"h":260,"bottom":699},"gridScrollTop":0,"viewport":{"w":1151,"h":767},"gridOverflowY":"auto"}
+[0-0] DIAG seedstate: seedEnv=single dom={"titles":["E2E Resume Fixture A"],"n":1,"ready":true}
+[0-0] PROBE dark-1200 {"cards":[{"title":{"left":253,"right":437,"top":605,"w":184,"h":20,"bottom":625},"coverState":"ready","coverImg":{"boxRatio":1.369,"objectFit":"contain","w":208,"natural":0.773,"h":152},"top":439,"coverRatio":1.369,"w":210,"meta":{"left":253,"right":437,"top":633,"w":184,"h":17,"bottom":651},"cover":{"left":241,"right":449,"top":440,"w":208,"h":152,"bottom":592},"bottom":675,"progress":{"left":253,"right":437,"top":658,"w":184,"h":4,"bottom":662}}],"grid":{"left":240,"right":1128,"top":439,"w":888,"h":260,"bottom":699},"gridScrollTop":0,"viewport":{"w":1151,"h":767},"gridOverflowY":"auto"}
+[0-0] DIAG seedstate: seedEnv=single dom={"titles":["E2E Resume Fixture A"],"n":1,"ready":true}
+[0-0] PROBE light-640 {"cards":[{"title":{"left":253,"right":471,"top":605,"w":218,"h":20,"bottom":625},"coverState":"ready","coverImg":{"boxRatio":1.593,"objectFit":"contain","w":242,"natural":0.773,"h":152},"top":439,"coverRatio":1.593,"w":244,"meta":{"left":253,"right":471,"top":633,"w":218,"h":17,"bottom":651},"cover":{"left":241,"right":483,"top":440,"w":242,"h":152,"bottom":592},"bottom":675,"progress":{"left":253,"right":471,"top":658,"w":218,"h":4,"bottom":662}}],"grid":{"left":240,"right":744,"top":439,"w":504,"h":260,"bottom":699},"gridScrollTop":0,"viewport":{"w":767,"h":767},"gridOverflowY":"auto"}
+[0-0] DIAG seedstate: seedEnv=single dom={"titles":["E2E Resume Fixture A"],"n":1,"ready":true}
+[0-0] PROBE dark-640 {"cards":[{"title":{"left":253,"right":471,"top":605,"w":218,"h":20,"bottom":625},"coverState":"ready","coverImg":{"boxRatio":1.593,"objectFit":"contain","w":242,"natural":0.773,"h":152},"top":439,"coverRatio":1.593,"w":244,"meta":{"left":253,"right":471,"top":633,"w":218,"h":17,"bottom":651},"cover":{"left":241,"right":483,"top":440,"w":242,"h":152,"bottom":592},"bottom":675,"progress":{"left":253,"right":471,"top":658,"w":218,"h":4,"bottom":662}}],"grid":{"left":240,"right":744,"top":439,"w":504,"h":260,"bottom":699},"gridScrollTop":0,"viewport":{"w":767,"h":767},"gridOverflowY":"auto"}
+[0-0] DIAG seedstate: seedEnv=single dom={"titles":["E2E Resume Fixture A"],"n":1,"ready":true}
+[0-0] PASSED in undefined - file:///e2e/card-fold-verify.e2e.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[wry 0.53.5 linux #0-0] Running: wry (v0.53.5) on linux
+[wry 0.53.5 linux #0-0] Session ID: <REDACTED-RUN-ID>
+[wry 0.53.5 linux #0-0]
+[wry 0.53.5 linux #0-0] » e2e/card-fold-verify.e2e.mjs
+[wry 0.53.5 linux #0-0] S1 card-fold verify (card text inside the fold)
+[wry 0.53.5 linux #0-0]    ✓ seed=single: card text visible without inner-grid scrolling, both themes
+[wry 0.53.5 linux #0-0]
+[wry 0.53.5 linux #0-0] 1 passing (3.6s)
+
+
+Spec Files:	 1 passed, 1 total (100% completed) in 00:00:05
+
+==> [dual] Building frontend (VITE_E2E_NATIVE=true)
+! Corepack is about to download https://registry.npmjs.org/pnpm/-/pnpm-11.22.0.tgz
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+$ tsc && vite build
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+==> debug binary rebuilt (seed frontend embedded)
+Xvfb ready on DISPLAY=:1 profile=<HERMETIC_PROFILE>
+
+> lectrice@0.2.0 test:e2e <WORKTREE>
+> wdio run wdio.conf.mjs
+
+
+Execution of 1 workers started at 2026-08-20T21:48:52.833Z
+
+[0-0] RUNNING in undefined - file:///e2e/card-fold-verify.e2e.mjs
+[0-0] PROBE light-1200 {"cards":[{"title":{"left":253,"right":437,"top":675,"w":184,"h":20,"bottom":695},"coverState":"ready","coverImg":{"boxRatio":2.173,"objectFit":"contain","w":208,"natural":0.773,"h":96},"top":565,"coverRatio":2.173,"w":210,"meta":{"left":253,"right":437,"top":703,"w":184,"h":17,"bottom":720},"cover":{"left":241,"right":449,"top":566,"w":208,"h":96,"bottom":662},"bottom":745,"progress":{"left":253,"right":437,"top":728,"w":184,"h":4,"bottom":732}},{"title":{"left":479,"right":663,"top":675,"w":184,"h":20,"bottom":695},"coverState":"ready","coverImg":{"boxRatio":2.173,"objectFit":"contain","w":208,"natural":0.773,"h":96},"top":565,"coverRatio":2.173,"w":210,"meta":{"left":479,"right":663,"top":703,"w":184,"h":17,"bottom":720},"cover":{"left":467,"right":675,"top":566,"w":208,"h":96,"bottom":662},"bottom":745,"progress":{"left":479,"right":663,"top":728,"w":184,"h":4,"bottom":732}}],"grid":{"left":240,"right":1128,"top":565,"w":888,"h":134,"bottom":699},"gridScrollTop":0,"viewport":{"w":1151,"h":767},"gridOverflowY":"auto"}
+[0-0] DIAG seedstate: seedEnv=dual dom={"titles":["E2E Resume Fixture A","E2E Resume Fixture B"],"n":2,"ready":true}
+[0-0] Error in "S1 card-fold verify (card text inside the fold).seed=dual: card text visible without inner-grid scrolling, both themes"
+Error: expect(received).toBeGreaterThan(expected)
+
+Expected: > 0
+Received:   0
+    at Context.<anonymous> (file://<WORKTREE>/e2e/card-fold-verify.e2e.mjs:186:30)
+[0-0] FAILED in undefined - file:///e2e/card-fold-verify.e2e.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[wry 0.53.5 linux #0-0] Running: wry (v0.53.5) on linux
+[wry 0.53.5 linux #0-0] Session ID: <REDACTED-RUN-ID>
+[wry 0.53.5 linux #0-0]
+[wry 0.53.5 linux #0-0] » e2e/card-fold-verify.e2e.mjs
+[wry 0.53.5 linux #0-0] S1 card-fold verify (card text inside the fold)
+[wry 0.53.5 linux #0-0]    ✖ seed=dual: card text visible without inner-grid scrolling, both themes
+[wry 0.53.5 linux #0-0]
+[wry 0.53.5 linux #0-0] 1 failing (1.6s)
+[wry 0.53.5 linux #0-0]
+[wry 0.53.5 linux #0-0] 1) S1 card-fold verify (card text inside the fold) seed=dual: card text visible without inner-grid scrolling, both themes
+[wry 0.53.5 linux #0-0] expect(received).toBeGreaterThan(expected)
+
+Expected: > 0
+Received:   0
+[wry 0.53.5 linux #0-0] Error: expect(received).toBeGreaterThan(expected)
+[wry 0.53.5 linux #0-0]
+[wry 0.53.5 linux #0-0] Expected: > 0
+[wry 0.53.5 linux #0-0] Received:   0
+[wry 0.53.5 linux #0-0]     at Context.<anonymous> (file://<WORKTREE>/e2e/card-fold-verify.e2e.mjs:186:30)
+
+
+Spec Files:	 0 passed, 1 failed, 1 total (100% completed) in 00:00:03
+
+ ELIFECYCLE  Command failed with exit code 1.
+exit_code=1

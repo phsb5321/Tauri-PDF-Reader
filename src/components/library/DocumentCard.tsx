@@ -18,6 +18,34 @@ interface DocumentCardProps {
   onToggleShelf?: (shelfId: string, filed: boolean) => void;
 }
 
+function formatLastOpened(lastOpenedAt: string | null | undefined): string {
+  if (!lastOpenedAt) return "Never";
+  try {
+    const date = new Date(lastOpenedAt);
+    return date.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year:
+        date.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
+    });
+  } catch {
+    return "Unknown";
+  }
+}
+
+function getDeleteLabels(confirming: boolean): {
+  contextMenu: string;
+  button: string;
+} {
+  if (confirming) {
+    return {
+      contextMenu: "Click again to confirm remove",
+      button: "Click again to confirm remove",
+    };
+  }
+  return { contextMenu: "Remove from Library", button: "Remove from library" };
+}
+
 export function DocumentCard({
   document,
   isSelected,
@@ -45,23 +73,11 @@ export function DocumentCard({
     return Math.round((document.currentPage / document.pageCount) * 100);
   }, [document.currentPage, document.pageCount]);
 
-  // Format date for display
-  const lastOpened = useMemo(() => {
-    if (!document.lastOpenedAt) return "Never";
-    try {
-      const date = new Date(document.lastOpenedAt);
-      return date.toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-        year:
-          date.getFullYear() === new Date().getFullYear()
-            ? undefined
-            : "numeric",
-      });
-    } catch {
-      return "Unknown";
-    }
-  }, [document.lastOpenedAt]);
+  // Format date for display outside the component's interaction branches.
+  const lastOpened = useMemo(
+    () => formatLastOpened(document.lastOpenedAt),
+    [document.lastOpenedAt],
+  );
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -124,6 +140,7 @@ export function DocumentCard({
   // Same menu in both view modes: filing a book is the reason the menu exists
   // now, and it was previously unreachable in list view — the handler set the
   // flag but the list branch returned before anything rendered it.
+  const deleteLabels = getDeleteLabels(confirmingDelete);
   const contextMenu = showContextMenu && (
     <div className="document-card-context-menu">
       <button type="button" onClick={onDoubleClick}>
@@ -153,7 +170,7 @@ export function DocumentCard({
         </fieldset>
       )}
       <button type="button" onClick={handleDelete}>
-        {confirmingDelete ? "Click again to confirm remove" : "Remove from Library"}
+        {deleteLabels.contextMenu}
       </button>
       <button type="button" onClick={handleCloseContextMenu}>
         Cancel
@@ -218,8 +235,8 @@ export function DocumentCard({
           type="button"
           className={`document-card-delete ${confirmingDelete ? "document-card-delete--confirming" : ""}`}
           onClick={handleDelete}
-          title={confirmingDelete ? "Click again to confirm remove" : "Remove from library"}
-          aria-label={confirmingDelete ? "Click again to confirm remove" : "Remove from library"}
+          title={deleteLabels.button}
+          aria-label={deleteLabels.button}
         >
           <DeleteIcon />
         </button>
@@ -288,8 +305,8 @@ export function DocumentCard({
         type="button"
         className={`document-card-delete ${confirmingDelete ? "document-card-delete--confirming" : ""}`}
         onClick={handleDelete}
-        title={confirmingDelete ? "Click again to confirm remove" : "Remove from library"}
-        aria-label={confirmingDelete ? "Click again to confirm remove" : "Remove from library"}
+        title={deleteLabels.button}
+        aria-label={deleteLabels.button}
       >
         <DeleteIcon />
       </button>
