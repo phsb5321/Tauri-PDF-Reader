@@ -67,4 +67,18 @@ printf '# Tasks\n- [ ] T001 Prove the gate\n' >specs/080-negative-control/tasks.
 "$subject" --base main --spec-only >"$output" 2>&1
 grep -q 'harness-policy: PASS' "$output"
 
-echo 'negative-control: PASS — targeted allowed; partial-stage refused without loss; no/partial spec refused; complete chain allowed'
+git checkout -q --orphan 080-unrelated-control
+git rm -qrf .
+mkdir -p src
+printf 'a\n' >src/a.ts
+printf 'b\n' >src/b.ts
+printf 'c\n' >src/c.ts
+git add src
+git commit -qm 'unrelated broad product change'
+if "$subject" --base main --spec-only >"$output" 2>&1; then
+  echo "negative-control: FAIL — unrelated-history product change passed" >&2
+  exit 1
+fi
+grep -q 'complete branch-bound chain' "$output"
+
+echo 'negative-control: PASS — targeted allowed; partial-stage refused without loss; no/partial/unrelated spec refused; complete chain allowed'

@@ -48,7 +48,13 @@ case "$mode" in
   base)
     git rev-parse --verify --quiet "$base" >/dev/null || { echo "harness-policy: base ref '$base' is unavailable" >&2; exit 2; }
     {
-      git diff --name-only --diff-filter=ACMRTDU "$base...HEAD"
+      if git merge-base "$base" HEAD >/dev/null 2>&1; then
+        git diff --name-only --diff-filter=ACMRTDU "$base...HEAD"
+      else
+        # Shallow CI checkouts may hold both trees without their merge base.
+        # Compare the complete trees rather than silently measuring no change.
+        git diff --name-only --diff-filter=ACMRTDU "$base" HEAD
+      fi
       git diff --name-only --diff-filter=ACMRTDU HEAD
       git ls-files --others --exclude-standard
     } >"$tmp"
