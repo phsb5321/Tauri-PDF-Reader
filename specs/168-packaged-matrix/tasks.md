@@ -19,5 +19,5 @@
 - [x] T007 Run syntax checks, targeted contracts, and tool-availability probes.
 - [x] T008 Run packaged highlight and reader journeys.
 - [x] T009 Replay the close journey, retain timing failures, and obtain one complete four-phase pass.
-- [ ] T010 Obtain a different-family exact-head review and resolve findings.
-- [ ] T011 Push, pass required checks plus the full packaged matrix, squash-merge, and verify merged `main`.
+- [x] T010 Obtain a different-family exact-head review and resolve findings — Anthropic-over-OpenAI ALLOW at `b048acb0d20a1b1074b87fe7668e30dcbf69a1a4` after DeepSeek Pro exited 143 without output.
+- [x] T011 Push, pass required checks plus the full packaged matrix, squash-merge, and verify merged `main` — PR #168 merged as `c7cda43db6847bb31642a9b39bb9a1ebf7ec9e88`; exact-head full-matrix job `97108248709` passed all eight lanes.
