@@ -131,12 +131,13 @@ toolchain_exec '
   # sibling and then fall through as if our own app had died. The [r] bracket
   # keeps the pattern from matching this script own command line.
   : "${E2E_REPO_ROOT:?E2E_REPO_ROOT unset — the kill pattern would match nothing and phase isolation would silently not happen}"
-  APP_PAT="^${E2E_REPO_ROOT}/src-tauri/target/debug/tauri-pdf-reade[r]"
+  : "${E2E_APP_PATH:?E2E_APP_PATH unset — process identity must follow Cargo output}"
+  APP_PAT="^${E2E_APP_PATH%r}[r]"
   # Validate the ANCHOR itself, once, against the file it must name. A pattern
   # that matches nothing makes pgrep fail on the first poll, so the death wait
   # would exit instantly and report isolation it never performed — fail-open.
-  [ -x "$E2E_REPO_ROOT/src-tauri/target/debug/tauri-pdf-reader" ] || {
-    echo "FATAL: no debug binary at $E2E_REPO_ROOT/src-tauri/target/debug/tauri-pdf-reader — the kill pattern cannot match the app" >&2
+  [ -x "$E2E_APP_PATH" ] || {
+    echo "FATAL: no debug binary at $E2E_APP_PATH — the kill pattern cannot match the app" >&2
     exit 1
   }
   # run_phase NEVER returns non-zero (set -e would kill the whole lane on the

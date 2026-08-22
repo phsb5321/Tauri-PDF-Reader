@@ -13,9 +13,9 @@
  *  2. every lane must source the ONE shared toolchain entry point
  *     (`scripts/e2e-toolchain.sh`), which must invoke `nix develop` (the
  *     flake) and never `nix-shell -p <list>`;
- *  3. the flake devShell must declare the packages the lanes need that it
- *     previously lacked (perl, speechd, xvfb) — deleting any of them from the
- *     flake turns this RED.
+ *  3. the flake devShell must declare every executable the lanes call;
+ *  4. process observers must use the same app path as Cargo/WebdriverIO when
+ *     CI redirects CARGO_TARGET_DIR.
  */
 
 import { readFileSync } from "node:fs";
@@ -27,11 +27,22 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, "../../..");
 
 const LANES = [
-  "scripts/e2e-all.sh",
+  "e2e/run-critical-loop.sh",
   "scripts/e2e-home.sh",
   "scripts/e2e-native.sh",
+  "e2e/run-open-journey.sh",
+  "e2e/run-session-journey.sh",
+  "e2e/run-reader-journey.sh",
+  "e2e/run-highlight-journey.sh",
+  "e2e/run-close-journey.sh",
+];
+const APP_OBSERVERS = [
+  "e2e/run-close-journey.sh",
+  "e2e/close-journey.e2e.mjs",
+  "e2e/real-corpus.e2e.mjs",
 ];
 const TOOLCHAIN = join(REPO_ROOT, "scripts/e2e-toolchain.sh");
+const PROFILE = join(REPO_ROOT, "scripts/e2e-profile.sh");
 const FLAKE = join(REPO_ROOT, "flake.nix");
 
 describe("e2e toolchain provisioning (101)", () => {
@@ -53,18 +64,34 @@ describe("e2e toolchain provisioning (101)", () => {
     }
   });
 
-  it("the shared toolchain entry point uses the flake devShell, never a list", () => {
+  it("the shared profile stays under the cross-shell Linux temp root", () => {
+    expect(readFileSync(PROFILE, "utf8")).toContain(
+      "mktemp -d /tmp/lectrice-e2e-profile.XXXXXX",
+    );
+  });
+
+  it("the shared toolchain entry point uses the flake and exports Cargo's app path", () => {
     const toolchain = readFileSync(TOOLCHAIN, "utf8");
     expect(toolchain).toMatch(/nix\s+develop/);
     expect(toolchain).not.toMatch(/nix-shell\s+-p/);
+    expect(toolchain).toContain("E2E_APP_PATH");
+    expect(toolchain).toContain("CARGO_TARGET_DIR");
+  });
+
+  it("every process observer follows the shared app path", () => {
+    for (const observer of APP_OBSERVERS) {
+      const src = readFileSync(join(REPO_ROOT, observer), "utf8");
+      expect(src, `${observer} must follow Cargo's app path`).toContain(
+        "E2E_APP_PATH",
+      );
+    }
   });
 
   it("the flake devShell declares every package the lanes need", () => {
     const flake = readFileSync(FLAKE, "utf8");
-    // The three packages the lanes' hand-maintained list had that the flake
-    // lacked — deleting any of them here must fail this test (and, via the
-    // shared entry point, every lane).
-    for (const pkg of ["perl", "speechd", "xvfb", "pnpm_10"]) {
+    // Deleting any executable used by a lane must fail here and, via the
+    // shared entry point, in the packaged matrix.
+    for (const pkg of ["perl", "speechd", "xvfb", "sqlite", "pnpm_10"]) {
       expect(flake, `flake.nix devShell must declare ${pkg}`).toContain(pkg);
     }
   });

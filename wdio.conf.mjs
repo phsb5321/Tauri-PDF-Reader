@@ -19,7 +19,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TARGET_DIR = process.env.CARGO_TARGET_DIR
   ? path.resolve(__dirname, process.env.CARGO_TARGET_DIR)
   : path.resolve(__dirname, "src-tauri/target");
-const APP = path.join(TARGET_DIR, "debug/tauri-pdf-reader");
+const APP = process.env.E2E_APP_PATH
+  ? path.resolve(__dirname, process.env.E2E_APP_PATH)
+  : path.join(TARGET_DIR, "debug/tauri-pdf-reader");
 // tauri-driver lookup: PATH first (the flake devShell now ships the pinned
 // build, and a `nix profile install` on the CI runner lands in
 // ~/.nix-profile/bin), then the legacy hardcoded path as fallback. An

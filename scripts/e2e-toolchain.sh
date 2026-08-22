@@ -36,6 +36,19 @@ if [ "${CI:-}" = "true" ]; then
   export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS=""
 fi
 
+# One executable identity for WebdriverIO and every process observer. CI puts
+# Cargo output outside the checkout; hardcoding src-tauri/target makes a lane
+# either fail or observe a sibling/stale process instead of the app it built.
+if [ -n "${CARGO_TARGET_DIR:-}" ]; then
+  case "$CARGO_TARGET_DIR" in
+    /*) E2E_TARGET_DIR="$CARGO_TARGET_DIR" ;;
+    *) E2E_TARGET_DIR="$PWD/$CARGO_TARGET_DIR" ;;
+  esac
+else
+  E2E_TARGET_DIR="$PWD/src-tauri/target"
+fi
+export E2E_APP_PATH="$E2E_TARGET_DIR/debug/tauri-pdf-reader"
+
 toolchain_run() {
   nix develop -c bash -c "$1"
 }
