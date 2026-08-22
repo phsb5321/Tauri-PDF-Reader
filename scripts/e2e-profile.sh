@@ -23,7 +23,9 @@
 set -euo pipefail
 
 if [ -z "${E2E_PROFILE_DIR:-}" ]; then
-  E2E_PROFILE_DIR="$(mktemp -d)"
+  # The fixture guard accepts literal /tmp across an outer shell and a Nix
+  # devShell, whose TMPDIR values can differ (/var/tmp vs nix-shell.*).
+  E2E_PROFILE_DIR="$(mktemp -d /tmp/lectrice-e2e-profile.XXXXXX)"
 fi
 export E2E_PROFILE_DIR
 export XDG_DATA_HOME="$E2E_PROFILE_DIR"

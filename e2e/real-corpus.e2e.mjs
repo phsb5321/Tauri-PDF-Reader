@@ -79,8 +79,10 @@ function closeWindow() {
  */
 async function closeAndObserve(tAction) {
   const { execFileSync } = await import("node:child_process");
-  const cwdRe = process.cwd().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const appPattern = `^${cwdRe}/src-tauri/target/debug/tauri-pdf-reader`;
+  const appPath = process.env.E2E_APP_PATH;
+  if (!appPath)
+    throw new Error("E2E_APP_PATH is required for process observation");
+  const appPattern = `^${appPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`;
   const alive = (file, args) => {
     try {
       execFileSync(file, args, { stdio: "ignore" });
@@ -151,10 +153,7 @@ describe(`Real-corpus (${PHASE})`, () => {
   if (PHASE === "open") {
     it("opens the REAL book, renders it, and navigates to page 3", async () => {
       await bridgeReady();
-      await browser.execute(
-        (p) => window.__E2E__.installCorpusBook(p),
-        BOOK,
-      );
+      await browser.execute((p) => window.__E2E__.installCorpusBook(p), BOOK);
       // Toolbar Open (the only visible open path on packaged Linux).
       await browser.execute(() =>
         document.querySelector("button.open-button")?.click(),
@@ -202,7 +201,11 @@ describe(`Real-corpus (${PHASE})`, () => {
       expect(nav.currentPage).toBe(3);
       console.log(
         "DIAG corpus-open:",
-        JSON.stringify({ book: BOOK, totalPages: opened.totalPages, currentPage: nav.currentPage }),
+        JSON.stringify({
+          book: BOOK,
+          totalPages: opened.totalPages,
+          currentPage: nav.currentPage,
+        }),
       );
     });
   }
@@ -241,7 +244,10 @@ describe(`Real-corpus (${PHASE})`, () => {
       await browser.waitUntil(
         async () =>
           browser.execute(() => window.__E2E__.getState().currentPage) === 4,
-        { timeout: 15000, timeoutMsg: "page did not advance to 4 before close" },
+        {
+          timeout: 15000,
+          timeoutMsg: "page did not advance to 4 before close",
+        },
       );
       const tAction = Date.now();
       await closeAndObserve(tAction);
@@ -261,7 +267,7 @@ describe(`Real-corpus (${PHASE})`, () => {
       );
       const row = await browser.execute(() => {
         const el = document.querySelector(".resume-line, .document-row");
-        return el ? el.textContent ?? null : null;
+        return el ? (el.textContent ?? null) : null;
       });
       // The close phase wrote page 4 inside the debounce; the flush must
       // have survived — the row reflects "Page 4 of N".
@@ -281,7 +287,11 @@ describe(`Real-corpus (${PHASE})`, () => {
       const state = await browser.execute(() => window.__E2E__.getState());
       console.log(
         "DIAG corpus-verify:",
-        JSON.stringify({ book: BOOK, row: row ?? null, currentPage: state.currentPage }),
+        JSON.stringify({
+          book: BOOK,
+          row: row ?? null,
+          currentPage: state.currentPage,
+        }),
       );
       expect(state.currentPage).toBe(4);
     });

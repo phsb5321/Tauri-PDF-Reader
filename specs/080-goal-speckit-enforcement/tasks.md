@@ -18,5 +18,5 @@
 ## Phase 3 — Verification and delivery
 
 - [x] T008 Run shell syntax, negative-control, Make, package, TypeScript, and alignment checks.
-- [ ] T009 Obtain different-family exact-head review and resolve every finding.
-- [ ] T010 Push, pass required checks, squash-merge, and verify the command from merged `main`.
+- [x] T009 Obtain different-family exact-head review and resolve every finding — final ALLOW at exact head `7661bb449b9cdb789d2455a0ca761ab18f2518b5`.
+- [x] T010 Push, pass required checks, squash-merge, and verify the command from merged `main` — PR #155 merged as `974f03d0f19eca32486febd601c476c171a3b214`; exact-main CI, Sonar, and CodeQL passed.

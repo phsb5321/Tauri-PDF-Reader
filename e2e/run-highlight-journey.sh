@@ -21,11 +21,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-NIX_PKGS="pkg-config openssl alsa-lib gnumake perl clang llvmPackages.libclang.lib gtk3 webkitgtk_4_1 libayatana-appindicator librsvg speechd xvfb"
-export LIBCLANG_PATH="${LIBCLANG_PATH:-$(nix eval --raw nixpkgs#llvmPackages.libclang.lib)/lib}"
-
-# Hermetic profile — the SHARED helper (single entry point for all lanes).
+# Hermetic profile + pinned toolchain — the shared entry points used by every
+# packaged lane. Keeping a private nix-shell list here was the drift.
 source ./scripts/e2e-profile.sh
+source ./scripts/e2e-toolchain.sh
 APP_DIR="$E2E_PROFILE_DIR/com.lectrice.reader"
 mkdir -p "$APP_DIR"
 node scripts/gen-e2e-fixtures.mjs "$APP_DIR" >/dev/null
@@ -37,7 +36,7 @@ touch src-tauri/src/lib.rs
 
 echo "==> Building debug binary (--features e2e-tts-fixture) + both phases under Xvfb"
 export CI=true
-exec nix-shell -p $NIX_PKGS --run '
+toolchain_exec '
   set -euo pipefail
   ( cd src-tauri && cargo build --features e2e-tts-fixture >/dev/null 2>&1 )
   export WEBKIT_WEBDRIVER="$(command -v WebKitWebDriver)"

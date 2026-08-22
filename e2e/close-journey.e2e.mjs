@@ -129,8 +129,10 @@ function closeWindow() {
 function prepareCloseObserver() {
   // execFileSync (argv, no shell) so a repo path containing a quote or a
   // regex metacharacter cannot reshape the pattern.
-  const cwdRe = process.cwd().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const appPattern = `^${cwdRe}/src-tauri/target/debug/tauri-pdf-reader`;
+  const appPath = process.env.E2E_APP_PATH;
+  if (!appPath)
+    throw new Error("E2E_APP_PATH is required for process observation");
+  const appPattern = `^${appPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`;
   const alive = (file, args) => {
     try {
       execFileSync(file, args, { stdio: "ignore" });
@@ -314,21 +316,15 @@ describe("Packaged close journey (DL-1 highlight loss, DL-2 position loss)", () 
       'button[aria-label^="Resume E2E Resume Fixture A, page"]';
     await browser.waitUntil(
       async () =>
-        browser.execute(
-          (sel) => !!document.querySelector(sel),
-          resumeSelector,
-        ),
+        browser.execute((sel) => !!document.querySelector(sel), resumeSelector),
       { timeout: 15000, timeoutMsg: "resume button never appeared" },
     );
     let resumeFocused = false;
     for (let i = 0; i < 40; i++) {
-      resumeFocused = await browser.execute(
-        (sel) => {
-          const el = document.activeElement;
-          return !!el && el.matches(sel);
-        },
-        resumeSelector,
-      );
+      resumeFocused = await browser.execute((sel) => {
+        const el = document.activeElement;
+        return !!el && el.matches(sel);
+      }, resumeSelector);
       if (resumeFocused) break;
       await browser.keys(["Tab"]);
     }
@@ -342,8 +338,7 @@ describe("Packaged close journey (DL-1 highlight loss, DL-2 position loss)", () 
     // page input, never __E2E_READ__). The expected page comes from the
     // resume button's own accessible name (public), not from the observer.
     const resumeLabel = await browser.execute(
-      (sel) =>
-        document.querySelector(sel)?.getAttribute("aria-label") ?? "",
+      (sel) => document.querySelector(sel)?.getAttribute("aria-label") ?? "",
       resumeSelector,
     );
     const labelPage = Number((resumeLabel.match(/page (\d+)/) || [])[1] ?? 0);

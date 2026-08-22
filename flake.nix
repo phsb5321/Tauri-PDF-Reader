@@ -45,6 +45,9 @@
           perl
           speechd
           xvfb
+          # Packaged observers query their hermetic SQLite profile between
+          # app phases; the executable is part of the lane, not a host tool.
+          sqlite
           # Close-journey lane (113): drives a GENUINE WM_DELETE_WINDOW close
           # through the X server (xdotool windowquit — the graceful close-
           # confirmation message; windowclose would destroy the window without

@@ -32,7 +32,11 @@ const CONF_URL = pathToFileURL(join(REPO_ROOT, "wdio.conf.mjs")).href;
 function applicationUnder(env: Record<string, string | undefined>): string {
   const script = `const { config } = await import(${JSON.stringify(CONF_URL)});
 process.stdout.write(config.capabilities[0]["tauri:options"].application);`;
-  const { CARGO_TARGET_DIR: _drop, ...base } = process.env;
+  const {
+    CARGO_TARGET_DIR: _dropCargo,
+    E2E_APP_PATH: _dropApp,
+    ...base
+  } = process.env;
   return execFileSync(process.execPath, ["--input-type=module", "-e", script], {
     cwd: REPO_ROOT,
     env: { ...base, ...env },
@@ -52,6 +56,12 @@ describe("wdio APP-path contract (launch the binary cargo wrote)", () => {
     expect(applicationUnder({ CARGO_TARGET_DIR: dir })).toBe(
       `${dir}/debug/tauri-pdf-reader`,
     );
+  });
+
+  it("uses the shared observer identity when provided", () => {
+    const app =
+      "/home/runner/ci-cargo/lectrice/packaged-nix-target/debug/tauri-pdf-reader";
+    expect(applicationUnder({ E2E_APP_PATH: app })).toBe(app);
   });
 
   it("resolves a relative CARGO_TARGET_DIR against the repo root, as cargo does", () => {
