@@ -2,6 +2,13 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #73 — 22/08/2026 (packaged matrix repair merged and exact-head green)
+
+- **Merged/verified:** PR #168 squash-merged as `c7cda43db6847bb31642a9b39bb9a1ebf7ec9e88`. Every required PR check passed at reviewed head `b048acb0d20a1b1074b87fe7668e30dcbf69a1a4` (CI, CodeQL, trust anchor, and packaged PR-fast), and manually dispatched full-matrix job `97108248709` passed all eight serial packaged lanes at that same head in run `32604816246`.
+- **Run-level red is separately bounded:** the manual workflow's real-corpus sibling job failed before execution because `LECTRICE_REAL_PDF_CORPUS` is unset on vm103; its evidence upload also hit the still-recalculating GitHub artifact quota. That makes the overall workflow red but does not contradict the exact-head full-matrix success. Real-corpus remains a named BLOCKED optional soak, never a skipped-green product claim.
+- **Current delivery state:** v0.2.0 remains published for Linux; Spec 079 recovery and Spec 080 enforcement are closed; the repository had no open PR after #168 merged. No measured first-reader blocker is open. Remaining config writer/hot reload, credential-free offline voice, card-fold polish, macOS journey enablement, and stale vault authoring are post-release work requiring normal ranking/specification rather than being smuggled into this repair.
+- **Next:** land this two-file delivery receipt, update the separate vault SAVE-STATE in its own vault-authoring worktree, then let Product rank the next user outcome against the verified first-reader loop.
+
 ## Iteration #72 — 22/08/2026 (scheduled packaged matrix: harness drift isolated and repaired)
 
 - **Live project checkpoint:** `main` is clean/synced at `974f03d0f19eca32486febd601c476c171a3b214`; v0.2.0 remains the published Linux release; open PR count was zero. Exact-main CI, Sonar, and CodeQL are green (zero open CodeQL alerts). Spec 079 recovery remains deterministically VERIFIED; Spec 080 merged as PR #155 and its stale T009/T010 boxes are corrected in this slice.
