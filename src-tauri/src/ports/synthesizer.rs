@@ -56,6 +56,7 @@ pub struct WordTiming {
 pub struct SynthesisRequest {
     pub text: String,
     pub voice_id: String,
+    pub model_id: Option<String>,
     pub speed: f32,
     pub with_word_timings: bool,
 }

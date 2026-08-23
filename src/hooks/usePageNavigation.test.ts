@@ -56,6 +56,12 @@ describe("navigatePageBy", () => {
     expect(useDocumentStore.getState().currentPage).toBe(6);
   });
 
+  it("cancels an in-flight synthesis before changing the page", async () => {
+    playbackState("loading");
+    await navigatePageBy(1);
+    expect(aiTtsStop).toHaveBeenCalledOnce();
+  });
+
   it("stops from paused too", async () => {
     playbackState("paused");
     await navigatePageBy(1);

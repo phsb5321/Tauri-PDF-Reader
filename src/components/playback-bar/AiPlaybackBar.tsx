@@ -19,9 +19,16 @@ export function consumeNaturalCompletion(
   observed: number,
   consumed: number,
   playbackRequested: boolean,
+  usesWordHighlighting: boolean,
 ): { consumed: number; advance: boolean } {
   if (observed <= consumed) return { consumed, advance: false };
-  return { consumed: observed, advance: playbackRequested };
+  return {
+    consumed: observed,
+    // Marks mode already consumes the same sink-finished event through
+    // useTtsWordHighlight.onComplete. Only no-mark/plain playback consumes the
+    // store token, or the page would advance twice.
+    advance: playbackRequested && !usesWordHighlighting,
+  };
 }
 
 interface AiPlaybackBarProps {
@@ -68,6 +75,9 @@ export function AiPlaybackBar({
   const setAutoPageEnabled = useAiTtsStore((s) => s.setAutoPageEnabled);
   const naturalCompletionCount = useAiTtsStore((s) => s.naturalCompletionCount);
   const playingRef = useRef(false);
+  // Providers without marks use ordinary playback state; claiming a karaoke
+  // word in that mode would fabricate precision the service did not publish.
+  const usesWordHighlighting = enableHighlighting && supportsWordTimings;
   const speakWithHighlightRef = useRef<
     ((text: string, pageNumber: number) => Promise<boolean>) | null
   >(null);
@@ -195,10 +205,11 @@ export function AiPlaybackBar({
       naturalCompletionCount,
       consumedNaturalCompletion.current,
       playingRef.current,
+      usesWordHighlighting,
     );
     consumedNaturalCompletion.current = outcome.consumed;
     if (outcome.advance) void handlePlaybackComplete();
-  }, [naturalCompletionCount, handlePlaybackComplete]);
+  }, [naturalCompletionCount, handlePlaybackComplete, usesWordHighlighting]);
 
   // Word highlighting hook
   const {
@@ -225,9 +236,6 @@ export function AiPlaybackBar({
     speakWithHighlightRef.current = speakWithHighlight;
   }, [speakWithHighlight]);
 
-  // Providers without marks use ordinary playback state; claiming a karaoke
-  // word in that mode would fabricate precision the service did not publish.
-  const usesWordHighlighting = enableHighlighting && supportsWordTimings;
   const isPlaying = usesWordHighlighting
     ? isHighlightActive && !isHighlightPaused
     : playbackState === "playing";

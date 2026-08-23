@@ -37,7 +37,11 @@ export async function navigatePageBy(delta: number): Promise<void> {
 
   // Mirrors PageNavigation's on-navigation guard: audio for the page you just
   // left is worse than a moment of silence.
-  if (playbackState === "playing" || playbackState === "paused") {
+  if (
+    playbackState === "loading" ||
+    playbackState === "playing" ||
+    playbackState === "paused"
+  ) {
     try {
       await aiTtsStop();
     } catch (error) {

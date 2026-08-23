@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   initialize: vi.fn(),
+  initializeLocal: vi.fn(),
   onClose: vi.fn(),
   useAiTts: vi.fn(),
   cacheInfo: vi.fn(async () => ({
@@ -109,6 +110,7 @@ describe("AiTtsSettings session-secret setup", () => {
       apiKey: null,
       needsApiKey: false,
       initialize: mocks.initialize,
+      initializeLocal: mocks.initializeLocal,
       error: null,
       initError: null,
       provider: "local",
@@ -126,6 +128,30 @@ describe("AiTtsSettings session-secret setup", () => {
       screen.queryByLabelText("ElevenLabs API Key"),
     ).not.toBeInTheDocument();
     expect(screen.getByText(/word highlighting is unavailable/i)).toBeVisible();
+  });
+
+  it("offers an explicit retry after a local service failure", async () => {
+    mocks.initializeLocal.mockResolvedValue(undefined);
+    mocks.useAiTts.mockReturnValue({
+      initialized: false,
+      apiKey: null,
+      needsApiKey: false,
+      initialize: mocks.initialize,
+      initializeLocal: mocks.initializeLocal,
+      error: null,
+      initError: "LOCAL_TTS_UNREACHABLE",
+      provider: "local",
+      localUrl: "http://127.0.0.1:5301",
+      supportsWordTimings: false,
+    });
+
+    await act(async () => {
+      render(<AiTtsSettings onClose={mocks.onClose} />);
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Retry local connection" }),
+    );
+    expect(mocks.initializeLocal).toHaveBeenCalledOnce();
   });
 
   it("prioritizes the pending label during duplicate Update submissions", async () => {

@@ -233,6 +233,11 @@ export function useAiTts() {
         await aiTtsSpeak(text, store.selectedVoiceId ?? undefined);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        if (message.startsWith("TTS_CANCELLED:")) {
+          store.setError(null);
+          store.setPlaybackState("idle");
+          return;
+        }
         console.debug("[TTS] State transition: -> error (speak failed)", {
           error: message,
         });

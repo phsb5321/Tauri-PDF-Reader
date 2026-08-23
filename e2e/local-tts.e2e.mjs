@@ -1,5 +1,13 @@
 /* global browser, $, expect */
 
+// Runs in the WebdriverIO Node process, NOT inside browser.execute/WebKit. The
+// production CSP therefore stays closed; this observer reads only the hermetic
+// fixture's request ledger and performs no action in the app.
+const readFixtureRequests = () =>
+  globalThis
+    .fetch("http://127.0.0.1:5301/requests")
+    .then((response) => response.json());
+
 describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
   it("plays through the configured local provider with no key or fake marks", async () => {
     await browser.waitUntil(
@@ -42,8 +50,7 @@ describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
 
     await browser.waitUntil(
       async () => {
-        const response = await fetch("http://127.0.0.1:5301/requests");
-        const body = await response.json();
+        const body = await readFixtureRequests();
         return body.requests.length === 1;
       },
       {
@@ -51,9 +58,7 @@ describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
         timeoutMsg: "local fixture received no synthesis request",
       },
     );
-    const receipt = await fetch("http://127.0.0.1:5301/requests").then((r) =>
-      r.json(),
-    );
+    const receipt = await readFixtureRequests();
     expect(receipt.requests[0].body.voice).toBe("F1-pt");
     expect(receipt.requests[0].body.input).toMatch(/alpha|lectrice|fixture/i);
     expect(receipt.requests[0].idempotencyKey).toMatch(/^[0-9a-f]{64}$/);

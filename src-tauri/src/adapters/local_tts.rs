@@ -15,6 +15,7 @@ pub use crate::config::schema::LOCAL_TTS_URL;
 
 const HARD_MAX_TEXT_UTF8_BYTES: usize = 8_192;
 const MAX_AUDIO_BYTES: usize = 64 * 1024 * 1024;
+const MAX_CONTROL_RESPONSE_BYTES: usize = 1024 * 1024;
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(2);
 const TOTAL_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -141,9 +142,22 @@ impl LocalTtsClient {
                 response.status().as_u16()
             ));
         }
-        response
-            .json()
-            .await
+        if response
+            .content_length()
+            .is_some_and(|length| length > MAX_CONTROL_RESPONSE_BYTES as u64)
+        {
+            return Err(format!("LOCAL_TTS_CONTROL_TOO_LARGE: {path}"));
+        }
+        let mut bytes = Vec::new();
+        let mut stream = response.bytes_stream();
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.map_err(|error| format!("LOCAL_TTS_CONTROL: {path}: {error}"))?;
+            if bytes.len().saturating_add(chunk.len()) > MAX_CONTROL_RESPONSE_BYTES {
+                return Err(format!("LOCAL_TTS_CONTROL_TOO_LARGE: {path}"));
+            }
+            bytes.extend_from_slice(&chunk);
+        }
+        serde_json::from_slice(&bytes)
             .map_err(|error| format!("LOCAL_TTS_INVALID_JSON: {path}: {error}"))
     }
 
@@ -338,10 +352,7 @@ impl SynthesizerPort for LocalTtsClient {
         };
         let key = Self::idempotency_key(&self.revision, &request);
         let mut response = self.send_synthesis(&body, &key).await;
-        if response
-            .as_ref()
-            .is_err_and(|error| error.is_timeout() || error.is_connect())
-        {
+        if response.as_ref().is_err_and(reqwest::Error::is_timeout) {
             response = self.send_synthesis(&body, &key).await;
         }
         let response = response.map_err(|error| format!("LOCAL_TTS_REQUEST: {error}"))?;
@@ -480,6 +491,7 @@ mod tests {
             .synthesize(SynthesisRequest {
                 text: "Olá do Lectrice.".to_string(),
                 voice_id: "F1-pt".to_string(),
+                model_id: None,
                 speed: 1.0,
                 with_word_timings: false,
             })
@@ -561,6 +573,7 @@ mod tests {
             .synthesize(SynthesisRequest {
                 text: "four".to_string(),
                 voice_id: "F1-pt".to_string(),
+                model_id: None,
                 speed: 1.0,
                 with_word_timings: false,
             })
@@ -607,6 +620,7 @@ mod tests {
         let future = local.synthesize(SynthesisRequest {
             text: "timeout".to_string(),
             voice_id: "F1-pt".to_string(),
+            model_id: None,
             speed: 1.0,
             with_word_timings: false,
         });
@@ -628,6 +642,7 @@ mod tests {
         let request = SynthesisRequest {
             text: "Olá".to_string(),
             voice_id: "F1-pt".to_string(),
+            model_id: None,
             speed: 1.0,
             with_word_timings: false,
         };

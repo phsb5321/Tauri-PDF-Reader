@@ -32,6 +32,7 @@ export function AiTtsSettings({ onClose }: AiTtsSettingsProps) {
     apiKey,
     needsApiKey,
     initialize,
+    initializeLocal,
     error,
     initError,
     provider,
@@ -145,6 +146,15 @@ export function AiTtsSettings({ onClose }: AiTtsSettingsProps) {
                 <span className="ai-tts-status-warning">Not connected</span>
               )}
             </div>
+            {!initialized && (
+              <button
+                type="button"
+                className="ai-tts-settings-btn primary"
+                onClick={() => void initializeLocal()}
+              >
+                Retry local connection
+              </button>
+            )}
           </div>
         </div>
       ) : (

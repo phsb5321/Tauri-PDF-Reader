@@ -586,13 +586,13 @@ impl SynthesizerPort for ElevenLabsClient {
     }
 
     async fn synthesize(&self, request: SynthesisRequest) -> Result<SynthesisResult, String> {
+        let model_id = request
+            .model_id
+            .as_deref()
+            .unwrap_or_else(|| self.provider_revision());
         if request.with_word_timings {
             let result = self
-                .text_to_speech_with_timestamps(
-                    &request.text,
-                    &request.voice_id,
-                    Some(self.provider_revision()),
-                )
+                .text_to_speech_with_timestamps(&request.text, &request.voice_id, Some(model_id))
                 .await?;
             return Ok(SynthesisResult {
                 audio_data: result.audio_data,
@@ -603,11 +603,7 @@ impl SynthesizerPort for ElevenLabsClient {
             });
         }
         let audio_data = self
-            .text_to_speech(
-                &request.text,
-                &request.voice_id,
-                Some(self.provider_revision()),
-            )
+            .text_to_speech(&request.text, &request.voice_id, Some(model_id))
             .await?;
         Ok(SynthesisResult {
             audio_data,

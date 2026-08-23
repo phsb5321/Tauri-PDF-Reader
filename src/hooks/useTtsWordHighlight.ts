@@ -307,6 +307,12 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        if (message.startsWith("TTS_CANCELLED:")) {
+          ttsStore.setError(null);
+          ttsStore.setPlaybackState("idle");
+          speakingRef.current = false;
+          return false;
+        }
         console.error(
           "[TtsWordHighlight] Failed to speak with timestamps:",
           message,

@@ -155,9 +155,10 @@ impl AiTtsEngine {
         Ok(())
     }
 
-    /// Initialize the account-free local provider from native config.
-    pub async fn init_local(&mut self, base_url: &str) -> Result<(), String> {
-        let client = Arc::new(LocalTtsClient::connect(base_url).await?);
+    /// Install a preflighted local client. Commands perform network preflight
+    /// before taking the engine write lock, so Stop cannot queue behind HTTP.
+    pub async fn install_local(&mut self, client: LocalTtsClient) -> Result<(), String> {
+        let client = Arc::new(client);
         let voices = client.list_voices().await?;
         let first_voice = voices
             .first()
@@ -304,14 +305,24 @@ impl AiTtsEngine {
         let audio_data = match cached {
             Some(data) => data,
             None => {
-                let result = self
+                let result = match self
                     .synthesize(SynthesisRequest {
                         text: text.to_string(),
                         voice_id: voice,
+                        model_id: config.model_id.clone(),
                         speed: config.speed,
                         with_word_timings: false,
                     })
-                    .await?;
+                    .await
+                {
+                    Ok(result) => result,
+                    Err(error) => {
+                        let mut state = self.state.write().await;
+                        state.is_playing = false;
+                        state.is_paused = false;
+                        return Err(error);
+                    }
+                };
                 if result.media_type != expected_media {
                     return Err("TTS_MEDIA_MISMATCH: provider returned an unexpected format".into());
                 }
@@ -376,14 +387,24 @@ impl AiTtsEngine {
             }
         }
 
-        let result = self
+        let result = match self
             .synthesize(SynthesisRequest {
                 text: text.to_string(),
                 voice_id: voice,
+                model_id: config.model_id.clone(),
                 speed: config.speed,
                 with_word_timings: true,
             })
-            .await?;
+            .await
+        {
+            Ok(result) => result,
+            Err(error) => {
+                let mut state = self.state.write().await;
+                state.is_playing = false;
+                state.is_paused = false;
+                return Err(error);
+            }
+        };
         if result.media_type != media_type {
             return Err("TTS_MEDIA_MISMATCH: provider returned an unexpected format".into());
         }
@@ -530,6 +551,7 @@ impl AiTtsEngine {
             .synthesize(SynthesisRequest {
                 text: text.to_string(),
                 voice_id: voice,
+                model_id: config.model_id.clone(),
                 speed: config.speed,
                 with_word_timings: true,
             })
@@ -648,6 +670,7 @@ mod tests {
         let future = engine.synthesize(SynthesisRequest {
             text: "cancel me".to_string(),
             voice_id: "F1-pt".to_string(),
+            model_id: None,
             speed: 1.0,
             with_word_timings: false,
         });

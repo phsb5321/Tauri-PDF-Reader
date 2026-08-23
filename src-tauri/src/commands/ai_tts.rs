@@ -3,7 +3,7 @@
 //! Provides commands for text-to-speech using AI providers like ElevenLabs.
 //! Includes cache management commands for persisted audio.
 
-use crate::adapters::{CacheInfo, ClearResult};
+use crate::adapters::{CacheInfo, ClearResult, LocalTtsClient};
 use crate::ai_tts::{AiTtsEngine, TtsConfig, VoiceInfo, WordTiming};
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -159,8 +159,11 @@ pub async fn ai_tts_init_local(
         .ai_tts
         .local_url
         .ok_or("LOCAL_TTS_CONFIG: ai_tts.local_url is missing")?;
+    // Network preflight happens before the write lock. Stop/page-change can
+    // still reach the current engine while a dead local service times out.
+    let client = LocalTtsClient::connect(&destination).await?;
     let mut engine = state.0.write().await;
-    engine.init_local(&destination).await?;
+    engine.install_local(client).await?;
     let voices = engine.list_voices().await?;
     let supports_word_timings = engine.supports_word_timings();
     Ok(InitLocalResponse {
