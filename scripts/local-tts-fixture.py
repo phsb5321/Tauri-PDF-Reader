@@ -48,7 +48,7 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(encoded)
 
-    def do_GET(self) -> None:  # noqa: N802
+    def do_GET(self) -> None:
         if self.path == "/health":
             self.json_response({"status": "ok", "ready": True, "version": "fixture-1"})
         elif self.path == "/v1/capabilities":
@@ -77,7 +77,7 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self.json_response({"error": "not_found"}, 404)
 
-    def do_POST(self) -> None:  # noqa: N802
+    def do_POST(self) -> None:
         if self.path != "/v1/tts":
             self.json_response({"error": "not_found"}, 404)
             return

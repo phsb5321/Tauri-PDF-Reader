@@ -46,7 +46,10 @@ const BACKEND_MARKERS = [/reqwest::/];
 
 /** The egress modules SECURITY.md names, relative to the repo root. */
 const DOCUMENTED_FRONTEND = new Set([]);
-const DOCUMENTED_BACKEND = new Set(["src-tauri/src/ai_tts/elevenlabs.rs"]);
+const DOCUMENTED_BACKEND = new Set([
+  "src-tauri/src/adapters/local_tts.rs",
+  "src-tauri/src/ai_tts/elevenlabs.rs",
+]);
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -73,7 +76,9 @@ function egressFiles(files: string[], markers: (RegExp | string)[]): string[] {
   return files.filter((file) => {
     const source = readFileSync(file, "utf8");
     return markers.some((marker) =>
-      typeof marker === "string" ? source.includes(marker) : marker.test(source),
+      typeof marker === "string"
+        ? source.includes(marker)
+        : marker.test(source),
     );
   });
 }
