@@ -4,21 +4,21 @@
  * Tauri commands for AI-powered text-to-speech (ElevenLabs).
  */
 
-import { invoke } from '@tauri-apps/api/core';
-import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 // Types
 
 export interface AiVoiceInfo {
   id: string;
   name: string;
-  provider: 'elevenlabs';
+  provider: "elevenlabs" | "local";
   previewUrl: string | null;
-  labels: Record<string, string> | null;
+  labels: Record<string, unknown> | null;
 }
 
 export interface AiTtsConfig {
-  provider: 'elevenlabs';
+  provider: "elevenlabs" | "local";
   apiKey: string | null;
   voiceId: string | null;
   modelId: string | null;
@@ -56,19 +56,21 @@ export interface SpeakWithTimestampsResponse {
 
 // Commands
 
-export async function aiTtsInit(apiKey: string): Promise<{ success: boolean; voicesCount: number }> {
-  return invoke('ai_tts_init', { apiKey });
+export async function aiTtsInit(
+  apiKey: string,
+): Promise<{ success: boolean; voicesCount: number }> {
+  return invoke("ai_tts_init", { apiKey });
 }
 
 export async function aiTtsListVoices(): Promise<{ voices: AiVoiceInfo[] }> {
-  return invoke('ai_tts_list_voices');
+  return invoke("ai_tts_list_voices");
 }
 
 export async function aiTtsSpeak(
   text: string,
-  voiceId?: string
+  voiceId?: string,
 ): Promise<{ success: boolean }> {
-  return invoke('ai_tts_speak', { text, voiceId });
+  return invoke("ai_tts_speak", { text, voiceId });
 }
 
 /**
@@ -78,37 +80,41 @@ export async function aiTtsSpeak(
  */
 export async function aiTtsSpeakWithTimestamps(
   text: string,
-  voiceId?: string
+  voiceId?: string,
 ): Promise<SpeakWithTimestampsResponse> {
-  return invoke('ai_tts_speak_with_timestamps', { text, voiceId });
+  return invoke("ai_tts_speak_with_timestamps", { text, voiceId });
 }
 
 export async function aiTtsStop(): Promise<{ success: boolean }> {
-  return invoke('ai_tts_stop');
+  return invoke("ai_tts_stop");
 }
 
 export async function aiTtsPause(): Promise<{ success: boolean }> {
-  return invoke('ai_tts_pause');
+  return invoke("ai_tts_pause");
 }
 
 export async function aiTtsResume(): Promise<{ success: boolean }> {
-  return invoke('ai_tts_resume');
+  return invoke("ai_tts_resume");
 }
 
-export async function aiTtsSetVoice(voiceId: string): Promise<{ success: boolean }> {
-  return invoke('ai_tts_set_voice', { voiceId });
+export async function aiTtsSetVoice(
+  voiceId: string,
+): Promise<{ success: boolean }> {
+  return invoke("ai_tts_set_voice", { voiceId });
 }
 
-export async function aiTtsSetSpeed(speed: number): Promise<{ success: boolean }> {
-  return invoke('ai_tts_set_speed', { speed });
+export async function aiTtsSetSpeed(
+  speed: number,
+): Promise<{ success: boolean }> {
+  return invoke("ai_tts_set_speed", { speed });
 }
 
 export async function aiTtsGetState(): Promise<AiTtsState> {
-  return invoke('ai_tts_get_state');
+  return invoke("ai_tts_get_state");
 }
 
 export async function aiTtsGetConfig(): Promise<AiTtsConfig> {
-  return invoke('ai_tts_get_config');
+  return invoke("ai_tts_get_config");
 }
 
 // Cache Types
@@ -142,36 +148,38 @@ export interface AiTtsPrebufferResponse {
  * Get TTS audio cache statistics
  */
 export async function aiTtsCacheInfo(): Promise<AiTtsCacheInfo> {
-  return invoke('ai_tts_cache_info');
+  return invoke("ai_tts_cache_info");
 }
 
 /**
  * Clear all cached TTS audio
  */
 export async function aiTtsCacheClear(): Promise<AiTtsCacheClearResult> {
-  return invoke('ai_tts_cache_clear');
+  return invoke("ai_tts_cache_clear");
 }
 
 /**
  * Invalidate cached audio for a specific voice
  */
-export async function aiTtsCacheInvalidateVoice(voiceId: string): Promise<AiTtsCacheClearResult> {
-  return invoke('ai_tts_cache_invalidate_voice', { voiceId });
+export async function aiTtsCacheInvalidateVoice(
+  voiceId: string,
+): Promise<AiTtsCacheClearResult> {
+  return invoke("ai_tts_cache_invalidate_voice", { voiceId });
 }
 
 // Pre-buffering Commands
 
 /**
  * Pre-generate and cache TTS audio without playing
- * 
+ *
  * Call this when a PDF page loads to ensure instant playback when user clicks play.
  * The audio is fetched from ElevenLabs (if not already cached) and saved to disk cache.
  */
 export async function aiTtsPrebuffer(
   text: string,
-  voiceId?: string
+  voiceId?: string,
 ): Promise<AiTtsPrebufferResponse> {
-  return invoke('ai_tts_prebuffer', { text, voiceId });
+  return invoke("ai_tts_prebuffer", { text, voiceId });
 }
 
 // Event Types
@@ -188,9 +196,11 @@ export interface AiTtsErrorEvent {
 // Event Listeners
 
 export function onAiTtsStarted(
-  callback: (event: AiTtsStartedEvent) => void
+  callback: (event: AiTtsStartedEvent) => void,
 ): Promise<UnlistenFn> {
-  return listen<AiTtsStartedEvent>('ai-tts:started', (event) => callback(event.payload));
+  return listen<AiTtsStartedEvent>("ai-tts:started", (event) =>
+    callback(event.payload),
+  );
 }
 
 /**
@@ -200,25 +210,27 @@ export function onAiTtsStarted(
  * timer estimate, so it fires correctly even when the audio duration is unknown.
  */
 export function onAiTtsFinished(callback: () => void): Promise<UnlistenFn> {
-  return listen('ai-tts:finished', () => callback());
+  return listen("ai-tts:finished", () => callback());
 }
 
 export function onAiTtsStopped(callback: () => void): Promise<UnlistenFn> {
-  return listen('ai-tts:stopped', () => callback());
+  return listen("ai-tts:stopped", () => callback());
 }
 
 export function onAiTtsPaused(callback: () => void): Promise<UnlistenFn> {
-  return listen('ai-tts:paused', () => callback());
+  return listen("ai-tts:paused", () => callback());
 }
 
 export function onAiTtsResumed(callback: () => void): Promise<UnlistenFn> {
-  return listen('ai-tts:resumed', () => callback());
+  return listen("ai-tts:resumed", () => callback());
 }
 
 export function onAiTtsError(
-  callback: (event: AiTtsErrorEvent) => void
+  callback: (event: AiTtsErrorEvent) => void,
 ): Promise<UnlistenFn> {
-  return listen<AiTtsErrorEvent>('ai-tts:error', (event) => callback(event.payload));
+  return listen<AiTtsErrorEvent>("ai-tts:error", (event) =>
+    callback(event.payload),
+  );
 }
 
 /**
@@ -234,7 +246,10 @@ export interface AiTtsPlaybackStartingEvent {
  * This is the correct time to start the highlight timer for accurate sync.
  */
 export function onAiTtsPlaybackStarting(
-  callback: (event: AiTtsPlaybackStartingEvent) => void
+  callback: (event: AiTtsPlaybackStartingEvent) => void,
 ): Promise<UnlistenFn> {
-  return listen<AiTtsPlaybackStartingEvent>('ai-tts:playback-starting', (event) => callback(event.payload));
+  return listen<AiTtsPlaybackStartingEvent>(
+    "ai-tts:playback-starting",
+    (event) => callback(event.payload),
+  );
 }

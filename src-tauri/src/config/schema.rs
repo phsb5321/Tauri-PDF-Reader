@@ -194,8 +194,26 @@ pub struct Cache {
     pub eviction_policy: EvictionPolicy,
 }
 
+pub const LOCAL_TTS_URL: &str = "http://127.0.0.1:5301";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum AiTtsProvider {
+    #[default]
+    ElevenLabs,
+    Local,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct AiTts {
+    /// Provider selection is native config only; the WebView receives read-only
+    /// effective state and has no command that can mutate the destination.
+    #[serde(default)]
+    pub provider: AiTtsProvider,
+    /// Initial local-provider boundary is deliberately one exact loopback URL.
+    /// Broader addresses require a separate security decision.
+    #[serde(default)]
+    pub local_url: Option<String>,
     /// localStorage `ai-tts-storage.selectedVoiceId`.
     ///
     /// NOT an `Option`, unlike `tts.voice`, and the round-trip property is why:
@@ -291,6 +309,8 @@ impl Default for Cache {
 impl Default for AiTts {
     fn default() -> Self {
         Self {
+            provider: AiTtsProvider::default(),
+            local_url: None,
             voice_id: default_ai_voice_id(),
             speed: default_ai_speed(),
             auto_page: default_true(),

@@ -38,7 +38,13 @@ const DEFAULT_CONFIG = {
     debug_overlay: false,
   },
   cache: { max_size_bytes: 5368709120, eviction_policy: "lru" },
-  ai_tts: { voice_id: "21m00Tcm4TlvDq8ikWAM", speed: 1.0, auto_page: true },
+  ai_tts: {
+    provider: "elevenlabs",
+    local_url: null,
+    voice_id: "21m00Tcm4TlvDq8ikWAM",
+    speed: 1.0,
+    auto_page: true,
+  },
 };
 
 describe("seedStoresFromConfigFile", () => {
@@ -72,6 +78,33 @@ describe("seedStoresFromConfigFile", () => {
     expect(useAiTtsStore.getState().autoPageEnabled).toBe(false);
   });
 
+  it("seeds local provider and destination only from a loaded native config", async () => {
+    configGetEffective.mockResolvedValue({
+      config: {
+        ...DEFAULT_CONFIG,
+        ai_tts: {
+          provider: "local",
+          local_url: "http://127.0.0.1:5301",
+          voice_id: "F1-pt",
+          speed: 1.0,
+          auto_page: true,
+        },
+      },
+      path: "/home/p/.config/lectrice/config.toml",
+      loaded: true,
+      warnings: [],
+      error: null,
+    });
+
+    await seedStoresFromConfigFile();
+
+    expect(useAiTtsStore.getState()).toMatchObject({
+      provider: "local",
+      localUrl: "http://127.0.0.1:5301",
+      selectedVoiceId: "F1-pt",
+    });
+  });
+
   it("leaves stored settings ALONE when no config file exists", async () => {
     // The regression guard: defaults come back even with no file, and applying
     // them would wipe what the user already configured through the UI.
@@ -98,7 +131,9 @@ describe("seedStoresFromConfigFile", () => {
       warnings: [],
       error: "config.toml:3:8: key `tts.rate`: invalid type",
     });
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
 
     await seedStoresFromConfigFile();
 
@@ -178,7 +213,9 @@ describe("seedStoresFromConfigFile", () => {
     // A reader that will not start because its config could not be read is a
     // worse bug than any misconfiguration.
     configGetEffective.mockRejectedValue(new Error("IPC is down"));
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
 
     await expect(seedStoresFromConfigFile()).resolves.toBeUndefined();
 

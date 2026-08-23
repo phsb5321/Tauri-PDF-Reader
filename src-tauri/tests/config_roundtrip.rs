@@ -64,7 +64,12 @@ prop_compose! {
             telemetry: Telemetry { analytics, errors },
             render: Render { quality_mode, max_megapixels, hw_acceleration, debug_overlay },
             cache: Cache { max_size_bytes, eviction_policy: EvictionPolicy::Lru },
-            ai_tts: AiTts { voice_id: ai_voice_id, speed, auto_page },
+            ai_tts: AiTts {
+                voice_id: ai_voice_id,
+                speed,
+                auto_page,
+                ..AiTts::default()
+            },
         }
     }
 }

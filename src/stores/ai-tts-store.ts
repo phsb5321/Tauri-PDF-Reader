@@ -6,6 +6,8 @@ import type {
 } from "../lib/tauri-invoke";
 import type { CoverageResponse } from "../lib/api/audio-cache";
 
+export type AiTtsProvider = "elevenlabs" | "local";
+
 export type AiTtsPlaybackState =
   | "idle"
   | "playing"
@@ -32,11 +34,15 @@ interface AiTtsState {
   initialized: boolean;
   apiKey: string | null;
   initError: string | null;
+  provider: AiTtsProvider;
+  localUrl: string | null;
+  supportsWordTimings: boolean;
 
   // Playback state
   playbackState: AiTtsPlaybackState;
   currentText: string | null;
   error: string | null;
+  naturalCompletionCount: number;
 
   // Voice settings
   voices: AiVoiceInfo[];
@@ -51,6 +57,11 @@ interface AiTtsState {
 
   // Actions
   setApiKey: (key: string | null) => void;
+  setProviderConfig: (
+    provider: AiTtsProvider,
+    localUrl: string | null,
+    supportsWordTimings?: boolean,
+  ) => void;
   setInitialized: (initialized: boolean, error?: string) => void;
   setVoices: (voices: AiVoiceInfo[]) => void;
   setSelectedVoice: (voiceId: string | null) => void;
@@ -62,6 +73,7 @@ interface AiTtsState {
   transitionTo: (nextState: AiTtsPlaybackState, force?: boolean) => boolean;
   setCurrentText: (text: string | null) => void;
   setError: (error: string | null) => void;
+  markNaturalCompletion: () => void;
   clearError: () => void;
   updateFromBackend: (state: BackendTtsState) => void;
   reset: () => void;
@@ -79,9 +91,13 @@ const initialState = {
   initialized: false,
   apiKey: null as string | null,
   initError: null as string | null,
+  provider: "elevenlabs" as AiTtsProvider,
+  localUrl: null as string | null,
+  supportsWordTimings: true,
   playbackState: "idle" as AiTtsPlaybackState,
   currentText: null as string | null,
   error: null as string | null,
+  naturalCompletionCount: 0,
   voices: [] as AiVoiceInfo[],
   selectedVoiceId: DEFAULT_VOICE_ID,
   speed: DEFAULT_SPEED,
@@ -129,6 +145,15 @@ export const useAiTtsStore = create<AiTtsState>()(
       ...initialState,
 
       setApiKey: (key) => set({ apiKey: key }),
+
+      setProviderConfig: (
+        provider,
+        localUrl,
+        supportsWordTimings = provider === "elevenlabs",
+      ) => {
+        console.debug("[AiTtsStore] provider:", get().provider, "->", provider);
+        set({ provider, localUrl, supportsWordTimings });
+      },
 
       setInitialized: (initialized, error) =>
         set({
@@ -209,6 +234,9 @@ export const useAiTtsStore = create<AiTtsState>()(
           playbackState: error ? "error" : get().playbackState,
         }),
 
+      markNaturalCompletion: () =>
+        set({ naturalCompletionCount: get().naturalCompletionCount + 1 }),
+
       clearError: () =>
         set({
           error: null,
@@ -230,8 +258,11 @@ export const useAiTtsStore = create<AiTtsState>()(
       reset: () =>
         set({
           ...initialState,
-          // Reset only the current session; the backend may still hold its copy.
+          // Reset only the current session; native config remains authoritative.
           selectedVoiceId: get().selectedVoiceId,
+          provider: get().provider,
+          localUrl: get().localUrl,
+          supportsWordTimings: get().supportsWordTimings,
         }),
     }),
     {
@@ -269,7 +300,8 @@ export const selectIsLoading = (state: AiTtsState) =>
   state.playbackState === "loading";
 export const selectCanPlay = (state: AiTtsState) =>
   state.initialized && !state.error;
-export const selectNeedsApiKey = (state: AiTtsState) => !state.apiKey;
+export const selectNeedsApiKey = (state: AiTtsState) =>
+  state.provider === "elevenlabs" && !state.apiKey;
 export const selectSelectedVoice = (state: AiTtsState) =>
   state.voices.find((v) => v.id === state.selectedVoiceId) ?? null;
 export const selectCacheCoverage = (state: AiTtsState) => state.cacheCoverage;

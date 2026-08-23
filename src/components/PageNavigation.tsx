@@ -52,7 +52,11 @@ export function PageNavigation() {
       const clampedPage = Math.max(1, Math.min(page, totalPages));
 
       // Stop TTS playback on page navigation (T023)
-      if (playbackState === "playing" || playbackState === "paused") {
+      if (
+        playbackState === "loading" ||
+        playbackState === "playing" ||
+        playbackState === "paused"
+      ) {
         try {
           console.debug("[PageNavigation] Stopping TTS before page navigation");
           await aiTtsStop();

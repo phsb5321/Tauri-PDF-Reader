@@ -470,6 +470,18 @@ async sessionTouch(sessionId: string) : Promise<Result<null, string>> {
  */
 async configGetEffective() : Promise<EffectiveConfig> {
     return await TAURI_INVOKE("config_get_effective");
+},
+/**
+ * Initialize local TTS from validated native config. The WebView supplies no
+ * URL and has no command that can mutate the destination.
+ */
+async aiTtsInitLocal() : Promise<Result<InitLocalResponse, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("ai_tts_init_local") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -484,6 +496,16 @@ async configGetEffective() : Promise<EffectiveConfig> {
 /** user-defined types **/
 
 export type AiTts = { 
+/**
+ * Provider selection is native config only; the WebView receives read-only
+ * effective state and has no command that can mutate the destination.
+ */
+provider?: AiTtsProvider; 
+/**
+ * Initial local-provider boundary is deliberately one exact loopback URL.
+ * Broader addresses require a separate security decision.
+ */
+local_url?: string | null; 
 /**
  * localStorage `ai-tts-storage.selectedVoiceId`.
  * 
@@ -507,6 +529,7 @@ speed?: number;
  * localStorage `ai-tts-storage.autoPageEnabled`
  */
 auto_page?: boolean }
+export type AiTtsProvider = "elevenlabs" | "local"
 export type Appearance = { 
 /**
  * SQLite `theme`
@@ -605,6 +628,7 @@ default_color?: string;
  * SQLite `highlight.colors`
  */
 colors?: string[] }
+export type InitLocalResponse = { success: boolean; voicesCount: number; provider: string; supportsWordTimings: boolean; destination: string }
 /**
  * Response types for commands
  */

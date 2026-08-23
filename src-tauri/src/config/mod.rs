@@ -168,6 +168,25 @@ pub fn parse(path: &Path, source: &str) -> LoadOutcome {
         warnings.push(Warning::Clamped { detail });
     }
 
+    // 5. Enforce the first local-provider trust boundary as a whitelist. This
+    // is intentionally stricter than URL parsing: a denylist misses private,
+    // link-local, IPv6 and credential-bearing variants.
+    if config.ai_tts.provider == schema::AiTtsProvider::Local
+        && config.ai_tts.local_url.as_deref() != Some(schema::LOCAL_TTS_URL)
+    {
+        let mut outcome = LoadOutcome::defaults(Some(path.to_path_buf()));
+        outcome.error = Some(ConfigError {
+            file: path.display().to_string(),
+            position: None,
+            key: Some("ai_tts.local_url".to_string()),
+            message: format!(
+                "local TTS requires the exact destination `{}`",
+                schema::LOCAL_TTS_URL
+            ),
+        });
+        return outcome;
+    }
+
     LoadOutcome {
         config,
         path: Some(path.to_path_buf()),
@@ -373,6 +392,66 @@ mod tests {
                 .collect::<Vec<_>>()
         );
         assert_eq!(outcome.config, Config::default());
+    }
+
+    #[test]
+    fn local_tts_config_round_trips_the_exact_loopback_destination() {
+        let source = r#"
+            [ai_tts]
+            provider = "local"
+            local_url = "http://127.0.0.1:5301"
+            voice_id = "F1-pt"
+        "#;
+
+        let outcome = parse(path(), source);
+
+        assert!(
+            outcome.loaded,
+            "valid local config must load: {:?}",
+            outcome.error
+        );
+        assert_eq!(outcome.config.ai_tts.provider, schema::AiTtsProvider::Local);
+        assert_eq!(
+            outcome.config.ai_tts.local_url.as_deref(),
+            Some("http://127.0.0.1:5301")
+        );
+        let encoded = toml::to_string(&outcome.config).expect("serialize effective config");
+        let reparsed = parse(path(), &encoded);
+        assert!(reparsed.loaded);
+        assert_eq!(reparsed.config, outcome.config);
+    }
+
+    #[test]
+    fn local_tts_config_rejects_every_noncanonical_destination_wholesale() {
+        for rejected in [
+            "http://127.0.0.1:5302",
+            "http://localhost:5301",
+            "http://10.0.0.5:5301",
+            "http://169.254.169.254:5301",
+            "http://[::1]:5301",
+            "https://127.0.0.1:5301",
+            "http://user:pass@127.0.0.1:5301",
+            "http://127.0.0.1:5301/v1",
+            "http://127.0.0.1:5301?mode=tts",
+            "http://127.0.0.1:5301#fragment",
+        ] {
+            let source = format!("[ai_tts]\nprovider = \"local\"\nlocal_url = \"{rejected}\"\n");
+            let outcome = parse(path(), &source);
+            assert!(!outcome.loaded, "must reject {rejected}");
+            assert_eq!(
+                outcome.config,
+                Config::default(),
+                "must not half-apply {rejected}"
+            );
+            assert!(
+                outcome
+                    .error
+                    .as_ref()
+                    .is_some_and(|error| error.to_string().contains("http://127.0.0.1:5301")),
+                "error must state the only accepted destination for {rejected}: {:?}",
+                outcome.error
+            );
+        }
     }
 
     #[test]

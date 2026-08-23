@@ -11,11 +11,16 @@ mod stretch; // pitch-preserving playback speed (spec 039)
 pub use elevenlabs::{ElevenLabsClient, TtsWithTimings, WordTiming};
 pub use player::AudioPlayer;
 
-use crate::adapters::{AudioCacheAdapter, CacheInfo, CachedWordTiming, ClearResult};
+use crate::adapters::{
+    AudioCacheAdapter, CacheInfo, CachedWordTiming, ClearResult, LocalTtsClient,
+};
+use crate::ports::{
+    AudioMediaType, SynthesisProvider, SynthesisRequest, SynthesisVoice, SynthesizerPort,
+};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::RwLock;
+use tokio::sync::{watch, RwLock};
 
 /// Supported TTS providers
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -24,6 +29,7 @@ use tokio::sync::RwLock;
 pub enum TtsProvider {
     #[default]
     ElevenLabs,
+    Local,
 }
 
 /// Voice information
@@ -99,17 +105,20 @@ pub struct AiTtsEngine {
     config: Arc<RwLock<TtsConfig>>,
     state: Arc<RwLock<TtsState>>,
     player: Arc<AudioPlayer>,
-    elevenlabs: Option<ElevenLabsClient>,
+    synthesizer: Option<Arc<dyn SynthesizerPort>>,
+    cancel_tx: watch::Sender<u64>,
     cache: Option<AudioCacheAdapter>,
 }
 
 impl AiTtsEngine {
     pub fn new() -> Self {
+        let (cancel_tx, _) = watch::channel(0_u64);
         Self {
             config: Arc::new(RwLock::new(TtsConfig::default())),
             state: Arc::new(RwLock::new(TtsState::default())),
             player: Arc::new(AudioPlayer::new()),
-            elevenlabs: None,
+            synthesizer: None,
+            cancel_tx,
             cache: None,
         }
     }
@@ -131,59 +140,150 @@ impl AiTtsEngine {
         tracing::info!("TTS audio cache initialized");
     }
 
-    /// Initialize with API key
+    /// Initialize with an ElevenLabs API key.
     pub async fn init(&mut self, api_key: String) -> Result<(), String> {
-        let client = ElevenLabsClient::new(api_key.clone());
-
-        // Verify API key works by fetching voices
+        let client = Arc::new(ElevenLabsClient::new(api_key.clone()));
         client
             .list_voices()
             .await
-            .map_err(|e| format!("Failed to initialize ElevenLabs: {}", e))?;
-
-        self.elevenlabs = Some(client);
-
+            .map_err(|e| format!("Failed to initialize ElevenLabs: {e}"))?;
+        self.synthesizer = Some(client);
         let mut config = self.config.write().await;
+        config.provider = TtsProvider::ElevenLabs;
         config.api_key = Some(api_key);
-
         tracing::info!("AI TTS engine initialized with ElevenLabs");
         Ok(())
     }
 
-    /// Check if initialized
+    /// Install a preflighted local client. Commands perform network preflight
+    /// before taking the engine write lock, so Stop cannot queue behind HTTP.
+    pub async fn install_local(&mut self, client: LocalTtsClient) -> Result<(), String> {
+        let client = Arc::new(client);
+        let voices = client.list_voices().await?;
+        let first_voice = voices
+            .first()
+            .map(|voice| voice.id.clone())
+            .ok_or("LOCAL_TTS_NO_VOICES")?;
+        self.synthesizer = Some(client);
+        let mut config = self.config.write().await;
+        config.provider = TtsProvider::Local;
+        config.api_key = None;
+        if !voices
+            .iter()
+            .any(|voice| config.voice_id.as_deref() == Some(&voice.id))
+        {
+            config.voice_id = Some(first_voice);
+        }
+        tracing::info!("AI TTS engine initialized with local provider");
+        Ok(())
+    }
+
+    /// Check if initialized.
     pub async fn is_initialized(&self) -> bool {
-        self.elevenlabs.is_some()
+        self.synthesizer.is_some()
     }
 
-    /// Get available voices
+    pub fn supports_word_timings(&self) -> bool {
+        self.synthesizer
+            .as_ref()
+            .is_some_and(|provider| provider.supports_word_timings())
+    }
+
+    fn voice_info(voice: SynthesisVoice) -> VoiceInfo {
+        VoiceInfo {
+            id: voice.id,
+            name: voice.name,
+            provider: match voice.provider {
+                SynthesisProvider::ElevenLabs => TtsProvider::ElevenLabs,
+                SynthesisProvider::Local => TtsProvider::Local,
+            },
+            preview_url: voice.preview_url,
+            labels: voice.labels,
+        }
+    }
+
+    /// Get available voices.
     pub async fn list_voices(&self) -> Result<Vec<VoiceInfo>, String> {
-        let client = self
-            .elevenlabs
+        let provider = self
+            .synthesizer
             .as_ref()
-            .ok_or("NOT_INITIALIZED: Call init() with API key first")?;
-
-        client.list_voices().await
+            .ok_or("NOT_INITIALIZED: initialize a TTS provider first")?;
+        provider
+            .list_voices()
+            .await
+            .map(|voices| voices.into_iter().map(Self::voice_info).collect())
     }
 
-    /// Speak text (with caching support)
-    pub async fn speak(&self, text: &str, voice_id: Option<&str>) -> Result<(), String> {
-        let client = self
-            .elevenlabs
-            .as_ref()
-            .ok_or("NOT_INITIALIZED: Call init() with API key first")?;
+    async fn synthesize(
+        &self,
+        request: SynthesisRequest,
+    ) -> Result<crate::ports::SynthesisResult, String> {
+        let provider = Arc::clone(
+            self.synthesizer
+                .as_ref()
+                .ok_or("NOT_INITIALIZED: initialize a TTS provider first")?,
+        );
+        let mut cancelled = self.cancel_tx.subscribe();
+        tokio::select! {
+            result = provider.synthesize(request) => result,
+            changed = cancelled.changed() => {
+                let _ = changed;
+                Err("TTS_CANCELLED: synthesis was cancelled".to_string())
+            }
+        }
+    }
 
-        let config = self.config.read().await;
+    fn cache_coordinates(
+        &self,
+        text: &str,
+        voice: &str,
+        config: &TtsConfig,
+        with_word_timings: bool,
+    ) -> Result<(String, AudioMediaType), String> {
+        let provider = self
+            .synthesizer
+            .as_ref()
+            .ok_or("NOT_INITIALIZED: initialize a TTS provider first")?;
+        if provider.provider() == SynthesisProvider::ElevenLabs {
+            let model_id = config
+                .model_id
+                .clone()
+                .unwrap_or_else(|| "eleven_monolingual_v1".to_string());
+            let suffix = if with_word_timings { "_ts" } else { "" };
+            let settings_hash = format!(
+                "{:.2}_{:.2}{suffix}",
+                config.stability, config.similarity_boost
+            );
+            return Ok((
+                AudioCacheAdapter::generate_cache_key(text, voice, &model_id, &settings_hash),
+                AudioMediaType::Mp3,
+            ));
+        }
+        let settings_hash = format!(
+            "local_{}_{}",
+            config.speed,
+            AudioMediaType::Wav.content_type()
+        );
+        Ok((
+            AudioCacheAdapter::generate_cache_key(
+                text,
+                voice,
+                provider.provider_revision(),
+                &settings_hash,
+            ),
+            AudioMediaType::Wav,
+        ))
+    }
+
+    /// Speak text (with provider-aware caching support).
+    pub async fn speak(&self, text: &str, voice_id: Option<&str>) -> Result<(), String> {
+        let config = self.config.read().await.clone();
         let voice = voice_id
-            .map(|s| s.to_string())
+            .map(str::to_string)
             .or_else(|| config.voice_id.clone())
             .ok_or("NO_VOICE: No voice ID specified")?;
+        let (cache_key, expected_media) = self.cache_coordinates(text, &voice, &config, false)?;
 
-        let model_id = config
-            .model_id
-            .clone()
-            .unwrap_or_else(|| "eleven_monolingual_v1".to_string());
-
-        // Update state
         {
             let mut state = self.state.write().await;
             state.is_playing = true;
@@ -193,67 +293,66 @@ impl AiTtsEngine {
             state.progress = 0.0;
         }
 
-        // Generate cache key
-        let settings_hash = format!("{:.2}_{:.2}", config.stability, config.similarity_boost);
-        let cache_key =
-            AudioCacheAdapter::generate_cache_key(text, &voice, &model_id, &settings_hash);
-
-        // Check cache first
-        let audio_data = if let Some(cache) = &self.cache {
-            match cache.get(&cache_key) {
-                Ok(Some(cached_data)) => {
-                    tracing::info!("Cache hit for TTS audio, {} bytes", cached_data.len());
-                    cached_data
-                }
-                Ok(None) => {
-                    tracing::debug!("Cache miss, fetching from ElevenLabs");
-                    let data = client.text_to_speech(text, &voice, Some(&model_id)).await?;
-
-                    // Cache the audio (best-effort, ignore errors)
-                    if let Err(e) = cache.set(&cache_key, &data) {
-                        tracing::warn!("Failed to cache audio: {}", e);
-                    }
-                    data
-                }
-                Err(e) => {
-                    tracing::warn!("Cache error, fetching from API: {}", e);
-                    client.text_to_speech(text, &voice, Some(&model_id)).await?
+        let cached = self.cache.as_ref().and_then(|cache| {
+            match cache.get_media(&cache_key, expected_media) {
+                Ok(value) => value,
+                Err(error) => {
+                    tracing::warn!("Cache error, synthesizing: {error}");
+                    None
                 }
             }
-        } else {
-            client.text_to_speech(text, &voice, Some(&model_id)).await?
+        });
+        let audio_data = match cached {
+            Some(data) => data,
+            None => {
+                let result = match self
+                    .synthesize(SynthesisRequest {
+                        text: text.to_string(),
+                        voice_id: voice,
+                        model_id: config.model_id.clone(),
+                        speed: config.speed,
+                        with_word_timings: false,
+                    })
+                    .await
+                {
+                    Ok(result) => result,
+                    Err(error) => {
+                        let mut state = self.state.write().await;
+                        state.is_playing = false;
+                        state.is_paused = false;
+                        return Err(error);
+                    }
+                };
+                if result.media_type != expected_media {
+                    return Err("TTS_MEDIA_MISMATCH: provider returned an unexpected format".into());
+                }
+                if let Some(cache) = &self.cache {
+                    if let Err(error) =
+                        cache.set_media(&cache_key, &result.audio_data, result.media_type)
+                    {
+                        tracing::warn!("Failed to cache audio: {error}");
+                    }
+                }
+                result.audio_data
+            }
         };
-
-        // Play audio (non-blocking)
         self.player.play_mp3(&audio_data)?;
-
         Ok(())
     }
 
-    /// Speak text with word-level timestamps for karaoke highlighting
-    /// Includes disk-based caching to save API tokens across app restarts
+    /// Synthesize audio plus provider marks when available.
     pub async fn speak_with_timestamps(
         &self,
         text: &str,
         voice_id: Option<&str>,
     ) -> Result<TtsWithTimings, String> {
-        let client = self
-            .elevenlabs
-            .as_ref()
-            .ok_or("NOT_INITIALIZED: Call init() with API key first")?;
-
-        let config = self.config.read().await;
+        let config = self.config.read().await.clone();
         let voice = voice_id
-            .map(|s| s.to_string())
+            .map(str::to_string)
             .or_else(|| config.voice_id.clone())
             .ok_or("NO_VOICE: No voice ID specified")?;
+        let (cache_key, media_type) = self.cache_coordinates(text, &voice, &config, true)?;
 
-        let model_id = config
-            .model_id
-            .clone()
-            .unwrap_or_else(|| "eleven_monolingual_v1".to_string());
-
-        // Update state
         {
             let mut state = self.state.write().await;
             state.is_playing = true;
@@ -263,94 +362,79 @@ impl AiTtsEngine {
             state.progress = 0.0;
         }
 
-        // Generate cache key for timestamps
-        let settings_hash = format!("{:.2}_{:.2}_ts", config.stability, config.similarity_boost);
-        let cache_key =
-            AudioCacheAdapter::generate_cache_key(text, &voice, &model_id, &settings_hash);
-
-        // Check disk cache first (persists across app restarts)
         if let Some(disk_cache) = &self.cache {
-            match disk_cache.get_with_timestamps(&cache_key) {
+            match disk_cache.get_with_timestamps_media(&cache_key, media_type) {
                 Ok(Some(cached)) => {
-                    tracing::info!(
-                        "Disk cache hit for TTS with timestamps: {} bytes, {} words",
-                        cached.audio_data.len(),
-                        cached.word_timings.len()
-                    );
-
-                    // Play cached audio
-                    self.player.play_mp3(&cached.audio_data)?;
-
-                    // Convert CachedWordTiming to WordTiming
-                    let word_timings: Vec<WordTiming> = cached
+                    let word_timings = cached
                         .word_timings
                         .into_iter()
-                        .map(|wt| WordTiming {
-                            word: wt.word,
-                            start_time: wt.start_time,
-                            end_time: wt.end_time,
-                            char_start: wt.char_start,
-                            char_end: wt.char_end,
+                        .map(|timing| WordTiming {
+                            word: timing.word,
+                            start_time: timing.start_time,
+                            end_time: timing.end_time,
+                            char_start: timing.char_start,
+                            char_end: timing.char_end,
                         })
                         .collect();
-
                     return Ok(TtsWithTimings {
                         audio_data: cached.audio_data,
                         word_timings,
                         total_duration: cached.total_duration,
                     });
                 }
-                Ok(None) => {
-                    tracing::debug!("Disk cache miss for timestamps");
-                }
-                Err(e) => {
-                    tracing::warn!("Disk cache error: {}", e);
-                }
+                Ok(None) => {}
+                Err(error) => tracing::warn!("Disk cache error: {error}"),
             }
         }
 
-        tracing::info!("Fetching TTS with timestamps from ElevenLabs API");
-
-        // Get TTS with timestamps from API
-        let tts_result = client
-            .text_to_speech_with_timestamps(text, &voice, Some(&model_id))
-            .await?;
-
-        // Cache the result to disk (persists across app restarts)
-        if let Some(disk_cache) = &self.cache {
-            // Convert WordTiming to CachedWordTiming for storage
-            let cached_timings: Vec<CachedWordTiming> = tts_result
+        let result = match self
+            .synthesize(SynthesisRequest {
+                text: text.to_string(),
+                voice_id: voice,
+                model_id: config.model_id.clone(),
+                speed: config.speed,
+                with_word_timings: true,
+            })
+            .await
+        {
+            Ok(result) => result,
+            Err(error) => {
+                let mut state = self.state.write().await;
+                state.is_playing = false;
+                state.is_paused = false;
+                return Err(error);
+            }
+        };
+        if result.media_type != media_type {
+            return Err("TTS_MEDIA_MISMATCH: provider returned an unexpected format".into());
+        }
+        let tts_result = TtsWithTimings {
+            audio_data: result.audio_data,
+            word_timings: result.word_timings,
+            total_duration: result.total_duration,
+        };
+        if let Some(cache) = &self.cache {
+            let cached_timings = tts_result
                 .word_timings
                 .iter()
-                .map(|wt| CachedWordTiming {
-                    word: wt.word.clone(),
-                    start_time: wt.start_time,
-                    end_time: wt.end_time,
-                    char_start: wt.char_start,
-                    char_end: wt.char_end,
+                .map(|timing| CachedWordTiming {
+                    word: timing.word.clone(),
+                    start_time: timing.start_time,
+                    end_time: timing.end_time,
+                    char_start: timing.char_start,
+                    char_end: timing.char_end,
                 })
-                .collect();
-
-            if let Err(e) = disk_cache.set_with_timestamps(
+                .collect::<Vec<_>>();
+            if let Err(error) = cache.set_with_timestamps_media(
                 &cache_key,
                 &tts_result.audio_data,
                 &cached_timings,
                 tts_result.total_duration,
+                media_type,
             ) {
-                tracing::warn!("Failed to cache TTS to disk: {}", e);
-            } else {
-                tracing::info!(
-                    "Cached TTS with timestamps to disk: {} words, {:.2}s",
-                    tts_result.word_timings.len(),
-                    tts_result.total_duration
-                );
+                tracing::warn!("Failed to cache TTS: {error}");
             }
         }
-
-        // NOTE: Audio playback is NOT started here anymore.
-        // The command layer will emit ai-tts:playback-starting event THEN call play_audio()
-        // This ensures frontend can sync highlight timer accurately.
-
         Ok(tts_result)
     }
 
@@ -362,8 +446,14 @@ impl AiTtsEngine {
         self.player.play_mp3(audio_data)
     }
 
+    fn cancel_synthesis(&self) {
+        let next = self.cancel_tx.borrow().wrapping_add(1);
+        let _ = self.cancel_tx.send(next);
+    }
+
     /// Stop playback
     pub async fn stop(&self) -> Result<(), String> {
+        self.cancel_synthesis();
         let result = self.player.stop();
         if result.is_ok() {
             let mut state = self.state.write().await;
@@ -438,95 +528,63 @@ impl AiTtsEngine {
         text: &str,
         voice_id: Option<&str>,
     ) -> Result<PrebufferResult, String> {
-        let client = self
-            .elevenlabs
-            .as_ref()
-            .ok_or("NOT_INITIALIZED: Call init() with API key first")?;
-
-        let config = self.config.read().await;
+        let config = self.config.read().await.clone();
         let voice = voice_id
-            .map(|s| s.to_string())
+            .map(str::to_string)
             .or_else(|| config.voice_id.clone())
             .ok_or("NO_VOICE: No voice ID specified")?;
-
-        let model_id = config
-            .model_id
-            .clone()
-            .unwrap_or_else(|| "eleven_monolingual_v1".to_string());
-
-        // Generate cache key for timestamps
-        let settings_hash = format!("{:.2}_{:.2}_ts", config.stability, config.similarity_boost);
-        let cache_key =
-            AudioCacheAdapter::generate_cache_key(text, &voice, &model_id, &settings_hash);
-
-        // Check if already cached
-        if let Some(disk_cache) = &self.cache {
-            match disk_cache.get_with_timestamps(&cache_key) {
+        let (cache_key, media_type) = self.cache_coordinates(text, &voice, &config, true)?;
+        if let Some(cache) = &self.cache {
+            match cache.get_with_timestamps_media(&cache_key, media_type) {
                 Ok(Some(cached)) => {
-                    tracing::info!(
-                        "Pre-buffer: already cached ({} bytes, {} words)",
-                        cached.audio_data.len(),
-                        cached.word_timings.len()
-                    );
                     return Ok(PrebufferResult {
                         was_cached: true,
                         word_count: cached.word_timings.len(),
                         total_duration: cached.total_duration,
                     });
                 }
-                Ok(None) => {
-                    tracing::debug!("Pre-buffer: cache miss, fetching from API");
-                }
-                Err(e) => {
-                    tracing::warn!("Pre-buffer: cache error: {}", e);
-                }
+                Ok(None) => {}
+                Err(error) => tracing::warn!("Pre-buffer cache error: {error}"),
             }
         }
-
-        // Fetch from API
-        tracing::info!(
-            "Pre-buffering TTS from ElevenLabs API ({} chars)",
-            text.len()
-        );
-
-        let tts_result = client
-            .text_to_speech_with_timestamps(text, &voice, Some(&model_id))
+        let result = self
+            .synthesize(SynthesisRequest {
+                text: text.to_string(),
+                voice_id: voice,
+                model_id: config.model_id.clone(),
+                speed: config.speed,
+                with_word_timings: true,
+            })
             .await?;
-
-        // Cache the result to disk
-        if let Some(disk_cache) = &self.cache {
-            let cached_timings: Vec<CachedWordTiming> = tts_result
+        if result.media_type != media_type {
+            return Err("TTS_MEDIA_MISMATCH: provider returned an unexpected format".into());
+        }
+        if let Some(cache) = &self.cache {
+            let timings = result
                 .word_timings
                 .iter()
-                .map(|wt| CachedWordTiming {
-                    word: wt.word.clone(),
-                    start_time: wt.start_time,
-                    end_time: wt.end_time,
-                    char_start: wt.char_start,
-                    char_end: wt.char_end,
+                .map(|timing| CachedWordTiming {
+                    word: timing.word.clone(),
+                    start_time: timing.start_time,
+                    end_time: timing.end_time,
+                    char_start: timing.char_start,
+                    char_end: timing.char_end,
                 })
-                .collect();
-
-            if let Err(e) = disk_cache.set_with_timestamps(
+                .collect::<Vec<_>>();
+            if let Err(error) = cache.set_with_timestamps_media(
                 &cache_key,
-                &tts_result.audio_data,
-                &cached_timings,
-                tts_result.total_duration,
+                &result.audio_data,
+                &timings,
+                result.total_duration,
+                media_type,
             ) {
-                tracing::warn!("Failed to cache pre-buffered TTS: {}", e);
-            } else {
-                tracing::info!(
-                    "Pre-buffered and cached TTS: {} words, {:.2}s",
-                    tts_result.word_timings.len(),
-                    tts_result.total_duration
-                );
+                tracing::warn!("Failed to cache pre-buffered TTS: {error}");
             }
         }
-
         Ok(PrebufferResult {
             was_cached: false,
-            word_count: tts_result.word_timings.len(),
-            total_duration: tts_result.total_duration,
+            word_count: result.word_timings.len(),
+            total_duration: result.total_duration,
         })
     }
 
@@ -572,5 +630,58 @@ impl AiTtsEngine {
 impl Default for AiTtsEngine {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ports::{SynthesisResult, SynthesisVoice};
+    use async_trait::async_trait;
+
+    struct PendingSynthesizer;
+
+    #[async_trait]
+    impl SynthesizerPort for PendingSynthesizer {
+        fn provider(&self) -> SynthesisProvider {
+            SynthesisProvider::Local
+        }
+        fn provider_revision(&self) -> &str {
+            "pending-1"
+        }
+        fn max_text_utf8_bytes(&self) -> usize {
+            8_192
+        }
+        fn supports_word_timings(&self) -> bool {
+            false
+        }
+        async fn list_voices(&self) -> Result<Vec<SynthesisVoice>, String> {
+            Ok(Vec::new())
+        }
+        async fn synthesize(&self, _request: SynthesisRequest) -> Result<SynthesisResult, String> {
+            std::future::pending().await
+        }
+    }
+
+    #[tokio::test]
+    async fn cancellation_drops_a_pending_provider_without_fallback() {
+        let mut engine = AiTtsEngine::new();
+        engine.synthesizer = Some(Arc::new(PendingSynthesizer));
+        let future = engine.synthesize(SynthesisRequest {
+            text: "cancel me".to_string(),
+            voice_id: "F1-pt".to_string(),
+            model_id: None,
+            speed: 1.0,
+            with_word_timings: false,
+        });
+        tokio::pin!(future);
+        assert!(futures::poll!(&mut future).is_pending());
+
+        engine.cancel_synthesis();
+
+        assert_eq!(
+            future.await.unwrap_err(),
+            "TTS_CANCELLED: synthesis was cancelled"
+        );
     }
 }

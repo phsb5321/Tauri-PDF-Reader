@@ -48,7 +48,7 @@ rodio = { version = "0.20", optional = true }
 # speed — spec 039. MIT; builds vendored C++ via cc+bindgen (needs libclang).
 signalsmith-stretch = { version = "0.1.3", optional = true }
 reqwest = { version = "0.12", default-features = false, features = ["stream", "json", "native-tls-vendored"], optional = true }
-tokio = { version = "1", features = ["sync", "rt", "time"], optional = true }
+tokio = { version = "1", features = ["sync", "rt", "time", "macros"], optional = true }
 futures = { version = "0.3", optional = true }
 bytes = { version = "1", optional = true }
 base64 = { version = "0.22", optional = true }
@@ -72,7 +72,7 @@ tauri-plugin-shell = "2"
 
 [dev-dependencies]
 mockall = "0.13"
-tokio = { version = "1", features = ["rt", "macros"] }
+tokio = { version = "1", features = ["rt", "macros", "test-util"] }
 # Spectral assertion for the pitch-preserving time-stretch gate (spec 039).
 rustfft = "6"
 # Config round-trip property (spec 078): Config -> toml -> Config must be the

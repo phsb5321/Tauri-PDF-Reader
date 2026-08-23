@@ -3,9 +3,10 @@
 //! Provides commands for text-to-speech using AI providers like ElevenLabs.
 //! Includes cache management commands for persisted audio.
 
-use crate::adapters::{CacheInfo, ClearResult};
+use crate::adapters::{CacheInfo, ClearResult, LocalTtsClient};
 use crate::ai_tts::{AiTtsEngine, TtsConfig, VoiceInfo, WordTiming};
 use serde::{Deserialize, Serialize};
+use specta::Type;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
 use tokio::sync::RwLock;
@@ -20,6 +21,16 @@ pub struct AiTtsEngineState(pub Arc<RwLock<AiTtsEngine>>);
 pub struct InitResponse {
     pub success: bool,
     pub voices_count: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct InitLocalResponse {
+    pub success: bool,
+    pub voices_count: usize,
+    pub provider: String,
+    pub supports_word_timings: bool,
+    pub destination: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -124,6 +135,44 @@ pub async fn ai_tts_init(
             voices_count: voices.len(),
         })
     }
+}
+
+/// Initialize local TTS from validated native config. The WebView supplies no
+/// URL and has no command that can mutate the destination.
+#[tauri::command]
+#[specta::specta]
+pub async fn ai_tts_init_local(
+    state: State<'_, AiTtsEngineState>,
+) -> Result<InitLocalResponse, String> {
+    let outcome = crate::config::load();
+    if !outcome.loaded {
+        return Err(outcome
+            .error
+            .map(|error| format!("LOCAL_TTS_CONFIG: {error}"))
+            .unwrap_or_else(|| "LOCAL_TTS_CONFIG: no native config file loaded".to_string()));
+    }
+    if outcome.config.ai_tts.provider != crate::config::schema::AiTtsProvider::Local {
+        return Err("LOCAL_TTS_CONFIG: ai_tts.provider is not local".to_string());
+    }
+    let destination = outcome
+        .config
+        .ai_tts
+        .local_url
+        .ok_or("LOCAL_TTS_CONFIG: ai_tts.local_url is missing")?;
+    // Network preflight happens before the write lock. Stop/page-change can
+    // still reach the current engine while a dead local service times out.
+    let client = LocalTtsClient::connect(&destination).await?;
+    let mut engine = state.0.write().await;
+    engine.install_local(client).await?;
+    let voices = engine.list_voices().await?;
+    let supports_word_timings = engine.supports_word_timings();
+    Ok(InitLocalResponse {
+        success: true,
+        voices_count: voices.len(),
+        provider: "local".to_string(),
+        supports_word_timings,
+        destination,
+    })
 }
 
 /// List available voices
