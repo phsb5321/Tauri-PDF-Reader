@@ -105,7 +105,10 @@ max_size_bytes = {max_size_bytes}
 eviction_policy = "{eviction}"
 
 [ai_tts]
-# ElevenLabs voice id used for high-quality narration.
+# "elevenlabs" (default) or "local". Local mode requires the exact next line:
+# local_url = "http://127.0.0.1:5301"
+provider = "{ai_provider}"
+# Provider voice id. Local voices come from the service capability catalog.
 voice_id = "{ai_voice}"
 # Playback speed, {AI_SPEED_MIN}..{AI_SPEED_MAX} (pitch-preserving).
 speed = {ai_speed}
@@ -122,6 +125,7 @@ auto_page = {auto_page}
         hw_acceleration = d.render.hw_acceleration,
         debug_overlay = d.render.debug_overlay,
         max_size_bytes = d.cache.max_size_bytes,
+        ai_provider = toml_enum(&d.ai_tts.provider),
         ai_speed = float(d.ai_tts.speed),
         auto_page = d.ai_tts.auto_page,
     )

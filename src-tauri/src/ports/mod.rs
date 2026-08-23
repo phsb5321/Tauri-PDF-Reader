@@ -10,6 +10,7 @@ pub mod document_repository;
 pub mod highlight_repository;
 pub mod session_repository;
 pub mod settings_repository;
+pub mod synthesizer;
 pub mod tts_engine;
 
 // Re-export main traits and types
@@ -28,6 +29,10 @@ pub use session_repository::{
     UpdateSessionDocumentInput, UpdateSessionInput,
 };
 pub use settings_repository::SettingsRepository;
+pub use synthesizer::{
+    AudioMediaType, SynthesisProvider, SynthesisRequest, SynthesisResult, SynthesisVoice,
+    SynthesizerPort, WordTiming as SynthesisWordTiming,
+};
 pub use tts_engine::{TtsCapabilities, TtsChunk, TtsEngine, TtsInitResponse, TtsState, VoiceInfo};
 
 // Re-export mock types for tests (both unit tests and integration tests with test-mocks feature)

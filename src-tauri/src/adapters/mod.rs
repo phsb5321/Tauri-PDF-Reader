@@ -22,7 +22,11 @@
 //! - Tauri command handlers
 
 pub mod audio_cache;
+#[cfg(feature = "elevenlabs-tts")]
+pub mod local_tts;
 pub mod sqlite;
 
 pub use audio_cache::{AudioCacheAdapter, CacheInfo, CachedTtsData, CachedWordTiming, ClearResult};
+#[cfg(feature = "elevenlabs-tts")]
+pub use local_tts::LocalTtsClient;
 pub use sqlite::{SqliteAudioCacheRepo, SqliteSessionRepo, SqliteSettingsRepo};

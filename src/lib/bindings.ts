@@ -485,6 +485,16 @@ async configGetEffective() : Promise<EffectiveConfig> {
 
 export type AiTts = { 
 /**
+ * Provider selection is native config only; the WebView receives read-only
+ * effective state and has no command that can mutate the destination.
+ */
+provider?: AiTtsProvider; 
+/**
+ * Initial local-provider boundary is deliberately one exact loopback URL.
+ * Broader addresses require a separate security decision.
+ */
+local_url?: string | null; 
+/**
  * localStorage `ai-tts-storage.selectedVoiceId`.
  * 
  * NOT an `Option`, unlike `tts.voice`, and the round-trip property is why:
@@ -507,6 +517,7 @@ speed?: number;
  * localStorage `ai-tts-storage.autoPageEnabled`
  */
 auto_page?: boolean }
+export type AiTtsProvider = "elevenlabs" | "local"
 export type Appearance = { 
 /**
  * SQLite `theme`
