@@ -22,7 +22,7 @@
 ## Phase 4 — Verification and delivery
 
 - [x] T011 Run targeted Rust and frontend gates, lint, typecheck, bindings ratchet, and config tests — `CI=true nix develop -c pnpm verify` PASS (1,139 frontend tests plus Rust/contracts), alignment and harness PASS.
-- [x] T012 Run packaged public-control local Play with one WAV request and zero cloud requests — vm103 exact head `2677073`, receipt SHA-256 `f5416432f27f97c098a8969b383972ad9ee8194ada55dbac599f0ad227c7ba10`.
-- [ ] T013 Run full verification and alignment, then obtain a different-family exact-head review and resolve every finding.
+- [x] T012 Run packaged public-control local Play with one WAV request and zero cloud requests — vm103 exact head `60a9c82`, receipt SHA-256 `f5416432f27f97c098a8969b383972ad9ee8194ada55dbac599f0ad227c7ba10`.
+- [x] T013 Run full verification and alignment, then obtain a different-family exact-head review and resolve every finding — full verify/alignment PASS, DeepSeek Pro ALLOW with no BLOCKER/MAJOR, and PR #170 required CI green after the fail-closed tauri-driver prerequisite rerun.
 - [x] T014 Configure a key-only, health-checked launchd Mac SSH loopback forward with retained unload command; prove one Mac-origin PT-BR WAV request without credentials — bridge `.3`, 5.782 s WAV SHA-256 `00c37c3305c12f3c2ad6d44731d5fcc369175ac8f293260b1a4091c926252463`.
 - [ ] T015 Stage a Mac candidate only if T001–T014 are green. Keep installation BLOCKED and retain the restored bundle until a safe Mac app actor can prove the staged candidate.
