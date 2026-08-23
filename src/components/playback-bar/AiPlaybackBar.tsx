@@ -15,6 +15,15 @@ import { AudioCacheProgress } from "../audio-progress/AudioCacheProgress";
 import { AudioExportDialog } from "../export-dialog/AudioExportDialog";
 import "./AiPlaybackBar.css";
 
+export function consumeNaturalCompletion(
+  observed: number,
+  consumed: number,
+  playbackRequested: boolean,
+): { consumed: number; advance: boolean } {
+  if (observed <= consumed) return { consumed, advance: false };
+  return { consumed: observed, advance: playbackRequested };
+}
+
 interface AiPlaybackBarProps {
   getText: () => Promise<string | null>;
   enableHighlighting?: boolean;
@@ -182,9 +191,13 @@ export function AiPlaybackBar({
   // by the store. Explicit Stop never increments this token.
   const consumedNaturalCompletion = useRef(naturalCompletionCount);
   useEffect(() => {
-    if (naturalCompletionCount <= consumedNaturalCompletion.current) return;
-    consumedNaturalCompletion.current = naturalCompletionCount;
-    if (playingRef.current) void handlePlaybackComplete();
+    const outcome = consumeNaturalCompletion(
+      naturalCompletionCount,
+      consumedNaturalCompletion.current,
+      playingRef.current,
+    );
+    consumedNaturalCompletion.current = outcome.consumed;
+    if (outcome.advance) void handlePlaybackComplete();
   }, [naturalCompletionCount, handlePlaybackComplete]);
 
   // Word highlighting hook

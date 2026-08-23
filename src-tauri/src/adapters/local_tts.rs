@@ -3,6 +3,7 @@ use crate::ports::{
     SynthesizerPort,
 };
 use async_trait::async_trait;
+use futures::StreamExt;
 use reqwest::{Client, Response};
 use rodio::{Decoder, Source};
 use serde::{Deserialize, Serialize};
@@ -187,6 +188,25 @@ impl LocalTtsClient {
             .await
     }
 
+    fn validate_response_metadata(
+        content_type: &str,
+        content_length: Option<u64>,
+    ) -> Result<(), String> {
+        if !content_type
+            .split(';')
+            .next()
+            .is_some_and(|media| media.trim().eq_ignore_ascii_case("audio/wav"))
+        {
+            return Err(format!(
+                "LOCAL_TTS_MEDIA_TYPE: expected audio/wav, got {content_type}"
+            ));
+        }
+        if content_length.is_some_and(|length| length > MAX_AUDIO_BYTES as u64) {
+            return Err("LOCAL_TTS_RESPONSE_TOO_LARGE".to_string());
+        }
+        Ok(())
+    }
+
     fn read_u16(bytes: &[u8], at: usize) -> Result<u16, String> {
         let raw: [u8; 2] = bytes
             .get(at..at + 2)
@@ -333,28 +353,15 @@ impl SynthesizerPort for LocalTtsClient {
             .get(reqwest::header::CONTENT_TYPE)
             .and_then(|value| value.to_str().ok())
             .unwrap_or("");
-        if !content_type
-            .split(';')
-            .next()
-            .is_some_and(|media| media.trim().eq_ignore_ascii_case("audio/wav"))
-        {
-            return Err(format!(
-                "LOCAL_TTS_MEDIA_TYPE: expected audio/wav, got {content_type}"
-            ));
-        }
-        if response
-            .content_length()
-            .is_some_and(|length| length > MAX_AUDIO_BYTES as u64)
-        {
-            return Err("LOCAL_TTS_RESPONSE_TOO_LARGE".to_string());
-        }
-        let audio_data = response
-            .bytes()
-            .await
-            .map_err(|error| format!("LOCAL_TTS_RESPONSE: {error}"))?
-            .to_vec();
-        if audio_data.len() > MAX_AUDIO_BYTES {
-            return Err("LOCAL_TTS_RESPONSE_TOO_LARGE".to_string());
+        Self::validate_response_metadata(content_type, response.content_length())?;
+        let mut audio_data = Vec::new();
+        let mut stream = response.bytes_stream();
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.map_err(|error| format!("LOCAL_TTS_RESPONSE: {error}"))?;
+            if audio_data.len().saturating_add(chunk.len()) > MAX_AUDIO_BYTES {
+                return Err("LOCAL_TTS_RESPONSE_TOO_LARGE".to_string());
+            }
+            audio_data.extend_from_slice(&chunk);
         }
         let total_duration = Self::validate_wav(&audio_data)?;
         Ok(SynthesisResult {
@@ -373,7 +380,8 @@ mod tests {
     use crate::ports::AudioMediaType;
     use std::io::{Read, Write};
     use std::net::TcpListener;
-    use std::sync::{Arc, Mutex};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::{mpsc, Arc, Mutex};
 
     fn pcm_wav() -> Vec<u8> {
         let sample_rate = 16_000_u32;
@@ -510,6 +518,20 @@ mod tests {
     }
 
     #[test]
+    fn response_metadata_rejects_wrong_media_and_oversize() {
+        assert!(
+            LocalTtsClient::validate_response_metadata("audio/wav; charset=binary", Some(44))
+                .is_ok()
+        );
+        assert!(LocalTtsClient::validate_response_metadata("audio/mpeg", Some(44)).is_err());
+        assert!(LocalTtsClient::validate_response_metadata(
+            "audio/wav",
+            Some(MAX_AUDIO_BYTES as u64 + 1)
+        )
+        .is_err());
+    }
+
+    #[test]
     fn wav_validation_rejects_truncation_and_non_pcm() {
         let valid = pcm_wav();
         assert!((LocalTtsClient::validate_wav(&valid).unwrap() - 0.1).abs() < 0.000_001);
@@ -517,6 +539,88 @@ mod tests {
         let mut float = valid;
         float[20..22].copy_from_slice(&3_u16.to_le_bytes());
         assert!(LocalTtsClient::validate_wav(&float).is_err());
+    }
+
+    #[tokio::test]
+    async fn over_bound_text_fails_before_network_dispatch() {
+        let local = LocalTtsClient {
+            client: Client::new(),
+            base_url: "http://127.0.0.1:9".to_string(),
+            revision: "fixture-bound".to_string(),
+            max_text_utf8_bytes: 3,
+            voices: vec![SynthesisVoice {
+                id: "F1-pt".to_string(),
+                name: "F1-pt".to_string(),
+                language: Some("pt-BR".to_string()),
+                provider: SynthesisProvider::Local,
+                preview_url: None,
+                labels: None,
+            }],
+        };
+        let error = local
+            .synthesize(SynthesisRequest {
+                text: "four".to_string(),
+                voice_id: "F1-pt".to_string(),
+                speed: 1.0,
+                with_word_timings: false,
+            })
+            .await
+            .unwrap_err();
+        assert!(error.starts_with("TEXT_TOO_LONG:"), "{error}");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn timeout_retries_exactly_once_then_fails_locally() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let base_url = format!("http://{}", listener.local_addr().unwrap());
+        let accepted = Arc::new(AtomicUsize::new(0));
+        let observed = Arc::clone(&accepted);
+        let (release_tx, release_rx) = mpsc::channel();
+        std::thread::spawn(move || {
+            let mut held = Vec::new();
+            for _ in 0..2 {
+                let (stream, _) = listener.accept().unwrap();
+                observed.fetch_add(1, Ordering::SeqCst);
+                held.push(stream);
+            }
+            let _ = release_rx.recv();
+        });
+        let client = Client::builder()
+            .connect_timeout(Duration::from_secs(1))
+            .timeout(Duration::from_secs(1))
+            .build()
+            .unwrap();
+        let local = LocalTtsClient {
+            client,
+            base_url,
+            revision: "fixture-timeout".to_string(),
+            max_text_utf8_bytes: 8_192,
+            voices: vec![SynthesisVoice {
+                id: "F1-pt".to_string(),
+                name: "F1-pt".to_string(),
+                language: Some("pt-BR".to_string()),
+                provider: SynthesisProvider::Local,
+                preview_url: None,
+                labels: None,
+            }],
+        };
+        let future = local.synthesize(SynthesisRequest {
+            text: "timeout".to_string(),
+            voice_id: "F1-pt".to_string(),
+            speed: 1.0,
+            with_word_timings: false,
+        });
+        tokio::pin!(future);
+        assert!(futures::poll!(&mut future).is_pending());
+        tokio::time::advance(Duration::from_secs(1)).await;
+        for _ in 0..10 {
+            tokio::task::yield_now().await;
+        }
+        tokio::time::advance(Duration::from_secs(1)).await;
+        let error = future.await.unwrap_err();
+        assert!(error.starts_with("LOCAL_TTS_REQUEST:"), "{error}");
+        assert_eq!(accepted.load(Ordering::SeqCst), 2, "one retry only");
+        let _ = release_tx.send(());
     }
 
     #[test]

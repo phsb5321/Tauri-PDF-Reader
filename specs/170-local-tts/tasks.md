@@ -3,9 +3,9 @@
 ## Phase 1 — Fail-first contracts
 
 - [x] T001 Add config round-trip and invalid-destination tests for local provider selection.
-- [ ] T002 Add Rust adapter contract tests covering readiness, voices, exact idempotency/body, connect/total timeout, cancellation, replay, strict PCM-WAV validation, media/size bounds, over-bound text, and no-cloud fallback; prove same-key/changed-body 409 separately at the direct service-contract fixture level.
-- [ ] T003 Add frontend tests proving local mode needs no API key, names the destination, disables word-progress claims when marks are unavailable, and distinguishes natural finish/auto-page from explicit Stop.
-- [ ] T004 Add packaged fixture/zero-cloud trap contract and make the local Play journey fail before implementation.
+- [x] T002 Add Rust adapter contract tests covering readiness, voices, exact idempotency/body, connect/total timeout, cancellation, replay, strict PCM-WAV validation, media/size bounds, over-bound text, and no-cloud fallback; prove same-key/changed-body 409 separately at the direct service-contract fixture level.
+- [x] T003 Add frontend tests proving local mode needs no API key, names the destination, disables word-progress claims when marks are unavailable, and distinguishes natural finish/auto-page from explicit Stop.
+- [x] T004 Add packaged fixture/zero-cloud trap contract and prove the local Play journey RED with a planted key requirement before its exact-head GREEN run.
 
 ## Phase 2 — Provider seam
 
@@ -22,7 +22,7 @@
 ## Phase 4 — Verification and delivery
 
 - [ ] T011 Run targeted Rust and frontend gates, lint, typecheck, bindings ratchet, and config tests.
-- [ ] T012 Run packaged public-control local Play with one WAV request and zero cloud requests.
+- [x] T012 Run packaged public-control local Play with one WAV request and zero cloud requests — vm103 exact head `2677073`, receipt SHA-256 `f5416432f27f97c098a8969b383972ad9ee8194ada55dbac599f0ad227c7ba10`.
 - [ ] T013 Run full verification and alignment, then obtain a different-family exact-head review and resolve every finding.
-- [ ] T014 Configure a key-only, health-checked launchd Mac SSH loopback forward with retained unload command; prove one Mac-origin PT-BR WAV request without credentials.
+- [x] T014 Configure a key-only, health-checked launchd Mac SSH loopback forward with retained unload command; prove one Mac-origin PT-BR WAV request without credentials — bridge `.3`, 5.782 s WAV SHA-256 `00c37c3305c12f3c2ad6d44731d5fcc369175ac8f293260b1a4091c926252463`.
 - [ ] T015 Stage a Mac candidate only if T001–T014 are green. Keep installation BLOCKED and retain the restored bundle until a safe Mac app actor can prove the staged candidate.
