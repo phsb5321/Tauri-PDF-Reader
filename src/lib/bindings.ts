@@ -470,6 +470,18 @@ async sessionTouch(sessionId: string) : Promise<Result<null, string>> {
  */
 async configGetEffective() : Promise<EffectiveConfig> {
     return await TAURI_INVOKE("config_get_effective");
+},
+/**
+ * Initialize local TTS from validated native config. The WebView supplies no
+ * URL and has no command that can mutate the destination.
+ */
+async aiTtsInitLocal() : Promise<Result<InitLocalResponse, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("ai_tts_init_local") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -616,6 +628,7 @@ default_color?: string;
  * SQLite `highlight.colors`
  */
 colors?: string[] }
+export type InitLocalResponse = { success: boolean; voicesCount: number; provider: string; supportsWordTimings: boolean; destination: string }
 /**
  * Response types for commands
  */

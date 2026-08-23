@@ -7,6 +7,7 @@
 //! - `{cache_key}.mp3` - Audio data
 //! - `{cache_key}.json` - Timestamps and metadata (optional)
 
+use crate::ports::AudioMediaType;
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::{Read, Write};
@@ -122,7 +123,17 @@ impl AudioCacheAdapter {
     /// - `Ok(None)` if cache miss
     /// - `Err` if error reading file (corrupted files are deleted and treated as miss)
     pub fn get(&self, cache_key: &str) -> Result<Option<Vec<u8>>, String> {
-        let file_path = self.cache_dir.join(format!("{}.mp3", cache_key));
+        self.get_media(cache_key, AudioMediaType::Mp3)
+    }
+
+    pub fn get_media(
+        &self,
+        cache_key: &str,
+        media_type: AudioMediaType,
+    ) -> Result<Option<Vec<u8>>, String> {
+        let file_path = self
+            .cache_dir
+            .join(format!("{}.{}", cache_key, media_type.extension()));
 
         if !file_path.exists() {
             return Ok(None);
@@ -163,10 +174,21 @@ impl AudioCacheAdapter {
     /// - Permission errors are returned as errors
     /// - Disk full errors are logged and ignored (cache is best-effort)
     pub fn set(&self, cache_key: &str, data: &[u8]) -> Result<(), String> {
+        self.set_media(cache_key, data, AudioMediaType::Mp3)
+    }
+
+    pub fn set_media(
+        &self,
+        cache_key: &str,
+        data: &[u8],
+        media_type: AudioMediaType,
+    ) -> Result<(), String> {
         // Ensure cache directory exists
         self.ensure_cache_dir()?;
 
-        let file_path = self.cache_dir.join(format!("{}.mp3", cache_key));
+        let file_path = self
+            .cache_dir
+            .join(format!("{}.{}", cache_key, media_type.extension()));
 
         match fs::File::create(&file_path) {
             Ok(mut file) => {
@@ -211,10 +233,29 @@ impl AudioCacheAdapter {
         word_timings: &[CachedWordTiming],
         total_duration: f64,
     ) -> Result<(), String> {
+        self.set_with_timestamps_media(
+            cache_key,
+            audio_data,
+            word_timings,
+            total_duration,
+            AudioMediaType::Mp3,
+        )
+    }
+
+    pub fn set_with_timestamps_media(
+        &self,
+        cache_key: &str,
+        audio_data: &[u8],
+        word_timings: &[CachedWordTiming],
+        total_duration: f64,
+        media_type: AudioMediaType,
+    ) -> Result<(), String> {
         // Ensure cache directory exists
         self.ensure_cache_dir()?;
 
-        let audio_path = self.cache_dir.join(format!("{}.mp3", cache_key));
+        let audio_path = self
+            .cache_dir
+            .join(format!("{}.{}", cache_key, media_type.extension()));
         let meta_path = self.cache_dir.join(format!("{}.json", cache_key));
 
         // Write audio file
@@ -272,7 +313,17 @@ impl AudioCacheAdapter {
     ///
     /// Returns None if either file is missing or corrupted.
     pub fn get_with_timestamps(&self, cache_key: &str) -> Result<Option<CachedTtsData>, String> {
-        let audio_path = self.cache_dir.join(format!("{}.mp3", cache_key));
+        self.get_with_timestamps_media(cache_key, AudioMediaType::Mp3)
+    }
+
+    pub fn get_with_timestamps_media(
+        &self,
+        cache_key: &str,
+        media_type: AudioMediaType,
+    ) -> Result<Option<CachedTtsData>, String> {
+        let audio_path = self
+            .cache_dir
+            .join(format!("{}.{}", cache_key, media_type.extension()));
         let meta_path = self.cache_dir.join(format!("{}.json", cache_key));
 
         // Check if both files exist
@@ -379,15 +430,15 @@ impl AudioCacheAdapter {
             Ok(entries) => {
                 for entry in entries.flatten() {
                     let path = entry.path();
-                    // Clear both .mp3 and .json files
+                    // Clear provider audio plus timestamp metadata.
                     let ext = path.extension().and_then(|e| e.to_str());
-                    if ext == Some("mp3") || ext == Some("json") {
+                    if matches!(ext, Some("mp3" | "wav" | "json")) {
                         if let Ok(metadata) = entry.metadata() {
                             bytes_cleared += metadata.len();
                         }
                         if fs::remove_file(&path).is_ok() {
-                            // Only count mp3 files as entries (json is metadata)
-                            if ext == Some("mp3") {
+                            // Count audio files as entries (json is metadata).
+                            if matches!(ext, Some("mp3" | "wav")) {
                                 entries_removed += 1;
                             }
                         }
@@ -435,13 +486,13 @@ impl AudioCacheAdapter {
             Ok(entries) => {
                 for entry in entries.flatten() {
                     let path = entry.path();
-                    // Count both .mp3 and .json files for size
+                    // Count provider audio and timestamp metadata for size.
                     let ext = path.extension().and_then(|e| e.to_str());
-                    if ext == Some("mp3") || ext == Some("json") {
+                    if matches!(ext, Some("mp3" | "wav" | "json")) {
                         if let Ok(metadata) = entry.metadata() {
                             total_size += metadata.len();
-                            // Only count mp3 files as entries
-                            if ext == Some("mp3") {
+                            // Count audio files as entries.
+                            if matches!(ext, Some("mp3" | "wav")) {
                                 entry_count += 1;
 
                                 if let Ok(created) = metadata.created() {
@@ -506,6 +557,34 @@ mod tests {
 
         assert_eq!(hash1, hash2);
         assert_ne!(hash1, hash3);
+    }
+
+    #[test]
+    fn local_wav_is_retrieved_counted_and_cleared_with_legacy_mp3() {
+        let cache_dir = temp_dir().join(format!("test_tts_media_cache-{}", std::process::id()));
+        let adapter = AudioCacheAdapter::new(cache_dir.clone());
+
+        adapter
+            .set_media("local", &[1, 2, 3], crate::ports::AudioMediaType::Wav)
+            .unwrap();
+        adapter.set("legacy", &[4, 5]).unwrap();
+
+        assert_eq!(
+            adapter
+                .get_media("local", crate::ports::AudioMediaType::Wav)
+                .unwrap(),
+            Some(vec![1, 2, 3])
+        );
+        let info = adapter.get_info().unwrap();
+        assert_eq!(info.entry_count, 2);
+        assert_eq!(info.total_size_bytes, 5);
+
+        let cleared = adapter.clear().unwrap();
+        assert_eq!(cleared.entries_removed, 2);
+        assert!(!adapter.get_cache_dir().join("local.wav").exists());
+        assert!(!adapter.get_cache_dir().join("legacy.mp3").exists());
+
+        let _ = fs::remove_dir_all(&cache_dir);
     }
 
     #[test]

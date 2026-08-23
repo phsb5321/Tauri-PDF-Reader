@@ -67,6 +67,8 @@ export interface E2ENativeRead {
   playbackState: () => string;
   /** Whether this lane launched with a TTS key (fixture-initialized). */
   hasKey: () => boolean;
+  /** Active TTS provider from native config/session state. */
+  provider: () => string;
   /** Real document-store current page (read-only page oracle). */
   currentPage: () => number;
   /** Store-side highlights array (read-only; the load-path oracle). */
@@ -91,9 +93,13 @@ export interface E2ENativeRead {
   logs: () => string[];
 }
 
-/** The two-sided TTS signal lane: `"fixture"` (default) or `"none"` (no key). */
-const TTS_LANE: "fixture" | "none" =
-  import.meta.env.VITE_E2E_NATIVE_TTS === "none" ? "none" : "fixture";
+/** TTS lane: timestamp fixture, no provider, or real local HTTP provider. */
+const TTS_LANE: "fixture" | "none" | "local" =
+  import.meta.env.VITE_E2E_NATIVE_TTS === "none"
+    ? "none"
+    : import.meta.env.VITE_E2E_NATIVE_TTS === "local"
+      ? "local"
+      : "fixture";
 
 /** Home-profile seeding: unset (native-play lane), `"single"` or `"dual"`. */
 const SEED_LANE: string | undefined = import.meta.env.VITE_E2E_NATIVE_SEED;
@@ -208,6 +214,7 @@ export async function installE2ENativeBootstrap(): Promise<void> {
     wordCount: () => useTtsHighlightStore.getState().wordTimings.length,
     playbackState: () => useAiTtsStore.getState().playbackState,
     hasKey: () => useAiTtsStore.getState().apiKey !== null,
+    provider: () => useAiTtsStore.getState().provider,
     currentPage: () => useDocumentStore.getState().currentPage,
     storeHighlights: () => useDocumentStore.getState().highlights,
     storeError: () => useDocumentStore.getState().error,

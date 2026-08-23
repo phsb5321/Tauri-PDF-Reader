@@ -1,0 +1,78 @@
+/* global browser, $, expect */
+
+describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
+  it("plays through the configured local provider with no key or fake marks", async () => {
+    await browser.waitUntil(
+      async () =>
+        browser.execute(
+          () => !!(window.__E2E_READ__ && window.__E2E_READ__.ready),
+        ),
+      { timeout: 40000, timeoutMsg: "native bootstrap never became ready" },
+    );
+    await browser.setWindowSize(1200, 800);
+    await browser.keys(["Control", "l"]);
+
+    await browser.waitUntil(
+      async () =>
+        browser.execute(() => {
+          const spans = document.querySelectorAll(
+            ".textLayer span, [class*='textLayer'] span, [class*='text-layer'] span",
+          );
+          return Array.from(spans).some((span) =>
+            /alpha|lectrice|fixture/i.test(span.textContent || ""),
+          );
+        }),
+      { timeout: 30000, timeoutMsg: "fixture PDF text never rendered" },
+    );
+
+    await browser.waitUntil(
+      async () =>
+        browser.execute(
+          () =>
+            window.__E2E_READ__.provider() === "local" &&
+            window.__E2E_READ__.hasKey() === false,
+        ),
+      { timeout: 15000, timeoutMsg: "local provider did not initialize keylessly" },
+    );
+
+    const play = await $(".ai-playback-button");
+    await play.waitForExist({ timeout: 15000 });
+    await play.waitForEnabled({ timeout: 15000 });
+    await play.waitForClickable({ timeout: 15000 });
+    expect(await browser.execute(() => window.__E2E_READ__.wordCount())).toBe(0);
+    expect(await browser.execute(() => window.__E2E_READ__.isActive())).toBe(false);
+
+    await browser.execute(() =>
+      document.querySelector(".ai-playback-button").click(),
+    );
+
+    await browser.waitUntil(
+      async () => {
+        const response = await fetch("http://127.0.0.1:5301/requests");
+        const body = await response.json();
+        return body.requests.length === 1;
+      },
+      { timeout: 15000, timeoutMsg: "local fixture received no synthesis request" },
+    );
+    const receipt = await fetch("http://127.0.0.1:5301/requests").then((r) =>
+      r.json(),
+    );
+    expect(receipt.requests[0].body.voice).toBe("F1-pt");
+    expect(receipt.requests[0].body.input).toMatch(/alpha|lectrice|fixture/i);
+    expect(receipt.requests[0].idempotencyKey).toMatch(/^[0-9a-f]{64}$/);
+
+    expect(await browser.execute(() => window.__E2E_READ__.wordCount())).toBe(0);
+    expect(await browser.execute(() => window.__E2E_READ__.isActive())).toBe(false);
+    expect(
+      await browser.execute(() =>
+        document.querySelector(".ai-playback-progress") === null,
+      ),
+    ).toBe(true);
+
+    await browser.waitUntil(
+      async () =>
+        browser.execute(() => window.__E2E_READ__.playbackState() === "idle"),
+      { timeout: 15000, timeoutMsg: "WAV sink did not finish back at idle" },
+    );
+  });
+});

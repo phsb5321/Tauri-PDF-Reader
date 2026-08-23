@@ -103,6 +103,31 @@ describe("AiTtsSettings session-secret setup", () => {
     expect(mocks.onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("shows the local destination without an ElevenLabs key field", async () => {
+    mocks.useAiTts.mockReturnValue({
+      initialized: true,
+      apiKey: null,
+      needsApiKey: false,
+      initialize: mocks.initialize,
+      error: null,
+      initError: null,
+      provider: "local",
+      localUrl: "http://127.0.0.1:5301",
+      supportsWordTimings: false,
+    });
+
+    await act(async () => {
+      render(<AiTtsSettings onClose={mocks.onClose} />);
+    });
+
+    expect(screen.getByText("Local TTS")).toBeVisible();
+    expect(screen.getByText("http://127.0.0.1:5301")).toBeVisible();
+    expect(
+      screen.queryByLabelText("ElevenLabs API Key"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/word highlighting is unavailable/i)).toBeVisible();
+  });
+
   it("prioritizes the pending label during duplicate Update submissions", async () => {
     let resolveInitialize!: () => void;
     mocks.initialize.mockReturnValue(

@@ -8,6 +8,12 @@
 #![allow(dead_code)]
 
 use super::{TtsProvider, VoiceInfo};
+pub use crate::ports::synthesizer::WordTiming;
+use crate::ports::{
+    AudioMediaType, SynthesisProvider, SynthesisRequest, SynthesisResult, SynthesisVoice,
+    SynthesizerPort,
+};
+use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::error::Error as StdError;
@@ -91,17 +97,6 @@ struct AlignmentData {
     characters: Vec<String>,
     character_start_times_seconds: Vec<f64>,
     character_end_times_seconds: Vec<f64>,
-}
-
-/// Word timing information for highlighting
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct WordTiming {
-    pub word: String,
-    pub start_time: f64,
-    pub end_time: f64,
-    pub char_start: usize,
-    pub char_end: usize,
 }
 
 /// TTS result with audio and word timings
@@ -553,6 +548,74 @@ impl ElevenLabsClient {
         );
 
         words
+    }
+}
+
+#[async_trait]
+impl SynthesizerPort for ElevenLabsClient {
+    fn provider(&self) -> SynthesisProvider {
+        SynthesisProvider::ElevenLabs
+    }
+
+    fn provider_revision(&self) -> &str {
+        "eleven_monolingual_v1"
+    }
+
+    fn max_text_utf8_bytes(&self) -> usize {
+        10_000
+    }
+
+    fn supports_word_timings(&self) -> bool {
+        true
+    }
+
+    async fn list_voices(&self) -> Result<Vec<SynthesisVoice>, String> {
+        ElevenLabsClient::list_voices(self).await.map(|voices| {
+            voices
+                .into_iter()
+                .map(|voice| SynthesisVoice {
+                    id: voice.id,
+                    name: voice.name,
+                    language: None,
+                    provider: SynthesisProvider::ElevenLabs,
+                    preview_url: voice.preview_url,
+                    labels: voice.labels,
+                })
+                .collect()
+        })
+    }
+
+    async fn synthesize(&self, request: SynthesisRequest) -> Result<SynthesisResult, String> {
+        if request.with_word_timings {
+            let result = self
+                .text_to_speech_with_timestamps(
+                    &request.text,
+                    &request.voice_id,
+                    Some(self.provider_revision()),
+                )
+                .await?;
+            return Ok(SynthesisResult {
+                audio_data: result.audio_data,
+                media_type: AudioMediaType::Mp3,
+                word_timings: result.word_timings,
+                total_duration: result.total_duration,
+                provider_revision: self.provider_revision().to_string(),
+            });
+        }
+        let audio_data = self
+            .text_to_speech(
+                &request.text,
+                &request.voice_id,
+                Some(self.provider_revision()),
+            )
+            .await?;
+        Ok(SynthesisResult {
+            audio_data,
+            media_type: AudioMediaType::Mp3,
+            word_timings: Vec::new(),
+            total_duration: 0.0,
+            provider_revision: self.provider_revision().to_string(),
+        })
     }
 }
 

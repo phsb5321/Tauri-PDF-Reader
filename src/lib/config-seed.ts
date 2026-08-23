@@ -87,6 +87,10 @@ export async function seedStoresFromConfigFile(): Promise<void> {
 
   useAiTtsStore.setState(
     definedOnly({
+      provider: config.ai_tts?.provider,
+      localUrl: config.ai_tts?.local_url,
+      supportsWordTimings:
+        config.ai_tts?.provider === "local" ? false : undefined,
       selectedVoiceId: config.ai_tts?.voice_id,
       speed: config.ai_tts?.speed,
       autoPageEnabled: config.ai_tts?.auto_page,

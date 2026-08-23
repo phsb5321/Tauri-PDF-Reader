@@ -66,6 +66,11 @@ beforeEach(() => {
   useLibraryStore.getState().reset();
   useCollectionsStore.getState().reset();
   useAiTtsStore.getState().reset();
+  useAiTtsStore.setState({
+    provider: "elevenlabs",
+    localUrl: null,
+    supportsWordTimings: true,
+  });
   loadDocument.mockReset();
   loadDocument.mockResolvedValue({
     numPages: 585,
@@ -105,6 +110,38 @@ async function shelf() {
 }
 
 describe("resume and play", () => {
+  it("uses plain playback for a keyless local provider with no word marks", async () => {
+    useAiTtsStore.setState({
+      provider: "local",
+      localUrl: "http://127.0.0.1:5301",
+      supportsWordTimings: false,
+      apiKey: null,
+      initialized: true,
+      selectedVoiceId: "F1-pt",
+    });
+
+    render(<ReaderView />);
+    const row = await within(await shelf()).findByRole("button", {
+      name: /Resume Moby-Dick and start reading aloud/,
+    });
+    fireEvent.click(row);
+
+    await waitFor(() =>
+      expect(mockInvoke).toHaveBeenCalledWith("ai_tts_speak", {
+        text: "It was the best of times.",
+        voiceId: "F1-pt",
+      }),
+    );
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "ai_tts_speak_with_timestamps",
+      expect.anything(),
+    );
+    expect(useAiTtsStore.getState().playbackState).not.toBe("idle");
+    expect(
+      screen.queryByText(/AI TTS requires an ElevenLabs API key/),
+    ).toBeNull();
+  });
+
   it("opens the document at its saved page AND drives TTS out of idle", async () => {
     // A key is already connected this session (session-only per #73) — the
     // realistic case this action is for.

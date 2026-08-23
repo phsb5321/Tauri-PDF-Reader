@@ -27,8 +27,17 @@ function getSubmitLabel(isSubmitting: boolean, initialized: boolean): string {
 }
 
 export function AiTtsSettings({ onClose }: AiTtsSettingsProps) {
-  const { initialized, apiKey, needsApiKey, initialize, error, initError } =
-    useAiTts();
+  const {
+    initialized,
+    apiKey,
+    needsApiKey,
+    initialize,
+    error,
+    initError,
+    provider,
+    localUrl,
+    supportsWordTimings,
+  } = useAiTts();
   const [inputKey, setInputKey] = useState(apiKey || "");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showKey, setShowKey] = useState(false);
@@ -111,119 +120,148 @@ export function AiTtsSettings({ onClose }: AiTtsSettingsProps) {
         )}
       </div>
 
-      <form
-        onSubmit={handleSubmit}
-        className="ai-tts-settings-form"
-        aria-label="Connect ElevenLabs"
-      >
-        <div className="ai-tts-settings-field">
-          <label htmlFor="api-key">ElevenLabs API Key</label>
-          <div className="ai-tts-settings-input-wrapper">
-            <input
-              id="api-key"
-              type={showKey ? "text" : "password"}
-              value={inputKey}
-              onChange={(e) => setInputKey(e.target.value)}
-              placeholder="Enter your ElevenLabs API key"
-              disabled={isSubmitting}
-              autoComplete="off"
-              aria-describedby="ai-tts-egress-disclosure"
-            />
+      {provider === "local" ? (
+        <div className="ai-tts-settings-form" aria-label="Local TTS status">
+          <div className="ai-tts-settings-field">
+            <h3>Local TTS</h3>
+            <p className="ai-tts-settings-hint">
+              PDF-derived text is sent to this configured destination and not to
+              ElevenLabs.
+            </p>
+            <code>{localUrl}</code>
+            {!supportsWordTimings && (
+              <p className="ai-tts-settings-hint">
+                Word highlighting is unavailable for this voice service;
+                playback remains audio-only.
+              </p>
+            )}
+            {(error || initError) && (
+              <div className="ai-tts-settings-error">{error ?? initError}</div>
+            )}
+            <div className="ai-tts-settings-status">
+              {initialized ? (
+                <span className="ai-tts-status-ok">Connected</span>
+              ) : (
+                <span className="ai-tts-status-warning">Not connected</span>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <form
+          onSubmit={handleSubmit}
+          className="ai-tts-settings-form"
+          aria-label="Connect ElevenLabs"
+        >
+          <div className="ai-tts-settings-field">
+            <label htmlFor="api-key">ElevenLabs API Key</label>
+            <div className="ai-tts-settings-input-wrapper">
+              <input
+                id="api-key"
+                type={showKey ? "text" : "password"}
+                value={inputKey}
+                onChange={(e) => setInputKey(e.target.value)}
+                placeholder="Enter your ElevenLabs API key"
+                disabled={isSubmitting}
+                autoComplete="off"
+                aria-describedby="ai-tts-egress-disclosure"
+              />
+              <button
+                type="button"
+                className="ai-tts-settings-toggle-visibility"
+                onClick={() => setShowKey(!showKey)}
+                title={showKey ? "Hide" : "Show"}
+                aria-label="API key visibility"
+                aria-pressed={showKey}
+              >
+                {showKey ? (
+                  <svg viewBox="0 0 24 24" width="16" height="16">
+                    <path
+                      d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      fill="none"
+                      strokeLinecap="round"
+                    />
+                    <line
+                      x1="1"
+                      y1="1"
+                      x2="23"
+                      y2="23"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" width="16" height="16">
+                    <path
+                      d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      fill="none"
+                    />
+                    <circle
+                      cx="12"
+                      cy="12"
+                      r="3"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      fill="none"
+                    />
+                  </svg>
+                )}
+              </button>
+            </div>
+            <p className="ai-tts-settings-hint">
+              Get your API key from{" "}
+              <a
+                href="https://elevenlabs.io"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                elevenlabs.io
+              </a>
+            </p>
+            <p id="ai-tts-egress-disclosure" className="ai-tts-settings-hint">
+              Requested PDF-derived text leaves this device and is sent to
+              ElevenLabs for speech generation.
+            </p>
+          </div>
+
+          {(error || initError) && (
+            <div className="ai-tts-settings-error">{error ?? initError}</div>
+          )}
+
+          <div className="ai-tts-settings-status">
+            {initialized ? (
+              <span className="ai-tts-status-ok">Connected</span>
+            ) : needsApiKey ? (
+              <span className="ai-tts-status-warning">API key required</span>
+            ) : (
+              <span className="ai-tts-status-pending">Not initialized</span>
+            )}
+          </div>
+
+          <div className="ai-tts-settings-actions">
             <button
               type="button"
-              className="ai-tts-settings-toggle-visibility"
-              onClick={() => setShowKey(!showKey)}
-              title={showKey ? "Hide" : "Show"}
-              aria-label="API key visibility"
-              aria-pressed={showKey}
+              className="ai-tts-settings-btn secondary"
+              onClick={handleClear}
+              disabled={isSubmitting || !inputKey}
             >
-              {showKey ? (
-                <svg viewBox="0 0 24 24" width="16" height="16">
-                  <path
-                    d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    fill="none"
-                    strokeLinecap="round"
-                  />
-                  <line
-                    x1="1"
-                    y1="1"
-                    x2="23"
-                    y2="23"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              ) : (
-                <svg viewBox="0 0 24 24" width="16" height="16">
-                  <path
-                    d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    fill="none"
-                  />
-                  <circle
-                    cx="12"
-                    cy="12"
-                    r="3"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    fill="none"
-                  />
-                </svg>
-              )}
+              Clear API key field
+            </button>
+            <button
+              type="submit"
+              className="ai-tts-settings-btn primary"
+              disabled={isSubmitting || !inputKey.trim()}
+            >
+              {submitLabel}
             </button>
           </div>
-          <p className="ai-tts-settings-hint">
-            Get your API key from{" "}
-            <a
-              href="https://elevenlabs.io"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              elevenlabs.io
-            </a>
-          </p>
-          <p id="ai-tts-egress-disclosure" className="ai-tts-settings-hint">
-            Requested PDF-derived text leaves this device and is sent to
-            ElevenLabs for speech generation.
-          </p>
-        </div>
-
-        {(error || initError) && (
-          <div className="ai-tts-settings-error">{error ?? initError}</div>
-        )}
-
-        <div className="ai-tts-settings-status">
-          {initialized ? (
-            <span className="ai-tts-status-ok">Connected</span>
-          ) : needsApiKey ? (
-            <span className="ai-tts-status-warning">API key required</span>
-          ) : (
-            <span className="ai-tts-status-pending">Not initialized</span>
-          )}
-        </div>
-
-        <div className="ai-tts-settings-actions">
-          <button
-            type="button"
-            className="ai-tts-settings-btn secondary"
-            onClick={handleClear}
-            disabled={isSubmitting || !inputKey}
-          >
-            Clear API key field
-          </button>
-          <button
-            type="submit"
-            className="ai-tts-settings-btn primary"
-            disabled={isSubmitting || !inputKey.trim()}
-          >
-            {submitLabel}
-          </button>
-        </div>
-      </form>
+        </form>
+      )}
 
       {/* Audio Cache Section */}
       <div className="ai-tts-settings-section">

@@ -16,6 +16,7 @@ import {
   onAiTtsResumed,
   onAiTtsError,
 } from "../lib/tauri-invoke";
+import { commands } from "../lib/bindings";
 import { useAiTtsStore } from "../stores/ai-tts-store";
 
 /**
@@ -37,6 +38,7 @@ export function useAiTts() {
         const result = await aiTtsInit(apiKey);
 
         if (result.success) {
+          store.setProviderConfig("elevenlabs", null, true);
           store.setApiKey(apiKey);
           store.setInitialized(true);
 
@@ -68,12 +70,68 @@ export function useAiTts() {
     [store],
   );
 
-  // Auto-initialize if API key exists
-  useEffect(() => {
-    if (store.apiKey && !store.initialized && !initializingRef.current) {
-      initialize(store.apiKey);
+  const initializeLocal = useCallback(async () => {
+    if (initializingRef.current) return;
+    initializingRef.current = true;
+    useAiTtsStore.getState().setPlaybackState("loading");
+    try {
+      const result = await commands.aiTtsInitLocal();
+      if (result.status === "error") throw new Error(result.error);
+      useAiTtsStore
+        .getState()
+        .setProviderConfig(
+          "local",
+          result.data.destination,
+          result.data.supportsWordTimings,
+        );
+      useAiTtsStore.getState().setApiKey(null);
+      useAiTtsStore.getState().setInitialized(true);
+      const voicesResult = await aiTtsListVoices();
+      useAiTtsStore.getState().setVoices(voicesResult.voices);
+      const selected = useAiTtsStore.getState().selectedVoiceId;
+      if (selected) await aiTtsSetVoice(selected);
+      await aiTtsSetSpeed(useAiTtsStore.getState().speed);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      useAiTtsStore.getState().setInitialized(false, message);
+    } finally {
+      initializingRef.current = false;
+      const current = useAiTtsStore.getState();
+      if (current.playbackState === "loading") {
+        current.setPlaybackState("idle");
+      }
     }
-  }, [store.apiKey, store.initialized, initialize]);
+  }, []);
+
+  // Native config selects local mode; cloud mode still initializes only from a
+  // session API key.
+  useEffect(() => {
+    if (
+      store.provider === "local" &&
+      store.localUrl &&
+      !store.initialized &&
+      !store.initError &&
+      !initializingRef.current
+    ) {
+      void initializeLocal();
+    } else if (
+      store.provider === "elevenlabs" &&
+      store.apiKey &&
+      !store.initialized &&
+      !store.initError &&
+      !initializingRef.current
+    ) {
+      void initialize(store.apiKey);
+    }
+  }, [
+    store.provider,
+    store.localUrl,
+    store.apiKey,
+    store.initialized,
+    store.initError,
+    initialize,
+    initializeLocal,
+  ]);
 
   // Subscribe to TTS events
   useEffect(() => {
@@ -98,6 +156,7 @@ export function useAiTts() {
         const unsub2 = await onAiTtsFinished(() => {
           if (mounted) {
             console.debug("[TTS] State transition: -> idle (finished event)");
+            store.markNaturalCompletion();
             store.setPlaybackState("idle");
             store.setCurrentText(null);
           }
@@ -275,13 +334,17 @@ export function useAiTts() {
     currentText: store.currentText,
     error: store.error,
     initError: store.initError,
+    provider: store.provider,
+    localUrl: store.localUrl,
+    supportsWordTimings: store.supportsWordTimings,
     voices: store.voices,
     selectedVoiceId: store.selectedVoiceId,
     speed: store.speed,
-    needsApiKey: !store.apiKey,
+    needsApiKey: store.provider === "elevenlabs" && !store.apiKey,
 
     // Actions
     initialize,
+    initializeLocal,
     speak,
     stop,
     pause,

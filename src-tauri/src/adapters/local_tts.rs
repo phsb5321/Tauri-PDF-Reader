@@ -473,6 +473,7 @@ mod tests {
                 text: "Olá do Lectrice.".to_string(),
                 voice_id: "F1-pt".to_string(),
                 speed: 1.0,
+                with_word_timings: false,
             })
             .await
             .unwrap();
@@ -524,6 +525,7 @@ mod tests {
             text: "Olá".to_string(),
             voice_id: "F1-pt".to_string(),
             speed: 1.0,
+            with_word_timings: false,
         };
         let first = LocalTtsClient::idempotency_key("fixture-1", &request);
         assert_eq!(first.len(), 64);

@@ -1,9 +1,10 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum SynthesisProvider {
+    #[default]
     ElevenLabs,
     Local,
 }
@@ -56,6 +57,7 @@ pub struct SynthesisRequest {
     pub text: String,
     pub voice_id: String,
     pub speed: f32,
+    pub with_word_timings: bool,
 }
 
 #[derive(Debug, Clone)]

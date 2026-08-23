@@ -42,6 +42,7 @@ export function AiPlaybackBar({
     pause,
     resume,
     clearError,
+    supportsWordTimings,
   } = useAiTts();
 
   const {
@@ -56,7 +57,11 @@ export function AiPlaybackBar({
   // T033: Use store for autoPageEnabled (persisted setting)
   const autoPageEnabled = useAiTtsStore((s) => s.autoPageEnabled);
   const setAutoPageEnabled = useAiTtsStore((s) => s.setAutoPageEnabled);
+  const naturalCompletionCount = useAiTtsStore((s) => s.naturalCompletionCount);
   const playingRef = useRef(false);
+  const speakWithHighlightRef = useRef<
+    ((text: string, pageNumber: number) => Promise<boolean>) | null
+  >(null);
 
   // T050: Audio cache coverage for current document
   const documentId = currentDocument?.id ?? null;
@@ -151,7 +156,11 @@ export function AiPlaybackBar({
         if (playingRef.current) {
           const nextText = await getPageText(nextPage);
           if (nextText && playingRef.current) {
-            await speakWithHighlight(nextText, nextPage);
+            if (supportsWordTimings) {
+              await speakWithHighlightRef.current?.(nextText, nextPage);
+            } else {
+              await speak(nextText);
+            }
           } else {
             playingRef.current = false;
           }
@@ -161,7 +170,22 @@ export function AiPlaybackBar({
       console.debug("[AiPlaybackBar] Reached last page, stopping");
       playingRef.current = false;
     }
-  }, [autoPageEnabled, setCurrentPage, getPageText]);
+  }, [
+    autoPageEnabled,
+    setCurrentPage,
+    getPageText,
+    supportsWordTimings,
+    speak,
+  ]);
+
+  // Plain/no-mark providers complete from the real sink-drained event recorded
+  // by the store. Explicit Stop never increments this token.
+  const consumedNaturalCompletion = useRef(naturalCompletionCount);
+  useEffect(() => {
+    if (naturalCompletionCount <= consumedNaturalCompletion.current) return;
+    consumedNaturalCompletion.current = naturalCompletionCount;
+    if (playingRef.current) void handlePlaybackComplete();
+  }, [naturalCompletionCount, handlePlaybackComplete]);
 
   // Word highlighting hook
   const {
@@ -184,11 +208,17 @@ export function AiPlaybackBar({
     onScrollNeeded: scrollToWord,
   });
 
-  // Derived state - use highlight state as primary when highlighting is enabled
-  const isPlaying = enableHighlighting
+  useEffect(() => {
+    speakWithHighlightRef.current = speakWithHighlight;
+  }, [speakWithHighlight]);
+
+  // Providers without marks use ordinary playback state; claiming a karaoke
+  // word in that mode would fabricate precision the service did not publish.
+  const usesWordHighlighting = enableHighlighting && supportsWordTimings;
+  const isPlaying = usesWordHighlighting
     ? isHighlightActive && !isHighlightPaused
     : playbackState === "playing";
-  const isPaused = enableHighlighting
+  const isPaused = usesWordHighlighting
     ? isHighlightPaused
     : playbackState === "paused";
   const isLoading = playbackState === "loading";
@@ -220,7 +250,7 @@ export function AiPlaybackBar({
     if (!canPlay) return;
 
     if (isPaused) {
-      if (enableHighlighting) {
+      if (usesWordHighlighting) {
         await resumeHighlight();
       } else {
         await resume();
@@ -229,7 +259,7 @@ export function AiPlaybackBar({
       playingRef.current = true;
       const text = await getText();
       if (text) {
-        if (enableHighlighting) {
+        if (usesWordHighlighting) {
           await speakWithHighlight(text, currentPage);
         } else {
           await speak(text);
@@ -246,17 +276,17 @@ export function AiPlaybackBar({
     resume,
     speakWithHighlight,
     resumeHighlight,
-    enableHighlighting,
+    usesWordHighlighting,
     currentPage,
   ]);
 
   const handlePause = useCallback(async () => {
-    if (enableHighlighting) {
+    if (usesWordHighlighting) {
       await pauseHighlight();
     } else {
       await pause();
     }
-  }, [pause, pauseHighlight, enableHighlighting]);
+  }, [pause, pauseHighlight, usesWordHighlighting]);
 
   // Resume-and-play: consume each new `autoPlayToken` at most once, tracked
   // by a ref rather than by comparing against the playback state, so a value
@@ -276,12 +306,12 @@ export function AiPlaybackBar({
 
   const handleStop = useCallback(async () => {
     playingRef.current = false;
-    if (enableHighlighting) {
+    if (usesWordHighlighting) {
       await stopHighlight();
     } else {
       await stop();
     }
-  }, [stop, stopHighlight, enableHighlighting]);
+  }, [stop, stopHighlight, usesWordHighlighting]);
 
   // Keyboard shortcuts
   useEffect(() => {
