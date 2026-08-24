@@ -343,10 +343,13 @@ JSON
   if [[ "$variant" == repo-merge-progressed ]]; then
     # This repo squash-merges every PR (AGENTS.md), so main is always linear.
     # A true two-parent merge commit is an unusual topology this oracle must
-    # still tolerate: an unrelated second-parent branch that never touches
-    # RECEIPT_PATH must not be miscounted as a second receipt-touching commit
-    # by git's default pathspec history simplification.
-    git -C "$repo" checkout -q -b unrelated-branch
+    # still tolerate: branch from accepted_sha itself (NOT from R) so the
+    # second-parent side genuinely never contains RECEIPT_PATH. Only then does
+    # git's default pathspec history simplification treat the merge as
+    # touching the path (since one parent side differs), which is the exact
+    # over-count this oracle must not fall for.
+    git -C "$repo" branch -q unrelated-branch "$accepted_sha"
+    git -C "$repo" checkout -q unrelated-branch
     printf 'unrelated branch work\n' >"$repo/docs/unrelated-branch.md"
     git -C "$repo" add -A
     git -C "$repo" commit -q -m "fixture: unrelated branch work"
