@@ -94,9 +94,9 @@ describe("the verify receipt (M2.4)", () => {
   });
 
   it("records failure on the default gate list too (a failed pnpm is a failed gate)", () => {
-    // Shadow `pnpm` with a stub that always fails: the default list's first
-    // gate ("dependencies") dies instantly — no cargo, no minutes. This is
-    // the case that would have shipped a success-only receipt.
+    // Shadow `pnpm` with a stub that always fails, so the default list dies
+    // fast — no cargo, no minutes. This is the case that would have shipped a
+    // success-only receipt.
     const fakeBin = mkdtempSync(join(tmpdir(), "verify-fakebin-"));
     writeFileSync(join(fakeBin, "pnpm"), "#!/bin/sh\nexit 1\n");
     chmodSync(join(fakeBin, "pnpm"), 0o755);
@@ -114,6 +114,17 @@ describe("the verify receipt (M2.4)", () => {
 
     const json = JSON.parse(readFileSync(receipt, "utf8"));
     expect(json.status).toBe("failed");
-    expect(json.failedGate).toBe("dependencies");
+
+    // #155 put `harness-policy` ahead of `dependencies`, so WHICH gate dies
+    // first depends on the working tree: harness-policy counts changed paths,
+    // and a CI checkout carries artefacts a clean `main` does not. Pinning the
+    // name made this test pass on main by accident and fail on branches. The
+    // invariant the default list owes is not a gate name — it is that the
+    // receipt names the gate that failed and stops there.
+    const gates = json.gates as Array<{ gate: string; status: string }>;
+    const failed = gates.filter((g) => g.status === "fail");
+    expect(failed).toHaveLength(1);
+    expect(json.failedGate).toBe(failed[0].gate);
+    expect(gates.at(-1)?.gate).toBe(json.failedGate);
   });
 });
