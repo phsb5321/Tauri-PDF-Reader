@@ -2,6 +2,14 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #76 — 24/08/2026 (niri native-Wayland viewport corruption reproduced and bounded)
+
+- **User-visible failure:** a clean current-main debug build opened on the desktop with the entire library UI compressed into a few pixels. Rebuilding without the stale E2E fixture did not change it, disproving the initial artifact hypothesis.
+- **Measured root cause:** a hermetic, read-only WebDriver probe against the live niri Wayland session reported `devicePixelRatio=-0.010416666977107525`, `innerWidth=-121632`, `innerHeight=-99264`, and `rootFontSize=9000000px`. The same exact binary through XWayland reported DPR `1`, viewport `1267×1034`, root `16px`, and body `14px`. This is GTK/WebKit display geometry corruption, not CSS or library data.
+- **Fix on `174-wayland-scale`:** before Tauri creates GTK state, niri sessions with automatic GTK backend selection and a usable `DISPLAY` are pinned to `GDK_BACKEND=x11`. Niri is recognized by `XDG_CURRENT_DESKTOP` or `NIRI_SOCKET`; explicit X11, explicit Wayland (the diagnostic escape hatch), non-niri desktops, pure X11 sessions, and Wayland sessions without XWayland are unchanged. The narrow fallback is marked for removal when WebKitGTK/wry reports sane native-niri geometry.
+- **Fail-first + acceptance evidence:** the selector test failed `None != Some("x11")` before implementation and passes after it. A rebuilt application launched with the formerly broken `GDK_BACKEND=wayland,x11` input then passed the live read-only geometry oracle at DPR `1`, viewport `1267×1034`, root `16px`, and body `14px`; the oracle rejects non-positive DPR/viewport/root geometry and implausible root text size.
+- **Scope/revert:** one Rust startup path plus this durable receipt; no database, user profile, frontend, dependency, or cross-platform behavior changed. Revert is one PR reverting the eventual squash commit.
+
 ## Iteration #75 — 23/08/2026 (Spec 170 Mac candidate staged, restored bundle retained)
 
 - **Spec 170 is delivery-complete without installation:** the candidate already staged after PR #170 merged was verified in place rather than rebuilt. It is sourced from exact squash `933436c936f93cce455d9d98945f18715e400ece` at `~/Library/Application Support/Lectrice Local TTS/candidates/933436c936f93cce455d9d98945f18715e400ece/Lectrice.app` on Mac.Pro, classified `uninstalled-candidate`, version `0.2.0`, bundle id `com.lectrice.reader`, binary SHA-256 `bf3c134ced3e60dd392a7a640025bd8521159c2be98d94eb9fcc6dd2929764b5`, and passes `codesign --verify --deep --strict`.

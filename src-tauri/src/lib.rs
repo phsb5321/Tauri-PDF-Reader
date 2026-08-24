@@ -468,6 +468,56 @@ fn handle_cli_flags<I: IntoIterator<Item = String>>(args: I) -> bool {
     false
 }
 
+#[cfg(target_os = "linux")]
+fn linux_display_backend_override(
+    current_backend: Option<&str>,
+    current_desktop: Option<&str>,
+    has_niri_socket: bool,
+    has_wayland_display: bool,
+    has_x11_display: bool,
+) -> Option<&'static str> {
+    let is_niri = has_niri_socket
+        || current_desktop.is_some_and(|desktops| {
+            desktops
+                .split(':')
+                .any(|desktop| desktop.trim().eq_ignore_ascii_case("niri"))
+        });
+    let backend_is_automatic = current_backend.is_none_or(|backends| {
+        let backends = backends.trim();
+        backends.is_empty()
+            || (backends
+                .split(',')
+                .any(|backend| backend.trim().eq_ignore_ascii_case("wayland"))
+                && backends
+                    .split(',')
+                    .any(|backend| backend.trim().eq_ignore_ascii_case("x11")))
+    });
+
+    (is_niri && has_wayland_display && has_x11_display && backend_is_automatic).then_some("x11")
+}
+
+#[cfg(target_os = "linux")]
+fn apply_linux_display_backend() {
+    let current_backend = std::env::var("GDK_BACKEND").ok();
+    let current_desktop = std::env::var("XDG_CURRENT_DESKTOP").ok();
+    let has_display = |name| std::env::var_os(name).is_some_and(|value| !value.is_empty());
+
+    if let Some(backend) = linux_display_backend_override(
+        current_backend.as_deref(),
+        current_desktop.as_deref(),
+        has_display("NIRI_SOCKET"),
+        has_display("WAYLAND_DISPLAY"),
+        has_display("DISPLAY"),
+    ) {
+        // ponytail: niri-scoped XWayland fallback; remove when WebKitGTK/wry
+        // reports a positive DPR and viewport on native niri Wayland.
+        std::env::set_var("GDK_BACKEND", backend);
+        tracing::warn!(
+            "Native niri Wayland gives WebKitGTK invalid display geometry; using X11 backend"
+        );
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Fail-closed before ANY state is written (crash flags, sqlite, settings).
@@ -488,6 +538,10 @@ pub fn run() {
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
+
+    // GTK must choose its backend before Tauri creates the first window.
+    #[cfg(target_os = "linux")]
+    apply_linux_display_backend();
 
     // Check for crash from previous startup and enable safe mode if needed (FR-015)
     let crashed_last_time = hw_accel::check_and_handle_crash();
@@ -896,6 +950,49 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn niri_wayland_with_xwayland_selects_x11_backend() {
+        assert_eq!(
+            linux_display_backend_override(Some("wayland,x11"), Some("niri"), false, true, true,),
+            Some("x11")
+        );
+        assert_eq!(
+            linux_display_backend_override(None, None, true, true, true),
+            Some("x11")
+        );
+        assert_eq!(
+            linux_display_backend_override(None, Some("wlroots: niri"), false, true, true),
+            Some("x11")
+        );
+        assert_eq!(
+            linux_display_backend_override(Some("x11"), Some("niri"), false, true, true),
+            None
+        );
+        assert_eq!(
+            linux_display_backend_override(Some("wayland"), Some("niri"), false, true, true),
+            None,
+            "explicit native Wayland remains an operator escape hatch"
+        );
+        assert_eq!(
+            linux_display_backend_override(None, Some("niri"), false, false, true),
+            None
+        );
+        assert_eq!(
+            linux_display_backend_override(None, Some("niri"), false, true, false),
+            None
+        );
+
+        let source = include_str!("lib.rs");
+        let apply = source
+            .find("\n    apply_linux_display_backend();\n")
+            .expect("display backend selection must be called");
+        let builder = source
+            .find("\n    let mut builder = tauri::Builder::default()")
+            .expect("Tauri builder must exist");
+        assert!(apply < builder, "GTK backend selection must precede Tauri");
+    }
 
     /// The real native-menu -> Rust wire: every menu id the SubmenuBuilder
     /// registers must map to its `menu-action` payload, and non-menu ids to None.
