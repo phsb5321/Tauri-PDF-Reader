@@ -29,34 +29,39 @@ function getSubmitLabel(isSubmitting: boolean, initialized: boolean): string {
 function ConnectionStatus({
   initialized,
   needsApiKey,
-}: {
+}: Readonly<{
   initialized: boolean;
   needsApiKey?: boolean;
-}) {
+}>) {
   if (initialized) return <span className="ai-tts-status-ok">Connected</span>;
   if (needsApiKey)
     return <span className="ai-tts-status-warning">API key required</span>;
   return <span className="ai-tts-status-pending">Not initialized</span>;
 }
 
-function SettingsError({ message }: { message?: string | null }) {
-  if (!message) return null;
-  return <div className="ai-tts-settings-error">{message}</div>;
+function SettingsError({
+  error,
+  initError,
+}: Readonly<{ error?: string | null; initError?: string | null }>) {
+  if (!(error || initError)) return null;
+  return <div className="ai-tts-settings-error">{error ?? initError}</div>;
 }
 
 function LocalTtsPanel({
   initialized,
   localUrl,
   supportsWordTimings,
-  errorMessage,
+  error,
+  initError,
   onRetry,
-}: {
+}: Readonly<{
   initialized: boolean;
   localUrl?: string | null;
   supportsWordTimings: boolean;
-  errorMessage?: string | null;
+  error?: string | null;
+  initError?: string | null;
   onRetry: () => void;
-}) {
+}>) {
   return (
     <div className="ai-tts-settings-form" aria-label="Local TTS status">
       <div className="ai-tts-settings-field">
@@ -72,7 +77,7 @@ function LocalTtsPanel({
             remains audio-only.
           </p>
         )}
-        <SettingsError message={errorMessage} />
+        <SettingsError error={error} initError={initError} />
         <div className="ai-tts-settings-status">
           {initialized ? (
             <span className="ai-tts-status-ok">Connected</span>
@@ -94,7 +99,7 @@ function LocalTtsPanel({
   );
 }
 
-function ApiKeyVisibilityIcon({ showKey }: { showKey: boolean }) {
+function ApiKeyVisibilityIcon({ showKey }: Readonly<{ showKey: boolean }>) {
   if (showKey) {
     return (
       <svg viewBox="0 0 24 24" width="16" height="16">
@@ -145,7 +150,8 @@ interface ElevenLabsFormProps {
   isSubmitting: boolean;
   initialized: boolean;
   needsApiKey?: boolean;
-  errorMessage?: string | null;
+  error?: string | null;
+  initError?: string | null;
   submitLabel: string;
   onSubmit: (e: React.FormEvent) => void;
   onClear: () => void;
@@ -159,11 +165,12 @@ function ElevenLabsForm({
   isSubmitting,
   initialized,
   needsApiKey,
-  errorMessage,
+  error,
+  initError,
   submitLabel,
   onSubmit,
   onClear,
-}: ElevenLabsFormProps) {
+}: Readonly<ElevenLabsFormProps>) {
   return (
     <form
       onSubmit={onSubmit}
@@ -210,7 +217,7 @@ function ElevenLabsForm({
         </p>
       </div>
 
-      <SettingsError message={errorMessage} />
+      <SettingsError error={error} initError={initError} />
 
       <div className="ai-tts-settings-status">
         <ConnectionStatus initialized={initialized} needsApiKey={needsApiKey} />
@@ -237,7 +244,9 @@ function ElevenLabsForm({
   );
 }
 
-function CacheStats({ cacheInfo }: { cacheInfo: AiTtsCacheInfo | null }) {
+function CacheStats({
+  cacheInfo,
+}: Readonly<{ cacheInfo: AiTtsCacheInfo | null }>) {
   if (!cacheInfo) return null;
   return (
     <div className="ai-tts-cache-info">
@@ -253,7 +262,7 @@ function CacheStats({ cacheInfo }: { cacheInfo: AiTtsCacheInfo | null }) {
   );
 }
 
-export function AiTtsSettings({ onClose }: AiTtsSettingsProps) {
+export function AiTtsSettings({ onClose }: Readonly<AiTtsSettingsProps>) {
   const {
     initialized,
     apiKey,
@@ -329,8 +338,6 @@ export function AiTtsSettings({ onClose }: AiTtsSettingsProps) {
     void initializeLocal();
   }, [initializeLocal]);
 
-  const errorMessage = error ?? initError;
-
   return (
     <div className="ai-tts-settings">
       <div className="ai-tts-settings-header">
@@ -359,7 +366,8 @@ export function AiTtsSettings({ onClose }: AiTtsSettingsProps) {
           initialized={initialized}
           localUrl={localUrl}
           supportsWordTimings={supportsWordTimings}
-          errorMessage={errorMessage}
+          error={error}
+          initError={initError}
           onRetry={handleRetryLocal}
         />
       ) : (
@@ -371,7 +379,8 @@ export function AiTtsSettings({ onClose }: AiTtsSettingsProps) {
           isSubmitting={isSubmitting}
           initialized={initialized}
           needsApiKey={needsApiKey}
-          errorMessage={errorMessage}
+          error={error}
+          initError={initError}
           submitLabel={submitLabel}
           onSubmit={handleSubmit}
           onClear={handleClear}
