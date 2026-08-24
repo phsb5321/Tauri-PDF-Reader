@@ -98,6 +98,23 @@ make_fixture() {
   git -C "$vault" commit -q -m "fixture: vault state"
   vault_sha="$(git -C "$vault" rev-parse HEAD)"
 
+  if [[ "$variant" == vault-origin-preferred ]]; then
+    local vault_origin="$root/vault-origin.git"
+    git init -q --bare "$vault_origin"
+    git -C "$vault" remote add origin "$vault_origin"
+    git -C "$vault" push -q origin main
+    # Local checkout diverges onto an unrelated orphan history that does NOT
+    # contain vault_sha at all; only origin/main still does. If the oracle
+    # fell back to local HEAD here it would wrongly report E_STATE_STALE.
+    git -C "$vault" checkout -q --orphan local-divergent
+    git -C "$vault" rm -rf -q . >/dev/null
+    printf 'local checkout is stale/unrelated, not the truth\n' >"$vault/local-divergent.txt"
+    git -C "$vault" add -A
+    git -C "$vault" commit -q -m "fixture: local checkout diverged from origin"
+    git -C "$vault" branch -f main local-divergent
+    git -C "$vault" checkout -q main
+  fi
+
   spec_sha="$(git -C "$repo" show "$accepted_sha:specs/079-fleet-alignment-recovery/spec.md" | sha256sum | awk '{print $1}')"
   plan_sha="$(git -C "$repo" show "$accepted_sha:specs/079-fleet-alignment-recovery/plan.md" | sha256sum | awk '{print $1}')"
   tasks_sha="$(git -C "$repo" show "$accepted_sha:specs/079-fleet-alignment-recovery/tasks.md" | sha256sum | awk '{print $1}')"
@@ -323,6 +340,19 @@ JSON
     git -C "$repo" add -A
     git -C "$repo" commit -q -m "fixture: further work merged after acceptance"
   fi
+  if [[ "$variant" == repo-merge-progressed ]]; then
+    # This repo squash-merges every PR (AGENTS.md), so main is always linear.
+    # A true two-parent merge commit is an unusual topology this oracle must
+    # still tolerate: an unrelated second-parent branch that never touches
+    # RECEIPT_PATH must not be miscounted as a second receipt-touching commit
+    # by git's default pathspec history simplification.
+    git -C "$repo" checkout -q -b unrelated-branch
+    printf 'unrelated branch work\n' >"$repo/docs/unrelated-branch.md"
+    git -C "$repo" add -A
+    git -C "$repo" commit -q -m "fixture: unrelated branch work"
+    git -C "$repo" checkout -q main
+    git -C "$repo" merge -q --no-ff unrelated-branch -m "fixture: merge unrelated branch after acceptance"
+  fi
   if [[ "$variant" == receipt-tampered ]]; then
     jq '.generated_at = "2026-08-21T00:00:00-03:00"' "$repo/docs/alignment-recovery-receipt.json" >"$repo/docs/alignment-recovery-receipt.json.tmp"
     mv "$repo/docs/alignment-recovery-receipt.json.tmp" "$repo/docs/alignment-recovery-receipt.json"
@@ -416,8 +446,14 @@ expect_pass vault-progressed
 make_fixture repo-progressed repo-progressed
 expect_pass repo-progressed
 
+make_fixture repo-merge-progressed repo-merge-progressed
+expect_pass repo-merge-progressed
+
 make_fixture receipt-tampered receipt-tampered
 expect_fail receipt-tampered E_RECEIPT_PARENT
+
+make_fixture vault-origin-preferred vault-origin-preferred
+expect_pass vault-origin-preferred
 
 make_fixture spec-missing missing-spec
 expect_fail spec-missing E_SPEC_MISSING

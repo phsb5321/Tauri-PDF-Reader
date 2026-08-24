@@ -329,8 +329,12 @@ if $receipt_shape_valid; then
     ! git -C "$REPO_ROOT" merge-base --is-ancestor "$accepted_sha" HEAD 2>/dev/null; then
     fail E_RECEIPT_PARENT "accepted_main_sha $accepted_sha does not resolve to an ancestor of HEAD $HEAD_SHA"
   else
+    # --first-parent (not --ancestry-path) avoids a git pathspec-simplification
+    # quirk: a merge commit that brings in an unrelated second-parent branch is
+    # otherwise counted as "touching" RECEIPT_PATH even though the mainline
+    # (first-parent) side never changed it, over-counting receipt_commit_count.
     receipt_commits_tmp="$(new_tmp)" || fatal E_TMP "cannot allocate receipt-commit list"
-    git -C "$REPO_ROOT" rev-list --ancestry-path --reverse "$accepted_sha..HEAD" -- "$RECEIPT_PATH" \
+    git -C "$REPO_ROOT" rev-list --first-parent --reverse "$accepted_sha..HEAD" -- "$RECEIPT_PATH" \
       >"$receipt_commits_tmp" 2>/dev/null || true
     receipt_commit_count="$(wc -l <"$receipt_commits_tmp" | tr -d ' ')"
 
@@ -535,12 +539,15 @@ if $receipt_shape_valid; then
           state_failures=$((state_failures + 1))
           continue
         fi
-        # Current regression monitoring trusts the fetched origin/main tip, not a
-        # possibly stale/dirty local checkout HEAD, and only proves the historical
-        # reference is undisturbed (ancestor, unchanged content at that revision,
-        # still present at the current tip). It does not require current content
-        # to still equal the historical snapshot: the SAVE-STATE doc legitimately
-        # keeps evolving after acceptance.
+        # Current regression monitoring prefers the last-known origin/main
+        # remote-tracking ref over a possibly stale/dirty local checkout HEAD
+        # (the oracle does not fetch; a stale remote-tracking ref is a known
+        # limitation of any git-ref-based check, not unique to this one), and
+        # only proves the historical reference is undisturbed (ancestor,
+        # unchanged content at that revision, still present at the current
+        # tip). It does not require current content to still equal the
+        # historical snapshot: the SAVE-STATE doc legitimately keeps evolving
+        # after acceptance.
         if git -C "$VAULT_ROOT" show-ref --verify --quiet refs/remotes/origin/main; then
           current_vault_ref="$(git -C "$VAULT_ROOT" rev-parse origin/main 2>/dev/null)"
         else
