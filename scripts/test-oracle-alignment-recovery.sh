@@ -308,10 +308,26 @@ JSON
     jq '[.[] | select(.seat != "fleet-qa")]' "$root/goals.json" >"$root/goals.tmp"
     mv "$root/goals.tmp" "$root/goals.json"
   fi
-  if [[ "$variant" == stale-state ]]; then
-    printf 'vault drifted\n' >"$vault/1. Projects/Lectrice — Tauri PDF Reader/SAVE-STATE.md"
+  if [[ "$variant" == vault-progressed ]]; then
+    printf 'vault progressed after acceptance\n' >>"$vault/1. Projects/Lectrice — Tauri PDF Reader/SAVE-STATE.md"
     git -C "$vault" add -A
-    git -C "$vault" commit -q -m "fixture: stale vault state"
+    git -C "$vault" commit -q -m "fixture: legitimate vault progress after acceptance"
+  fi
+  if [[ "$variant" == vault-rewritten ]]; then
+    printf 'vault history rewritten\n' >"$vault/1. Projects/Lectrice — Tauri PDF Reader/SAVE-STATE.md"
+    git -C "$vault" add -A
+    git -C "$vault" commit --amend -q -m "fixture: vault history rewritten past the referenced revision"
+  fi
+  if [[ "$variant" == repo-progressed ]]; then
+    printf 'unrelated later work\n' >"$repo/docs/later-work.md"
+    git -C "$repo" add -A
+    git -C "$repo" commit -q -m "fixture: further work merged after acceptance"
+  fi
+  if [[ "$variant" == receipt-tampered ]]; then
+    jq '.generated_at = "2026-08-21T00:00:00-03:00"' "$repo/docs/alignment-recovery-receipt.json" >"$repo/docs/alignment-recovery-receipt.json.tmp"
+    mv "$repo/docs/alignment-recovery-receipt.json.tmp" "$repo/docs/alignment-recovery-receipt.json"
+    git -C "$repo" add -A
+    git -C "$repo" commit -q -m "fixture: receipt touched a second time after R"
   fi
 
   FIXTURE_REPO="$repo"
@@ -391,8 +407,17 @@ expect_fail check-failed E_CHECK
 make_fixture artifact-drift artifact-drift
 expect_fail artifact-drift E_ARTIFACT_HASH
 
-make_fixture state-stale stale-state
-expect_fail state-stale E_STATE_STALE
+make_fixture vault-rewritten vault-rewritten
+expect_fail vault-rewritten E_STATE_STALE
+
+make_fixture vault-progressed vault-progressed
+expect_pass vault-progressed
+
+make_fixture repo-progressed repo-progressed
+expect_pass repo-progressed
+
+make_fixture receipt-tampered receipt-tampered
+expect_fail receipt-tampered E_RECEIPT_PARENT
 
 make_fixture spec-missing missing-spec
 expect_fail spec-missing E_SPEC_MISSING
