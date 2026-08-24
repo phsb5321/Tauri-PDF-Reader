@@ -62,7 +62,8 @@ export function useTtsPrebuffer(
         const text = textContent.items
           .map((item) => ("str" in item ? item.str : ""))
           .join(" ")
-          .replace(/\s+/g, " ")
+          .split(/\s+/)
+          .join(" ")
           .trim();
         return text || null;
       } catch (err) {
