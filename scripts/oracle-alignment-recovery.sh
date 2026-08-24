@@ -319,25 +319,52 @@ fi
 if $receipt_shape_valid; then
   accepted_sha="$(jq -r .accepted_main_sha "$receipt_tmp")"
   declared_parent="$(jq -r .receipt_commit_parent "$receipt_tmp")"
-  parent_line="$(git -C "$REPO_ROOT" rev-list --parents -n 1 HEAD 2>/dev/null)"
-  parent_count=$(($(awk '{print NF}' <<<"$parent_line") - 1))
-  actual_parent="$(awk '{print $2}' <<<"$parent_line")"
 
-  if ((parent_count == 1)) && [[ "$actual_parent" == "$accepted_sha" && "$declared_parent" == "$accepted_sha" ]]; then
-    pass "receipt child R has exactly one parent and R^ = accepted main A"
+  # Historical acceptance is frozen at the receipt-only child R, found by walking
+  # accepted_sha..HEAD for the (exactly one) commit that introduces RECEIPT_PATH.
+  # Current regression monitoring is separate: it only requires HEAD to still be
+  # a descendant of R, so ordinary post-acceptance commits (further merged PRs)
+  # never re-fail an already-accepted historical receipt.
+  if ! git -C "$REPO_ROOT" cat-file -e "$accepted_sha" 2>/dev/null ||
+    ! git -C "$REPO_ROOT" merge-base --is-ancestor "$accepted_sha" HEAD 2>/dev/null; then
+    fail E_RECEIPT_PARENT "accepted_main_sha $accepted_sha does not resolve to an ancestor of HEAD $HEAD_SHA"
   else
-    fail E_RECEIPT_PARENT "parents=$parent_count actual=${actual_parent:-none} accepted=$accepted_sha declared=$declared_parent"
-  fi
+    # --first-parent (not --ancestry-path) avoids a git pathspec-simplification
+    # quirk: a merge commit that brings in an unrelated second-parent branch is
+    # otherwise counted as "touching" RECEIPT_PATH even though the mainline
+    # (first-parent) side never changed it, over-counting receipt_commit_count.
+    receipt_commits_tmp="$(new_tmp)" || fatal E_TMP "cannot allocate receipt-commit list"
+    git -C "$REPO_ROOT" rev-list --first-parent --reverse "$accepted_sha..HEAD" -- "$RECEIPT_PATH" \
+      >"$receipt_commits_tmp" 2>/dev/null || true
+    receipt_commit_count="$(wc -l <"$receipt_commits_tmp" | tr -d ' ')"
 
-  actual_paths="$(new_tmp)" || fatal E_TMP "cannot allocate changed-path list"
-  allowed_paths="$(new_tmp)" || fatal E_TMP "cannot allocate envelope list"
-  git -C "$REPO_ROOT" diff --name-only "$actual_parent..HEAD" 2>/dev/null | LC_ALL=C sort >"$actual_paths"
-  jq -r '.receipt_envelope[]' "$receipt_tmp" | LC_ALL=C sort >"$allowed_paths"
-  if diff -u "$allowed_paths" "$actual_paths" >/dev/null &&
-    ! git -C "$REPO_ROOT" cat-file -e "$actual_parent:$RECEIPT_PATH" 2>/dev/null; then
-    pass "A..R is the one-file receipt envelope and the receipt is new at R"
-  else
-    fail E_RECEIPT_ENVELOPE "A..R differs from receipt_envelope or receipt already existed at A"
+    if ((receipt_commit_count == 0)); then
+      fail E_RECEIPT_PARENT "no commit between accepted main $accepted_sha and HEAD introduces $RECEIPT_PATH"
+    elif ((receipt_commit_count > 1)); then
+      fail E_RECEIPT_PARENT "$RECEIPT_PATH was committed $receipt_commit_count times after accepted main; the receipt is not immutable"
+    else
+      receipt_commit="$(head -n 1 "$receipt_commits_tmp")"
+      parent_line="$(git -C "$REPO_ROOT" rev-list --parents -n 1 "$receipt_commit" 2>/dev/null)"
+      parent_count=$(($(awk '{print NF}' <<<"$parent_line") - 1))
+      actual_parent="$(awk '{print $2}' <<<"$parent_line")"
+
+      if ((parent_count == 1)) && [[ "$actual_parent" == "$accepted_sha" && "$declared_parent" == "$accepted_sha" ]]; then
+        pass "receipt-only child R ($receipt_commit) has exactly one parent and R^ = accepted main A; HEAD may be R or any later descendant"
+      else
+        fail E_RECEIPT_PARENT "parents=$parent_count actual=${actual_parent:-none} accepted=$accepted_sha declared=$declared_parent"
+      fi
+
+      actual_paths="$(new_tmp)" || fatal E_TMP "cannot allocate changed-path list"
+      allowed_paths="$(new_tmp)" || fatal E_TMP "cannot allocate envelope list"
+      git -C "$REPO_ROOT" diff --name-only "$accepted_sha..$receipt_commit" 2>/dev/null | LC_ALL=C sort >"$actual_paths"
+      jq -r '.receipt_envelope[]' "$receipt_tmp" | LC_ALL=C sort >"$allowed_paths"
+      if diff -u "$allowed_paths" "$actual_paths" >/dev/null &&
+        ! git -C "$REPO_ROOT" cat-file -e "$accepted_sha:$RECEIPT_PATH" 2>/dev/null; then
+        pass "A..R is the one-file receipt envelope and the receipt is new at R"
+      else
+        fail E_RECEIPT_ENVELOPE "A..R differs from receipt_envelope or receipt already existed at A"
+      fi
+    fi
   fi
 
   for path in "$SCHEMA_PATH" scripts/oracle-alignment-recovery.sh scripts/test-oracle-alignment-recovery.sh; do
@@ -512,14 +539,26 @@ if $receipt_shape_valid; then
           state_failures=$((state_failures + 1))
           continue
         fi
-        current_vault_head="$(git -C "$VAULT_ROOT" rev-parse HEAD 2>/dev/null)"
+        # Current regression monitoring prefers the last-known origin/main
+        # remote-tracking ref over a possibly stale/dirty local checkout HEAD
+        # (the oracle does not fetch; a stale remote-tracking ref is a known
+        # limitation of any git-ref-based check, not unique to this one), and
+        # only proves the historical reference is undisturbed (ancestor,
+        # unchanged content at that revision, still present at the current
+        # tip). It does not require current content to still equal the
+        # historical snapshot: the SAVE-STATE doc legitimately keeps evolving
+        # after acceptance.
+        if git -C "$VAULT_ROOT" show-ref --verify --quiet refs/remotes/origin/main; then
+          current_vault_ref="$(git -C "$VAULT_ROOT" rev-parse origin/main 2>/dev/null)"
+        else
+          current_vault_ref="$(git -C "$VAULT_ROOT" rev-parse HEAD 2>/dev/null)"
+        fi
         referenced_hash="$(blob_sha256 "$VAULT_ROOT" "$revision" "$path")"
-        current_hash="$(blob_sha256 "$VAULT_ROOT" "$current_vault_head" "$path")"
-        if ! git -C "$VAULT_ROOT" merge-base --is-ancestor "$revision" "$current_vault_head" 2>/dev/null ||
-          [[ "$referenced_hash" != "$expected_hash" || "$current_hash" != "$expected_hash" ]] ||
-          ! git -C "$VAULT_ROOT" diff --quiet -- "$path" ||
-          ! git -C "$VAULT_ROOT" diff --cached --quiet -- "$path"; then
-          fail E_STATE_STALE "vault SAVE-STATE moved, changed, or is dirty after referenced revision $revision"
+        if [[ -z "$current_vault_ref" ]] ||
+          ! git -C "$VAULT_ROOT" merge-base --is-ancestor "$revision" "$current_vault_ref" 2>/dev/null ||
+          [[ "$referenced_hash" != "$expected_hash" ]] ||
+          ! git -C "$VAULT_ROOT" cat-file -e "$current_vault_ref:$path" 2>/dev/null; then
+          fail E_STATE_STALE "vault SAVE-STATE was rewritten past $revision, its historical content changed, or it no longer exists at the current vault reference"
           state_failures=$((state_failures + 1))
         fi
         ;;

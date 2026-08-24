@@ -2,6 +2,15 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #74 — 23/08/2026 (alignment-recovery oracle regression: frozen receipt vs current HEAD, fixed)
+
+- **Root cause:** `scripts/oracle-alignment-recovery.sh` required HEAD to literally be the receipt-only child R (`R^ == accepted_main_sha`) and required the vault SAVE-STATE's current content to byte-match its frozen historical snapshot. PRs #168/#169/#170 merged after Spec 079 acceptance moved HEAD past R and updated the vault doc, so `fleet-intel verify lectrice-alignment-recovery` (already `verified`) went red again on both `E_RECEIPT_PARENT`/`E_RECEIPT_ENVELOPE` and `E_STATE_STALE` — a design flaw, not a real regression: nothing about the accepted contract had actually changed.
+- **Fix (PR #171):** decouples frozen historical acceptance (validated against R, found by walking `accepted_sha..HEAD` for the exactly-one commit introducing the receipt) from current regression monitoring (HEAD only needs to still descend from R). The vault state_ref now prefers the `origin/main` remote-tracking ref over a possibly stale/dirty local `~/Documents/Notes` checkout, and drops requiring current vault content to stay byte-identical to the historical snapshot — the SAVE-STATE doc is expected to keep evolving.
+- **Review:** Codex (different-family) found a real bug in the first pass — git's pathspec history-simplification over-counts an unrelated merge commit as touching the receipt path — fixed with `--first-parent` (this repo squash-merges every PR, so main is always linear anyway) and reproduced with a dedicated fixture (fails under the old logic, passes under the fix). Final round: ALLOW.
+- **Evidence:** `scripts/oracle-alignment-recovery.sh` exits 0 at current main; `scripts/test-oracle-alignment-recovery.sh` is 22/22 (6 new fixtures covering the exact production regression, the merge-commit false-positive, history-rewrite detection, and the origin/main preference path end-to-end).
+- **Out of scope, named not fixed:** `scripts/e2e-real-corpus.sh`'s `LECTRICE_REAL_PDF_CORPUS` prerequisite remains unset on this host (correctly BLOCKED, not skipped-green — no private PDF corpus is provisioned here). The separate `~/Documents/Notes` local vault checkout is genuinely 90+ commits behind `origin/main` with unrelated sibling-agent WIP (COC_BOT) dirty in the same worktree; that is vault-repo maintenance, out of this repository's scope, and is why the fix trusts `origin/main` instead of requiring that local checkout to be synced.
+- **Next:** land PR #171, re-run `fleet-intel verify lectrice-alignment-recovery` to confirm VERIFIED again. No product/user-facing change in this slice.
+
 ## Iteration #73 — 22/08/2026 (packaged matrix repair merged and exact-head green)
 
 - **Merged/verified:** PR #168 squash-merged as `c7cda43db6847bb31642a9b39bb9a1ebf7ec9e88`. Every required PR check passed at reviewed head `b048acb0d20a1b1074b87fe7668e30dcbf69a1a4` (CI, CodeQL, trust anchor, and packaged PR-fast), and manually dispatched full-matrix job `97108248709` passed all eight serial packaged lanes at that same head in run `32604816246`.
