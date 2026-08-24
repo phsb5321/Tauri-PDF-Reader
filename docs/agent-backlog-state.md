@@ -2,6 +2,13 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #75 — 23/08/2026 (Spec 170 Mac candidate staged, restored bundle retained)
+
+- **Spec 170 is delivery-complete without installation:** the candidate already staged after PR #170 merged was verified in place rather than rebuilt. It is sourced from exact squash `933436c936f93cce455d9d98945f18715e400ece` at `~/Library/Application Support/Lectrice Local TTS/candidates/933436c936f93cce455d9d98945f18715e400ece/Lectrice.app` on Mac.Pro, classified `uninstalled-candidate`, version `0.2.0`, bundle id `com.lectrice.reader`, binary SHA-256 `bf3c134ced3e60dd392a7a640025bd8521159c2be98d94eb9fcc6dd2929764b5`, and passes `codesign --verify --deep --strict`.
+- **Prerequisites remain evidence-bound:** PR #170's required checks were green; the Linux packaged public-control journey recorded one local WAV request and zero cloud requests; the retained Mac-origin receipt proves key-only tunnel `com.lectrice.local-tts-tunnel`, bridge `supertonic-1.3.1+proso-bridge.3`, voice `F1-pt`, no credential, and a 5.782 s mono/44.1 kHz WAV with SHA-256 `00c37c3305c12f3c2ad6d44731d5fcc369175ac8f293260b1a4091c926252463`. A fresh health-only check still returned that exact bridge version; the completed sentence synthesis was not repeated.
+- **Installed state is untouched:** both `~/Applications/Lectrice.app` and `/Applications/Lectrice.app` retain binary SHA-256 `f8bea415e6e4f3ceaf02efd22c2a3c9c570cabf3511f88f2a18b9de3049e7ad8`, distinct from the candidate; the running process resolves to the restored home bundle. The candidate receipt keeps installation `blocked` because no safe macOS packaged-app actor exists.
+- **Next:** do not install or replace either restored bundle. A safe public-control macOS actor remains the explicit unblock condition; until then the candidate and tunnel rollback receipt stay retained. No Spec 170 implementation or proof action remains open.
+
 ## Iteration #74 — 23/08/2026 (alignment-recovery oracle regression: frozen receipt vs current HEAD, fixed)
 
 - **Root cause:** `scripts/oracle-alignment-recovery.sh` required HEAD to literally be the receipt-only child R (`R^ == accepted_main_sha`) and required the vault SAVE-STATE's current content to byte-match its frozen historical snapshot. PRs #168/#169/#170 merged after Spec 079 acceptance moved HEAD past R and updated the vault doc, so `fleet-intel verify lectrice-alignment-recovery` (already `verified`) went red again on both `E_RECEIPT_PARENT`/`E_RECEIPT_ENVELOPE` and `E_STATE_STALE` — a design flaw, not a real regression: nothing about the accepted contract had actually changed.
