@@ -61,6 +61,7 @@ jobs:
         uses: pnpm/action-setup@v4
         with:
           version: 10 # package.json has no packageManager field — pin required
+          dest: ${{ runner.temp }}/setup-pnpm-${{ github.run_id }}-${{ github.job }}
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
