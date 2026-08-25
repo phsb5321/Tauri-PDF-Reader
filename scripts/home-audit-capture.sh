@@ -51,6 +51,10 @@ if [ "$SEED" = "cover" ]; then
     > "$APP_DIR/e2e-coverless.pdf"
 fi
 
+# The receipt label must determine the baked seed. Do not inherit a caller's
+# unrelated E2E mode/seed into an audit with a different name.
+unset VITE_E2E VITE_E2E_NATIVE VITE_E2E_NATIVE_TTS VITE_E2E_NATIVE_SEED VITE_E2E_PROFILE_DIR
+
 echo "==> Building frontend (VITE_E2E_NATIVE=true, seed=${SEED_ENV:-<none>})"
 build_env=(VITE_E2E_NATIVE=true VITE_E2E_NATIVE_TTS="$TTS_ENV")
 [ -n "$SEED_ENV" ] && build_env+=(VITE_E2E_NATIVE_SEED="$SEED_ENV")

@@ -37,7 +37,7 @@ export function Toolbar({
   // Roving tabindex for keyboard navigation within the toolbar
   const { getItemProps } = useRovingTabindex({
     containerRef: toolbarRef,
-    itemSelector: "button:not([disabled])",
+    itemSelector: "button.toolbar-roving-item",
     orientation: "horizontal",
     loop: true,
   });
@@ -45,6 +45,7 @@ export function Toolbar({
   const { currentDocument, pdfDocument, isLoading } = useDocumentStore();
 
   const handleOpenFile = async () => {
+    if (isLoading) return;
     // Slice 112: collapse onto the shared useOpenPdf flow — Toolbar kept its
     // own copy of the open logic (dialog -> load -> library upsert -> store)
     // which had already diverged once. One copy now.
@@ -69,7 +70,7 @@ export function Toolbar({
         <div className="toolbar-section toolbar-left">
           <button
             type="button"
-            className="toolbar-button sessions-button"
+            className="toolbar-button toolbar-roving-item sessions-button"
             onClick={() => setIsSessionMenuOpen((open) => !open)}
             title="Reading Sessions"
             aria-pressed={isSessionMenuOpen}
@@ -89,11 +90,11 @@ export function Toolbar({
 
           <button
             type="button"
-            className="toolbar-button open-button"
+            className="toolbar-button toolbar-roving-item open-button"
             onClick={handleOpenFile}
-            disabled={isLoading}
+            aria-disabled={isLoading}
             title="Open PDF file"
-            {...(isLoading ? {} : getItemProps(1))}
+            {...getItemProps(1)}
           >
             <svg
               viewBox="0 0 24 24"
@@ -120,7 +121,7 @@ export function Toolbar({
           {pdfDocument && <ZoomControls />}
           <button
             type="button"
-            className="toolbar-button settings-button"
+            className="toolbar-button toolbar-roving-item settings-button"
             onClick={onSettings}
             title="Settings"
             aria-label="Settings"

@@ -256,6 +256,9 @@ where
     Error: std::fmt::Display,
 {
     let mut restored = 0;
+    // Picker grants are path-based, not content-bound. Restore that same exact
+    // path authority here; the cover pipeline still hashes bytes against the
+    // row identity before it can cache or display a changed file.
     for document in documents {
         if !is_valid_doc_id(&document.id) {
             continue;

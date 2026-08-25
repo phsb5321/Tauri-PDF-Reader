@@ -97,5 +97,10 @@ SQL
     echo "ERROR: missing path was granted" >&2
     exit 1
   fi
+
+  echo "==> phase 3: reader-surface Settings remains reachable"
+  LIBRARY_COMPLETENESS_PHASE=reader \
+    E2E_SPEC=./e2e/library-completeness.e2e.mjs pnpm test:e2e
+
   echo "PASS receipt=$LIBRARY_COMPLETENESS_OUT scope=$SCOPE"
 '

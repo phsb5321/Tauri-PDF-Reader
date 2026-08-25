@@ -43,15 +43,37 @@ describe("packaged legacy library completeness", () => {
       return;
     }
 
-    expect(PHASE).toBe("verify");
+    expect(["verify", "reader"]).toContain(PHASE);
     await browser.waitUntil(
       async () => (await $$(".document-card")).length === 2,
       { timeout: 30000, timeoutMsg: "two legacy cards did not render" },
     );
 
     const real = await cardByTitle(REAL_TITLE);
-    const missing = await cardByTitle(MISSING_TITLE);
     expect(real).not.toBeNull();
+
+    if (PHASE === "reader") {
+      await real.scrollIntoView();
+      await real.$(".document-card-open").doubleClick();
+      const viewer = await $(".pdf-viewer");
+      await viewer.waitForDisplayed({
+        timeout: 30000,
+        timeoutMsg: "legacy book did not open on the reader surface",
+      });
+      const readerSettings = await $('button[aria-label="Settings"]');
+      await readerSettings.waitForClickable({ timeout: 15000 });
+      await readerSettings.click();
+      await $('dialog[aria-labelledby="settings-title"]').waitForDisplayed({
+        timeout: 10000,
+        timeoutMsg: "reader toolbar Settings did not open the dialog",
+      });
+      const receipt = JSON.parse(fs.readFileSync(OUT, "utf8"));
+      receipt.readerSettings = { viewerDisplayed: true, dialogDisplayed: true };
+      fs.writeFileSync(OUT, `${JSON.stringify(receipt, null, 2)}\n`);
+      return;
+    }
+
+    const missing = await cardByTitle(MISSING_TITLE);
     expect(missing).not.toBeNull();
 
     await browser.waitUntil(

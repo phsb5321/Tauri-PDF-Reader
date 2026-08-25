@@ -28,5 +28,9 @@
   "missingCover": {
     "state": "fallback",
     "cardAccessibleName": "Select Missing book control; press Enter or double-click to open"
+  },
+  "readerSettings": {
+    "viewerDisplayed": true,
+    "dialogDisplayed": true
   }
 }

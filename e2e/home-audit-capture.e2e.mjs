@@ -41,23 +41,12 @@ async function clickThemeButton(label) {
 }
 
 async function openSettings() {
-  // Empty library: the empty state's "Open Settings" action.
-  const hasEmptyAction = await browser.execute(() =>
-    [...document.querySelectorAll("button")]
-      .some((b) => b.textContent.trim() === "Open Settings"),
-  );
-  if (hasEmptyAction) {
-    await browser.execute(() =>
-      [...document.querySelectorAll("button")]
-        .find((b) => b.textContent.trim() === "Open Settings")
-        ?.click(),
-    );
-  } else {
-    // Seeded: the resume section's Configure signal.
-    const configure = await $(".resume-section-tts-signal-action");
-    await configure.waitForClickable({ timeout: 15000 });
-    await domClick(".resume-section-tts-signal-action");
-  }
+  const trigger = await $('button[aria-label="Settings"]');
+  await trigger.waitForClickable({
+    timeout: 15000,
+    timeoutMsg: "shared toolbar Settings action is unavailable",
+  });
+  await trigger.click();
   const settings = await $("dialog.settings-backdrop[open]");
   await settings.waitForExist({ timeout: 10000 });
   return settings;
@@ -129,7 +118,10 @@ async function probe() {
       return {
         card: box(card),
         title: box(card.querySelector(".document-card-title")),
-        content: box(card.querySelector(".document-card-content")),
+        content: box(
+          card.querySelector(".document-card-content") ??
+            card.querySelector(".document-card-open"),
+        ),
       };
     });
 
@@ -259,6 +251,21 @@ describe("Home/library audit capture", () => {
     assertCardGeometry(result, "dark-640");
     console.log(`PROBE dark-640 ${JSON.stringify(result)}`);
     await browser.saveScreenshot(`/tmp/lectrice-audit-${SEED}-dark-640.png`);
+
+    // ---- Dark, narrow list: the grid fix must not regress the alternate mode.
+    await domClick('button[aria-label="List view"]');
+    result = await probe();
+    assertCardGeometry(result, "dark-list-640");
+    if (result.cards > 0 && result.gridColumnCount !== 1) {
+      throw new Error(
+        `dark-list-640: expected one list column, got ${result.gridColumnCount}`,
+      );
+    }
+    console.log(`PROBE dark-list-640 ${JSON.stringify(result)}`);
+    await browser.saveScreenshot(
+      `/tmp/lectrice-audit-${SEED}-dark-list-640.png`,
+    );
+    await domClick('button[aria-label="Grid view"]');
 
     // ---- Dark, ultrawide: keep useful title width instead of packing every
     // book into minimally-sized columns. Xvfb is deliberately 2560-wide.

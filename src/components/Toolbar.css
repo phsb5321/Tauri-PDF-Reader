@@ -50,7 +50,7 @@
   transition: all var(--transition-fast);
 }
 
-.toolbar-button:hover:not(:disabled) {
+.toolbar-button:hover:not(:disabled):not([aria-disabled="true"]) {
   background: var(--color-button-bg-hover);
   border-color: var(--color-accent);
 }
@@ -60,11 +60,12 @@
   box-shadow: var(--shadow-focus);
 }
 
-.toolbar-button:active:not(:disabled) {
+.toolbar-button:active:not(:disabled):not([aria-disabled="true"]) {
   transform: scale(0.98);
 }
 
-.toolbar-button:disabled {
+.toolbar-button:disabled,
+.toolbar-button[aria-disabled="true"] {
   opacity: 0.5;
   cursor: not-allowed;
 }

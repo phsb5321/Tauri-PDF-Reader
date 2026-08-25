@@ -54,7 +54,7 @@ As a reader, I can identify every book and its progress in ordinary, narrow, and
 - **FR-004** — Restored authorization MUST be file-specific. Directory, wildcard, parent, sibling, and whole-library-folder grants are forbidden.
 - **FR-005** — An already-allowed path MUST NOT be re-added on each list operation.
 - **FR-006** — Cover generation MUST retain the existing source-size bound, content-hash check, first-page raster policy, cache validation, and deterministic fallback.
-- **FR-007** — Missing, non-PDF, non-regular, unreadable, or changed files MUST NOT gain a grant or suppress their fallback card.
+- **FR-007** — Missing, non-PDF, non-regular, or unreadable files MUST NOT gain a grant. Grants remain path-based like the original picker grant: a file replaced at an already-registered path MAY regain that exact path authorization, but the existing content-hash check MUST keep it on fallback and MUST NOT cache it under the old identity.
 - **FR-008** — Every document card MUST display a non-empty title and expose a non-empty accessible card name in real-cover and fallback states; decorative grid covers MUST NOT duplicate that announcement.
 - **FR-009** — Scope recovery MUST NOT mutate library rows, reading progress, highlights, sessions, or source files.
 - **FR-010** — The restored file grants MUST survive restart through the existing persistence mechanism.
@@ -63,6 +63,7 @@ As a reader, I can identify every book and its progress in ordinary, narrow, and
 - **FR-013** — Every visible grid title, metadata row, and progress indicator MUST remain within its card at 640×800 and 1200×800.
 - **FR-014** — A card’s content block MUST end within one spacing token of the card edge; the grid MUST NOT stretch a single row into a large empty card.
 - **FR-015** — At 2560×1080 the grid MUST cap column width/count so book titles remain useful instead of packing ten minimally sized columns.
+- **FR-016** — List mode MUST remain a single column with each title and content box contained by its row at narrow width.
 
 ## Edge Cases
 
@@ -84,4 +85,4 @@ As a reader, I can identify every book and its progress in ordinary, narrow, and
 - **SC-004** — The persisted scope is absent before launch and present after the readable row is listed; it contains a file-specific grant, not a directory wildcard.
 - **SC-005** — Targeted frontend, Rust, architecture, type, lint, and harness checks remain green without lowering any gate.
 - **SC-006** — The packaged geometry probe fails if any title/content rectangle escapes its card or if dead space exceeds one spacing token.
-- **SC-007** — The same probe at 2560×1080 observes no more than nine bounded grid columns and no horizontal overflow.
+- **SC-007** — The same probe observes one contained list column at narrow width, then at 2560×1080 no more than nine bounded grid columns and no horizontal overflow.

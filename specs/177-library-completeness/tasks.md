@@ -22,7 +22,7 @@
 
 - [x] T010 Make grid rows content-sized and start-aligned; remove the duplicate wrapper aspect-ratio authority.
 - [x] T011 Cap ultrawide grid tracks while preserving internal vertical scrolling, list mode, and no horizontal overflow.
-- [x] T012 Run the geometry lane at 640×800, 1200×800, and 2560×1080 and retain the pre/post probe evidence.
+- [x] T012 Run the grid geometry lane at 640×800, 1200×800, and 2560×1080 plus list mode at 640×800; retain the pre/post probe evidence.
 
 ## Phase 5 — Acceptance and delivery
 
