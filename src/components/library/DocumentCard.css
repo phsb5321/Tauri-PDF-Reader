@@ -157,6 +157,8 @@
 /* List View */
 .document-card--list {
   display: flex;
+  min-width: 0;
+  max-width: 100%;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
@@ -258,6 +260,19 @@
   color: var(--color-error-text);
 }
 
+/* At the real 640px window the shelf leaves ~350px for list rows. Preserve the
+   title and progress—the two reading decisions—and demote duplicated date/page
+   metadata that is already available after opening the book. */
+@media (max-width: 700px) {
+  .document-card--list .document-card-meta {
+    display: none;
+  }
+
+  .document-card--list .document-card-progress {
+    min-width: 72px;
+  }
+}
+
 /* Shared Styles */
 .progress-bar {
   flex: 1;
@@ -348,5 +363,9 @@
 
 /* Slice 146 — click-again confirm state on the delete control. */
 .document-card-delete--confirming {
-  background: color-mix(in srgb, var(--color-accent-alpha) 45%, var(--color-bg-surface));
+  background: color-mix(
+    in srgb,
+    var(--color-accent-alpha) 45%,
+    var(--color-bg-surface)
+  );
 }

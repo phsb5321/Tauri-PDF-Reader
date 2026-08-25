@@ -27,6 +27,7 @@ import { useAutoSave } from "../../hooks/useAutoSave";
 import { onAppCloseRequested, emitAppCloseAck } from "../../lib/api/app-close";
 import { useTtsPrebuffer } from "../../hooks/useTtsPrebuffer";
 import { useOpenPdf } from "../../hooks/useOpenPdf";
+import { usePdfDropSession } from "../../hooks/usePdfDropSession";
 import {
   useHighlightPersistence,
   loadHighlights,
@@ -58,7 +59,10 @@ export function ReaderView() {
     error,
     setError,
   } = useDocumentStore();
-  const { openPdf, resumeDocument } = useOpenPdf();
+  const { openPdf, openDroppedPdf, resumeDocument } = useOpenPdf();
+  const createSession = useSessionStore((state) => state.createSession);
+  const restoreSession = useSessionStore((state) => state.restoreSession);
+  const deleteSession = useSessionStore((state) => state.deleteSession);
 
   // The reading home is the landing surface, so this starts true: a reader with
   // nothing loaded has nothing to show, and the library is where a returning
@@ -66,6 +70,23 @@ export function ReaderView() {
   // `pdfDocument` stays alive behind the home, which is what lets View ->
   // Library go back and forth without re-reading the file or losing the page.
   const [showLibrary, setShowLibrary] = useState(true);
+
+  const handleDroppedSessionCreated = useCallback(() => {
+    setShowLibrary(false);
+  }, []);
+  const {
+    isDragActive,
+    isImporting: isDropImporting,
+    status: dropStatus,
+    dismissStatus: dismissDropStatus,
+  } = usePdfDropSession({
+    openDroppedPdf,
+    createSession,
+    restoreSession,
+    deleteSession,
+    onSessionCreated: handleDroppedSessionCreated,
+    onError: setError,
+  });
 
   // Settings lives at the shell level, not inside `AiPlaybackBar`, precisely
   // because that bar only mounts once a document is open (below). A reader
@@ -336,6 +357,18 @@ export function ReaderView() {
           </button>
         </div>
       )}
+      {dropStatus && (
+        <div
+          className="library-drop-status"
+          role="status"
+          aria-label={dropStatus.message}
+        >
+          <span>{dropStatus.message}</span>
+          <button type="button" onClick={dismissDropStatus}>
+            Dismiss
+          </button>
+        </div>
+      )}
       {/* The reading surface and the highlights panel are SIBLINGS IN A ROW.
           `.app-layout-main` is a flex COLUMN, so mounting the 300px panel
           directly into it made the panel a column item: it stacked underneath
@@ -343,6 +376,27 @@ export function ReaderView() {
           instead of docking. The row wrapper is what makes "beside" possible;
           the panel's own width is meaningless without it. */}
       <div className="reader-surface">
+        {(isDragActive || isDropImporting) && (
+          <div
+            className="pdf-drop-overlay"
+            role="status"
+            aria-label={
+              isDropImporting
+                ? "Creating reading session from dropped PDF"
+                : "Drop one PDF to create a reading session"
+            }
+          >
+            <div className="pdf-drop-overlay__content">
+              <DropPdfIcon />
+              <strong>
+                {isDropImporting
+                  ? "Creating reading session…"
+                  : "Drop PDF to create a reading session"}
+              </strong>
+              {!isDropImporting && <span>One PDF at a time</span>}
+            </div>
+          </div>
+        )}
         {libraryShowing ? (
           <div className="library-surface">
             <LibraryView
@@ -374,5 +428,14 @@ export function ReaderView() {
         onClose={() => setShowSettings(false)}
       />
     </AppLayout>
+  );
+}
+
+function DropPdfIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <path d="M14 2v6h6M12 11v7M9 15l3 3 3-3" />
+    </svg>
   );
 }

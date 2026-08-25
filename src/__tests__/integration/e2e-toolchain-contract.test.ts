@@ -76,6 +76,8 @@ describe("e2e toolchain provisioning (101)", () => {
     expect(toolchain).not.toMatch(/nix-shell\s+-p/);
     expect(toolchain).toContain("E2E_APP_PATH");
     expect(toolchain).toContain("CARGO_TARGET_DIR");
+    expect(toolchain).toContain("--option min-free 0");
+    expect(toolchain).toContain("--option max-free 0");
   });
 
   it("every process observer follows the shared app path", () => {
@@ -91,7 +93,15 @@ describe("e2e toolchain provisioning (101)", () => {
     const flake = readFileSync(FLAKE, "utf8");
     // Deleting any executable used by a lane must fail here and, via the
     // shared entry point, in the packaged matrix.
-    for (const pkg of ["perl", "speechd", "xvfb", "sqlite", "pnpm_10"]) {
+    for (const pkg of [
+      "perl",
+      "speechd",
+      "xvfb",
+      "sqlite",
+      "xdotool",
+      "dragon-drop",
+      "pnpm_10",
+    ]) {
       expect(flake, `flake.nix devShell must declare ${pkg}`).toContain(pkg);
     }
   });

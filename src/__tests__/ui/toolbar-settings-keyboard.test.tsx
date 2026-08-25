@@ -42,7 +42,7 @@ describe("toolbar Settings keyboard reachability", () => {
     render(<Toolbar onSettings={vi.fn()} />);
 
     const sessions = screen.getByRole("button", { name: "Sessions" });
-    const open = screen.getByRole("button", { name: "Open" });
+    const open = screen.getByRole("button", { name: "Open PDF" });
     const settings = screen.getByRole("button", { name: "Settings" });
 
     expect(open).toHaveAttribute("aria-disabled", "true");

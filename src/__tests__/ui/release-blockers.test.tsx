@@ -110,7 +110,7 @@ describe("release blockers (109)", () => {
       await screen.findByRole("heading", { name: "Library" }),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Open" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open PDF" }));
 
     await waitFor(() =>
       expect(screen.getByTestId("pdf-viewer")).toBeInTheDocument(),
@@ -190,7 +190,7 @@ describe("release blockers (109)", () => {
     render(<ReaderView />);
     await screen.findByRole("heading", { name: "Library" });
 
-    fireEvent.click(screen.getByRole("button", { name: "Open" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open PDF" }));
 
     const banner = await screen.findByRole("alert");
     expect(banner).toHaveTextContent(/PDF_INVALID/);

@@ -54,6 +54,10 @@
           # any client close request) — a process kill would prove nothing
           # about CloseRequested.
           xdotool
+          # Drag-session lane (177): one-purpose visible X11 drag source for
+          # the real PDF fixture. Unlike a synthetic DOM/Tauri event, dragon
+          # exercises the same OS file drag a user performs from a file manager.
+          dragon-drop
           # Close-journey lane (125): windowquit's WM_DELETE_WINDOW only
           # reaches the app when a REAL window manager is running — without
           # one the client message never arrives (lane-9: zero CloseRequested

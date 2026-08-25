@@ -44,8 +44,8 @@ body,
 
 body {
   font-family: var(--font-family);
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
   color: var(--text-color);
   background: var(--bg-color);
   -webkit-font-smoothing: antialiased;

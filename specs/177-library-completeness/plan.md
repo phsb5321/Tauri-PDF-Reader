@@ -4,16 +4,16 @@
 
 ## Technical Context
 
-The shared `Toolbar` already owns Sessions and Open, while `ReaderView` already owns and mounts the application-wide `SettingsPanel`; only a visible toolbar callback is missing. Real first-page covers already exist as a lazy, size-bounded, SHA-bound pdf.js pipeline. Legacy library rows fail before that pipeline because `plugin-fs` has no persisted dialog grant; the database still contains ten SHA-identified rows, seven of whose regular PDFs exist and are readable, while the live cache contains zero covers.
+The shared `Toolbar` already owns Sessions and Open, while `ReaderView` already owns and mounts the application-wide `SettingsPanel`; only a visible toolbar callback is missing. Real first-page covers already exist as a lazy, size-bounded, SHA-bound pdf.js pipeline. Legacy library rows fail before that pipeline because `plugin-fs` has no persisted dialog grant. Follow-up evidence on 25/08/2026 also showed WebKitGTK painting the Sort select with a native light face under pale dark-theme text, and the user requested a larger default type scale plus one-step PDF drag-to-session. Tauri 2 already exposes native webview drag/drop events and grants dropped paths to plugin-fs before the frontend event; the existing import flow already binds parsed bytes to the backend document hash, and the existing session store already creates/restores sessions. The missing piece is shell orchestration, not another path-grant API.
 
 ## Constitution Check
 
 - **Hexagonal architecture**: UI only adds a callback to the existing shell-owned Settings state. Native file authorization remains in the library command boundary; cover rendering stays behind the existing cover repository/service.
-- **Typed IPC ratchet**: no new command and no generated-binding edit. Adding injected `AppHandle` to an existing command does not alter its frontend signature.
-- **Test first**: toolbar, scope-selection, and responsive geometry assertions fail before implementation; packaged legacy-profile and multi-width journeys are the user-visible oracles.
-- **Design system**: the Settings action reuses `toolbar-button`, `toolbar-icon`, and existing tokens.
-- **State management**: no new store or transition.
-- **Verification discipline**: the packaged journey drives Settings through its accessible control and distinguishes one real cover from a missing-file fallback. DOM state and persisted narrow scope are the judges, not visual opinion.
+- **Typed IPC ratchet**: no new command and no generated-binding edit. The native Tauri drop pipeline already supplies plugin-fs authority before its event; adding a callable path-grant IPC would broaden the trust boundary unnecessarily.
+- **Test first**: toolbar, scope-selection, responsive geometry, painted control contrast, relative type scale, drop subscription, hash-bound path import, invalid-drop non-mutation, and session activation assertions fail before implementation; packaged legacy-profile, multi-width, and real OS-drag journeys are the user-visible oracles.
+- **Design system**: the Settings action reuses `toolbar-button`, `toolbar-icon`, and existing tokens. Larger typography scales the rem system with a relative root percentage. Form controls and the drop target use semantic colour/spacing/z-index tokens.
+- **State management**: no new store is introduced. Drag completion composes the existing document and session store actions; shell-local hover/busy/status state prevents duplicate drops and remains UI-only.
+- **Verification discipline**: packaged journeys drive Settings and a real file-manager drag through public controls, distinguish one real cover from a missing-file fallback, and measure computed type/contrast plus session state through visible output. DOM/accessibility state, backend rows, and persisted narrow scope are the judges, not visual opinion or a synthetic drop dispatch.
 
 ## Architecture
 
@@ -48,12 +48,29 @@ The shared `Toolbar` already owns Sessions and Open, while `ReaderView` already 
 4. Make grid rows content-sized, keep alignment at the start, and leave one 2:3 sizing authority on `DocumentCover`.
 5. Cap grid tracks while preserving the existing internal vertical scroller and list mode.
 
+### Slice E — Legible native controls and larger relative type
+
+1. Add fail-first source/computed-style assertions for a relative 112.5% root scale and the library's body/control floors.
+2. Disable WebKitGTK's native face on the Sort select, bind its foreground/background/border to semantic tokens, and draw the disclosure indicator in CSS so painted and measured colours agree.
+3. Run the existing packaged contrast sweep in explicit dark and light themes; require Search/Sort foreground/background contrast ≥4.5:1.
+4. Re-run narrow geometry after the type increase; wrapping/scrolling may adapt, clipping and horizontal overflow may not.
+
+### Slice F — Native PDF drop creates an active session
+
+1. Wrap `getCurrentWebview().onDragDropEvent` behind a small file-drop API/hook with cleanup and one in-flight latch. ReaderView owns the public hover target and status/error output.
+2. Factor `useOpenPdf`'s dialog-independent, SHA-bound import body into a path entry point. Tauri's native drop event has already granted plugin-fs access; reject non-PDF paths before reading and do not add an arbitrary-path grant command.
+3. Accept exactly one dropped PDF. After verified import, create and restore a one-document session named from the bounded document title, then reveal the reader. Invalid/multiple drops create no app row/session/document.
+4. Add targeted hook and shell tests plus a packaged journey that uses an actual X11 file-manager window and pointer drag into the app; synthetic event dispatch cannot satisfy the actor gate.
+5. Record the dependency boundary honestly: Tauri/plugin-fs automatically scopes every native drop before emitting it, even an invalid multi-file/directory drop. This behavior already exists with the default handler and needs dependency-level hardening rather than a second application grant surface.
+
 ## Security Decisions
 
 - Database rows identify the files the reader already presents to the WebView. Recovery authorizes only canonical, existing, regular `.pdf` files from returned rows.
 - No directory or glob grant is introduced.
 - Invalid IDs and invalid paths are skipped, not authorized.
 - Scope restoration enables the same frontend read the original dialog grant intended; it does not add a command that returns arbitrary file bytes.
+- No custom drop grant command exists. Tauri/plugin-fs performs native drop authorization before the frontend event; the application accepts only one `.pdf` and performs no further scope mutation.
+- The existing SHA-bound import sequence and backend path canonicalization remain the authority for library identity; native scope authorization alone cannot create a row or session.
 - The existing cover pipeline still verifies source bytes against the row hash before cache write. A changed file may be readable but never becomes a cover under the old identity.
 
 ## Verification Order
@@ -63,11 +80,12 @@ The shared `Toolbar` already owns Sessions and Open, while `ReaderView` already 
 3. Implement Slice A; run targeted frontend tests, typecheck, lint.
 4. Implement Slice B; run targeted Rust tests with `--features test-mocks -j 1`, rustfmt, clippy.
 5. Record the packaged geometry probe failing before Slice D, implement its CSS root fix, then rerun at all three widths.
-6. Run the packaged legacy-profile journey serially.
-7. Run `make harness-check` and `pnpm verify` before commit.
-8. Obtain a different-family exact-head review; repair every BLOCKER/MAJOR.
-9. Push, poll required CI green, squash-merge, and verify the merged state.
+6. Add fail-first typography/Sort-paint and drag-session contracts; implement Slices E/F and run targeted frontend/Rust checks.
+7. Run the packaged legacy-profile, contrast/typography, geometry, and real OS-drag journeys serially.
+8. Run `make harness-check` and `pnpm verify` before commit.
+9. Obtain a different-family exact-head review; repair every BLOCKER/MAJOR.
+10. Push, poll required CI green, squash-merge, and verify the merged state.
 
 ## Rollback
 
-One squash revert removes the visible Settings callback, legacy file-grant restoration, packaged journey, and spec receipt. It does not delete existing persisted grants, cache files, or library data; those remain ordinary user-owned app state.
+One squash revert removes the visible Settings callback, legacy file-grant restoration, responsive/type/control repairs, native drop orchestration, packaged journeys, and spec receipt. It cannot delete sessions or exact-file grants a user already created while the feature was active; those remain ordinary user-owned app state and can be removed through the existing UI/profile controls.

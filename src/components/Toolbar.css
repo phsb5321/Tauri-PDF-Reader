@@ -18,6 +18,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  min-width: 0;
 }
 
 .toolbar-left {
@@ -96,4 +97,24 @@
 .open-button .toolbar-icon {
   fill: var(--color-accent);
   stroke: var(--color-accent);
+}
+
+/* Keep the real 640px window usable even when a loaded document remains behind
+   the library home (page + zoom controls stay mounted). Labels remain in the
+   accessible names above; only their visual duplicates collapse at this size. */
+@media (max-width: 700px) {
+  .toolbar {
+    padding: 0 var(--space-2);
+  }
+
+  .toolbar-button .button-text,
+  .document-title {
+    display: none;
+  }
+
+  .toolbar-button {
+    width: var(--button-height);
+    padding: 0;
+    justify-content: center;
+  }
 }

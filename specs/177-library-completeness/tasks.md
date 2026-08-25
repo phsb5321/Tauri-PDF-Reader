@@ -24,9 +24,25 @@
 - [x] T011 Cap ultrawide grid tracks while preserving internal vertical scrolling, list mode, and no horizontal overflow.
 - [x] T012 Run the grid geometry lane at 640×800, 1200×800, and 2560×1080 plus list mode at 640×800; retain the pre/post probe evidence.
 
-## Phase 5 — Acceptance and delivery
+## Phase 5 — Initial acceptance
 
 - [x] T013 Run targeted frontend tests, typecheck, lint, targeted Rust tests, rustfmt, clippy, and `make harness-check`.
 - [x] T014 Run the packaged legacy-profile journey and retain: Settings dialog open, real card `ready`, missing card `fallback`, non-empty visible/accessibility names, and file-specific persisted scope with no wildcard.
 - [x] T015 Run `pnpm verify`, obtain a different-family exact-head review, and resolve every BLOCKER/MAJOR without weakening tests.
-- [ ] T016 Push the PR, poll every required check green, squash-merge, verify `state=MERGED`, update the durable backlog receipt, and run the fleet done oracle.
+
+## Phase 6 — 25/08 user feedback: legibility and drag-to-session
+
+- [x] T016 Add fail-first source/computed-style tests for a relative 112.5% root scale, enlarged body/control text floors, and a non-native Sort face with semantic foreground/background colours.
+- [x] T017 Repair Search/Sort painted contrast in light and dark WebKitGTK themes; re-run the packaged contrast sweep and 640px geometry after increasing the type scale.
+- [x] T018 Verify against pinned Tauri/plugin-fs source that native drop authorization happens before the frontend event; reject a duplicate arbitrary-path grant command and record the invalid-drop upstream scope limitation.
+- [x] T019 Keep the typed IPC surface unchanged: no new drop grant/byte-read command and no generated-binding delta.
+- [x] T020 Factor the existing hash-bound import flow into a native-authorized dropped-path entry point without weakening known-row progress, fresh-row double-hash, or final-read checks.
+- [x] T021 Add a cleaned-up native drag/drop subscription, one-in-flight latch, visible drop target, readable invalid-drop error, and dismissible session-created status.
+- [x] T022 On one valid drop, create and restore a one-document session named from the bounded verified title, open the book, and prove repeated/invalid drops do not duplicate or mutate.
+- [x] T023 Run targeted frontend tests, typecheck, lint, fuzz seed `20260825`, and `make harness-check` (the final full gate owns rustfmt/clippy; no Rust source changed in this follow-up).
+- [x] T024 Run a packaged real OS file-manager drag through visible controls; retain the drop-target, active-session, exact-scope, reader, negative-control, and anomaly evidence.
+
+## Phase 7 — Final delivery
+
+- [x] T025 Run `pnpm verify`, obtain a different-family exact-head review, and resolve every BLOCKER/MAJOR without weakening tests.
+- [ ] T026 Push the updated PR, merge the prerequisite workflow gate when authorized, poll every required check green, squash-merge, verify `state=MERGED`, update the durable backlog receipt, and run the fleet done oracle.

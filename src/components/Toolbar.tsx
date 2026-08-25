@@ -73,6 +73,7 @@ export function Toolbar({
             className="toolbar-button toolbar-roving-item sessions-button"
             onClick={() => setIsSessionMenuOpen((open) => !open)}
             title="Reading Sessions"
+            aria-label="Sessions"
             aria-pressed={isSessionMenuOpen}
             {...getItemProps(0)}
           >
@@ -93,6 +94,7 @@ export function Toolbar({
             className="toolbar-button toolbar-roving-item open-button"
             onClick={handleOpenFile}
             aria-disabled={isLoading}
+            aria-label="Open PDF"
             title="Open PDF file"
             {...getItemProps(1)}
           >

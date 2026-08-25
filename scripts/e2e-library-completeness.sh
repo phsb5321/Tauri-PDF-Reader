@@ -13,14 +13,16 @@ APP_DIR="$E2E_PROFILE_DIR/com.lectrice.reader"
 SOURCE_DIR="$RUN_ROOT/legacy-source"
 SOURCE="$SOURCE_DIR/legacy-readable.pdf"
 MISSING="$SOURCE_DIR/missing-control.pdf"
+NON_PDF="$SOURCE_DIR/not-a-pdf.txt"
 DB="$APP_DIR/pdf-reader.db"
 SCOPE="$APP_DIR/.persisted-scope"
 export LIBRARY_COMPLETENESS_OUT="${LIBRARY_COMPLETENESS_OUT:-$RUN_ROOT/receipt.json}"
 mkdir -p "$APP_DIR" "$SOURCE_DIR"
 cp public/e2e-fixture.pdf "$SOURCE"
+printf 'invalid drag control\n' > "$NON_PDF"
 REAL_ID="$(sha256sum "$SOURCE" | cut -d' ' -f1)"
 MISSING_ID="$(printf '%s' "$MISSING" | sha256sum | cut -d' ' -f1)"
-export SOURCE SOURCE_DIR MISSING DB SCOPE REAL_ID MISSING_ID
+export SOURCE SOURCE_DIR MISSING NON_PDF DB SCOPE REAL_ID MISSING_ID
 
 # Normal production frontend: no E2E bootstrap, fixture key, or seeded scope.
 unset VITE_E2E VITE_E2E_NATIVE VITE_E2E_NATIVE_TTS VITE_E2E_NATIVE_SEED
@@ -101,6 +103,33 @@ SQL
   echo "==> phase 3: reader-surface Settings remains reachable"
   LIBRARY_COMPLETENESS_PHASE=reader \
     E2E_SPEC=./e2e/library-completeness.e2e.mjs pnpm test:e2e
+
+  echo "==> phase 4: real OS PDF drag creates and activates one session"
+  LIBRARY_COMPLETENESS_PHASE=drop \
+    E2E_SPEC=./e2e/library-completeness.e2e.mjs pnpm test:e2e
+
+  SESSION_COUNT=$(sqlite3 "$DB" "SELECT COUNT(*) FROM reading_sessions;")
+  [ "$SESSION_COUNT" = 1 ] || { echo "ERROR: expected one dropped-PDF session, got $SESSION_COUNT" >&2; exit 1; }
+  MEMBER_COUNT=$(sqlite3 "$DB" "SELECT COUNT(*) FROM session_documents;")
+  [ "$MEMBER_COUNT" = 1 ] || { echo "ERROR: dropped session does not contain exactly one PDF row" >&2; exit 1; }
+
+  # Pinned Tauri/plugin-fs behavior: all native dropped paths are scoped before
+  # the frontend event. The app rejects this invalid drop without a row/session,
+  # but the dependency scope side effect is retained as evidence for issue #184.
+  if grep -aFq "$NON_PDF" "$SCOPE"; then
+    echo "OBSERVED upstream #184: rejected native drop was pre-scoped by plugin-fs"
+  fi
+
+  if [ -n "${LIBRARY_COMPLETENESS_EVIDENCE_DIR:-}" ]; then
+    mkdir -p "$LIBRARY_COMPLETENESS_EVIDENCE_DIR"
+    cp "$RUN_ROOT"/drop-hover.png "$LIBRARY_COMPLETENESS_EVIDENCE_DIR/177-drop-hover.png"
+    cp "$RUN_ROOT"/drop-success.png "$LIBRARY_COMPLETENESS_EVIDENCE_DIR/177-drop-success.png"
+    cp "$RUN_ROOT"/drop-active-session.png "$LIBRARY_COMPLETENESS_EVIDENCE_DIR/177-drop-active-session.png"
+    RECEIPT_DEST="$LIBRARY_COMPLETENESS_EVIDENCE_DIR/177-library-completeness.json"
+    if [ "$(realpath "$LIBRARY_COMPLETENESS_OUT")" != "$(realpath -m "$RECEIPT_DEST")" ]; then
+      cp "$LIBRARY_COMPLETENESS_OUT" "$RECEIPT_DEST"
+    fi
+  fi
 
   echo "PASS receipt=$LIBRARY_COMPLETENESS_OUT scope=$SCOPE"
 '
