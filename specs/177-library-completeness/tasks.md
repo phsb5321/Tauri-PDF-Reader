@@ -28,5 +28,5 @@
 
 - [x] T013 Run targeted frontend tests, typecheck, lint, targeted Rust tests, rustfmt, clippy, and `make harness-check`.
 - [x] T014 Run the packaged legacy-profile journey and retain: Settings dialog open, real card `ready`, missing card `fallback`, non-empty visible/accessibility names, and file-specific persisted scope with no wildcard.
-- [ ] T015 Run `pnpm verify`, obtain a different-family exact-head review, and resolve every BLOCKER/MAJOR without weakening tests.
+- [x] T015 Run `pnpm verify`, obtain a different-family exact-head review, and resolve every BLOCKER/MAJOR without weakening tests.
 - [ ] T016 Push the PR, poll every required check green, squash-merge, verify `state=MERGED`, update the durable backlog receipt, and run the fleet done oracle.
