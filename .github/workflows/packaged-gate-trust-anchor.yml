@@ -36,7 +36,6 @@ jobs:
         uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
         with:
           version: 10
-          dest: ${{ runner.temp }}/setup-pnpm-${{ github.run_id }}-${{ github.job }}
 
       - name: Install dependencies (yaml is an explicit devDependency)
         run: pnpm install --frozen-lockfile

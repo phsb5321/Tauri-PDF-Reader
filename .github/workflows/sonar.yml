@@ -65,7 +65,6 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: 10
-          dest: ${{ runner.temp }}/setup-pnpm-${{ github.run_id }}-${{ github.job }}
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
