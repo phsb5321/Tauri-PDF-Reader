@@ -2,6 +2,14 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #77 — 24/08/2026 (complete library home + responsive card geometry)
+
+- **Branch / issue:** `177-library-completeness`, issue #177, rebased onto merged niri-scale fix `43a8d81`. Returning libraries now expose Settings in the shared toolbar and restore only canonical, existing, regular-PDF file grants before the current bounded cover pipeline runs. Invalid IDs, missing/non-PDF paths, already-allowed files, and per-row grant failures remain isolated; no directory or wildcard grant exists.
+- **Visual root cause fixed:** the grid's definite flex height made CSS Grid stretch auto rows. Three rows were compressed to ~111–181 px and clipped every title/metadata/progress block; one ultrawide row stretched into large dead space. Rows are now start-aligned/content-sized, `DocumentCover` is the sole 2:3 sizing authority, and tracks cap at 260 px. The packaged geometry oracle was RED pre-fix (`title y=892..912` outside card `y=565..676`) and GREEN after at 640×800, 1200×800, and 2560×1080 (1/3/8 columns, zero user-visible horizontal overflow).
+- **Packaged legacy-profile proof:** two phases began with no `.persisted-scope`; the pre-fix replay left the readable card `fallback`. Final replay observed readable=`ready`, missing=`fallback`, both visible titles and named card actions, then persisted the exact readable file only. Receipts: `docs/evidence/177-library-completeness-pre-fix.txt`, `177-library-completeness.json`, and `177-responsive-geometry.json`.
+- **Checks:** targeted frontend 19/19; scope tests 3/3; cover backend 5/5; typecheck; lint 0 errors; rustfmt; clippy `-D warnings`; harness policy; seeded fuzz `20260801` 2/2; full `pnpm verify` all 11 gates (`docs/evidence/177-verify-receipt.json`). Different-family exact-head review and delivery remain before merge.
+- **Live reading/TTS finding:** the real Data Engineering Design Patterns PDF opened, local Supertonic synthesized page 1, cached a 688,172-byte WAV, and natural completion advanced to page 2. The active route is CPU ONNX, not GPU. A bounded Magpie Q6 Vulkan bridge prototype proved the RX 5700 XT path (+562,728,960 VRAM bytes) on a short sentence but the held-out 2,233-character real page triggered a `ggml` assertion and HTTP 500. It was rolled back; `supertonic3-tts-desktop.service` is the safe active provider and the Magpie bridge is inactive. GPU promotion requires server-side chunking plus a >30 s Lectrice local-provider deadline, not relabeling the CPU route.
+
 ## Iteration #76 — 24/08/2026 (niri native-Wayland viewport corruption reproduced and bounded)
 
 - **User-visible failure:** a clean current-main debug build opened on the desktop with the entire library UI compressed into a few pixels. Rebuilding without the stale E2E fixture did not change it, disproving the initial artifact hypothesis.

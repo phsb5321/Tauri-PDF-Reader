@@ -1,0 +1,32 @@
+{
+  "titles": [
+    {
+      "text": "Legacy readable book",
+      "displayed": true,
+      "rect": {
+        "x": 252,
+        "y": 568,
+        "width": 234,
+        "height": 20
+      }
+    },
+    {
+      "text": "Missing book control",
+      "displayed": true,
+      "rect": {
+        "x": 528,
+        "y": 568,
+        "width": 234,
+        "height": 20
+      }
+    }
+  ],
+  "realCover": {
+    "state": "ready",
+    "cardAccessibleName": "Select Legacy readable book; press Enter or double-click to open"
+  },
+  "missingCover": {
+    "state": "fallback",
+    "cardAccessibleName": "Select Missing book control; press Enter or double-click to open"
+  }
+}

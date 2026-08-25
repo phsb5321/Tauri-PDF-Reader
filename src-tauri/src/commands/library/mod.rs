@@ -9,6 +9,7 @@ mod heal;
 
 use crate::commands::cover::remove_covers_for_document;
 use crate::db::models::{Document, FileExistsResponse};
+use crate::domain::cover::is_valid_doc_id;
 use chrono::Utc;
 use db::{compute_file_hash, get_pool, validate_pdf_path};
 use heal::{collect_pdfs, find_by_hash, rank_candidates, search_roots};
@@ -18,6 +19,7 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use tauri::Manager;
 use tauri::{AppHandle, State};
+use tauri_plugin_fs::FsExt;
 use tauri_plugin_sql::DbInstances;
 
 use crate::commands::audio_cache::create_service as create_audio_cache_service;
@@ -243,10 +245,45 @@ pub async fn library_update_document(
     Ok(())
 }
 
+fn restore_library_file_grants<IsAllowed, Allow, Error>(
+    documents: &[Document],
+    is_allowed: IsAllowed,
+    mut allow_file: Allow,
+) -> usize
+where
+    IsAllowed: Fn(&Path) -> bool,
+    Allow: FnMut(&Path) -> Result<(), Error>,
+    Error: std::fmt::Display,
+{
+    let mut restored = 0;
+    for document in documents {
+        if !is_valid_doc_id(&document.id) {
+            continue;
+        }
+        let path = match validate_pdf_path(&document.file_path) {
+            Ok(path) => path,
+            Err(_) => continue,
+        };
+        if is_allowed(&path) {
+            continue;
+        }
+        match allow_file(&path) {
+            Ok(()) => restored += 1,
+            Err(error) => tracing::warn!(
+                "Failed to restore file scope for library document {}: {}",
+                document.id,
+                error
+            ),
+        }
+    }
+    restored
+}
+
 /// List all documents in the library
 #[tauri::command]
 #[specta::specta]
 pub async fn library_list_documents(
+    app: AppHandle,
     db: State<'_, DbInstances>,
     order_by: Option<String>,
     limit: Option<i32>,
@@ -277,6 +314,13 @@ pub async fn library_list_documents(
         .fetch_all(&pool)
         .await
         .map_err(|e| format!("DATABASE_ERROR: {}", e))?;
+
+    let scope = app.fs_scope();
+    restore_library_file_grants(
+        &docs,
+        |path| scope.is_allowed(path),
+        |path| scope.allow_file(path),
+    );
 
     Ok(docs)
 }
@@ -533,6 +577,129 @@ pub async fn library_heal_document(
         .to_string();
 
     library_relocate_document(db, id, new_file_path).await
+}
+
+#[cfg(test)]
+mod legacy_scope_tests {
+    use super::restore_library_file_grants;
+    use crate::db::models::Document;
+    use std::cell::RefCell;
+    use std::fs;
+    use std::path::{Path, PathBuf};
+
+    fn document(id: &str, file_path: &Path) -> Document {
+        Document {
+            id: id.to_string(),
+            file_path: file_path.to_string_lossy().into_owned(),
+            title: Some("Legacy book".to_string()),
+            page_count: Some(1),
+            current_page: 1,
+            scroll_position: 0.0,
+            last_tts_chunk_id: None,
+            last_opened_at: None,
+            file_hash: Some(id.to_string()),
+            created_at: "2026-08-24T18:00:00Z".to_string(),
+        }
+    }
+
+    fn scratch(name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "lectrice-legacy-scope-{}-{name}",
+            std::process::id()
+        ))
+    }
+
+    #[test]
+    fn restores_only_ungranted_regular_pdf_rows() {
+        let root = scratch("candidates");
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        let pdf = root.join("book.pdf");
+        let text = root.join("notes.txt");
+        let missing = root.join("missing.pdf");
+        fs::write(&pdf, b"%PDF-1.7 fixture").unwrap();
+        fs::write(&text, b"not a pdf").unwrap();
+        let valid_id = "a".repeat(64);
+        let rows = vec![
+            document(&valid_id, &pdf),
+            document(&"b".repeat(64), &missing),
+            document(&"c".repeat(64), &text),
+            document("not-a-sha", &pdf),
+            document(&"d".repeat(64), &root),
+        ];
+        let allowed = RefCell::new(Vec::<PathBuf>::new());
+
+        let restored = restore_library_file_grants(
+            &rows,
+            |_| false,
+            |path| {
+                allowed.borrow_mut().push(path.to_path_buf());
+                Ok::<_, String>(())
+            },
+        );
+
+        assert_eq!(restored, 1);
+        assert_eq!(allowed.into_inner(), vec![fs::canonicalize(&pdf).unwrap()]);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn already_allowed_file_is_not_added_again() {
+        let root = scratch("already-allowed");
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        let pdf = root.join("book.pdf");
+        fs::write(&pdf, b"%PDF-1.7 fixture").unwrap();
+        let rows = vec![document(&"a".repeat(64), &pdf)];
+        let allow_calls = RefCell::new(0usize);
+
+        let restored = restore_library_file_grants(
+            &rows,
+            |_| true,
+            |_| {
+                *allow_calls.borrow_mut() += 1;
+                Ok::<_, String>(())
+            },
+        );
+
+        assert_eq!(restored, 0);
+        assert_eq!(*allow_calls.borrow(), 0);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn one_scope_failure_does_not_block_later_documents() {
+        let root = scratch("partial-failure");
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        let first = root.join("first.pdf");
+        let second = root.join("second.pdf");
+        fs::write(&first, b"%PDF-1.7 first").unwrap();
+        fs::write(&second, b"%PDF-1.7 second").unwrap();
+        let rows = vec![
+            document(&"a".repeat(64), &first),
+            document(&"b".repeat(64), &second),
+        ];
+        let attempts = RefCell::new(Vec::<PathBuf>::new());
+
+        let restored = restore_library_file_grants(
+            &rows,
+            |_| false,
+            |path| {
+                let mut attempted = attempts.borrow_mut();
+                attempted.push(path.to_path_buf());
+                if attempted.len() == 1 {
+                    Err("first grant failed")
+                } else {
+                    Ok(())
+                }
+            },
+        );
+
+        assert_eq!(restored, 1);
+        assert_eq!(attempts.borrow().len(), 2);
+        let _ = fs::remove_dir_all(root);
+    }
 }
 
 #[cfg(test)]

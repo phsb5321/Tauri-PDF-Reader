@@ -1,0 +1,284 @@
+{
+  "observedAtBrt": "24/08/2026 21:59",
+  "preFix": {
+    "exitCode": 1,
+    "failure": "light-1200: card 0 title escapes card ({\"title\":{\"x\":253,\"right\":437,\"w\":184,\"y\":892,\"bottom\":912,\"h\":20},\"card\":{\"x\":240,\"right\":450,\"w\":210,\"y\":565,\"bottom\":676,\"h\":111},\"content\":{\"x\":241,\"right\":449,\"w\":208,\"y\":880,\"bottom\":961,\"h\":81}})"
+  },
+  "postFix": {
+    "exitCode": 0,
+    "probes": {
+      "light-1200": {
+        "viewport": {
+          "w": 1152,
+          "h": 768
+        },
+        "cards": 3,
+        "gridColumnCount": 3,
+        "hOverflowPx": 1,
+        "hScroll": false,
+        "cardRects": [
+          {
+            "title": {
+              "x": 253,
+              "right": 487,
+              "w": 234,
+              "y": 966,
+              "bottom": 987,
+              "h": 20
+            },
+            "card": {
+              "x": 240,
+              "right": 500,
+              "w": 260,
+              "y": 565,
+              "bottom": 1037,
+              "h": 471
+            },
+            "content": {
+              "x": 241,
+              "right": 499,
+              "w": 258,
+              "y": 954,
+              "bottom": 1036,
+              "h": 81
+            }
+          },
+          {
+            "title": {
+              "x": 529,
+              "right": 763,
+              "w": 234,
+              "y": 966,
+              "bottom": 987,
+              "h": 20
+            },
+            "card": {
+              "x": 516,
+              "right": 776,
+              "w": 260,
+              "y": 565,
+              "bottom": 1037,
+              "h": 471
+            },
+            "content": {
+              "x": 517,
+              "right": 775,
+              "w": 258,
+              "y": 954,
+              "bottom": 1036,
+              "h": 81
+            }
+          },
+          {
+            "title": {
+              "x": 805,
+              "right": 1039,
+              "w": 234,
+              "y": 966,
+              "bottom": 987,
+              "h": 20
+            },
+            "card": {
+              "x": 792,
+              "right": 1052,
+              "w": 260,
+              "y": 565,
+              "bottom": 1037,
+              "h": 471
+            },
+            "content": {
+              "x": 793,
+              "right": 1051,
+              "w": 258,
+              "y": 954,
+              "bottom": 1036,
+              "h": 81
+            }
+          }
+        ]
+      },
+      "dark-640": {
+        "viewport": {
+          "w": 768,
+          "h": 768
+        },
+        "cards": 3,
+        "gridColumnCount": 1,
+        "hOverflowPx": 1,
+        "hScroll": false,
+        "cardRects": [
+          {
+            "title": {
+              "x": 253,
+              "right": 487,
+              "w": 234,
+              "y": 966,
+              "bottom": 987,
+              "h": 20
+            },
+            "card": {
+              "x": 240,
+              "right": 500,
+              "w": 260,
+              "y": 565,
+              "bottom": 1037,
+              "h": 471
+            },
+            "content": {
+              "x": 241,
+              "right": 499,
+              "w": 258,
+              "y": 954,
+              "bottom": 1036,
+              "h": 81
+            }
+          },
+          {
+            "title": {
+              "x": 253,
+              "right": 487,
+              "w": 234,
+              "y": 1454,
+              "bottom": 1474,
+              "h": 20
+            },
+            "card": {
+              "x": 240,
+              "right": 500,
+              "w": 260,
+              "y": 1053,
+              "bottom": 1524,
+              "h": 471
+            },
+            "content": {
+              "x": 241,
+              "right": 499,
+              "w": 258,
+              "y": 1442,
+              "bottom": 1523,
+              "h": 81
+            }
+          },
+          {
+            "title": {
+              "x": 253,
+              "right": 487,
+              "w": 234,
+              "y": 1941,
+              "bottom": 1961,
+              "h": 20
+            },
+            "card": {
+              "x": 240,
+              "right": 500,
+              "w": 260,
+              "y": 1540,
+              "bottom": 2012,
+              "h": 471
+            },
+            "content": {
+              "x": 241,
+              "right": 499,
+              "w": 258,
+              "y": 1929,
+              "bottom": 2011,
+              "h": 81
+            }
+          }
+        ]
+      },
+      "dark-2560": {
+        "viewport": {
+          "w": 2459,
+          "h": 1037
+        },
+        "cards": 3,
+        "gridColumnCount": 8,
+        "hOverflowPx": 1,
+        "hScroll": false,
+        "cardRects": [
+          {
+            "title": {
+              "x": 253,
+              "right": 487,
+              "w": 234,
+              "y": 966,
+              "bottom": 987,
+              "h": 20
+            },
+            "card": {
+              "x": 240,
+              "right": 500,
+              "w": 260,
+              "y": 565,
+              "bottom": 1037,
+              "h": 471
+            },
+            "content": {
+              "x": 241,
+              "right": 499,
+              "w": 258,
+              "y": 954,
+              "bottom": 1036,
+              "h": 81
+            }
+          },
+          {
+            "title": {
+              "x": 529,
+              "right": 763,
+              "w": 234,
+              "y": 966,
+              "bottom": 987,
+              "h": 20
+            },
+            "card": {
+              "x": 516,
+              "right": 776,
+              "w": 260,
+              "y": 565,
+              "bottom": 1037,
+              "h": 471
+            },
+            "content": {
+              "x": 517,
+              "right": 775,
+              "w": 258,
+              "y": 954,
+              "bottom": 1036,
+              "h": 81
+            }
+          },
+          {
+            "title": {
+              "x": 805,
+              "right": 1039,
+              "w": 234,
+              "y": 966,
+              "bottom": 987,
+              "h": 20
+            },
+            "card": {
+              "x": 792,
+              "right": 1052,
+              "w": 260,
+              "y": 565,
+              "bottom": 1037,
+              "h": 471
+            },
+            "content": {
+              "x": 793,
+              "right": 1051,
+              "w": 258,
+              "y": 954,
+              "bottom": 1036,
+              "h": 81
+            }
+          }
+        ]
+      }
+    },
+    "webdriverio": "1 passing"
+  },
+  "replay": "NIX_CONFIG=$'min-free = 0\\nmax-free = 0' AUDIT_SEED=cover flock /tmp/lectrice-heavy-gate.lock bash scripts/home-audit-capture.sh"
+}

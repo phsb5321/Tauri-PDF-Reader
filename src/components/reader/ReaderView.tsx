@@ -316,6 +316,7 @@ export function ReaderView() {
         <Toolbar
           onSessionRestored={handleSessionRestored}
           onOpen={() => setShowLibrary(false)}
+          onSettings={() => setShowSettings(true)}
         />
       }
       footer={

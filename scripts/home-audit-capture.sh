@@ -66,7 +66,7 @@ toolchain_exec '
   export WEBKIT_DISABLE_COMPOSITING_MODE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1 LIBGL_ALWAYS_SOFTWARE=1
   export GDK_BACKEND=x11
   DISPNUM_FILE=$(mktemp)
-  Xvfb -displayfd 3 -screen 0 1280x1024x24 3>$DISPNUM_FILE >/tmp/lectrice-audit-xvfb.log 2>&1 &
+  Xvfb -displayfd 3 -screen 0 2560x1440x24 3>$DISPNUM_FILE >/tmp/lectrice-audit-xvfb.log 2>&1 &
   XVFB_PID=$!
   trap "kill $XVFB_PID 2>/dev/null || true" EXIT
   for _ in $(seq 1 100); do [ -s $DISPNUM_FILE ] && break; sleep 0.1; done

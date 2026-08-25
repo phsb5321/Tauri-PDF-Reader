@@ -21,11 +21,14 @@ interface ToolbarProps {
    * and the user kept staring at the library).
    */
   onOpen?: () => void;
+  /** Opens the app-wide settings panel owned by the reader shell. */
+  onSettings?: () => void;
 }
 
 export function Toolbar({
   onSessionRestored,
   onOpen,
+  onSettings,
 }: Readonly<ToolbarProps>) {
   const [isSessionMenuOpen, setIsSessionMenuOpen] = useState(false);
   const { openPdf } = useOpenPdf();
@@ -115,6 +118,24 @@ export function Toolbar({
 
         <div className="toolbar-section toolbar-right">
           {pdfDocument && <ZoomControls />}
+          <button
+            type="button"
+            className="toolbar-button settings-button"
+            onClick={onSettings}
+            title="Settings"
+            aria-label="Settings"
+            {...getItemProps(2)}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="toolbar-icon"
+              aria-hidden="true"
+            >
+              <path d="M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z" />
+              <path d="M19.4 15a1.7 1.7 0 00.34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 00-1.88-.34 1.7 1.7 0 00-1.03 1.56V21h-4v-.09A1.7 1.7 0 009 19.35a1.7 1.7 0 00-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 004.63 15a1.7 1.7 0 00-1.56-1.03H3v-4h.09A1.7 1.7 0 004.65 9a1.7 1.7 0 00-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 009 4.63 1.7 1.7 0 0010.03 3.1V3h4v.09A1.7 1.7 0 0015 4.65a1.7 1.7 0 001.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0019.37 9a1.7 1.7 0 001.56 1.03H21v4h-.09A1.7 1.7 0 0019.4 15z" />
+            </svg>
+            <span className="button-text">Settings</span>
+          </button>
         </div>
       </div>
 

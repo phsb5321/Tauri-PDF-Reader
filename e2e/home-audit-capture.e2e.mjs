@@ -113,9 +113,24 @@ async function probe() {
 
     const cardRects = Array.from(
       document.querySelectorAll(".document-card"),
-    ).map((c) => {
-      const r = c.getBoundingClientRect();
-      return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width) };
+    ).map((card) => {
+      const box = (element) => {
+        if (!element) return null;
+        const r = element.getBoundingClientRect();
+        return {
+          x: Math.round(r.x),
+          y: Math.round(r.y),
+          w: Math.round(r.width),
+          h: Math.round(r.height),
+          right: Math.round(r.right),
+          bottom: Math.round(r.bottom),
+        };
+      };
+      return {
+        card: box(card),
+        title: box(card.querySelector(".document-card-title")),
+        content: box(card.querySelector(".document-card-content")),
+      };
     });
 
     const emptyState = (() => {
@@ -142,8 +157,12 @@ async function probe() {
       covers,
       resumeCoverCount,
       gridCols,
+      gridColumnCount: gridCols ? gridCols.split(/\s+/).length : 0,
       emptyState,
-      hScroll: document.documentElement.scrollWidth > window.innerWidth,
+      // WebKitGTK rounds the root box one CSS pixel wider than innerWidth on
+      // this lane. Treat only >1px as actual horizontal overflow.
+      hScroll: document.documentElement.scrollWidth > window.innerWidth + 1,
+      hOverflowPx: document.documentElement.scrollWidth - window.innerWidth,
       vScroll: document.documentElement.scrollHeight > window.innerHeight,
       bodyOverflowX: getComputedStyle(document.body).overflowX,
       scrollW: document.documentElement.scrollWidth,
@@ -158,6 +177,31 @@ async function probe() {
       cardRects,
     };
   });
+}
+
+function assertCardGeometry(result, label) {
+  for (const [index, rects] of result.cardRects.entries()) {
+    const { card, title, content } = rects;
+    if (!card || !title || !content) {
+      throw new Error(`${label}: card ${index} is missing geometry`);
+    }
+    if (title.y < card.y || title.bottom > card.bottom) {
+      throw new Error(
+        `${label}: card ${index} title escapes card (${JSON.stringify(rects)})`,
+      );
+    }
+    if (content.y < card.y || content.bottom > card.bottom) {
+      throw new Error(
+        `${label}: card ${index} content escapes card (${JSON.stringify(rects)})`,
+      );
+    }
+    const deadSpace = card.bottom - content.bottom;
+    if (deadSpace > 24) {
+      throw new Error(
+        `${label}: card ${index} has ${deadSpace}px stretched dead space`,
+      );
+    }
+  }
 }
 
 describe("Home/library audit capture", () => {
@@ -175,7 +219,9 @@ describe("Home/library audit capture", () => {
     await domClick("button.settings-close");
     await settings.waitForExist({ timeout: 5000, reverse: true });
     await waitForTheme("light");
-    console.log(`PROBE light-1200 ${JSON.stringify(await probe())}`);
+    let result = await probe();
+    assertCardGeometry(result, "light-1200");
+    console.log(`PROBE light-1200 ${JSON.stringify(result)}`);
     await browser.saveScreenshot(
       `/tmp/lectrice-audit-${SEED}-light-1200.png`,
     );
@@ -186,7 +232,9 @@ describe("Home/library audit capture", () => {
     await domClick("button.settings-close");
     await settings.waitForExist({ timeout: 5000, reverse: true });
     await waitForTheme("dark");
-    console.log(`PROBE dark-1200 ${JSON.stringify(await probe())}`);
+    result = await probe();
+    assertCardGeometry(result, "dark-1200");
+    console.log(`PROBE dark-1200 ${JSON.stringify(result)}`);
     await browser.saveScreenshot(`/tmp/lectrice-audit-${SEED}-dark-1200.png`);
 
     // ---- Light, narrow (640×800) ----
@@ -196,7 +244,9 @@ describe("Home/library audit capture", () => {
     await domClick("button.settings-close");
     await settings.waitForExist({ timeout: 5000, reverse: true });
     await waitForTheme("light");
-    console.log(`PROBE light-640 ${JSON.stringify(await probe())}`);
+    result = await probe();
+    assertCardGeometry(result, "light-640");
+    console.log(`PROBE light-640 ${JSON.stringify(result)}`);
     await browser.saveScreenshot(`/tmp/lectrice-audit-${SEED}-light-640.png`);
 
     // ---- Dark, narrow ----
@@ -205,7 +255,25 @@ describe("Home/library audit capture", () => {
     await domClick("button.settings-close");
     await settings.waitForExist({ timeout: 5000, reverse: true });
     await waitForTheme("dark");
-    console.log(`PROBE dark-640 ${JSON.stringify(await probe())}`);
+    result = await probe();
+    assertCardGeometry(result, "dark-640");
+    console.log(`PROBE dark-640 ${JSON.stringify(result)}`);
     await browser.saveScreenshot(`/tmp/lectrice-audit-${SEED}-dark-640.png`);
+
+    // ---- Dark, ultrawide: keep useful title width instead of packing every
+    // book into minimally-sized columns. Xvfb is deliberately 2560-wide.
+    await browser.setWindowSize(2560, 1080);
+    result = await probe();
+    assertCardGeometry(result, "dark-2560");
+    if (result.cards > 0 && result.gridColumnCount > 9) {
+      throw new Error(
+        `dark-2560: ${result.gridColumnCount} columns exceed the readable cap`,
+      );
+    }
+    if (result.hScroll) {
+      throw new Error("dark-2560: library introduced horizontal overflow");
+    }
+    console.log(`PROBE dark-2560 ${JSON.stringify(result)}`);
+    await browser.saveScreenshot(`/tmp/lectrice-audit-${SEED}-dark-2560.png`);
   });
 });

@@ -66,8 +66,6 @@
 
 .document-card--grid .document-card-thumbnail {
   position: relative;
-  aspect-ratio: 2 / 3;
-  height: auto;
   background: var(--bg-tertiary, #f5f5f5);
   display: flex;
   align-items: center;
