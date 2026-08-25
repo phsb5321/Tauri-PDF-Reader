@@ -391,8 +391,7 @@ mod tests {
     use crate::ports::AudioMediaType;
     use std::io::{Read, Write};
     use std::net::TcpListener;
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::sync::{mpsc, Arc, Mutex};
+    use std::sync::{Arc, Mutex};
 
     fn pcm_wav() -> Vec<u8> {
         let sample_rate = 16_000_u32;
@@ -584,19 +583,17 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn timeout_retries_exactly_once_then_fails_locally() {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let base_url = format!("http://{}", listener.local_addr().unwrap());
-        let accepted = Arc::new(AtomicUsize::new(0));
-        let observed = Arc::clone(&accepted);
-        let (release_tx, release_rx) = mpsc::channel();
-        std::thread::spawn(move || {
+        let (accepted_tx, mut accepted_rx) = tokio::sync::mpsc::unbounded_channel();
+        let server = tokio::spawn(async move {
             let mut held = Vec::new();
             for _ in 0..2 {
-                let (stream, _) = listener.accept().unwrap();
-                observed.fetch_add(1, Ordering::SeqCst);
+                let (stream, _) = listener.accept().await.unwrap();
                 held.push(stream);
+                accepted_tx.send(()).unwrap();
             }
-            let _ = release_rx.recv();
+            std::future::pending::<()>().await;
         });
         let client = Client::builder()
             .connect_timeout(Duration::from_secs(1))
@@ -625,16 +622,18 @@ mod tests {
             with_word_timings: false,
         });
         tokio::pin!(future);
+
         assert!(futures::poll!(&mut future).is_pending());
+        assert_eq!(accepted_rx.recv().await, Some(()), "first dispatch");
         tokio::time::advance(Duration::from_secs(1)).await;
-        for _ in 0..10 {
-            tokio::task::yield_now().await;
-        }
+        assert!(futures::poll!(&mut future).is_pending());
+        assert_eq!(accepted_rx.recv().await, Some(()), "one retry");
         tokio::time::advance(Duration::from_secs(1)).await;
+
         let error = future.await.unwrap_err();
         assert!(error.starts_with("LOCAL_TTS_REQUEST:"), "{error}");
-        assert_eq!(accepted.load(Ordering::SeqCst), 2, "one retry only");
-        let _ = release_tx.send(());
+        assert!(accepted_rx.try_recv().is_err(), "no third dispatch");
+        server.abort();
     }
 
     #[test]
