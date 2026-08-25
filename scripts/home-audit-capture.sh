@@ -28,7 +28,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 export TMPDIR=/tmp
-SEED="${AUDIT_SEED:-empty}"
+# Geometry is the default contract, so default to a multi-card profile. The
+# empty-state audit remains available explicitly as AUDIT_SEED=empty.
+SEED="${AUDIT_SEED:-cover}"
 case "$SEED" in
   empty)  TTS_ENV="none"; SEED_ENV="" ;;
   single) TTS_ENV="none"; SEED_ENV="single" ;;
