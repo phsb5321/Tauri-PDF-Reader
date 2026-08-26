@@ -46,7 +46,7 @@ status=$(curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/j
 [ "$status" = 409 ]
 : >"$REQUEST_LOG"
 
-VITE_E2E_NATIVE=true VITE_E2E_NATIVE_TTS=local pnpm build
+CI=true VITE_E2E_NATIVE=true VITE_E2E_NATIVE_TTS=local pnpm build
 touch src-tauri/src/lib.rs
 
 # cpal/rodio needs a real output device contract; ALSA's null PCM consumes the
