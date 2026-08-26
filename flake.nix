@@ -1,18 +1,22 @@
 {
-  description = "Lectrice — Tauri 2 desktop PDF reader devshell (Linux)";
+  description = "Lectrice — local-first desktop PDF reader";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
-    # Linux-only — the package list is the Tauri 2 GTK/webkitgtk desktop chain.
-    # eachDefaultSystem would let `nix flake check --all-systems` evaluate this
-    # on x86_64-darwin and fail (no webkitgtk_4_1 there).
-    flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (system:
-      let
-        pkgs = import nixpkgs { inherit system; };
+  outputs = {
+    self,
+    nixpkgs,
+    flake-utils,
+  }: let
+    linuxOutputs =
+      # Linux-only — the package list is the Tauri 2 GTK/webkitgtk desktop
+      # chain. Keep it separate from Darwin so evaluating the Mac package
+      # never asks nixpkgs for webkitgtk_4_1 on a platform that lacks it.
+      flake-utils.lib.eachSystem ["x86_64-linux" "aarch64-linux"] (system: let
+        pkgs = import nixpkgs {inherit system;};
 
         # Tauri 2 Linux runtime + build deps. Mirrors the upstream
         # `apt install libwebkit2gtk-4.1-dev build-essential libssl-dev
@@ -60,8 +64,7 @@
           # firings). openbox is started by run-close-journey.sh after Xvfb.
           openbox
         ];
-      in
-      rec {
+      in rec {
         # tauri-driver — the WebDriver↔Tauri bridge the packaged e2e lanes
         # drive (wdio.conf.mjs spawns it on port 4444). nixpkgs does NOT ship
         # it, so it is built here from crates.io and PINNED:
@@ -105,13 +108,15 @@
           # rustc + cargo + tauri-driver pin the toolchain to the flake's
           # nixpkgs rev — lanes build with the SAME pinned rust the
           # tauri-driver package uses, never an unpinned host toolchain.
-          packages = [
-            pkgs.nodejs_22
-            pkgs.pnpm_10
-            tauri-driver
-            pkgs.rustc
-            pkgs.cargo
-          ] ++ tauriLinuxDeps;
+          packages =
+            [
+              pkgs.nodejs_22
+              pkgs.pnpm_10
+              tauri-driver
+              pkgs.rustc
+              pkgs.cargo
+            ]
+            ++ tauriLinuxDeps;
 
           # bindgen (used transitively by several -sys crates) needs libclang.
           LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
@@ -136,4 +141,32 @@
 
         packages.tauri-driver = tauri-driver;
       });
+
+    darwinOutputs = flake-utils.lib.eachSystem ["aarch64-darwin"] (system: let
+      pkgs = import nixpkgs {inherit system;};
+      lectrice = import ./nix/lectrice-darwin.nix {
+        inherit pkgs;
+        src = self;
+      };
+    in {
+      packages = {
+        inherit lectrice;
+        default = lectrice;
+      };
+      apps = {
+        manage = {
+          type = "app";
+          program = "${lectrice}/bin/manage-macos-flake.sh";
+          meta.description = "Install, update, inspect, or roll back Lectrice's macOS profile";
+        };
+        verify = {
+          type = "app";
+          program = "${lectrice}/bin/verify-macos-flake.sh";
+          meta.description = "Verify Lectrice's native macOS app bundle";
+        };
+      };
+      checks.default = lectrice;
+    });
+  in
+    nixpkgs.lib.recursiveUpdate linuxOutputs darwinOutputs;
 }

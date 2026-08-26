@@ -9,13 +9,13 @@ Tauri 2.x (React/TypeScript + Rust).
 The name is French for _a person employed to read aloud to someone_ — the app
 is your lectrice. See [`docs/brand/`](docs/brand/) for the full brand system.
 
-> **Version:** 0.2.0, built for **Linux (AppImage + deb)** — published
-> artifacts come from the tagged commit, listed under
-> [Releases](https://github.com/phsb5321/Tauri-PDF-Reader/releases); see
-> [CHANGELOG.md](CHANGELOG.md) and
-> [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md). macOS and Windows are
-> **not yet covered by packaged builds or packaged tests** — see Platform
-> support below.
+> **Version:** 0.2.0. Linux AppImage/deb artifacts come from tagged commits
+> under [Releases](https://github.com/phsb5321/Tauri-PDF-Reader/releases).
+> Apple-silicon macOS has a personal Nix flake channel with exact bundle/launch
+> verification and profile rollback; it is ad-hoc signed, not a public
+> notarized distribution. See [CHANGELOG.md](CHANGELOG.md),
+> [docs/macos-nix.md](docs/macos-nix.md), and
+> [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
 
 ## Features
 
@@ -39,24 +39,18 @@ What is in the tree today, with the receipt that proved it:
 
 ## Platform support
 
-| Platform               | Packaged build         | Packaged E2E                               | Status                    |
-| ---------------------- | ---------------------- | ------------------------------------------ | ------------------------- |
-| Linux (AppImage + deb) | ✓ ([release workflow]) | ✓ (8 packaged E2E specs, WebKitGTK + Xvfb) | **only supported target** |
-| macOS                  | ✗ not published        | ✗ not runnable (see below)                 | builds + launches only    |
-| Windows                | ✗ not produced         | ✗ not run                                  | not yet covered           |
+| Platform               | Package                                  | Packaged journey                            | Status                   |
+| ---------------------- | ---------------------------------------- | ------------------------------------------- | ------------------------ |
+| Linux (AppImage + deb) | ✓ ([release workflow])                   | ✓ (8 specs, WebKitGTK + Xvfb)               | supported release target |
+| macOS (Apple silicon)  | ✓ Nix `packages.aarch64-darwin.lectrice` | bundle identity + real launch/Quartz window | personal Nix channel     |
+| Windows                | ✗ not produced                           | ✗ not run                                   | not yet covered          |
 
-A macOS build has been made and launched by hand (macOS 26.6.1/arm64, bundle
-`0.2.0`), but no macOS journey can be driven: the window exposes no
-accessibility children, the app registers no file association, and
-`tauri-driver` has no macOS support. Details in
+The macOS flake builds a native ad-hoc-signed app from committed Cargo/pnpm
+locks, verifies `com.lectrice.reader`, arm64 architecture, one exact process,
+and a real Quartz window, then installs through a rollback-capable profile.
+It is not Apple notarized and cannot run the Linux `tauri-driver` reader
+matrix; those limits remain explicit in
 [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
-
-There is **no packaged evidence for macOS or Windows** in this repository —
-treat the hand-run macOS build above as exactly that, one manual observation,
-and do not assume a working install there until a published artifact and a
-packaged E2E pass exist for it. The self-hosted release runner is Linux-only.
-The macOS and Windows prerequisites below are the upstream Tauri prerequisites,
-documented for future work, not claims about this app.
 
 ### All Platforms (upstream Tauri prerequisites)
 
@@ -81,12 +75,21 @@ sudo apt install -y \
   librsvg2-dev
 ```
 
-### macOS
+### macOS (Apple silicon, Nix)
 
 ```bash
-# Xcode Command Line Tools (upstream prerequisite; no packaged build yet)
-xcode-select --install
+# One-time install into a dedicated rollback-capable profile.
+nix run github:phsb5321/Tauri-PDF-Reader/main#manage -- install
+
+# Upgrade to the newest protected-main package, or roll back one generation.
+PROFILE="$HOME/.local/state/nix/profiles/lectrice"
+"$PROFILE/bin/manage-macos-flake.sh" update
+"$PROFILE/bin/manage-macos-flake.sh" rollback
 ```
+
+Full installation, update receipt, verification, duplicate-app migration, and
+recovery procedure: [docs/macos-nix.md](docs/macos-nix.md). Building outside
+Nix still requires Xcode Command Line Tools.
 
 ### Windows
 
@@ -141,6 +144,7 @@ Behaviour worth knowing:
   ```
   config.toml:3:8: key `tts.rate`: invalid type: string "fast", expected f64
   ```
+
 - **Out-of-range values are clamped, with a warning**, to the same bounds the
   UI enforces.
 - **Secrets do not belong here.** The ElevenLabs API key is entered at runtime
@@ -166,8 +170,11 @@ pnpm install
 # Start development server
 pnpm tauri dev
 
-# Build production (Linux)
+# Build production directly (Linux)
 pnpm tauri build
+
+# Reproducible Apple-silicon app bundle (run on macOS)
+nix build .#lectrice
 ```
 
 Verification (in this order, to keep this machine responsive):
