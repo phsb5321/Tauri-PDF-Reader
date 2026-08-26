@@ -34,6 +34,9 @@ jobs:
         # code. Creates a deliberate slop diff + asserts the gate fails.
         run: ./tools/test/alignment-gate-negative-control.sh
 
+      - name: System dependency install guard
+        run: ./tools/test/ci-install-system-dependencies.sh
+
   frontend:
     name: Frontend Checks
     runs-on: [self-hosted, Linux, X64, vm103]
@@ -111,10 +114,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libspeechd-dev libasound2-dev libssl-dev pkg-config clang libclang-dev
+      - name: Install missing system dependencies
+        run: ./scripts/ci-install-system-dependencies.sh
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -181,10 +182,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libspeechd-dev libasound2-dev libssl-dev pkg-config clang libclang-dev
+      - name: Install missing system dependencies
+        run: ./scripts/ci-install-system-dependencies.sh
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable

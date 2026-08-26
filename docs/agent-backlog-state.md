@@ -2,6 +2,13 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #77 — 26/08/2026 (shared-runner package mutation contained)
+
+- **Cross-repository failure:** PR #177's Backend job ran an unconditional `apt-get install` on persistent vm103. APT upgraded OpenSSL, the package/needrestart path requested `systemctl daemon-reexec`, and all 17 runner services stopped. DeliCasa/NextClient #429's required mutation gate was canceled at 6716/6720 mutants (97%, about one minute remaining). NixOS #2024 owns the host-wide boundary.
+- **Repository containment:** Backend and Contract jobs now share `scripts/ci-install-system-dependencies.sh`; the release job reuses it with its three extra packages. The helper skips APT when dependencies are already installed, and a missing-package path sends only missing names through `--no-upgrade --no-install-recommends` with `NEEDRESTART_MODE=l`.
+- **Executable guard:** `tools/test/ci-install-system-dependencies.sh` proves the all-present path never invokes sudo, the missing path carries both containment controls, and semantic mutants removing either control are rejected.
+- **Scope:** CI/workflow-only, no application/runtime/data behavior. Workflow merge remains Pedro-gated; revert is one PR reverting the eventual squash commit. Host-wide package provisioning and runner drain policy remain open in NixOS #2024.
+
 ## Iteration #76 — 24/08/2026 (niri native-Wayland viewport corruption reproduced and bounded)
 
 - **User-visible failure:** a clean current-main debug build opened on the desktop with the entire library UI compressed into a few pixels. Rebuilding without the stale E2E fixture did not change it, disproving the initial artifact hypothesis.
