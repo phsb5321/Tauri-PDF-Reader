@@ -212,8 +212,16 @@ export function onAiTtsStarted(
  * real completion signal; the frontend drives completion off it instead of a
  * timer estimate, so it fires correctly even when the audio duration is unknown.
  */
-export function onAiTtsFinished(callback: () => void): Promise<UnlistenFn> {
-  return listen("ai-tts:finished", () => callback());
+export interface AiTtsFinishedEvent {
+  generation: number;
+}
+
+export function onAiTtsFinished(
+  callback: (event: AiTtsFinishedEvent) => void,
+): Promise<UnlistenFn> {
+  return listen<number>("ai-tts:finished", (event) =>
+    callback({ generation: event.payload }),
+  );
 }
 
 export function onAiTtsStopped(callback: () => void): Promise<UnlistenFn> {
@@ -242,6 +250,7 @@ export function onAiTtsError(
  */
 export interface AiTtsPlaybackStartingEvent {
   duration: number;
+  generation: number;
 }
 
 /**

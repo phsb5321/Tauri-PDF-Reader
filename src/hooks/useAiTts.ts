@@ -11,6 +11,7 @@ import {
   aiTtsGetState,
   onAiTtsStarted,
   onAiTtsFinished,
+  onAiTtsPlaybackStarting,
   onAiTtsStopped,
   onAiTtsPaused,
   onAiTtsResumed,
@@ -32,6 +33,7 @@ export function useAiTts() {
       before.setSwitchingProvider(provider);
       before.setPlaybackState("loading");
       before.setCurrentText(null);
+      before.setBackendPlaybackGeneration(null);
       useTtsHighlightStore.getState().stopHighlighting();
 
       try {
@@ -97,7 +99,13 @@ export function useAiTts() {
     (provider: AiTtsProvider, generation: number, error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
       const current = useAiTtsStore.getState();
-      current.setConnectionStatus(provider, "error", { error: message });
+      current.setConnectionStatus(
+        provider,
+        current.connections[provider].status === "connected"
+          ? "connected"
+          : "error",
+        { error: message },
+      );
       if (
         current.isCurrentProviderOperation(generation) &&
         current.provider === provider &&
@@ -232,42 +240,53 @@ export function useAiTts() {
         });
         if (mounted) unsubscribers.push(unsub1);
 
-        const unsub2 = await onAiTtsFinished(() => {
+        const unsub2 = await onAiTtsPlaybackStarting((event) => {
           if (mounted) {
-            console.debug("[TTS] State transition: -> idle (finished event)");
-            store.markNaturalCompletion();
-            store.setPlaybackState("idle");
-            store.setCurrentText(null);
+            useAiTtsStore
+              .getState()
+              .setBackendPlaybackGeneration(event.generation);
           }
         });
         if (mounted) unsubscribers.push(unsub2);
 
-        const unsub3 = await onAiTtsStopped(() => {
-          if (mounted) {
-            console.debug("[TTS] State transition: -> idle (stopped event)");
-            store.setPlaybackState("idle");
-            store.setCurrentText(null);
+        const unsub3 = await onAiTtsFinished((event) => {
+          if (
+            mounted &&
+            typeof event?.generation === "number" &&
+            useAiTtsStore.getState().consumeBackendCompletion(event.generation)
+          ) {
+            console.debug("[TTS] State transition: -> idle (finished event)");
           }
         });
         if (mounted) unsubscribers.push(unsub3);
 
-        const unsub4 = await onAiTtsPaused(() => {
+        const unsub4 = await onAiTtsStopped(() => {
+          if (mounted) {
+            console.debug("[TTS] State transition: -> idle (stopped event)");
+            store.setPlaybackState("idle");
+            store.setCurrentText(null);
+            store.setBackendPlaybackGeneration(null);
+          }
+        });
+        if (mounted) unsubscribers.push(unsub4);
+
+        const unsub5 = await onAiTtsPaused(() => {
           if (mounted) {
             console.debug("[TTS] State transition: -> paused (paused event)");
             store.setPlaybackState("paused");
           }
         });
-        if (mounted) unsubscribers.push(unsub4);
+        if (mounted) unsubscribers.push(unsub5);
 
-        const unsub5 = await onAiTtsResumed(() => {
+        const unsub6 = await onAiTtsResumed(() => {
           if (mounted) {
             console.debug("[TTS] State transition: -> playing (resumed event)");
             store.setPlaybackState("playing");
           }
         });
-        if (mounted) unsubscribers.push(unsub5);
+        if (mounted) unsubscribers.push(unsub6);
 
-        const unsub6 = await onAiTtsError((event) => {
+        const unsub7 = await onAiTtsError((event) => {
           if (mounted) {
             console.debug("[TTS] State transition: -> error (error event)", {
               error: event.error,
@@ -276,7 +295,7 @@ export function useAiTts() {
             store.setPlaybackState("error");
           }
         });
-        if (mounted) unsubscribers.push(unsub6);
+        if (mounted) unsubscribers.push(unsub7);
       } catch (error) {
         console.error("Failed to setup TTS event listeners:", error);
       }
@@ -331,6 +350,7 @@ export function useAiTts() {
   const stop = useCallback(async () => {
     try {
       await aiTtsStop();
+      store.setBackendPlaybackGeneration(null);
       store.setPlaybackState("idle");
     } catch (error) {
       console.error("Failed to stop TTS:", error);

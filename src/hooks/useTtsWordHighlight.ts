@@ -41,6 +41,7 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
   const speakingRef = useRef<boolean>(false);
   const requestIdRef = useRef<number>(0);
   const playbackStartTimeRef = useRef<number | null>(null);
+  const playbackGenerationRef = useRef<number | null>(null);
   const optionsRef = useRef(options);
   optionsRef.current = options;
   // For debug logging throttling
@@ -59,6 +60,7 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
       speakingRef.current = false;
       requestIdRef.current += 1;
       playbackStartTimeRef.current = null;
+      playbackGenerationRef.current = null;
       if (animationFrameRef.current !== null) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
@@ -169,6 +171,7 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
       // Capture the exact moment - this is when audio is about to start
       const startTime = performance.now();
       playbackStartTimeRef.current = startTime;
+      playbackGenerationRef.current = event.generation;
 
       console.debug("[TtsWordHighlight] Playback starting event received", {
         duration: event.duration,
@@ -210,7 +213,15 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
   useEffect(() => {
     let unlistenFn: (() => void) | null = null;
 
-    onAiTtsFinished(() => {
+    onAiTtsFinished((event) => {
+      const activeGeneration = playbackGenerationRef.current;
+      if (activeGeneration !== null && event?.generation !== activeGeneration) {
+        console.debug("[TtsWordHighlight] Ignoring stale finished event", {
+          activeGeneration,
+          finishedGeneration: event?.generation,
+        });
+        return;
+      }
       completePlaybackRef.current("ai-tts:finished event");
     }).then((unlisten) => {
       unlistenFn = unlisten;
@@ -356,6 +367,7 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
       speakingRef.current = false;
       requestIdRef.current += 1;
       playbackStartTimeRef.current = null;
+      playbackGenerationRef.current = null;
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;

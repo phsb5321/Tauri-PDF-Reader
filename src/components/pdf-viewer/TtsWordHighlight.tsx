@@ -54,6 +54,10 @@ function createWordRange(
     charOffset + charLength,
   );
   if (annotated) return annotated;
+  // A partially annotated layer has a known normalized coordinate model. If a
+  // word cannot resolve inside it, fail closed rather than drifting through raw
+  // PDF.js node lengths. The raw fallback is only for wholly legacy layers.
+  if (element.querySelector("span[data-tts-start]")) return null;
 
   // Fallback for text layers created before annotation was available.
   // Collect the text-layer's text nodes in document order.

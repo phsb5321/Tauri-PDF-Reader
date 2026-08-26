@@ -34,19 +34,18 @@ export function annotatePdfTextLayer(
   container: HTMLElement,
   items: readonly unknown[],
 ): void {
-  const { segments } = buildPdfText(items);
+  const { text } = buildPdfText(items);
   const spans = Array.from(container.querySelectorAll<HTMLElement>("span"));
-  let spanIndex = 0;
+  let searchStart = 0;
 
-  for (const segment of segments) {
-    while (spanIndex < spans.length) {
-      const span = spans[spanIndex++];
-      const normalized = (span.textContent ?? "").replace(/\s+/gu, " ").trim();
-      if (!normalized) continue;
-      span.dataset.ttsStart = String(segment.start);
-      span.dataset.ttsText = segment.text;
-      break;
-    }
+  for (const span of spans) {
+    const normalized = (span.textContent ?? "").replace(/\s+/gu, " ").trim();
+    if (!normalized) continue;
+    const start = text.indexOf(normalized, searchStart);
+    if (start < 0) continue;
+    span.dataset.ttsStart = String(start);
+    span.dataset.ttsText = normalized;
+    searchStart = start + normalized.length;
   }
 }
 

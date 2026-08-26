@@ -215,7 +215,16 @@ export function AiPlaybackBar({
       baseOffset = 0,
     ): Promise<boolean> => {
       const sentences = segmentSpeechWithOffsets(text, maxTextUtf8Bytes);
-      if (sentences.length === 0) return false;
+      if (sentences.length === 0) {
+        if (text.trim()) {
+          useAiTtsStore
+            .getState()
+            .setError(
+              `TTS_TEXT_BOUND: ${provider} cannot safely split this text within ${maxTextUtf8Bytes} UTF-8 bytes`,
+            );
+        }
+        return false;
+      }
 
       const generation = ++playbackGenerationRef.current;
       const queue: SentencePlaybackQueue = {
@@ -249,7 +258,7 @@ export function AiPlaybackBar({
       if (started) prefetchSentence(queue, 1);
       return started;
     },
-    [maxTextUtf8Bytes, prefetchSentence, selectedVoiceId],
+    [maxTextUtf8Bytes, prefetchSentence, provider, selectedVoiceId],
   );
 
   // Handle multi-page continuation
@@ -407,11 +416,15 @@ export function AiPlaybackBar({
     speakWithHighlightRef.current = speakWithHighlight;
   }, [speakWithHighlight]);
 
+  const hasActiveSentenceQueue =
+    sentenceProgress !== null && playingRef.current;
   const isPlaying = usesWordHighlighting
-    ? isHighlightActive && !isHighlightPaused
+    ? hasActiveSentenceQueue
+      ? !isHighlightPaused
+      : isHighlightActive && !isHighlightPaused
     : playbackState === "playing";
   const isPaused = usesWordHighlighting
-    ? isHighlightPaused
+    ? isHighlightPaused && (hasActiveSentenceQueue || isHighlightActive)
     : playbackState === "paused";
   const isLoading = playbackState === "loading";
   const canPlay = initialized && !error && !switchingProvider;

@@ -21,6 +21,7 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::{watch, Mutex, RwLock};
 
@@ -179,7 +180,7 @@ impl SynthesizerPort for FixtureSynthesizer {
 
 pub struct PreparedTtsWithTimings {
     pub output: TtsWithTimings,
-    generation: u64,
+    pub generation: u64,
 }
 
 /// Main TTS engine that coordinates connected providers and playback.
@@ -189,22 +190,33 @@ pub struct AiTtsEngine {
     player: Arc<AudioPlayer>,
     providers: Arc<RwLock<ProviderRegistry>>,
     playback_gate: Arc<Mutex<()>>,
+    playback_generation: Arc<AtomicU64>,
     cancel_tx: watch::Sender<u64>,
     cache: Option<AudioCacheAdapter>,
 }
 
 impl AiTtsEngine {
     pub fn new() -> Self {
+        Self::with_player(AudioPlayer::new())
+    }
+
+    fn with_player(player: AudioPlayer) -> Self {
         let (cancel_tx, _) = watch::channel(0_u64);
         Self {
             config: Arc::new(RwLock::new(TtsConfig::default())),
             state: Arc::new(RwLock::new(TtsState::default())),
-            player: Arc::new(AudioPlayer::new()),
+            player: Arc::new(player),
             providers: Arc::new(RwLock::new(ProviderRegistry::default())),
             playback_gate: Arc::new(Mutex::new(())),
+            playback_generation: Arc::new(AtomicU64::new(0)),
             cancel_tx,
             cache: None,
         }
+    }
+
+    #[cfg(test)]
+    fn for_test() -> Self {
+        Self::with_player(AudioPlayer::for_test())
     }
 
     /// Rebuild the audio player so it invokes `on_finished` when playback ends
@@ -214,8 +226,11 @@ impl AiTtsEngine {
     ///
     /// Called once at startup before any playback, so swapping the player (the
     /// `new()` one was idle) is safe — its dropped thread joins cleanly.
-    pub fn set_finished_callback(&mut self, on_finished: Box<dyn Fn() + Send>) {
-        self.player = Arc::new(AudioPlayer::with_finished_callback(on_finished));
+    pub fn set_finished_callback(&mut self, on_finished: Box<dyn Fn(u64) + Send>) {
+        let playback_generation = Arc::clone(&self.playback_generation);
+        self.player = Arc::new(AudioPlayer::with_finished_callback(Box::new(move || {
+            on_finished(playback_generation.load(Ordering::Acquire));
+        })));
     }
 
     /// Initialize cache with app cache directory
@@ -470,8 +485,8 @@ impl AiTtsEngine {
                     .unwrap_or_else(|| "eleven_monolingual_v1".to_string());
                 let suffix = if with_word_timings { "_ts" } else { "" };
                 let settings_hash = format!(
-                    "{:.2}_{:.2}_{:.2}{suffix}",
-                    config.stability, config.similarity_boost, config.speed
+                    "{:.2}_{:.2}{suffix}",
+                    config.stability, config.similarity_boost
                 );
                 (
                     AudioCacheAdapter::generate_cache_key(text, voice, &model_id, &settings_hash),
@@ -511,11 +526,13 @@ impl AiTtsEngine {
         if *self.cancel_tx.borrow() != generation {
             return Err("TTS_CANCELLED: provider changed before playback".to_string());
         }
+        self.playback_generation
+            .store(generation, Ordering::Release);
         self.player.play_mp3(audio_data)
     }
 
     /// Speak text (with provider-aware caching support).
-    pub async fn speak(&self, text: &str, voice_id: Option<&str>) -> Result<(), String> {
+    pub async fn speak(&self, text: &str, voice_id: Option<&str>) -> Result<u64, String> {
         let (generation, connection, cancelled) = self.synthesis_context().await?;
         let config = self.config.read().await.clone();
         let voice = voice_id
@@ -592,7 +609,8 @@ impl AiTtsEngine {
                 result.audio_data
             }
         };
-        self.play_if_current(&audio_data, generation).await
+        self.play_if_current(&audio_data, generation).await?;
+        Ok(generation)
     }
 
     /// Synthesize audio plus provider marks when available.
@@ -1020,7 +1038,7 @@ mod tests {
 
     #[tokio::test]
     async fn registry_retains_connections_and_switch_rejects_unknown_provider() {
-        let engine = AiTtsEngine::new();
+        let engine = AiTtsEngine::for_test();
         install_counting(
             &engine,
             SynthesisProvider::Local,
@@ -1052,7 +1070,7 @@ mod tests {
 
     #[tokio::test]
     async fn provider_failure_never_falls_back_to_another_connection() {
-        let engine = AiTtsEngine::new();
+        let engine = AiTtsEngine::for_test();
         let local_calls = Arc::new(AtomicUsize::new(0));
         let groq_calls = Arc::new(AtomicUsize::new(0));
         install_counting(
@@ -1096,6 +1114,11 @@ mod tests {
         };
         let groq = CountingSynthesizer {
             provider: SynthesisProvider::Groq,
+            calls: Arc::clone(&calls),
+            failure: "unused",
+        };
+        let elevenlabs = CountingSynthesizer {
+            provider: SynthesisProvider::ElevenLabs,
             calls,
             failure: "unused",
         };
@@ -1105,18 +1128,26 @@ mod tests {
         };
         let (local_one, _) = AiTtsEngine::cache_coordinates(&local, "text", "voice", &config, true);
         let (groq_one, _) = AiTtsEngine::cache_coordinates(&groq, "text", "voice", &config, true);
+        let (elevenlabs_one, _) =
+            AiTtsEngine::cache_coordinates(&elevenlabs, "text", "voice", &config, true);
         config.speed = 2.0;
         let (local_two, _) = AiTtsEngine::cache_coordinates(&local, "text", "voice", &config, true);
         let (groq_two, _) = AiTtsEngine::cache_coordinates(&groq, "text", "voice", &config, true);
+        let (elevenlabs_two, _) =
+            AiTtsEngine::cache_coordinates(&elevenlabs, "text", "voice", &config, true);
 
         assert_ne!(local_one, groq_one, "provider identities cannot collide");
         assert_ne!(local_one, local_two, "Local renders speed into its WAV");
         assert_eq!(groq_one, groq_two, "Groq speed is player-side stretch");
+        assert_eq!(
+            elevenlabs_one, elevenlabs_two,
+            "ElevenLabs speed is player-side stretch"
+        );
     }
 
     #[tokio::test]
     async fn switch_cancels_a_pending_old_provider_before_activation() {
-        let engine = AiTtsEngine::new();
+        let engine = AiTtsEngine::for_test();
         engine
             .install_provider(
                 Arc::new(PendingSynthesizer),

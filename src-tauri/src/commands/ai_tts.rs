@@ -119,6 +119,8 @@ struct TtsStartedEvent {
 struct TtsPlaybackStartingEvent {
     /// Duration of the audio in seconds
     duration: f64,
+    /// Native playback generation; stale finished events carry an older value.
+    generation: u64,
 }
 
 // Note: TtsCompletedEvent removed - completion is now handled by user stop/pause actions
@@ -308,10 +310,14 @@ pub async fn ai_tts_speak(
     let result = engine.speak(&text, voice_id.as_deref()).await;
 
     match result {
-        Ok(_) => {
-            // Note: Don't emit ai-tts:completed here because playback is async.
-            // The completed event should be emitted when audio actually finishes,
-            // or the user can use stop() to end playback.
+        Ok(generation) => {
+            let _ = app.emit(
+                "ai-tts:playback-starting",
+                TtsPlaybackStartingEvent {
+                    duration: 0.0,
+                    generation,
+                },
+            );
             Ok(SpeakResponse { success: true })
         }
         Err(e) => {
@@ -363,6 +369,7 @@ pub async fn ai_tts_speak_with_timestamps(
             "ai-tts:playback-starting",
             TtsPlaybackStartingEvent {
                 duration: total_duration,
+                generation: 0,
             },
         );
         return Ok(SpeakWithTimestampsResponse {
@@ -404,6 +411,7 @@ pub async fn ai_tts_speak_with_timestamps(
                     "ai-tts:playback-starting",
                     TtsPlaybackStartingEvent {
                         duration: prepared.output.total_duration,
+                        generation: prepared.generation,
                     },
                 );
 

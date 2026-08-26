@@ -64,6 +64,8 @@ export interface E2ENativeRead {
   isActive: () => boolean;
   /** Number of marks the real backend returned (0 before play). */
   wordCount: () => number;
+  /** Current word text from the production highlight store. */
+  currentWordText: () => string | null;
   /** Real TTS playback state machine value. */
   playbackState: () => string;
   /** Whether ElevenLabs is connected for this native process. */
@@ -222,6 +224,10 @@ export async function installE2ENativeBootstrap(): Promise<void> {
     currentWordIndex: () => useTtsHighlightStore.getState().currentWordIndex,
     isActive: () => useTtsHighlightStore.getState().isActive,
     wordCount: () => useTtsHighlightStore.getState().wordTimings.length,
+    currentWordText: () => {
+      const state = useTtsHighlightStore.getState();
+      return state.wordTimings[state.currentWordIndex]?.word ?? null;
+    },
     playbackState: () => useAiTtsStore.getState().playbackState,
     hasKey: () =>
       useAiTtsStore.getState().connections.elevenlabs.status === "connected",

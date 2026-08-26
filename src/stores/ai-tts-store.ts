@@ -61,6 +61,7 @@ interface AiTtsState {
   currentText: string | null;
   error: string | null;
   naturalCompletionCount: number;
+  backendPlaybackGeneration: number | null;
 
   voices: AiVoiceInfo[];
   selectedVoiceId: string | null;
@@ -93,6 +94,8 @@ interface AiTtsState {
   transitionTo: (nextState: AiTtsPlaybackState, force?: boolean) => boolean;
   setCurrentText: (text: string | null) => void;
   setError: (error: string | null) => void;
+  setBackendPlaybackGeneration: (generation: number | null) => void;
+  consumeBackendCompletion: (generation: number) => boolean;
   markNaturalCompletion: () => void;
   clearError: () => void;
   updateFromBackend: (state: BackendTtsState) => void;
@@ -150,6 +153,7 @@ const initialState = {
   currentText: null as string | null,
   error: null as string | null,
   naturalCompletionCount: 0,
+  backendPlaybackGeneration: null as number | null,
   voices: [] as AiVoiceInfo[],
   selectedVoiceId: DEFAULT_VOICE_ID,
   speed: DEFAULT_SPEED,
@@ -268,7 +272,10 @@ export const useAiTtsStore = create<AiTtsState>()(
 
       beginProviderOperation: (provider) => {
         const generation = get().providerOperationGeneration + 1;
-        set({ providerOperationGeneration: generation });
+        set({
+          providerOperationGeneration: generation,
+          switchingProvider: null,
+        });
         get().setConnectionStatus(
           provider,
           get().connections[provider].status === "connected"
@@ -364,6 +371,18 @@ export const useAiTtsStore = create<AiTtsState>()(
       setCurrentText: (text) => set({ currentText: text }),
       setError: (error) =>
         set({ error, playbackState: error ? "error" : get().playbackState }),
+      setBackendPlaybackGeneration: (generation) =>
+        set({ backendPlaybackGeneration: generation }),
+      consumeBackendCompletion: (generation) => {
+        if (get().backendPlaybackGeneration !== generation) return false;
+        set({
+          backendPlaybackGeneration: null,
+          naturalCompletionCount: get().naturalCompletionCount + 1,
+          playbackState: "idle",
+          currentText: null,
+        });
+        return true;
+      },
       markNaturalCompletion: () =>
         set({ naturalCompletionCount: get().naturalCompletionCount + 1 }),
       clearError: () => set({ error: null, playbackState: "idle" }),

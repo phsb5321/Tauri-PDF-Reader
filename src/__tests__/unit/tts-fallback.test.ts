@@ -99,9 +99,12 @@ describe("buildWordFallbackTimings", () => {
     expect(timings[2].startTime).toBe(timings[1].endTime);
   });
 
-  it("fails closed without speakable text or a measured duration", () => {
+  it("fails closed without text and estimates an honest clock without duration", () => {
     expect(buildWordFallbackTimings("", 5)).toEqual([]);
-    expect(buildWordFallbackTimings("hello", 0)).toEqual([]);
+    const estimated = buildWordFallbackTimings("one two three four five", 0);
+    expect(estimated).toHaveLength(5);
+    expect(estimated[0].startTime).toBe(0);
+    expect(estimated.at(-1)?.endTime).toBeCloseTo(2, 9);
   });
 });
 

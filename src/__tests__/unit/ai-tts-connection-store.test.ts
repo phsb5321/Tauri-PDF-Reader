@@ -112,11 +112,38 @@ describe("AI TTS connection registry", () => {
     });
   });
 
-  it("ages out stale async provider operations", () => {
+  it("consumes a native finish once and ignores stale provider generations", () => {
+    useAiTtsStore.setState({
+      backendPlaybackGeneration: 12,
+      naturalCompletionCount: 0,
+      playbackState: "playing",
+      currentText: "new provider clip",
+    });
+
+    expect(useAiTtsStore.getState().consumeBackendCompletion(11)).toBe(false);
+    expect(useAiTtsStore.getState()).toMatchObject({
+      backendPlaybackGeneration: 12,
+      naturalCompletionCount: 0,
+      playbackState: "playing",
+      currentText: "new provider clip",
+    });
+    expect(useAiTtsStore.getState().consumeBackendCompletion(12)).toBe(true);
+    expect(useAiTtsStore.getState().consumeBackendCompletion(12)).toBe(false);
+    expect(useAiTtsStore.getState()).toMatchObject({
+      backendPlaybackGeneration: null,
+      naturalCompletionCount: 1,
+      playbackState: "idle",
+      currentText: null,
+    });
+  });
+
+  it("ages out stale async provider operations and clears an older switch", () => {
+    useAiTtsStore.getState().setSwitchingProvider("local");
     const first = useAiTtsStore.getState().beginProviderOperation("elevenlabs");
     const second = useAiTtsStore.getState().beginProviderOperation("groq");
 
     expect(first).toBe(1);
+    expect(useAiTtsStore.getState().switchingProvider).toBeNull();
     expect(second).toBe(2);
     expect(useAiTtsStore.getState().isCurrentProviderOperation(first)).toBe(
       false,

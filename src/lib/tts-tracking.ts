@@ -193,19 +193,20 @@ export function findTextItemForWord(
 }
 
 /**
- * Build duration-bound per-word timings when a local provider publishes audio
- * duration but no marks. Internal words are estimates; the first starts at 0
- * and the last ends exactly with the real WAV, keeping overlay and progress on
- * the same clock as playback.
+ * Build per-word timings when a provider publishes no marks. A measured audio
+ * duration is authoritative; otherwise an explicit ~150 wpm estimate keeps the
+ * rail non-empty while the native sink event remains the only completion clock.
  */
 export function buildWordFallbackTimings(
   text: string,
   totalDurationSeconds: number,
 ): WordTiming[] {
-  if (!(totalDurationSeconds > 0)) return [];
-
   const matches = [...text.matchAll(/\S+/gu)];
   if (matches.length === 0) return [];
+  const duration =
+    totalDurationSeconds > 0
+      ? totalDurationSeconds
+      : (matches.length / FALLBACK_WORDS_PER_MINUTE) * 60;
   const weights = matches.map((match) =>
     Math.max(0.5, Math.min(2, match[0].length / 5)),
   );
@@ -216,8 +217,8 @@ export function buildWordFallbackTimings(
     const startTime = elapsed;
     const endTime =
       index === matches.length - 1
-        ? totalDurationSeconds
-        : elapsed + (weights[index] / totalWeight) * totalDurationSeconds;
+        ? duration
+        : elapsed + (weights[index] / totalWeight) * duration;
     elapsed = endTime;
     const charStart = match.index;
     return {

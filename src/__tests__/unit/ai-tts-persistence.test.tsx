@@ -46,6 +46,7 @@ vi.mock("../../lib/tauri-invoke", () => ({
   })),
   onAiTtsStarted: mocks.listen,
   onAiTtsFinished: mocks.listen,
+  onAiTtsPlaybackStarting: mocks.listen,
   onAiTtsStopped: mocks.listen,
   onAiTtsPaused: mocks.listen,
   onAiTtsResumed: mocks.listen,

@@ -939,8 +939,8 @@ pub fn run() {
                     if let Some(cache_dir) = cache_dir {
                         engine.init_cache(cache_dir);
                     }
-                    engine.set_finished_callback(Box::new(move || {
-                        if let Err(e) = app_handle.emit("ai-tts:finished", ()) {
+                    engine.set_finished_callback(Box::new(move |generation| {
+                        if let Err(e) = app_handle.emit("ai-tts:finished", generation) {
                             tracing::warn!("Failed to emit ai-tts:finished: {e}");
                         }
                     }));

@@ -39,6 +39,7 @@ vi.mock("../../lib/tauri-invoke", () => ({
   aiTtsGetState: vi.fn(),
   onAiTtsStarted: mocks.listen,
   onAiTtsFinished: mocks.listen,
+  onAiTtsPlaybackStarting: mocks.listen,
   onAiTtsStopped: mocks.listen,
   onAiTtsPaused: mocks.listen,
   onAiTtsResumed: mocks.listen,
@@ -95,6 +96,40 @@ beforeEach(() => {
 });
 
 describe("provider connection races", () => {
+  it("keeps a failed reconnect ready on its previously validated client", async () => {
+    useAiTtsStore.setState({
+      provider: "local",
+      initialized: true,
+      connections: {
+        ...useAiTtsStore.getState().connections,
+        local: {
+          ...useAiTtsStore.getState().connections.local,
+          status: "connected",
+        },
+        groq: {
+          ...useAiTtsStore.getState().connections.groq,
+          status: "connected",
+        },
+      },
+    });
+    mocks.initGroq.mockResolvedValue({
+      status: "error",
+      error: "GROQ_AUTH: rejected",
+    });
+    const { result } = renderHook(() => useAiTts());
+
+    await act(async () => {
+      await result.current.initializeGroq("replacement-key");
+    });
+
+    expect(useAiTtsStore.getState().connections.groq).toMatchObject({
+      status: "connected",
+      error: "GROQ_AUTH: rejected",
+    });
+    expect(useAiTtsStore.getState().provider).toBe("local");
+    expect(useAiTtsStore.getState().initialized).toBe(true);
+  });
+
   it("keeps a slow older connection ready without stealing activation", async () => {
     const eleven = deferred<{
       success: boolean;

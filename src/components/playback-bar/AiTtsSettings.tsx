@@ -459,7 +459,9 @@ export function AiTtsSettings({ onClose }: Readonly<AiTtsSettingsProps>) {
                           : "ai-tts-status-pending"
                     }
                   >
-                    {connectionLabel(connectionProvider, connection.status)}
+                    {connection.status === "connected" && connection.error
+                      ? "Connected · last attempt failed"
+                      : connectionLabel(connectionProvider, connection.status)}
                   </span>
                 </button>
                 {active ? (

@@ -12,6 +12,8 @@ import { useDocumentStore } from "../../stores/document-store";
 
 const h = vi.hoisted(() => ({
   complete: null as (() => void) | null,
+  maxTextUtf8Bytes: 8192,
+  announce: vi.fn(),
   speakWithHighlight: vi.fn(() => Promise.resolve(true)),
   prebuffer: vi.fn(() =>
     Promise.resolve({
@@ -35,7 +37,7 @@ vi.mock("../../hooks/useAiTts", () => ({
     resume: vi.fn(),
     clearError: vi.fn(),
     supportsWordTimings: false,
-    maxTextUtf8Bytes: 8192,
+    maxTextUtf8Bytes: h.maxTextUtf8Bytes,
     connectedProviders: ["local"],
     switchingProvider: null,
   }),
@@ -57,7 +59,7 @@ vi.mock("../../hooks/useTtsWordHighlight", () => ({
 }));
 vi.mock("../../hooks/useAudioCache", () => ({ useAudioCache: vi.fn() }));
 vi.mock("../../hooks/useAnnounce", () => ({
-  useAnnounce: () => ({ announce: vi.fn() }),
+  useAnnounce: () => ({ announce: h.announce }),
   ANNOUNCEMENTS: {
     ttsPlaying: () => "playing",
     ttsPaused: () => "paused",
@@ -84,6 +86,7 @@ vi.mock("../../components/playback-bar/AiTtsSettings", () => ({
 beforeEach(() => {
   vi.clearAllMocks();
   h.complete = null;
+  h.maxTextUtf8Bytes = 8192;
   useAiTtsStore.setState({
     provider: "local",
     supportsWordTimings: false,
@@ -95,6 +98,7 @@ beforeEach(() => {
     },
     autoPageEnabled: false,
     naturalCompletionCount: 0,
+    error: null,
   });
   useDocumentStore.setState({
     currentPage: 1,
@@ -133,5 +137,20 @@ describe("local sentence playback", () => {
       ),
     );
     expect(h.speakWithHighlight).toHaveBeenCalledTimes(2);
+    expect(h.announce).not.toHaveBeenCalledWith("stopped");
+
+    await act(async () => h.complete?.());
+    await waitFor(() => expect(h.announce).toHaveBeenCalledWith("stopped"));
+  });
+
+  it("surfaces a provider-bound error when one grapheme cannot be split", async () => {
+    h.maxTextUtf8Bytes = 3;
+    render(<AiPlaybackBar getText={() => Promise.resolve("😀")} />);
+
+    fireEvent.click(screen.getByTitle("Play (Ctrl+Space)"));
+    await waitFor(() =>
+      expect(useAiTtsStore.getState().error).toContain("TTS_TEXT_BOUND"),
+    );
+    expect(h.speakWithHighlight).not.toHaveBeenCalled();
   });
 });

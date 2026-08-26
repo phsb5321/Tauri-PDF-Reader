@@ -70,6 +70,21 @@ async function playAndExpectRoute(provider, expectedCount) {
       (await readObserver(() => window.__E2E_READ__.wordCount())) > 0,
     { timeout: 10000, timeoutMsg: `${provider} produced no read-along marks` },
   );
+  await browser.waitUntil(
+    async () =>
+      readObserver(() => {
+        const expected = window.__E2E_READ__.currentWordText();
+        const highlight = CSS.highlights?.get("tts-current-word");
+        const range = highlight ? Array.from(highlight)[0] : null;
+        return Boolean(
+          expected && range && range.toString().trim() === expected.trim(),
+        );
+      }),
+    {
+      timeout: 10000,
+      timeoutMsg: `${provider} highlight range did not match its current word`,
+    },
+  );
 }
 
 describe("multiple TTS connections", () => {

@@ -35,9 +35,11 @@ import { aiTtsSpeakWithTimestamps } from "../../lib/tauri-invoke";
 // Shared mock state (hoisted so the vi.mock factories can reach it).
 const h = vi.hoisted(() => ({
   /** The `ai-tts:playback-starting` callback the hook registers on mount. */
-  playbackStartingCb: null as ((e: { duration: number }) => void) | null,
+  playbackStartingCb: null as
+    | ((e: { duration: number; generation?: number }) => void)
+    | null,
   /** The `ai-tts:finished` callback the hook registers on mount. */
-  finishedCb: null as (() => void) | null,
+  finishedCb: null as ((e?: { generation: number }) => void) | null,
   /** What `aiTtsSpeakWithTimestamps` resolves to for the next speak call. */
   speakResult: {
     success: true,
@@ -47,11 +49,13 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock("../../lib/api/ai-tts", () => ({
-  onAiTtsPlaybackStarting: vi.fn((cb: (e: { duration: number }) => void) => {
-    h.playbackStartingCb = cb;
-    return Promise.resolve(() => {});
-  }),
-  onAiTtsFinished: vi.fn((cb: () => void) => {
+  onAiTtsPlaybackStarting: vi.fn(
+    (cb: (e: { duration: number; generation?: number }) => void) => {
+      h.playbackStartingCb = cb;
+      return Promise.resolve(() => {});
+    },
+  ),
+  onAiTtsFinished: vi.fn((cb: (e?: { generation: number }) => void) => {
     h.finishedCb = cb;
     return Promise.resolve(() => {});
   }),
@@ -113,7 +117,7 @@ async function startViaProductionPath(
   h.speakResult = { success: true, wordTimings, totalDuration };
   // The backend emits playback-starting right before audio begins.
   nowMs = eventClockMs;
-  act(() => h.playbackStartingCb?.({ duration: totalDuration }));
+  act(() => h.playbackStartingCb?.({ duration: totalDuration, generation: 7 }));
   // The timestamps response arrives slightly later.
   nowMs = responseClockMs;
   await act(async () => {
@@ -193,7 +197,7 @@ describe("karaoke sync — highlight index advances with the timing marks", () =
     tick(3010);
     expect(onComplete).not.toHaveBeenCalled();
     expect(store().isActive).toBe(true);
-    act(() => h.finishedCb?.());
+    act(() => h.finishedCb?.({ generation: 7 }));
     expect(onComplete).toHaveBeenCalledTimes(1);
     expect(store().isActive).toBe(false);
     expect(idx()).toBe(-1);
@@ -236,9 +240,30 @@ describe("karaoke sync — highlight index advances with the timing marks", () =
     tick(3100);
     expect(onComplete).not.toHaveBeenCalled();
     expect(store().isActive).toBe(true);
-    act(() => h.finishedCb?.());
+    act(() => h.finishedCb?.({ generation: 7 }));
     expect(onComplete).toHaveBeenCalledOnce();
     expect(store().isActive).toBe(false);
+  });
+
+  it("ignores a finished event from the provider generation replaced by a switch", async () => {
+    const onComplete = vi.fn();
+    const { result } = renderHook(() => useTtsWordHighlight({ onComplete }));
+    await startViaProductionPath(
+      result.current.speakWithHighlight,
+      "alpha beta",
+      marks().slice(0, 2),
+      2,
+      0,
+      50,
+    );
+
+    act(() => h.finishedCb?.({ generation: 6 }));
+    expect(store().isActive).toBe(true);
+    expect(onComplete).not.toHaveBeenCalled();
+
+    act(() => h.finishedCb?.({ generation: 7 }));
+    expect(store().isActive).toBe(false);
+    expect(onComplete).toHaveBeenCalledOnce();
   });
 
   it("does not resurrect a stopped session when an old response arrives", async () => {
@@ -381,13 +406,13 @@ describe("karaoke sync — highlight index advances with the timing marks", () =
     expect(store().isActive).toBe(true);
 
     // Backend signals the rodio sink drained → completion fires off the event.
-    act(() => h.finishedCb?.());
+    act(() => h.finishedCb?.({ generation: 7 }));
     expect(onComplete).toHaveBeenCalledTimes(1);
     expect(store().isActive).toBe(false);
     expect(idx()).toBe(-1);
 
     // The event is idempotent vs the timer: a second fire does not re-complete.
-    act(() => h.finishedCb?.());
+    act(() => h.finishedCb?.({ generation: 7 }));
     expect(onComplete).toHaveBeenCalledTimes(1);
   });
 
