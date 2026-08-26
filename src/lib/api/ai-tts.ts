@@ -12,14 +12,13 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 export interface AiVoiceInfo {
   id: string;
   name: string;
-  provider: "elevenlabs" | "local";
+  provider: "elevenlabs" | "local" | "groq";
   previewUrl: string | null;
   labels: Record<string, unknown> | null;
 }
 
 export interface AiTtsConfig {
-  provider: "elevenlabs" | "local";
-  apiKey: string | null;
+  provider: "elevenlabs" | "local" | "groq";
   voiceId: string | null;
   modelId: string | null;
   stability: number;
@@ -56,9 +55,13 @@ export interface SpeakWithTimestampsResponse {
 
 // Commands
 
-export async function aiTtsInit(
-  apiKey: string,
-): Promise<{ success: boolean; voicesCount: number }> {
+export async function aiTtsInit(apiKey: string): Promise<{
+  success: boolean;
+  voicesCount: number;
+  provider: "elevenlabs";
+  supportsWordTimings: boolean;
+  maxTextUtf8Bytes: number;
+}> {
   return invoke("ai_tts_init", { apiKey });
 }
 

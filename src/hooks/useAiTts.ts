@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect } from "react";
 import {
   aiTtsInit,
   aiTtsListVoices,
@@ -17,101 +17,179 @@ import {
   onAiTtsError,
 } from "../lib/tauri-invoke";
 import { commands } from "../lib/bindings";
-import { useAiTtsStore } from "../stores/ai-tts-store";
+import { useAiTtsStore, type AiTtsProvider } from "../stores/ai-tts-store";
+import { useTtsHighlightStore } from "../stores/tts-highlight-store";
 
-/**
- * Hook for AI TTS (ElevenLabs) operations
- */
+/** Provider-neutral AI TTS operations and live connection switching. */
 export function useAiTts() {
   const store = useAiTtsStore();
-  const initializingRef = useRef(false);
 
-  // Initialize TTS when API key is available
-  const initialize = useCallback(
-    async (apiKey: string) => {
-      if (initializingRef.current) return;
-      initializingRef.current = true;
-
-      store.setPlaybackState("loading");
+  const activateProvider = useCallback(
+    async (provider: AiTtsProvider, generation?: number): Promise<boolean> => {
+      const before = useAiTtsStore.getState();
+      if (before.connections[provider].status !== "connected") return false;
+      const operation = generation ?? before.beginProviderOperation(provider);
+      before.setSwitchingProvider(provider);
+      before.setPlaybackState("loading");
+      before.setCurrentText(null);
+      useTtsHighlightStore.getState().stopHighlighting();
 
       try {
-        const result = await aiTtsInit(apiKey);
-
-        if (result.success) {
-          store.setProviderConfig("elevenlabs", null, true);
-          store.setApiKey(apiKey);
-          store.setInitialized(true);
-
-          // Fetch voices
-          const voicesResult = await aiTtsListVoices();
-          store.setVoices(voicesResult.voices);
-
-          // Set voice if one is selected
-          if (store.selectedVoiceId) {
-            await aiTtsSetVoice(store.selectedVoiceId);
-          }
-
-          // Set speed
-          await aiTtsSetSpeed(store.speed);
+        const switched = await commands.aiTtsSwitchProvider(provider);
+        if (switched.status === "error") throw new Error(switched.error);
+        if (!useAiTtsStore.getState().isCurrentProviderOperation(operation)) {
+          return false;
         }
+
+        const connection = useAiTtsStore.getState().connections[provider];
+        useAiTtsStore
+          .getState()
+          .setProviderConfig(
+            provider,
+            provider === "local" ? connection.destination : null,
+            switched.data.supportsWordTimings,
+            switched.data.maxTextUtf8Bytes,
+          );
+        useAiTtsStore.getState().setConnectionStatus(provider, "connected", {
+          error: null,
+          supportsWordTimings: switched.data.supportsWordTimings,
+          maxTextUtf8Bytes: switched.data.maxTextUtf8Bytes,
+        });
+
+        const voicesResult = await aiTtsListVoices();
+        if (!useAiTtsStore.getState().isCurrentProviderOperation(operation)) {
+          return false;
+        }
+        useAiTtsStore.getState().setVoices(voicesResult.voices);
+        const selected = useAiTtsStore.getState().selectedVoiceId;
+        if (selected) await aiTtsSetVoice(selected);
+        await aiTtsSetSpeed(useAiTtsStore.getState().speed);
+        if (!useAiTtsStore.getState().isCurrentProviderOperation(operation)) {
+          return false;
+        }
+        useAiTtsStore.getState().setApiKey(null);
+        useAiTtsStore.getState().setError(null);
+        useAiTtsStore.getState().setInitialized(true);
+        return true;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        store.setInitialized(false, message);
+        if (useAiTtsStore.getState().isCurrentProviderOperation(operation)) {
+          useAiTtsStore.getState().setConnectionStatus(provider, "connected", {
+            error: message,
+          });
+          useAiTtsStore.getState().setError(message);
+        }
+        return false;
       } finally {
-        initializingRef.current = false;
-        // Only reset to idle if we're still in loading state from init
-        // Don't clobber playing/paused states from ongoing playback
-        const currentState = store.playbackState;
-        if (currentState === "loading") {
-          store.setPlaybackState("idle");
+        const current = useAiTtsStore.getState();
+        if (current.isCurrentProviderOperation(operation)) {
+          current.setSwitchingProvider(null);
+          if (current.playbackState === "loading") {
+            current.setPlaybackState(current.initialized ? "idle" : "error");
+          }
         }
       }
     },
-    [store],
+    [],
+  );
+
+  const failConnection = useCallback(
+    (provider: AiTtsProvider, generation: number, error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      const current = useAiTtsStore.getState();
+      current.setConnectionStatus(provider, "error", { error: message });
+      if (
+        current.isCurrentProviderOperation(generation) &&
+        current.provider === provider &&
+        !current.initialized
+      ) {
+        current.setInitialized(false, message);
+      }
+    },
+    [],
+  );
+
+  const initialize = useCallback(
+    async (apiKey: string) => {
+      const initial = useAiTtsStore.getState();
+      if (initial.connections.elevenlabs.status === "connecting") return;
+      const generation = initial.beginProviderOperation("elevenlabs");
+      if (!initial.initialized) initial.setPlaybackState("loading");
+      try {
+        const result = await aiTtsInit(apiKey);
+        useAiTtsStore
+          .getState()
+          .setConnectionStatus("elevenlabs", "connected", {
+            error: null,
+            supportsWordTimings: result.supportsWordTimings,
+            maxTextUtf8Bytes: result.maxTextUtf8Bytes,
+          });
+        if (useAiTtsStore.getState().isCurrentProviderOperation(generation)) {
+          await activateProvider("elevenlabs", generation);
+        }
+      } catch (error) {
+        failConnection("elevenlabs", generation, error);
+      }
+    },
+    [activateProvider, failConnection],
+  );
+
+  const initializeGroq = useCallback(
+    async (apiKey: string) => {
+      const initial = useAiTtsStore.getState();
+      if (initial.connections.groq.status === "connecting") return;
+      const generation = initial.beginProviderOperation("groq");
+      if (!initial.initialized) initial.setPlaybackState("loading");
+      try {
+        const result = await commands.aiTtsInitGroq(apiKey);
+        if (result.status === "error") throw new Error(result.error);
+        useAiTtsStore.getState().setConnectionStatus("groq", "connected", {
+          error: null,
+          supportsWordTimings: result.data.supportsWordTimings,
+          maxTextUtf8Bytes: result.data.maxTextUtf8Bytes,
+        });
+        if (useAiTtsStore.getState().isCurrentProviderOperation(generation)) {
+          await activateProvider("groq", generation);
+        }
+      } catch (error) {
+        failConnection("groq", generation, error);
+      }
+    },
+    [activateProvider, failConnection],
   );
 
   const initializeLocal = useCallback(async () => {
-    if (initializingRef.current) return;
-    initializingRef.current = true;
-    useAiTtsStore.getState().setPlaybackState("loading");
+    const initial = useAiTtsStore.getState();
+    if (initial.connections.local.status === "connecting") return;
+    const generation = initial.beginProviderOperation("local");
+    if (!initial.initialized) initial.setPlaybackState("loading");
     try {
       const result = await commands.aiTtsInitLocal();
       if (result.status === "error") throw new Error(result.error);
-      useAiTtsStore
-        .getState()
-        .setProviderConfig(
-          "local",
-          result.data.destination,
-          result.data.supportsWordTimings,
-        );
-      useAiTtsStore.getState().setApiKey(null);
-      useAiTtsStore.getState().setInitialized(true);
-      const voicesResult = await aiTtsListVoices();
-      useAiTtsStore.getState().setVoices(voicesResult.voices);
-      const selected = useAiTtsStore.getState().selectedVoiceId;
-      if (selected) await aiTtsSetVoice(selected);
-      await aiTtsSetSpeed(useAiTtsStore.getState().speed);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      useAiTtsStore.getState().setInitialized(false, message);
-    } finally {
-      initializingRef.current = false;
-      const current = useAiTtsStore.getState();
-      if (current.playbackState === "loading") {
-        current.setPlaybackState("idle");
+      useAiTtsStore.getState().setConnectionStatus("local", "connected", {
+        error: null,
+        destination: result.data.destination,
+        supportsWordTimings: result.data.supportsWordTimings,
+        maxTextUtf8Bytes: result.data.maxTextUtf8Bytes,
+      });
+      if (useAiTtsStore.getState().isCurrentProviderOperation(generation)) {
+        await activateProvider("local", generation);
       }
+    } catch (error) {
+      failConnection("local", generation, error);
     }
-  }, []);
+  }, [activateProvider, failConnection]);
 
-  // Native config selects local mode; cloud mode still initializes only from a
-  // session API key.
+  // Native config selects the startup provider; cloud providers connect only
+  // after an explicit key submission in the current process.
   useEffect(() => {
+    const currentConnection = store.connections[store.provider];
     if (
       store.provider === "local" &&
       store.localUrl &&
       !store.initialized &&
       !store.initError &&
-      !initializingRef.current
+      currentConnection.status === "setup"
     ) {
       void initializeLocal();
     } else if (
@@ -119,7 +197,7 @@ export function useAiTts() {
       store.apiKey &&
       !store.initialized &&
       !store.initError &&
-      !initializingRef.current
+      currentConnection.status === "setup"
     ) {
       void initialize(store.apiKey);
     }
@@ -129,6 +207,7 @@ export function useAiTts() {
     store.apiKey,
     store.initialized,
     store.initError,
+    store.connections,
     initialize,
     initializeLocal,
   ]);
@@ -342,14 +421,25 @@ export function useAiTts() {
     provider: store.provider,
     localUrl: store.localUrl,
     supportsWordTimings: store.supportsWordTimings,
+    maxTextUtf8Bytes: store.maxTextUtf8Bytes,
+    connections: store.connections,
+    connectedProviders: (
+      Object.keys(store.connections) as AiTtsProvider[]
+    ).filter((provider) => store.connections[provider].status === "connected"),
+    switchingProvider: store.switchingProvider,
     voices: store.voices,
     selectedVoiceId: store.selectedVoiceId,
     speed: store.speed,
-    needsApiKey: store.provider === "elevenlabs" && !store.apiKey,
+    needsApiKey:
+      (store.provider === "elevenlabs" || store.provider === "groq") &&
+      !store.apiKey &&
+      store.connections[store.provider].status !== "connected",
 
     // Actions
     initialize,
+    initializeGroq,
     initializeLocal,
+    switchProvider: activateProvider,
     speak,
     stop,
     pause,

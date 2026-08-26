@@ -18,6 +18,9 @@ import { HighlightOverlay } from "./pdf-viewer/HighlightOverlay";
 import { TtsWordHighlight } from "./pdf-viewer/TtsWordHighlight";
 import type { TextSelection } from "./TextLayer";
 import type { Rect } from "../lib/schemas";
+import { selectionToPageEnd } from "../lib/selection-narration";
+import { nextPdfWheelZoom } from "../lib/pdf-wheel-zoom";
+import { annotatePdfTextLayer } from "../lib/pdf-text";
 import "./PdfViewer.css";
 
 // Padding around the PDF page
@@ -35,7 +38,11 @@ function clearContainer(container: HTMLElement): void {
   }
 }
 
-export function PdfViewer() {
+interface PdfViewerProps {
+  onReadFromHere?: (text: string, baseOffset: number) => void;
+}
+
+export function PdfViewer({ onReadFromHere }: Readonly<PdfViewerProps>) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textLayerRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -100,6 +107,7 @@ export function PdfViewer() {
     onError: (error) => {
       console.error("[PdfViewer] Highlight creation error:", error);
     },
+    onReadFromHere,
   });
 
   // Handle text selection from text layer
@@ -136,10 +144,15 @@ export function PdfViewer() {
     }
 
     if (rects.length > 0) {
+      const narration = textLayerRef.current
+        ? selectionToPageEnd(selection, textLayerRef.current)
+        : null;
       const textSelection: TextSelection = {
         text: selectedText,
         rects,
         pageNumber: currentPage,
+        narrationText: narration?.text,
+        narrationOffset: narration?.baseOffset,
       };
       console.debug("[PdfViewer] Forwarding selection to highlight handler:", {
         textLength: selectedText.length,
@@ -205,6 +218,21 @@ export function PdfViewer() {
     },
     [selectedHighlightId, setSelectedHighlight],
   );
+
+  const handleWheel = useCallback((event: WheelEvent) => {
+    if (!event.ctrlKey && !event.metaKey) return;
+    event.preventDefault();
+    const { zoomLevel: currentZoom, setZoomLevel } =
+      useDocumentStore.getState();
+    setZoomLevel(nextPdfWheelZoom(currentZoom, event.deltaY));
+  }, []);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    container.addEventListener("wheel", handleWheel, { passive: false });
+    return () => container.removeEventListener("wheel", handleWheel);
+  }, [handleWheel]);
 
   // Render the current page with canvas + text layer
   const renderPage = useCallback(async () => {
@@ -283,6 +311,11 @@ export function PdfViewer() {
         throw new Error("Could not get canvas 2D context");
       }
 
+      // An opaque canvas starts black. Paint the PDF page background before
+      // pdf.js draws so a cancelled/failed render never leaves a black void.
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+
       // Enable high-quality image rendering
       context.imageSmoothingEnabled = true;
       context.imageSmoothingQuality = "high";
@@ -314,6 +347,7 @@ export function PdfViewer() {
       });
 
       await textLayerInstanceRef.current.render();
+      annotatePdfTextLayer(textLayerDiv, textContent.items);
 
       console.log(
         "[PdfViewer] Rendered page",
@@ -480,38 +514,51 @@ export function PdfViewer() {
     zoomLevel,
   ]);
 
-  // Calculate fit-to-width scale when document loads
+  // Start with the complete page visible. Fit-width can approach 300% on a
+  // desktop monitor, hiding most of a portrait page below the fold before the
+  // reader has chosen any zoom mode.
   const initialZoomSetRef = useRef(false);
 
   useEffect(() => {
     if (!pdfDocument || !containerRef.current) return;
     if (initialZoomSetRef.current) return;
 
-    const calculateAndSetFitWidth = async () => {
+    const calculateAndSetFitPage = async () => {
       try {
         const page = await pdfDocument.getPage(1);
         const viewport = page.getViewport({ scale: 1.0 });
         const containerWidth =
           containerRef.current!.clientWidth - PAGE_PADDING * 2;
-        const fitScale = containerWidth / viewport.width;
+        const containerHeight =
+          containerRef.current!.clientHeight - PAGE_PADDING * 2;
+        const initialZoom = Math.max(
+          0.25,
+          Math.min(
+            4.0,
+            calculateFitPageZoom({
+              pageWidth: viewport.width,
+              pageHeight: viewport.height,
+              containerWidth,
+              containerHeight,
+              padding: 0,
+            }),
+          ),
+        );
 
-        // Set initial zoom to fit width (at least 1.0, max 2.0)
-        const initialZoom = Math.max(1.0, Math.min(fitScale, 2.0));
-        // Set fit-width mode by default
-        setFitMode("fit-width");
+        setFitMode("fit-page");
         useDocumentStore.setState({ zoomLevel: initialZoom });
         initialZoomSetRef.current = true;
         console.log(
           "[PdfViewer] Set initial zoom to:",
           initialZoom,
-          "(fit-width)",
+          "(fit-page)",
         );
       } catch (err) {
-        console.error("Error calculating fit-width:", err);
+        console.error("Error calculating fit-page:", err);
       }
     };
 
-    calculateAndSetFitWidth();
+    calculateAndSetFitPage();
   }, [pdfDocument, setFitMode]);
 
   // Reset initial zoom flag when document changes

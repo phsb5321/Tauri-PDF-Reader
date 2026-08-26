@@ -1,0 +1,15 @@
+{
+  "routes": {
+    "local": 1,
+    "elevenlabs": 1,
+    "groq": 1
+  },
+  "logsContainSecret": false,
+  "connections": {
+    "local": "connected",
+    "elevenlabs": "connected",
+    "groq": "connected"
+  },
+  "active": "local",
+  "storageContainsSecret": false
+}

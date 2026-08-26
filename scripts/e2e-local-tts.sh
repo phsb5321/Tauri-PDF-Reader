@@ -80,5 +80,11 @@ toolchain_exec '
 ' 2>&1 | tee "$EVIDENCE_DIR/lane.log"
 
 jq -s '{requests: .}' "$REQUEST_LOG" >"$EVIDENCE_DIR/receipt.json"
-jq -e '.requests | length == 1' "$EVIDENCE_DIR/receipt.json" >/dev/null
+jq -e '
+  (.requests | length) >= 1 and
+  (.requests | all(.[];
+    (.body.input | type == "string" and length > 0) and
+    (.body.voice == "F1-pt") and
+    (.idempotencyKey | test("^[0-9a-f]{64}$"))))
+' "$EVIDENCE_DIR/receipt.json" >/dev/null
 printf 'local-tts packaged gate PASS — evidence %s\n' "$EVIDENCE_DIR/receipt.json"

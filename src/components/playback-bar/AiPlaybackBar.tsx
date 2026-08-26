@@ -7,7 +7,13 @@ import { useDocumentStore } from "../../stores/document-store";
 import { useAiTtsStore } from "../../stores/ai-tts-store";
 import { pdfService } from "../../services/pdf-service";
 import { reducedMotionScrollBehavior } from "../../lib/reduced-motion";
+import { aiTtsPrebuffer } from "../../lib/api/ai-tts";
+import {
+  segmentSpeechWithOffsets,
+  type SentenceSpan,
+} from "../../lib/tts-tracking";
 import { AI_TTS_SETUP_MESSAGE } from "../../lib/constants";
+import { buildPdfText } from "../../lib/pdf-text";
 import { AiVoiceSelector } from "./AiVoiceSelector";
 import { AiSpeedSlider } from "./AiSpeedSlider";
 import { AiTtsSettings } from "./AiTtsSettings";
@@ -31,8 +37,19 @@ export function consumeNaturalCompletion(
   };
 }
 
+interface SentencePlaybackQueue {
+  pageNumber: number;
+  sentences: SentenceSpan[];
+  index: number;
+  generation: number;
+  baseOffset: number;
+  prefetchIndex: number | null;
+  prefetch: Promise<void> | null;
+}
+
 interface AiPlaybackBarProps {
   getText: () => Promise<string | null>;
+  getTextBaseOffset?: () => number;
   enableHighlighting?: boolean;
   /**
    * Incremented by the catch-up shelf's opt-in "Resume & play" action. Any
@@ -45,6 +62,7 @@ interface AiPlaybackBarProps {
 
 export function AiPlaybackBar({
   getText,
+  getTextBaseOffset,
   enableHighlighting = true,
   autoPlayToken = 0,
 }: AiPlaybackBarProps) {
@@ -58,7 +76,11 @@ export function AiPlaybackBar({
     pause,
     resume,
     clearError,
-    supportsWordTimings,
+    supportsWordTimings = useAiTtsStore.getState().supportsWordTimings,
+    maxTextUtf8Bytes = useAiTtsStore.getState().maxTextUtf8Bytes,
+    connectedProviders = [],
+    switchingProvider = null,
+    switchProvider = async () => false,
   } = useAiTts();
 
   const {
@@ -74,13 +96,39 @@ export function AiPlaybackBar({
   const autoPageEnabled = useAiTtsStore((s) => s.autoPageEnabled);
   const setAutoPageEnabled = useAiTtsStore((s) => s.setAutoPageEnabled);
   const naturalCompletionCount = useAiTtsStore((s) => s.naturalCompletionCount);
+  const provider = useAiTtsStore((s) => s.provider);
+  const selectedVoiceId = useAiTtsStore((s) => s.selectedVoiceId);
   const playingRef = useRef(false);
-  // Providers without marks use ordinary playback state; claiming a karaoke
-  // word in that mode would fabricate precision the service did not publish.
-  const usesWordHighlighting = enableHighlighting && supportsWordTimings;
+  // Providers without marks use measured-duration word estimates. The UI must
+  // remain on the same real audio clock instead of hiding karaoke and leaving
+  // progress stuck at zero.
+  const usesWordHighlighting = enableHighlighting;
   const speakWithHighlightRef = useRef<
-    ((text: string, pageNumber: number) => Promise<boolean>) | null
+    | ((
+        text: string,
+        pageNumber: number,
+        voiceId?: string,
+        baseOffset?: number,
+      ) => Promise<boolean>)
+    | null
   >(null);
+  const playbackGenerationRef = useRef(0);
+  const sentenceQueueRef = useRef<SentencePlaybackQueue | null>(null);
+  const [sentenceProgress, setSentenceProgress] = useState<{
+    completedWords: number;
+    totalWords: number;
+  } | null>(null);
+
+  // A provider switch starts in the shared store before the backend stop/swap.
+  // Invalidate this component's private queue immediately so an old sink event
+  // cannot advance a sentence or page while the switch is settling.
+  useEffect(() => {
+    if (!switchingProvider) return;
+    playingRef.current = false;
+    playbackGenerationRef.current += 1;
+    sentenceQueueRef.current = null;
+    setSentenceProgress(null);
+  }, [switchingProvider]);
 
   // T050: Audio cache coverage for current document
   const documentId = currentDocument?.id ?? null;
@@ -102,12 +150,7 @@ export function AiPlaybackBar({
       try {
         const page = await pdfService.getPage(pdfDocument, pageNum);
         const textContent = await page.getTextContent();
-        const text = textContent.items
-          .map((item) => ("str" in item ? item.str : ""))
-          .join(" ")
-          .replace(/\s+/g, " ")
-          .trim();
-        return text || null;
+        return buildPdfText(textContent.items).text || null;
       } catch (err) {
         console.error("Error extracting text for page", pageNum, err);
         return null;
@@ -148,9 +191,126 @@ export function AiPlaybackBar({
     }
   }, []);
 
+  const prefetchSentence = useCallback(
+    (queue: SentencePlaybackQueue, index: number) => {
+      if (supportsWordTimings || index >= queue.sentences.length) return;
+      const sentence = queue.sentences[index];
+      queue.prefetchIndex = index;
+      queue.prefetch = aiTtsPrebuffer(
+        sentence.text,
+        selectedVoiceId ?? undefined,
+      )
+        .then(() => undefined)
+        .catch((error) => {
+          console.warn("[AiPlaybackBar] Sentence prebuffer failed:", error);
+        });
+    },
+    [supportsWordTimings, selectedVoiceId],
+  );
+
+  const startNoMarkSentenceSequence = useCallback(
+    async (
+      text: string,
+      pageNumber: number,
+      baseOffset = 0,
+    ): Promise<boolean> => {
+      const sentences = segmentSpeechWithOffsets(text, maxTextUtf8Bytes);
+      if (sentences.length === 0) return false;
+
+      const generation = ++playbackGenerationRef.current;
+      const queue: SentencePlaybackQueue = {
+        pageNumber,
+        sentences,
+        index: 0,
+        generation,
+        baseOffset,
+        prefetchIndex: null,
+        prefetch: null,
+      };
+      sentenceQueueRef.current = queue;
+      setSentenceProgress({
+        completedWords: 0,
+        totalWords: sentences.reduce(
+          (total, sentence) =>
+            total + sentence.text.split(/\s+/u).filter(Boolean).length,
+          0,
+        ),
+      });
+
+      const first = sentences[0];
+      const started =
+        (await speakWithHighlightRef.current?.(
+          first.text,
+          pageNumber,
+          selectedVoiceId ?? undefined,
+          baseOffset + first.charStart,
+        )) ?? false;
+      if (generation !== playbackGenerationRef.current) return false;
+      if (started) prefetchSentence(queue, 1);
+      return started;
+    },
+    [maxTextUtf8Bytes, prefetchSentence, selectedVoiceId],
+  );
+
   // Handle multi-page continuation
   // Uses refs to avoid stale closure (T029)
   const handlePlaybackComplete = useCallback(async () => {
+    const queue = sentenceQueueRef.current;
+    if (queue && queue.generation !== playbackGenerationRef.current) return;
+    if (
+      queue &&
+      queue.generation === playbackGenerationRef.current &&
+      queue.index + 1 < queue.sentences.length &&
+      playingRef.current
+    ) {
+      const completed = queue.sentences[queue.index];
+      const nextIndex = queue.index + 1;
+      if (queue.prefetchIndex === nextIndex && queue.prefetch) {
+        await Promise.race([
+          queue.prefetch,
+          new Promise<void>((resolve) => setTimeout(resolve, 2_500)),
+        ]);
+      }
+      if (queue.generation !== playbackGenerationRef.current) return;
+
+      queue.index = nextIndex;
+      setSentenceProgress((progress) =>
+        progress
+          ? {
+              ...progress,
+              completedWords:
+                progress.completedWords +
+                completed.text.split(/\s+/u).filter(Boolean).length,
+            }
+          : null,
+      );
+      const next = queue.sentences[nextIndex];
+      const started =
+        (await speakWithHighlightRef.current?.(
+          next.text,
+          queue.pageNumber,
+          selectedVoiceId ?? undefined,
+          queue.baseOffset + next.charStart,
+        )) ?? false;
+      if (
+        queue.generation !== playbackGenerationRef.current ||
+        sentenceQueueRef.current !== queue
+      ) {
+        return;
+      }
+      if (!started) {
+        playingRef.current = false;
+        sentenceQueueRef.current = null;
+        setSentenceProgress(null);
+        return;
+      }
+      prefetchSentence(queue, nextIndex + 1);
+      return;
+    }
+
+    if (queue && sentenceQueueRef.current !== queue) return;
+    sentenceQueueRef.current = null;
+    setSentenceProgress(null);
     console.debug("[AiPlaybackBar] Playback complete, checking for next page");
 
     if (!autoPageEnabled || !playingRef.current) {
@@ -170,12 +330,19 @@ export function AiPlaybackBar({
       // Navigate to next page
       setCurrentPage(nextPage);
 
-      // Small delay to let page render, then continue TTS
+      // Small delay to let page render, then continue TTS. A Stop or newer
+      // Play invalidates this delayed continuation.
+      const generation = playbackGenerationRef.current;
       setTimeout(async () => {
-        if (playingRef.current) {
+        if (
+          playingRef.current &&
+          generation === playbackGenerationRef.current
+        ) {
           const nextText = await getPageText(nextPage);
           if (nextText && playingRef.current) {
-            if (supportsWordTimings) {
+            if (!supportsWordTimings) {
+              await startNoMarkSentenceSequence(nextText, nextPage, 0);
+            } else if (usesWordHighlighting) {
               await speakWithHighlightRef.current?.(nextText, nextPage);
             } else {
               await speak(nextText);
@@ -193,8 +360,12 @@ export function AiPlaybackBar({
     autoPageEnabled,
     setCurrentPage,
     getPageText,
-    supportsWordTimings,
+    usesWordHighlighting,
+    startNoMarkSentenceSequence,
+    selectedVoiceId,
+    prefetchSentence,
     speak,
+    supportsWordTimings,
   ]);
 
   // Plain/no-mark providers complete from the real sink-drained event recorded
@@ -243,7 +414,13 @@ export function AiPlaybackBar({
     ? isHighlightPaused
     : playbackState === "paused";
   const isLoading = playbackState === "loading";
-  const canPlay = initialized && !error;
+  const canPlay = initialized && !error && !switchingProvider;
+  const progressTotal = sentenceProgress?.totalWords ?? wordTimings.length;
+  const progressCurrent = Math.min(
+    progressTotal,
+    (sentenceProgress?.completedWords ?? 0) +
+      (currentWordIndex >= 0 ? currentWordIndex + 1 : 0),
+  );
 
   // Screen reader announcements for TTS state changes (T039)
   const { announce } = useAnnounce();
@@ -268,7 +445,7 @@ export function AiPlaybackBar({
   }, [isPlaying, isPaused, announce]);
 
   const handlePlay = useCallback(async () => {
-    if (!canPlay) return;
+    if (!canPlay || isLoading) return;
 
     if (isPaused) {
       if (usesWordHighlighting) {
@@ -277,27 +454,34 @@ export function AiPlaybackBar({
         await resume();
       }
     } else {
+      if (supportsWordTimings) playbackGenerationRef.current += 1;
       playingRef.current = true;
       const text = await getText();
+      const baseOffset = getTextBaseOffset?.() ?? 0;
       if (text) {
-        if (usesWordHighlighting) {
-          await speakWithHighlight(text, currentPage);
-        } else {
-          await speak(text);
-        }
+        const started = !supportsWordTimings
+          ? await startNoMarkSentenceSequence(text, currentPage, baseOffset)
+          : usesWordHighlighting
+            ? await speakWithHighlight(text, currentPage, undefined, baseOffset)
+            : await speak(text);
+        if (started === false) playingRef.current = false;
       } else {
         playingRef.current = false;
       }
     }
   }, [
     canPlay,
+    isLoading,
     isPaused,
     getText,
+    getTextBaseOffset,
     speak,
     resume,
     speakWithHighlight,
     resumeHighlight,
     usesWordHighlighting,
+    supportsWordTimings,
+    startNoMarkSentenceSequence,
     currentPage,
   ]);
 
@@ -319,14 +503,21 @@ export function AiPlaybackBar({
   // is what they see instead of a silent no-op.
   const consumedAutoPlayToken = useRef(0);
   useEffect(() => {
-    if (autoPlayToken > consumedAutoPlayToken.current && canPlay) {
+    if (
+      autoPlayToken > consumedAutoPlayToken.current &&
+      canPlay &&
+      !isLoading
+    ) {
       consumedAutoPlayToken.current = autoPlayToken;
       void handlePlay();
     }
-  }, [autoPlayToken, canPlay, handlePlay]);
+  }, [autoPlayToken, canPlay, isLoading, handlePlay]);
 
   const handleStop = useCallback(async () => {
     playingRef.current = false;
+    playbackGenerationRef.current += 1;
+    sentenceQueueRef.current = null;
+    setSentenceProgress(null);
     if (usesWordHighlighting) {
       await stopHighlight();
     } else {
@@ -493,26 +684,47 @@ export function AiPlaybackBar({
             className="ai-playback-progress-bar"
             style={{
               width:
-                wordTimings.length > 0
-                  ? ((currentWordIndex + 1) / wordTimings.length) * 100 + "%"
+                progressTotal > 0
+                  ? (progressCurrent / progressTotal) * 100 + "%"
                   : "0%",
             }}
           />
           <span className="ai-playback-progress-text">
-            {currentWordIndex + 1} / {wordTimings.length} (Page {currentPage}/
-            {totalPages})
+            {progressCurrent} / {progressTotal} (Page {currentPage}/{totalPages}
+            )
           </span>
         </div>
       )}
 
       {/* Audio cache coverage indicator (T050) */}
-      {documentId && (
+      {documentId && !isHighlightActive && wordTimings.length === 0 && (
         <AudioCacheProgress documentId={documentId} variant="compact" />
       )}
 
       <div className="ai-playback-settings-section">
-        <AiVoiceSelector disabled={isPlaying} />
-        <AiSpeedSlider disabled={false} />
+        {connectedProviders.length > 1 && (
+          <select
+            className="ai-playback-provider-select"
+            aria-label="Narration connection"
+            value={provider}
+            disabled={Boolean(switchingProvider)}
+            onChange={(event) => {
+              void switchProvider(event.target.value as typeof provider);
+            }}
+          >
+            {connectedProviders.map((connectedProvider) => (
+              <option key={connectedProvider} value={connectedProvider}>
+                {connectedProvider === "local"
+                  ? "Local TTS"
+                  : connectedProvider === "groq"
+                    ? "Groq"
+                    : "ElevenLabs"}
+              </option>
+            ))}
+          </select>
+        )}
+        <AiVoiceSelector disabled={isPlaying || Boolean(switchingProvider)} />
+        <AiSpeedSlider disabled={isPlaying || isPaused || isLoading} />
 
         {/* Export audiobook button (T090) */}
         <button
@@ -548,23 +760,19 @@ export function AiPlaybackBar({
         <button
           className="ai-playback-button ai-playback-button-settings"
           onClick={() => setShowSettings(!showSettings)}
-          title="TTS Settings"
+          title="Voice settings"
+          aria-label="Voice settings"
         >
           <svg viewBox="0 0 24 24" className="ai-playback-icon">
-            <circle
-              cx="12"
-              cy="12"
-              r="3"
-              stroke="currentColor"
-              strokeWidth="2"
-              fill="none"
-            />
             <path
-              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
+              d="M4 6h10M18 6h2M4 12h2M10 12h10M4 18h7M15 18h5"
               stroke="currentColor"
               strokeWidth="2"
               fill="none"
             />
+            <circle cx="16" cy="6" r="2" fill="currentColor" />
+            <circle cx="8" cy="12" r="2" fill="currentColor" />
+            <circle cx="13" cy="18" r="2" fill="currentColor" />
           </svg>
         </button>
       </div>

@@ -21,6 +21,14 @@ interface ToolbarProps {
    * and the user kept staring at the library).
    */
   onOpen?: () => void;
+  /** Whether the shell is currently showing the Library home. */
+  isLibraryShowing?: boolean;
+  /** Returns from an open document to the Library without closing the book. */
+  onLibrary?: () => void;
+  /** Whether the PDF outline panel is open. */
+  isContentsOpen?: boolean;
+  /** Opens the current PDF's chapters/outline. */
+  onContents?: () => void;
   /** Opens the app-wide settings panel owned by the reader shell. */
   onSettings?: () => void;
 }
@@ -28,6 +36,10 @@ interface ToolbarProps {
 export function Toolbar({
   onSessionRestored,
   onOpen,
+  isLibraryShowing = true,
+  onLibrary,
+  isContentsOpen = false,
+  onContents,
   onSettings,
 }: Readonly<ToolbarProps>) {
   const [isSessionMenuOpen, setIsSessionMenuOpen] = useState(false);
@@ -43,6 +55,7 @@ export function Toolbar({
   });
 
   const { currentDocument, pdfDocument, isLoading } = useDocumentStore();
+  const readerActionOffset = !isLibraryShowing && pdfDocument ? 2 : 0;
 
   const handleOpenFile = async () => {
     if (isLoading) return;
@@ -68,6 +81,49 @@ export function Toolbar({
         aria-label="Document toolbar"
       >
         <div className="toolbar-section toolbar-left">
+          {!isLibraryShowing && (
+            <button
+              type="button"
+              className="toolbar-button toolbar-roving-item library-button"
+              onClick={onLibrary}
+              title="Back to library"
+              aria-label="Back to library"
+              {...getItemProps(0)}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="toolbar-icon"
+                aria-hidden="true"
+              >
+                <path d="M3 11.5L12 4l9 7.5" />
+                <path d="M5.5 10.5V20h13v-9.5M9 20v-6h6v6" />
+              </svg>
+              <span className="button-text">Back to library</span>
+            </button>
+          )}
+
+          {!isLibraryShowing && pdfDocument && (
+            <button
+              type="button"
+              className="toolbar-button toolbar-roving-item contents-button"
+              onClick={onContents}
+              title="Chapters"
+              aria-label="Chapters"
+              aria-pressed={isContentsOpen}
+              {...getItemProps(1)}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="toolbar-icon"
+                aria-hidden="true"
+              >
+                <path d="M4 5h3M4 12h3M4 19h3" />
+                <path d="M10 5h10M10 12h10M10 19h10" />
+              </svg>
+              <span className="button-text">Chapters</span>
+            </button>
+          )}
+
           <button
             type="button"
             className="toolbar-button toolbar-roving-item sessions-button"
@@ -75,7 +131,7 @@ export function Toolbar({
             title="Reading Sessions"
             aria-label="Sessions"
             aria-pressed={isSessionMenuOpen}
-            {...getItemProps(0)}
+            {...getItemProps(readerActionOffset)}
           >
             <svg
               viewBox="0 0 24 24"
@@ -96,7 +152,7 @@ export function Toolbar({
             aria-disabled={isLoading}
             aria-label="Open PDF"
             title="Open PDF file"
-            {...getItemProps(1)}
+            {...getItemProps(readerActionOffset + 1)}
           >
             <svg
               viewBox="0 0 24 24"
@@ -108,7 +164,7 @@ export function Toolbar({
             <span className="button-text">Open</span>
           </button>
 
-          {currentDocument && (
+          {currentDocument && !isLibraryShowing && (
             <span className="document-title" title={currentDocument.filePath}>
               {currentDocument.title || "Untitled"}
             </span>
@@ -116,18 +172,18 @@ export function Toolbar({
         </div>
 
         <div className="toolbar-section toolbar-center">
-          {pdfDocument && <PageNavigation />}
+          {pdfDocument && !isLibraryShowing && <PageNavigation />}
         </div>
 
         <div className="toolbar-section toolbar-right">
-          {pdfDocument && <ZoomControls />}
+          {pdfDocument && !isLibraryShowing && <ZoomControls />}
           <button
             type="button"
             className="toolbar-button toolbar-roving-item settings-button"
             onClick={onSettings}
             title="Settings"
             aria-label="Settings"
-            {...getItemProps(2)}
+            {...getItemProps(readerActionOffset + 2)}
           >
             <svg
               viewBox="0 0 24 24"

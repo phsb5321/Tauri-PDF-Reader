@@ -404,9 +404,11 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
         session_remove_document,
         session_update_document,
         session_touch,
-        // User config file + config-owned local TTS initialization
+        // User config file + typed narration connection operations
         config_get_effective,
         ai_tts_init_local,
+        ai_tts_init_groq,
+        ai_tts_switch_provider,
     ])
 }
 
@@ -757,6 +759,10 @@ pub fn run() {
             ai_tts_init,
             #[cfg(feature = "elevenlabs-tts")]
             ai_tts_init_local,
+            #[cfg(feature = "elevenlabs-tts")]
+            ai_tts_init_groq,
+            #[cfg(feature = "elevenlabs-tts")]
+            ai_tts_switch_provider,
             #[cfg(feature = "elevenlabs-tts")]
             ai_tts_list_voices,
             #[cfg(feature = "elevenlabs-tts")]

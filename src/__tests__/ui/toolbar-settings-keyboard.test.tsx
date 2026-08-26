@@ -37,10 +37,37 @@ beforeEach(() => {
   });
 });
 
-describe("toolbar Settings keyboard reachability", () => {
-  it("keeps shell roving indices stable with reader controls and loading Open", () => {
-    render(<Toolbar onSettings={vi.fn()} />);
+describe("toolbar shell-action reachability", () => {
+  it("exposes visible routes to the library and chapters", () => {
+    const onLibrary = vi.fn();
+    const onContents = vi.fn();
+    render(
+      <Toolbar
+        isLibraryShowing={false}
+        onLibrary={onLibrary}
+        onContents={onContents}
+        onSettings={vi.fn()}
+      />,
+    );
 
+    fireEvent.click(screen.getByRole("button", { name: "Back to library" }));
+    fireEvent.click(screen.getByRole("button", { name: "Chapters" }));
+    expect(onLibrary).toHaveBeenCalledOnce();
+    expect(onContents).toHaveBeenCalledOnce();
+  });
+
+  it("keeps shell roving indices stable with reader controls and loading Open", () => {
+    render(
+      <Toolbar
+        isLibraryShowing={false}
+        onLibrary={vi.fn()}
+        onContents={vi.fn()}
+        onSettings={vi.fn()}
+      />,
+    );
+
+    const library = screen.getByRole("button", { name: "Back to library" });
+    const chapters = screen.getByRole("button", { name: "Chapters" });
     const sessions = screen.getByRole("button", { name: "Sessions" });
     const open = screen.getByRole("button", { name: "Open PDF" });
     const settings = screen.getByRole("button", { name: "Settings" });
@@ -48,7 +75,13 @@ describe("toolbar Settings keyboard reachability", () => {
     expect(open).toHaveAttribute("aria-disabled", "true");
     expect(open).not.toBeDisabled();
 
-    act(() => sessions.focus());
+    act(() => library.focus());
+    fireEvent.keyDown(library, { key: "ArrowRight" });
+    expect(chapters).toHaveFocus();
+
+    fireEvent.keyDown(chapters, { key: "ArrowRight" });
+    expect(sessions).toHaveFocus();
+
     fireEvent.keyDown(sessions, { key: "ArrowRight" });
     expect(open).toHaveFocus();
 

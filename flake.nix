@@ -120,6 +120,14 @@
           # bindgen (used transitively by several -sys crates) needs libclang.
           LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
 
+          # GTK's compiled schemas live under Nix's share/gsettings-schemas
+          # roots, not the ordinary package share roots setup.sh adds to
+          # XDG_DATA_DIRS. Without this bridge, opening the native file chooser
+          # aborts the whole app with "No GSettings schemas are installed".
+          shellHook = ''
+            export XDG_DATA_DIRS="$GSETTINGS_SCHEMAS_PATH''${XDG_DATA_DIRS:+:$XDG_DATA_DIRS}"
+          '';
+
           # Headless GL on a NON-NixOS lane host (143). The nix-built WebKit
           # resolves GL through libglvnd, which looks for drivers in
           # /run/opengl-driver — a NixOS-only path that does not exist on the

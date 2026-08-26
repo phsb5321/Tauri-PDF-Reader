@@ -47,14 +47,21 @@ describe("TableOfContents", () => {
         children: [{ title: "Section", pageNumber: 3, children: [] }],
       },
     ]);
-    render(<TableOfContents isOpen onClose={vi.fn()} />);
+    const onClose = vi.fn();
+    render(<TableOfContents isOpen onClose={onClose} />);
 
-    await screen.findByRole("button", { name: /Chapter/ });
-    fireEvent.click(screen.getByRole("button", { name: "Expand" }));
+    const chapter = await screen.findByRole("button", {
+      name: /^Chapter 2$/,
+    });
+    expect(chapter).toHaveAttribute("aria-current", "page");
+    fireEvent.click(screen.getByRole("button", { name: "Expand Chapter" }));
     fireEvent.click(screen.getByRole("button", { name: /Section/ }));
 
-    expect(setCurrentPage).toHaveBeenCalledWith(3);
-    expect(screen.getByRole("button", { name: "Collapse" })).toBeVisible();
+    await waitFor(() => expect(setCurrentPage).toHaveBeenCalledWith(3));
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(
+      screen.getByRole("button", { name: "Collapse Chapter" }),
+    ).toHaveAttribute("aria-expanded", "true");
   });
 
   it("closes from the native dialog backdrop and Escape key", async () => {

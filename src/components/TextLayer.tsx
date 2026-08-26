@@ -16,6 +16,10 @@ export interface TextSelection {
   text: string;
   rects: Rect[];
   pageNumber: number;
+  /** Selected word through the end of the page, normalized for narration. */
+  narrationText?: string;
+  /** UTF-16 offset of narrationText within the full PDF text layer. */
+  narrationOffset?: number;
 }
 
 function clearContainer(container: HTMLElement): void {

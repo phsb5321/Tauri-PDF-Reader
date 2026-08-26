@@ -3,10 +3,10 @@
 
 :root {
   font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
-  /* Keep the rem scale relative to the browser/OS preference while making the
-     default UI one step more readable. A percentage composes with a user's
-     chosen base size; a fixed px root would replace it (the Slice 111 defect). */
-  font-size: 112.5%;
+  /* Compose the app's adjustable chrome scale with the browser/OS preference.
+     A percentage-based root preserves platform text sizing; fixed px would
+     replace it. The desktop default is 125%, adjustable in Appearance. */
+  font-size: 125%;
   line-height: var(--leading-normal);
   font-weight: 400;
 

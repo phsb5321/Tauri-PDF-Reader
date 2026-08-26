@@ -61,6 +61,9 @@ describe("tts-highlight-store", () => {
     expect(s.currentWordIndex).toBe(-1);
     expect(s.playbackStartTime).toBeNull();
     expect(s.pausedAtTime).toBeNull();
+    expect(s.wordTimings).toEqual([]);
+    expect(s.currentText).toBeNull();
+    expect(s.pageNumber).toBeNull();
   });
 
   it("pauseHighlighting records elapsed time when active", () => {

@@ -107,6 +107,26 @@ async function physicalFileDrag(filePath, onHover) {
   }
 }
 
+function physicalWheel(button, modified) {
+  const appWindow = xdotool("search", "--name", "^Lectrice$").split(/\s+/)[0];
+  if (!appWindow) throw new Error("Lectrice X11 window not found");
+  const geometry = windowGeometry(appWindow);
+  xdotool("windowraise", appWindow);
+  xdotool("windowfocus", "--sync", appWindow);
+  xdotool(
+    "mousemove",
+    "--sync",
+    String(geometry.x + Math.floor(geometry.width / 2)),
+    String(geometry.y + Math.floor(geometry.height / 2)),
+  );
+  if (modified) xdotool("keydown", "ctrl");
+  try {
+    xdotool("click", String(button));
+  } finally {
+    if (modified) xdotool("keyup", "ctrl");
+  }
+}
+
 async function cardByTitle(title) {
   const cards = await $$(".document-card");
   for (const card of cards) {
@@ -182,6 +202,24 @@ describe("packaged legacy library completeness", () => {
       expect(await status.getAttribute("aria-label")).toBe(
         "Session “Legacy readable book” created",
       );
+
+      await browser.setWindowSize(1200, 800);
+      const zoomPercent = async () =>
+        Number.parseInt(await $(".zoom-percentage").getText(), 10);
+      const zoomBeforeWheel = await zoomPercent();
+      physicalWheel(4, true);
+      await browser.waitUntil(
+        async () => (await zoomPercent()) > zoomBeforeWheel,
+        {
+          timeout: 10000,
+          timeoutMsg: "Ctrl+wheel-up did not zoom the PDF",
+        },
+      );
+      const zoomAfterCtrlWheel = await zoomPercent();
+      physicalWheel(5, false);
+      await delay(300);
+      expect(await zoomPercent()).toBe(zoomAfterCtrlWheel);
+
       await browser.setWindowSize(640, 800);
       const readerNarrow = await browser.execute(() => {
         const toolbar = document
@@ -204,12 +242,35 @@ describe("packaged legacy library completeness", () => {
         readerNarrow.viewport + 1,
       );
       expect(readerNarrow.shellNames).toEqual([
+        "Back to library",
+        "Chapters",
         "Sessions",
         "Open PDF",
         "Settings",
       ]);
       await browser.saveScreenshot(`${process.env.RUN_ROOT}/drop-success.png`);
       await status.$("button").click();
+
+      const chaptersAction = await $('button[aria-label="Chapters"]');
+      await chaptersAction.waitForClickable({ timeout: 10000 });
+      await chaptersAction.click();
+      const contentsDialog = await $('dialog[aria-labelledby="toc-title"]');
+      await contentsDialog.waitForDisplayed({
+        timeout: 10000,
+        timeoutMsg: "visible Chapters action did not open the PDF outline",
+      });
+      await contentsDialog
+        .$('button[aria-label="Close table of contents"]')
+        .click();
+      await contentsDialog.waitForDisplayed({ reverse: true, timeout: 10000 });
+
+      const libraryAction = await $('button[aria-label="Back to library"]');
+      await libraryAction.waitForClickable({ timeout: 10000 });
+      await libraryAction.click();
+      await $(".library-view").waitForDisplayed({
+        timeout: 10000,
+        timeoutMsg: "visible Back to library action did not return home",
+      });
 
       await physicalFileDrag(process.env.NON_PDF, hover);
       const alert = await $(".library-error-banner");
@@ -249,6 +310,13 @@ describe("packaged legacy library completeness", () => {
         status: "Session “Legacy readable book” created",
         invalidError: "DROP_INVALID",
         viewerDisplayed: true,
+        chaptersSurface: true,
+        ctrlWheel: {
+          before: zoomBeforeWheel,
+          after: zoomAfterCtrlWheel,
+          ordinaryWheelPreservedZoom: true,
+        },
+        returnedToLibrary: true,
         activeSession: "Legacy readable book",
         readerNarrow,
       };

@@ -1,0 +1,27 @@
+warning: Git tree '/home/notroot/Documents/Code/personal/tauri-pdf-reader-177-library-completeness' is dirty
+   Compiling tauri-pdf-reader v0.2.0 (/home/notroot/Documents/Code/personal/tauri-pdf-reader-177-library-completeness/src-tauri)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 42.84s
+
+> lectrice@0.2.0 test:e2e /home/notroot/Documents/Code/personal/tauri-pdf-reader-177-library-completeness
+> wdio run wdio.conf.mjs
+
+
+Execution of 1 workers started at 2026-08-25T21:14:43.944Z
+
+[0-0] RUNNING in undefined - file:///e2e/local-tts.e2e.mjs
+GStreamer element appsink not found. Please install it.
+[0-0] PASSED in undefined - file:///e2e/local-tts.e2e.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[wry 0.53.5 linux #0-0] Running: wry (v0.53.5) on linux
+[wry 0.53.5 linux #0-0] Session ID: 29924e67-dec1-445b-8d8f-0af4cff28c73
+[wry 0.53.5 linux #0-0]
+[wry 0.53.5 linux #0-0] » e2e/local-tts.e2e.mjs
+[wry 0.53.5 linux #0-0] Local TTS (native config → Rust HTTP → WAV playback)
+[wry 0.53.5 linux #0-0]    ✓ plays through local sentence audio with an estimated read-along
+[wry 0.53.5 linux #0-0]
+[wry 0.53.5 linux #0-0] 1 passing (1.1s)
+
+
+Spec Files:	 1 passed, 1 total (100% completed) in 00:00:03

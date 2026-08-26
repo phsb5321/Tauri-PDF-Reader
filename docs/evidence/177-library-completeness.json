@@ -4,20 +4,20 @@
       "text": "Legacy readable book",
       "displayed": true,
       "rect": {
-        "x": 252,
-        "y": 571,
-        "width": 234,
-        "height": 23
+        "x": 265,
+        "y": 608,
+        "width": 228,
+        "height": 25
       }
     },
     {
       "text": "Missing book control",
       "displayed": true,
       "rect": {
-        "x": 528,
-        "y": 571,
-        "width": 234,
-        "height": 23
+        "x": 545,
+        "y": 608,
+        "width": 228,
+        "height": 25
       }
     }
   ],
@@ -38,6 +38,13 @@
     "status": "Session “Legacy readable book” created",
     "invalidError": "DROP_INVALID",
     "viewerDisplayed": true,
+    "chaptersSurface": true,
+    "ctrlWheel": {
+      "before": 62,
+      "after": 69,
+      "ordinaryWheelPreservedZoom": true
+    },
+    "returnedToLibrary": true,
     "activeSession": "Legacy readable book",
     "readerNarrow": {
       "toolbar": {
@@ -46,7 +53,13 @@
         "right": 614.172119140625
       },
       "viewport": 614,
-      "shellNames": ["Sessions", "Open PDF", "Settings"]
+      "shellNames": [
+        "Back to library",
+        "Chapters",
+        "Sessions",
+        "Open PDF",
+        "Settings"
+      ]
     }
   }
 }

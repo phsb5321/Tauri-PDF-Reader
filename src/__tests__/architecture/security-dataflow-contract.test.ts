@@ -47,6 +47,7 @@ const BACKEND_MARKERS = [/reqwest::/];
 /** The egress modules SECURITY.md names, relative to the repo root. */
 const DOCUMENTED_FRONTEND = new Set([]);
 const DOCUMENTED_BACKEND = new Set([
+  "src-tauri/src/adapters/groq_tts.rs",
   "src-tauri/src/adapters/local_tts.rs",
   "src-tauri/src/ai_tts/elevenlabs.rs",
 ]);

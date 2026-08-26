@@ -12,7 +12,7 @@
  * @module components/reader/ReaderView
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppLayout } from "../layout/AppLayout";
 import { Toolbar } from "../Toolbar";
 import { PdfViewer } from "../PdfViewer";
@@ -20,6 +20,7 @@ import { LibraryView } from "../library/LibraryView";
 import { AiPlaybackBar } from "../playback-bar/AiPlaybackBar";
 import { SettingsPanel } from "../settings/SettingsPanel";
 import { HighlightsPanel } from "../highlights/HighlightsPanel";
+import { TableOfContents } from "../sidebar/TableOfContents";
 import { useDocumentStore } from "../../stores/document-store";
 import { useAiTtsStore } from "../../stores/ai-tts-store";
 import { pdfService } from "../../services/pdf-service";
@@ -40,6 +41,7 @@ import { useCommandKeys } from "../../hooks/useCommandKeys";
 import { usePageNavigation } from "../../hooks/usePageNavigation";
 import { aiTtsPause, aiTtsResume } from "../../lib/tauri-invoke";
 import { libraryGetDocument } from "../../lib/api/library";
+import { buildPdfText } from "../../lib/pdf-text";
 import { useSessionStore } from "../../stores/session-store";
 import type { Document, Highlight } from "../../lib/schemas";
 import "./ReaderView.css";
@@ -63,6 +65,7 @@ export function ReaderView() {
   const createSession = useSessionStore((state) => state.createSession);
   const restoreSession = useSessionStore((state) => state.restoreSession);
   const deleteSession = useSessionStore((state) => state.deleteSession);
+  const playbackState = useAiTtsStore((state) => state.playbackState);
 
   // The reading home is the landing surface, so this starts true: a reader with
   // nothing loaded has nothing to show, and the library is where a returning
@@ -93,6 +96,7 @@ export function ReaderView() {
   // on the reading home — where they would go first to enter an API key —
   // must be able to reach it too.
   const [showSettings, setShowSettings] = useState(false);
+  const [showContents, setShowContents] = useState(false);
 
   // Highlights: the panel is document-scoped, so it lives at the shell level
   // (like settings) and is gated on a document being open. The native
@@ -138,6 +142,16 @@ export function ReaderView() {
   // a second resume-and-play (a different book) fire again even if the
   // previous one never actually started.
   const [autoPlayToken, setAutoPlayToken] = useState(0);
+  const pendingNarrationRef = useRef<{
+    text: string;
+    baseOffset: number;
+  } | null>(null);
+  const activeNarrationOffsetRef = useRef(0);
+  const handleReadFromHere = useCallback((text: string, baseOffset: number) => {
+    pendingNarrationRef.current = { text, baseOffset };
+    setAutoPlayToken((token) => token + 1);
+  }, []);
+
   const handleResumeAndPlay = useCallback(
     async (document: Document) => {
       if (await resumeDocument(document)) {
@@ -300,30 +314,31 @@ export function ReaderView() {
 
   // Get text content from current page for TTS
   const getCurrentPageText = useCallback(async (): Promise<string | null> => {
+    const selectedTail = pendingNarrationRef.current;
+    if (selectedTail) {
+      pendingNarrationRef.current = null;
+      activeNarrationOffsetRef.current = selectedTail.baseOffset;
+      return selectedTail.text;
+    }
+    activeNarrationOffsetRef.current = 0;
     if (!pdfDocument) return null;
 
     try {
       const page = await pdfService.getPage(pdfDocument, currentPage);
       const textContent = await page.getTextContent();
 
-      // Extract text from text items
-      const text = textContent.items
-        .map((item) => {
-          if ("str" in item) {
-            return item.str;
-          }
-          return "";
-        })
-        .join(" ")
-        .replace(/\s+/g, " ")
-        .trim();
-
-      return text || null;
+      return buildPdfText(textContent.items).text || null;
     } catch (error) {
       console.error("Error extracting text:", error);
       return null;
     }
   }, [pdfDocument, currentPage]);
+
+  const consumeNarrationBaseOffset = useCallback(() => {
+    const offset = activeNarrationOffsetRef.current;
+    activeNarrationOffsetRef.current = 0;
+    return offset;
+  }, []);
 
   // Nothing loaded means nothing to read, so the home wins regardless of the
   // toggle. The playback bar is deliberately NOT tied to this: audio started in
@@ -337,13 +352,22 @@ export function ReaderView() {
         <Toolbar
           onSessionRestored={handleSessionRestored}
           onOpen={() => setShowLibrary(false)}
+          isLibraryShowing={libraryShowing}
+          onLibrary={() => {
+            setShowContents(false);
+            setShowLibrary(true);
+          }}
+          isContentsOpen={showContents}
+          onContents={() => setShowContents((open) => !open)}
           onSettings={() => setShowSettings(true)}
         />
       }
       footer={
-        pdfDocument && (
+        pdfDocument &&
+        (!libraryShowing || playbackState !== "idle") && (
           <AiPlaybackBar
             getText={getCurrentPageText}
+            getTextBaseOffset={consumeNarrationBaseOffset}
             autoPlayToken={autoPlayToken}
           />
         )
@@ -411,7 +435,7 @@ export function ReaderView() {
             />
           </div>
         ) : (
-          <PdfViewer />
+          <PdfViewer onReadFromHere={handleReadFromHere} />
         )}
         {showHighlights && currentDocument && (
           <HighlightsPanel
@@ -423,6 +447,10 @@ export function ReaderView() {
           />
         )}
       </div>
+      <TableOfContents
+        isOpen={showContents && !libraryShowing}
+        onClose={() => setShowContents(false)}
+      />
       <SettingsPanel
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}

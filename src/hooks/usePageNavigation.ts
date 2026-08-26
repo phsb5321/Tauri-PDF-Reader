@@ -32,11 +32,8 @@ import { aiTtsStop } from "../lib/tauri-invoke";
  * second press. The store clamps the result to `[1, totalPages]`, so a delta
  * that would leave the document is a no-op rather than an error.
  */
-export async function navigatePageBy(delta: number): Promise<void> {
+async function stopPlaybackForNavigation(): Promise<void> {
   const { playbackState } = useAiTtsStore.getState();
-
-  // Mirrors PageNavigation's on-navigation guard: audio for the page you just
-  // left is worse than a moment of silence.
   if (
     playbackState === "loading" ||
     playbackState === "playing" ||
@@ -48,10 +45,20 @@ export async function navigatePageBy(delta: number): Promise<void> {
       console.error("Failed to stop TTS on navigation:", error);
     }
   }
+}
+
+export async function navigatePageBy(delta: number): Promise<void> {
+  await stopPlaybackForNavigation();
 
   // After the await, deliberately. See the module note.
   const { currentPage, setCurrentPage } = useDocumentStore.getState();
   setCurrentPage(currentPage + delta);
+}
+
+/** Jump to an absolute page with the same stop-audio-first ordering. */
+export async function navigateToPage(pageNumber: number): Promise<void> {
+  await stopPlaybackForNavigation();
+  useDocumentStore.getState().setCurrentPage(pageNumber);
 }
 
 /**

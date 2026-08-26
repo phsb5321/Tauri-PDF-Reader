@@ -3,8 +3,10 @@
 //! Provides commands for text-to-speech using AI providers like ElevenLabs.
 //! Includes cache management commands for persisted audio.
 
+#[cfg(not(feature = "e2e-tts-fixture"))]
+use crate::adapters::GroqTtsClient;
 use crate::adapters::{CacheInfo, ClearResult, LocalTtsClient};
-use crate::ai_tts::{AiTtsEngine, TtsConfig, VoiceInfo, WordTiming};
+use crate::ai_tts::{AiTtsEngine, TtsConfig, TtsProvider, VoiceInfo, WordTiming};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::sync::Arc;
@@ -16,11 +18,14 @@ pub struct AiTtsEngineState(pub Arc<RwLock<AiTtsEngine>>);
 
 // Response types
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct InitResponse {
     pub success: bool,
     pub voices_count: usize,
+    pub provider: TtsProvider,
+    pub supports_word_timings: bool,
+    pub max_text_utf8_bytes: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize, Type)]
@@ -30,7 +35,28 @@ pub struct InitLocalResponse {
     pub voices_count: usize,
     pub provider: String,
     pub supports_word_timings: bool,
+    pub max_text_utf8_bytes: usize,
     pub destination: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct InitGroqResponse {
+    pub success: bool,
+    pub voices_count: usize,
+    pub provider: TtsProvider,
+    pub supports_word_timings: bool,
+    pub max_text_utf8_bytes: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SwitchProviderResponse {
+    pub success: bool,
+    pub provider: TtsProvider,
+    pub voices_count: usize,
+    pub supports_word_timings: bool,
+    pub max_text_utf8_bytes: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -111,28 +137,35 @@ pub async fn ai_tts_init(
     state: State<'_, AiTtsEngineState>,
     api_key: String,
 ) -> Result<InitResponse, String> {
-    // E2E fixture mode: succeed without contacting ElevenLabs so the real play
-    // button renders (canPlay = initialized && !error) under WebDriver/Xvfb.
+    // E2E fixture mode installs an in-memory provider with no network/audio.
     #[cfg(feature = "e2e-tts-fixture")]
     {
-        let _ = (&state, &api_key);
+        let _ = api_key;
+        let engine = state.0.read().await;
+        engine.install_fixture(TtsProvider::ElevenLabs).await?;
         return Ok(InitResponse {
             success: true,
             voices_count: 1,
+            provider: TtsProvider::ElevenLabs,
+            supports_word_timings: true,
+            max_text_utf8_bytes: 10_000,
         });
     }
 
     #[cfg(not(feature = "e2e-tts-fixture"))]
     {
-        let mut engine = state.0.write().await;
-
+        let engine = state.0.read().await;
         engine.init(api_key).await?;
-
-        let voices = engine.list_voices().await?;
-
+        let (_, max_text_utf8_bytes, voices_count) = engine
+            .provider_capabilities(TtsProvider::ElevenLabs)
+            .await
+            .ok_or("TTS_PROVIDER_NOT_CONNECTED: ElevenLabs")?;
         Ok(InitResponse {
             success: true,
-            voices_count: voices.len(),
+            voices_count,
+            provider: TtsProvider::ElevenLabs,
+            supports_word_timings: true,
+            max_text_utf8_bytes,
         })
     }
 }
@@ -151,27 +184,90 @@ pub async fn ai_tts_init_local(
             .map(|error| format!("LOCAL_TTS_CONFIG: {error}"))
             .unwrap_or_else(|| "LOCAL_TTS_CONFIG: no native config file loaded".to_string()));
     }
-    if outcome.config.ai_tts.provider != crate::config::schema::AiTtsProvider::Local {
-        return Err("LOCAL_TTS_CONFIG: ai_tts.provider is not local".to_string());
-    }
     let destination = outcome
         .config
         .ai_tts
         .local_url
         .ok_or("LOCAL_TTS_CONFIG: ai_tts.local_url is missing")?;
-    // Network preflight happens before the write lock. Stop/page-change can
-    // still reach the current engine while a dead local service times out.
+    // Network preflight happens before touching engine state. Stop/page-change
+    // can still cancel the currently active provider while this host is down.
     let client = LocalTtsClient::connect(&destination).await?;
-    let mut engine = state.0.write().await;
+    let engine = state.0.read().await;
     engine.install_local(client).await?;
-    let voices = engine.list_voices().await?;
-    let supports_word_timings = engine.supports_word_timings();
+    let (supports_word_timings, max_text_utf8_bytes, voices_count) = engine
+        .provider_capabilities(TtsProvider::Local)
+        .await
+        .ok_or("TTS_PROVIDER_NOT_CONNECTED: Local")?;
     Ok(InitLocalResponse {
         success: true,
-        voices_count: voices.len(),
+        voices_count,
         provider: "local".to_string(),
         supports_word_timings,
+        max_text_utf8_bytes,
         destination,
+    })
+}
+
+/// Connect Groq with a session-only API key. The production destination/model
+/// are pinned inside the adapter and cannot be supplied by the WebView.
+#[tauri::command]
+#[specta::specta]
+pub async fn ai_tts_init_groq(
+    state: State<'_, AiTtsEngineState>,
+    api_key: String,
+) -> Result<InitGroqResponse, String> {
+    #[cfg(feature = "e2e-tts-fixture")]
+    {
+        let _ = api_key;
+        let engine = state.0.read().await;
+        engine.install_fixture(TtsProvider::Groq).await?;
+        return Ok(InitGroqResponse {
+            success: true,
+            voices_count: 6,
+            provider: TtsProvider::Groq,
+            supports_word_timings: false,
+            max_text_utf8_bytes: 200,
+        });
+    }
+
+    #[cfg(not(feature = "e2e-tts-fixture"))]
+    {
+        let client = GroqTtsClient::connect(&api_key).await?;
+        let engine = state.0.read().await;
+        engine.install_groq(client).await?;
+        let (supports_word_timings, max_text_utf8_bytes, voices_count) = engine
+            .provider_capabilities(TtsProvider::Groq)
+            .await
+            .ok_or("TTS_PROVIDER_NOT_CONNECTED: Groq")?;
+        Ok(InitGroqResponse {
+            success: true,
+            voices_count,
+            provider: TtsProvider::Groq,
+            supports_word_timings,
+            max_text_utf8_bytes,
+        })
+    }
+}
+
+/// Stop the old route before selecting an already-connected provider.
+#[tauri::command]
+#[specta::specta]
+pub async fn ai_tts_switch_provider(
+    state: State<'_, AiTtsEngineState>,
+    provider: TtsProvider,
+) -> Result<SwitchProviderResponse, String> {
+    let engine = state.0.read().await;
+    engine.switch_provider(provider).await?;
+    let (supports_word_timings, max_text_utf8_bytes, voices_count) = engine
+        .provider_capabilities(provider)
+        .await
+        .ok_or("TTS_PROVIDER_NOT_CONNECTED: selected provider disappeared")?;
+    Ok(SwitchProviderResponse {
+        success: true,
+        provider,
+        voices_count,
+        supports_word_timings,
+        max_text_utf8_bytes,
     })
 }
 
@@ -242,8 +338,20 @@ pub async fn ai_tts_speak_with_timestamps(
     // off these real marks against wall-clock — driven by the real play button.
     #[cfg(feature = "e2e-tts-fixture")]
     {
-        let _ = &state;
-        let (word_timings, total_duration) = e2e_fixture_timings(&text);
+        let provider = state
+            .0
+            .read()
+            .await
+            .active_provider()
+            .await
+            .ok_or("E2E_FIXTURE: no active provider")?;
+        let _ = app.emit("ai-tts:fixture-routed", provider);
+        let (fixture_timings, total_duration) = e2e_fixture_timings(&text);
+        let word_timings = if provider == TtsProvider::ElevenLabs {
+            fixture_timings
+        } else {
+            Vec::new()
+        };
         let _ = app.emit(
             "ai-tts:started",
             TtsStartedEvent {
@@ -283,33 +391,33 @@ pub async fn ai_tts_speak_with_timestamps(
             .speak_with_timestamps(&text, voice_id.as_deref())
             .await
         {
-            Ok(result) => {
+            Ok(prepared) => {
                 tracing::info!(
                     "TTS with timestamps ready: {} words, {:.2}s duration",
-                    result.word_timings.len(),
-                    result.total_duration
+                    prepared.output.word_timings.len(),
+                    prepared.output.total_duration
                 );
 
-                // Emit playback-starting event RIGHT BEFORE starting audio
-                // Frontend should use this to sync highlight timer
+                // Emit playback-starting immediately before the generation-
+                // checked player handoff.
                 let _ = app.emit(
                     "ai-tts:playback-starting",
                     TtsPlaybackStartingEvent {
-                        duration: result.total_duration,
+                        duration: prepared.output.total_duration,
                     },
                 );
 
-                // Now start audio playback
-                if let Err(e) = engine.play_audio(&result.audio_data) {
+                if let Err(e) = engine.play_audio(&prepared).await {
                     tracing::error!("Failed to play audio: {}", e);
                     let _ = app.emit("ai-tts:error", TtsErrorEvent { error: e.clone() });
                     return Err(e);
                 }
 
+                let output = prepared.output;
                 Ok(SpeakWithTimestampsResponse {
                     success: true,
-                    word_timings: result.word_timings,
-                    total_duration: result.total_duration,
+                    word_timings: output.word_timings,
+                    total_duration: output.total_duration,
                 })
             }
             Err(e) => {

@@ -3,8 +3,8 @@
  * Estimates word positions for synchronized display
  */
 
-import type { TextChunk } from './text-chunking';
-import type { WordTiming } from './api/ai-tts';
+import type { TextChunk } from "./text-chunking";
+import type { WordTiming } from "./api/ai-tts";
 
 /** Speaking-rate model shared with estimateWordTimings (≈150 wpm at 1x). */
 const FALLBACK_WORDS_PER_MINUTE = 150;
@@ -31,9 +31,9 @@ export interface WordEstimate {
  */
 export function estimateWordTimings(
   chunk: TextChunk,
-  rate: number = 1.0
+  rate: number = 1.0,
 ): WordEstimate[] {
-  const words = chunk.text.split(/\s+/).filter(w => w.length > 0);
+  const words = chunk.text.split(/\s+/).filter((w) => w.length > 0);
   if (words.length === 0) return [];
 
   // Average speaking rate: ~150 words per minute at 1x speed
@@ -70,10 +70,13 @@ export function estimateWordTimings(
  */
 export function getCurrentWordIndex(
   elapsed: number,
-  wordTimings: WordEstimate[]
+  wordTimings: WordEstimate[],
 ): number {
   for (let i = 0; i < wordTimings.length; i++) {
-    if (elapsed >= wordTimings[i].startTime && elapsed < wordTimings[i].endTime) {
+    if (
+      elapsed >= wordTimings[i].startTime &&
+      elapsed < wordTimings[i].endTime
+    ) {
       return i;
     }
   }
@@ -104,7 +107,7 @@ export function getCurrentWordIndex(
  */
 export function findWordIndexAtTime(
   elapsedSeconds: number,
-  wordTimings: ReadonlyArray<{ startTime: number; endTime: number }>
+  wordTimings: ReadonlyArray<{ startTime: number; endTime: number }>,
 ): number {
   for (let i = 0; i < wordTimings.length; i++) {
     const word = wordTimings[i];
@@ -114,7 +117,10 @@ export function findWordIndexAtTime(
     // Gap between this word and the next — keep the previous word highlighted.
     if (i < wordTimings.length - 1) {
       const nextWord = wordTimings[i + 1];
-      if (elapsedSeconds >= word.endTime && elapsedSeconds < nextWord.startTime) {
+      if (
+        elapsedSeconds >= word.endTime &&
+        elapsedSeconds < nextWord.startTime
+      ) {
         return i;
       }
     }
@@ -136,7 +142,7 @@ export function findWordIndexAtTime(
  */
 export function calculateReadingPosition(
   chunk: TextChunk,
-  progress: number
+  progress: number,
 ): TextPosition {
   return {
     pageNumber: chunk.pageNumber,
@@ -149,7 +155,10 @@ export function calculateReadingPosition(
 /**
  * Estimate total duration of a chunk in seconds
  */
-export function estimateChunkDuration(chunk: TextChunk, rate: number = 1.0): number {
+export function estimateChunkDuration(
+  chunk: TextChunk,
+  rate: number = 1.0,
+): number {
   const wordTimings = estimateWordTimings(chunk, rate);
   if (wordTimings.length === 0) return 0;
   return wordTimings[wordTimings.length - 1].endTime;
@@ -160,12 +169,17 @@ export function estimateChunkDuration(chunk: TextChunk, rate: number = 1.0): num
  */
 export function findTextItemForWord(
   wordIndex: number,
-  textItems: Array<{ str: string; transform: number[]; width: number; height: number }>
-): { item: typeof textItems[0]; localIndex: number } | null {
+  textItems: Array<{
+    str: string;
+    transform: number[];
+    width: number;
+    height: number;
+  }>,
+): { item: (typeof textItems)[0]; localIndex: number } | null {
   let globalWordIndex = 0;
 
   for (const item of textItems) {
-    const itemWords = item.str.split(/\s+/).filter(w => w.length > 0);
+    const itemWords = item.str.split(/\s+/).filter((w) => w.length > 0);
 
     for (let localIndex = 0; localIndex < itemWords.length; localIndex++) {
       if (globalWordIndex === wordIndex) {
@@ -178,6 +192,44 @@ export function findTextItemForWord(
   return null;
 }
 
+/**
+ * Build duration-bound per-word timings when a local provider publishes audio
+ * duration but no marks. Internal words are estimates; the first starts at 0
+ * and the last ends exactly with the real WAV, keeping overlay and progress on
+ * the same clock as playback.
+ */
+export function buildWordFallbackTimings(
+  text: string,
+  totalDurationSeconds: number,
+): WordTiming[] {
+  if (!(totalDurationSeconds > 0)) return [];
+
+  const matches = [...text.matchAll(/\S+/gu)];
+  if (matches.length === 0) return [];
+  const weights = matches.map((match) =>
+    Math.max(0.5, Math.min(2, match[0].length / 5)),
+  );
+  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+  let elapsed = 0;
+
+  return matches.map((match, index) => {
+    const startTime = elapsed;
+    const endTime =
+      index === matches.length - 1
+        ? totalDurationSeconds
+        : elapsed + (weights[index] / totalWeight) * totalDurationSeconds;
+    elapsed = endTime;
+    const charStart = match.index;
+    return {
+      word: match[0],
+      startTime,
+      endTime,
+      charStart,
+      charEnd: charStart + match[0].length,
+    };
+  });
+}
+
 /** A sentence and its UTF-16 char offsets within the ORIGINAL text. */
 export interface SentenceSpan {
   text: string;
@@ -185,8 +237,19 @@ export interface SentenceSpan {
   charEnd: number;
 }
 
-const SENTENCE_TERMINATORS = new Set([".", "!", "?"]);
+const SENTENCE_TERMINATORS = new Set([".", "!", "?", "…"]);
 const TRAILING_CLOSERS = /["')\]]/;
+const SHORT_ABBREVIATIONS = new Set([
+  "mr",
+  "mrs",
+  "ms",
+  "dr",
+  "st",
+  "jr",
+  "sr",
+  "vs",
+  "no",
+]);
 
 /**
  * Segment `text` into sentences, tracking each sentence's `[charStart, charEnd)`
@@ -209,9 +272,40 @@ export function segmentSentencesWithOffsets(text: string): SentenceSpan[] {
 
     let j = i;
     while (j < n) {
-      if (SENTENCE_TERMINATORS.has(text[j])) {
+      const char = text[j];
+      if (char === ".") {
+        let periodEnd = j + 1;
+        while (periodEnd < n && text[periodEnd] === ".") periodEnd++;
+        const previous = j > 0 ? text[j - 1] : "";
+        const next = periodEnd < n ? text[periodEnd] : " ";
+        let wordLength = 0;
+        for (
+          let wordIndex = j - 1;
+          wordIndex >= 0 && /[A-Za-z]/.test(text[wordIndex]);
+          wordIndex--
+        ) {
+          wordLength++;
+        }
+        const decimal = /\d/.test(previous) && /\d/.test(next);
+        const midToken = /[A-Za-z]/.test(previous) && /[A-Za-z]/.test(next);
+        const word = text.slice(j - wordLength, j).toLowerCase();
+        const shortAbbreviation =
+          SHORT_ABBREVIATIONS.has(word) && /\s/.test(next);
+        const dottedAbbreviation = /(?:[A-Za-z]\.){2,}$/.test(
+          text.slice(Math.max(0, periodEnd - 8), periodEnd),
+        );
+        if (decimal || midToken || shortAbbreviation || dottedAbbreviation) {
+          j = periodEnd;
+          continue;
+        }
+      }
+
+      if (SENTENCE_TERMINATORS.has(char)) {
         j++; // consume the terminator run + any closing quotes/brackets
-        while (j < n && (SENTENCE_TERMINATORS.has(text[j]) || TRAILING_CLOSERS.test(text[j]))) {
+        while (
+          j < n &&
+          (SENTENCE_TERMINATORS.has(text[j]) || TRAILING_CLOSERS.test(text[j]))
+        ) {
           j++;
         }
         break;
@@ -223,12 +317,126 @@ export function segmentSentencesWithOffsets(text: string): SentenceSpan[] {
     while (end > start && /\s/.test(text[end - 1])) end--;
 
     if (text.slice(start, end).trim().length > 0) {
-      spans.push({ text: text.slice(start, end), charStart: start, charEnd: end });
+      spans.push({
+        text: text.slice(start, end),
+        charStart: start,
+        charEnd: end,
+      });
     }
     i = j;
   }
 
   return spans;
+}
+
+interface GraphemeSpan {
+  text: string;
+  start: number;
+  end: number;
+  bytes: number;
+}
+
+function graphemeSpans(text: string): GraphemeSpan[] {
+  const spans: GraphemeSpan[] = [];
+  let offset = 0;
+  for (const character of text) {
+    const start = offset;
+    offset += character.length;
+    const joinsPrevious =
+      spans.length > 0 &&
+      (/\p{Mark}/u.test(character) ||
+        character === "\uFE0F" ||
+        character === "\u200D" ||
+        spans[spans.length - 1]?.text.endsWith("\u200D"));
+    if (joinsPrevious) {
+      const previous = spans[spans.length - 1];
+      previous.text += character;
+      previous.end = offset;
+      previous.bytes = new TextEncoder().encode(previous.text).length;
+    } else {
+      spans.push({
+        text: character,
+        start,
+        end: offset,
+        bytes: new TextEncoder().encode(character).length,
+      });
+    }
+  }
+  return spans;
+}
+
+/**
+ * Keep sentence boundaries when possible, then split oversized sentences at a
+ * whitespace/grapheme boundary while retaining original UTF-16 offsets.
+ * `maxTextUtf8Bytes` is a conservative provider dispatch bound; no chunk is
+ * silently truncated or allowed to exceed it.
+ */
+export function segmentSpeechWithOffsets(
+  text: string,
+  maxTextUtf8Bytes: number,
+): SentenceSpan[] {
+  if (!Number.isInteger(maxTextUtf8Bytes) || maxTextUtf8Bytes < 1) return [];
+  const output: SentenceSpan[] = [];
+  const encoder = new TextEncoder();
+
+  for (const sentence of segmentSentencesWithOffsets(text)) {
+    if (encoder.encode(sentence.text).length <= maxTextUtf8Bytes) {
+      output.push(sentence);
+      continue;
+    }
+
+    const graphemes = graphemeSpans(sentence.text);
+    let cursor = 0;
+    while (cursor < graphemes.length) {
+      while (
+        cursor < graphemes.length &&
+        /^\s+$/u.test(graphemes[cursor].text)
+      ) {
+        cursor++;
+      }
+      if (cursor >= graphemes.length) break;
+
+      const start = cursor;
+      let end = cursor;
+      let bytes = 0;
+      let lastWhitespace = -1;
+      while (end < graphemes.length) {
+        const nextBytes = graphemes[end].bytes;
+        if (bytes + nextBytes > maxTextUtf8Bytes) break;
+        bytes += nextBytes;
+        end++;
+        if (/^\s+$/u.test(graphemes[end - 1].text)) lastWhitespace = end;
+      }
+      if (end === start) {
+        // A single grapheme larger than the provider bound cannot be split
+        // without corrupting text. Fail closed; the caller surfaces no start.
+        return [];
+      }
+      if (end < graphemes.length && lastWhitespace > start) {
+        end = lastWhitespace;
+      }
+
+      let contentEnd = end;
+      while (
+        contentEnd > start &&
+        /^\s+$/u.test(graphemes[contentEnd - 1].text)
+      ) {
+        contentEnd--;
+      }
+      if (contentEnd > start) {
+        const localStart = graphemes[start].start;
+        const localEnd = graphemes[contentEnd - 1].end;
+        output.push({
+          text: sentence.text.slice(localStart, localEnd),
+          charStart: sentence.charStart + localStart,
+          charEnd: sentence.charStart + localEnd,
+        });
+      }
+      cursor = end;
+    }
+  }
+
+  return output;
 }
 
 /**
@@ -263,9 +471,11 @@ export function buildSentenceFallbackTimings(
 
   for (let i = 0; i < sentences.length; i++) {
     const s = sentences[i];
-    const share = totalChars > 0 ? s.text.length / totalChars : 1 / sentences.length;
+    const share =
+      totalChars > 0 ? s.text.length / totalChars : 1 / sentences.length;
     // The last sentence ends exactly at `duration` to avoid float drift.
-    const end = i === sentences.length - 1 ? duration : elapsed + share * duration;
+    const end =
+      i === sentences.length - 1 ? duration : elapsed + share * duration;
     timings.push({
       word: s.text,
       startTime: elapsed,

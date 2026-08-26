@@ -1,6 +1,10 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useAiTts } from "../../hooks/useAiTts";
-import { useAiTtsStore } from "../../stores/ai-tts-store";
+import {
+  AI_TTS_PROVIDERS,
+  useAiTtsStore,
+  type AiTtsProvider,
+} from "../../stores/ai-tts-store";
 import {
   aiTtsCacheInfo,
   aiTtsCacheClear,
@@ -73,8 +77,8 @@ function LocalTtsPanel({
         <code>{localUrl}</code>
         {!supportsWordTimings && (
           <p className="ai-tts-settings-hint">
-            Word highlighting is unavailable for this voice service; playback
-            remains audio-only.
+            This voice service publishes no native word marks. Lectrice shows an
+            estimated read-along derived from the measured audio duration.
           </p>
         )}
         <SettingsError error={error} initError={initError} />
@@ -142,7 +146,10 @@ function ApiKeyVisibilityIcon({ showKey }: Readonly<{ showKey: boolean }>) {
   );
 }
 
-interface ElevenLabsFormProps {
+interface CloudProviderFormProps {
+  providerId: "elevenlabs" | "groq";
+  providerName: "ElevenLabs" | "Groq";
+  providerUrl: string;
   inputKey: string;
   setInputKey: (value: string) => void;
   showKey: boolean;
@@ -157,7 +164,10 @@ interface ElevenLabsFormProps {
   onClear: () => void;
 }
 
-function ElevenLabsForm({
+function CloudProviderForm({
+  providerId,
+  providerName,
+  providerUrl,
   inputKey,
   setInputKey,
   showKey,
@@ -170,25 +180,27 @@ function ElevenLabsForm({
   submitLabel,
   onSubmit,
   onClear,
-}: Readonly<ElevenLabsFormProps>) {
+}: Readonly<CloudProviderFormProps>) {
+  const keyId = `${providerId}-api-key`;
+  const disclosureId = `${providerId}-egress-disclosure`;
   return (
     <form
       onSubmit={onSubmit}
       className="ai-tts-settings-form"
-      aria-label="Connect ElevenLabs"
+      aria-label={`Connect ${providerName}`}
     >
       <div className="ai-tts-settings-field">
-        <label htmlFor="api-key">ElevenLabs API Key</label>
+        <label htmlFor={keyId}>{providerName} API Key</label>
         <div className="ai-tts-settings-input-wrapper">
           <input
-            id="api-key"
+            id={keyId}
             type={showKey ? "text" : "password"}
             value={inputKey}
             onChange={(e) => setInputKey(e.target.value)}
-            placeholder="Enter your ElevenLabs API key"
+            placeholder={`Enter your ${providerName} API key`}
             disabled={isSubmitting}
             autoComplete="off"
-            aria-describedby="ai-tts-egress-disclosure"
+            aria-describedby={disclosureId}
           />
           <button
             type="button"
@@ -203,18 +215,24 @@ function ElevenLabsForm({
         </div>
         <p className="ai-tts-settings-hint">
           Get your API key from{" "}
-          <a
-            href="https://elevenlabs.io"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            elevenlabs.io
+          <a href={providerUrl} target="_blank" rel="noopener noreferrer">
+            {new URL(providerUrl).hostname}
           </a>
         </p>
-        <p id="ai-tts-egress-disclosure" className="ai-tts-settings-hint">
-          Requested PDF-derived text leaves this device and is sent to
-          ElevenLabs for speech generation.
+        <p id={disclosureId} className="ai-tts-settings-hint">
+          Requested PDF-derived text leaves this device and is sent to{" "}
+          {providerName} for speech generation.
         </p>
+        <p className="ai-tts-settings-hint">
+          The key stays in memory for this app session and is never written to
+          disk.
+        </p>
+        {providerId === "groq" && (
+          <p className="ai-tts-settings-hint">
+            Groq Orpheus accepts short WAV chunks and publishes no native word
+            marks. Read-along timing is estimated from measured audio duration.
+          </p>
+        )}
       </div>
 
       <SettingsError error={error} initError={initError} />
@@ -262,28 +280,59 @@ function CacheStats({
   );
 }
 
+const PROVIDER_NAMES: Record<AiTtsProvider, string> = {
+  local: "Local TTS",
+  elevenlabs: "ElevenLabs",
+  groq: "Groq",
+};
+
+function connectionLabel(
+  provider: AiTtsProvider,
+  status: "setup" | "connecting" | "connected" | "error",
+): string {
+  if (status === "connecting") return "Connecting…";
+  if (status === "connected") return "Connected";
+  if (status === "error") return "Connection failed";
+  return provider === "local" ? "Not connected" : "Key required";
+}
+
 export function AiTtsSettings({ onClose }: Readonly<AiTtsSettingsProps>) {
   const {
-    initialized,
-    apiKey,
-    needsApiKey,
+    initialized = false,
     initialize,
-    initializeLocal,
-    error,
-    initError,
-    provider,
-    localUrl,
-    supportsWordTimings,
+    initializeGroq = async () => undefined,
+    initializeLocal = async () => undefined,
+    switchProvider = async () => false,
+    provider = useAiTtsStore.getState().provider,
+    localUrl = useAiTtsStore.getState().localUrl,
+    supportsWordTimings = provider !== "local",
+    initError = null,
+    error = null,
+    connections: providedConnections,
+    switchingProvider = null,
   } = useAiTts();
-  const [inputKey, setInputKey] = useState(apiKey || "");
+  const [selectedProvider, setSelectedProvider] =
+    useState<AiTtsProvider>(provider);
+  const [inputKey, setInputKey] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const [cacheInfo, setCacheInfo] = useState<AiTtsCacheInfo | null>(null);
   const [isClearingCache, setIsClearingCache] = useState(false);
   const submittingRef = useRef(false);
-  const submitLabel = getSubmitLabel(isSubmitting, initialized);
+  const connections = providedConnections ?? {
+    ...useAiTtsStore.getState().connections,
+    [provider]: {
+      ...useAiTtsStore.getState().connections[provider],
+      status: initialized ? "connected" : initError ? "error" : "setup",
+      error: error ?? initError,
+      destination: provider === "local" ? localUrl : null,
+      supportsWordTimings,
+    },
+  };
+  const selectedConnection = connections[selectedProvider];
+  const selectedConnected = selectedConnection.status === "connected";
+  const submitLabel = getSubmitLabel(isSubmitting, selectedConnected);
 
-  // Load cache info on mount and after clearing
   const loadCacheInfo = useCallback(async () => {
     try {
       const info = await aiTtsCacheInfo();
@@ -296,6 +345,11 @@ export function AiTtsSettings({ onClose }: Readonly<AiTtsSettingsProps>) {
   useEffect(() => {
     loadCacheInfo();
   }, [loadCacheInfo]);
+
+  useEffect(() => {
+    setInputKey("");
+    setShowKey(false);
+  }, [selectedProvider]);
 
   const handleClearCache = useCallback(async () => {
     setIsClearingCache(true);
@@ -310,29 +364,38 @@ export function AiTtsSettings({ onClose }: Readonly<AiTtsSettingsProps>) {
   }, [loadCacheInfo]);
 
   const handleSubmit = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (submittingRef.current || !inputKey.trim()) return;
+    async (event: React.FormEvent) => {
+      event.preventDefault();
+      if (
+        submittingRef.current ||
+        selectedProvider === "local" ||
+        !inputKey.trim()
+      ) {
+        return;
+      }
 
       submittingRef.current = true;
       setIsSubmitting(true);
       try {
-        await initialize(inputKey.trim());
-        // Slice 109 B2: a wrong key must not close the dialog as if it
-        // succeeded — the user is still looking at the form where the error
-        // now shows. Close only on actual success.
-        if (useAiTtsStore.getState().initialized) onClose?.();
+        if (selectedProvider === "groq") {
+          await initializeGroq(inputKey.trim());
+        } else {
+          await initialize(inputKey.trim());
+        }
+        if (
+          useAiTtsStore.getState().connections[selectedProvider].status ===
+          "connected"
+        ) {
+          setInputKey("");
+          setShowKey(false);
+        }
       } finally {
         submittingRef.current = false;
         setIsSubmitting(false);
       }
     },
-    [inputKey, initialize, onClose],
+    [inputKey, initialize, initializeGroq, selectedProvider],
   );
-
-  const handleClear = useCallback(() => {
-    setInputKey("");
-  }, []);
 
   const handleRetryLocal = useCallback(() => {
     void initializeLocal();
@@ -361,33 +424,99 @@ export function AiTtsSettings({ onClose }: Readonly<AiTtsSettingsProps>) {
         )}
       </div>
 
-      {provider === "local" ? (
-        <LocalTtsPanel
-          initialized={initialized}
-          localUrl={localUrl}
-          supportsWordTimings={supportsWordTimings}
-          error={error}
-          initError={initError}
-          onRetry={handleRetryLocal}
-        />
-      ) : (
-        <ElevenLabsForm
-          inputKey={inputKey}
-          setInputKey={setInputKey}
-          showKey={showKey}
-          setShowKey={setShowKey}
-          isSubmitting={isSubmitting}
-          initialized={initialized}
-          needsApiKey={needsApiKey}
-          error={error}
-          initError={initError}
-          submitLabel={submitLabel}
-          onSubmit={handleSubmit}
-          onClear={handleClear}
-        />
-      )}
+      <section aria-labelledby="tts-connections-heading">
+        <h3 id="tts-connections-heading">Connections</h3>
+        <p className="ai-tts-settings-hint">
+          Keep several services ready and choose which one narrates next.
+        </p>
+        <ul
+          className="ai-tts-connections"
+          aria-label="Text-to-speech connections"
+        >
+          {AI_TTS_PROVIDERS.map((connectionProvider) => {
+            const connection = connections[connectionProvider];
+            const active = provider === connectionProvider && initialized;
+            return (
+              <li
+                key={connectionProvider}
+                className="ai-tts-connection"
+                data-status={connection.status}
+                data-active={active || undefined}
+              >
+                <button
+                  type="button"
+                  className="ai-tts-connection-select"
+                  aria-pressed={selectedProvider === connectionProvider}
+                  onClick={() => setSelectedProvider(connectionProvider)}
+                >
+                  <span>{PROVIDER_NAMES[connectionProvider]}</span>
+                  <span
+                    className={
+                      connection.status === "connected"
+                        ? "ai-tts-status-ok"
+                        : connection.status === "error"
+                          ? "ai-tts-status-warning"
+                          : "ai-tts-status-pending"
+                    }
+                  >
+                    {connectionLabel(connectionProvider, connection.status)}
+                  </span>
+                </button>
+                {active ? (
+                  <span className="ai-tts-connection-active">Active</span>
+                ) : (
+                  connection.status === "connected" && (
+                    <button
+                      type="button"
+                      className="ai-tts-settings-btn secondary"
+                      disabled={Boolean(switchingProvider)}
+                      onClick={() => void switchProvider(connectionProvider)}
+                    >
+                      Use {PROVIDER_NAMES[connectionProvider]}
+                    </button>
+                  )
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </section>
 
-      {/* Audio Cache Section */}
+      <div className="ai-tts-connection-detail">
+        {selectedProvider === "local" ? (
+          <LocalTtsPanel
+            initialized={selectedConnected}
+            localUrl={selectedConnection.destination ?? localUrl}
+            supportsWordTimings={selectedConnection.supportsWordTimings}
+            error={selectedConnection.error}
+            initError={selectedConnection.error}
+            onRetry={handleRetryLocal}
+          />
+        ) : (
+          <CloudProviderForm
+            providerId={selectedProvider}
+            providerName={selectedProvider === "groq" ? "Groq" : "ElevenLabs"}
+            providerUrl={
+              selectedProvider === "groq"
+                ? "https://console.groq.com/keys"
+                : "https://elevenlabs.io/app/settings/api-keys"
+            }
+            inputKey={inputKey}
+            setInputKey={setInputKey}
+            showKey={showKey}
+            setShowKey={setShowKey}
+            isSubmitting={isSubmitting}
+            initialized={selectedConnected}
+            needsApiKey={!selectedConnected}
+            error={selectedConnection.error}
+            initError={selectedConnection.error}
+            submitLabel={submitLabel}
+            onSubmit={handleSubmit}
+            onClear={() => setInputKey("")}
+          />
+        )}
+      </div>
+
       <div className="ai-tts-settings-section">
         <h3>Audio Cache</h3>
         <p className="ai-tts-settings-hint">

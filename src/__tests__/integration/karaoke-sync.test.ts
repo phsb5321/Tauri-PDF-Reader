@@ -30,6 +30,7 @@ import type { WordTiming } from "../../lib/api/ai-tts";
 import { useTtsWordHighlight } from "../../hooks/useTtsWordHighlight";
 import { useTtsHighlightStore } from "../../stores/tts-highlight-store";
 import { useAiTtsStore } from "../../stores/ai-tts-store";
+import { aiTtsSpeakWithTimestamps } from "../../lib/tauri-invoke";
 
 // Shared mock state (hoisted so the vi.mock factories can reach it).
 const h = vi.hoisted(() => ({
@@ -96,12 +97,18 @@ function tick(atMs: number): void {
  * the EVENT time, not the response time.
  */
 async function startViaProductionPath(
-  speak: (text: string, page: number) => Promise<boolean>,
+  speak: (
+    text: string,
+    page: number,
+    voice?: string,
+    baseOffset?: number,
+  ) => Promise<boolean>,
   text: string,
   wordTimings: WordTiming[],
   totalDuration: number,
   eventClockMs: number,
   responseClockMs: number,
+  baseOffset = 0,
 ): Promise<void> {
   h.speakResult = { success: true, wordTimings, totalDuration };
   // The backend emits playback-starting right before audio begins.
@@ -110,7 +117,7 @@ async function startViaProductionPath(
   // The timestamps response arrives slightly later.
   nowMs = responseClockMs;
   await act(async () => {
-    await speak(text, 1);
+    await speak(text, 1, undefined, baseOffset);
   });
 }
 
@@ -181,11 +188,80 @@ describe("karaoke sync — highlight index advances with the timing marks", () =
     expect(idx()).toBe(2);
     expect(onWordChange).toHaveBeenLastCalledWith(2, "gamma");
 
-    // Frame at/after totalDuration → completion fires, highlighting stops.
+    // Visual timing reaching the duration must never cut audio or advance the
+    // page; only the real sink-drained event completes the clip.
     tick(3010);
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(store().isActive).toBe(true);
+    act(() => h.finishedCb?.());
     expect(onComplete).toHaveBeenCalledTimes(1);
     expect(store().isActive).toBe(false);
     expect(idx()).toBe(-1);
+  });
+
+  it("builds a shared word/progress timeline when the local provider has no marks", async () => {
+    const onWordChange = vi.fn();
+    const onComplete = vi.fn();
+    const { result } = renderHook(() =>
+      useTtsWordHighlight({ onWordChange, onComplete }),
+    );
+
+    await startViaProductionPath(
+      result.current.speakWithHighlight,
+      "alpha beta gamma",
+      [],
+      3,
+      0,
+      100,
+      10,
+    );
+
+    expect(store().wordTimings[0]).toMatchObject({
+      charStart: 10,
+      charEnd: 15,
+    });
+    expect(store().wordTimings.map((timing) => timing.word)).toEqual([
+      "alpha",
+      "beta",
+      "gamma",
+    ]);
+    expect(store().wordTimings.at(-1)?.endTime).toBe(3);
+
+    tick(1100);
+    expect(idx()).toBe(1);
+    expect(onWordChange).toHaveBeenLastCalledWith(1, "beta");
+
+    // Estimated marks must not outrun the real sink event into the next queued
+    // sentence; a late event from this clip would otherwise kill its successor.
+    tick(3100);
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(store().isActive).toBe(true);
+    act(() => h.finishedCb?.());
+    expect(onComplete).toHaveBeenCalledOnce();
+    expect(store().isActive).toBe(false);
+  });
+
+  it("does not resurrect a stopped session when an old response arrives", async () => {
+    let resolveSpeak: ((value: typeof h.speakResult) => void) | undefined;
+    vi.mocked(aiTtsSpeakWithTimestamps).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveSpeak = resolve;
+      }),
+    );
+    const { result } = renderHook(() => useTtsWordHighlight());
+
+    let pending!: Promise<boolean>;
+    act(() => {
+      pending = result.current.speakWithHighlight("alpha beta", 1);
+    });
+    await act(async () => result.current.stop());
+    await act(async () => {
+      resolveSpeak?.({ success: true, wordTimings: marks(), totalDuration: 3 });
+      await pending;
+    });
+
+    expect(store().isActive).toBe(false);
+    expect(useAiTtsStore.getState().playbackState).toBe("idle");
   });
 
   it("advances at 2× speed: boundaries are crossed at half the wall-clock (spec 039)", async () => {

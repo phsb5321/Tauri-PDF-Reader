@@ -537,7 +537,9 @@ async function processOutlineItems(
 
         if (Array.isArray(dest) && dest.length > 0) {
           const ref = dest[0];
-          if (ref && typeof ref === "object" && "num" in ref) {
+          if (Number.isInteger(ref) && (ref as number) >= 0) {
+            pageNumber = (ref as number) + 1;
+          } else if (ref && typeof ref === "object" && "num" in ref) {
             const pageIndex = await pdf.getPageIndex(ref);
             pageNumber = pageIndex + 1; // Convert 0-indexed to 1-indexed
           }
