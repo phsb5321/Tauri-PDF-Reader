@@ -126,28 +126,14 @@ export function useOpenPdf() {
   );
 
   /**
-   * Pick a PDF from disk and open it, registering it in the library the first
-   * time it is seen.
+   * Parse, register, bind, and display one already-authorized path.
    *
-   * @returns `true` once a document is showing in the reader; `false` if the
-   * dialog was cancelled or the open failed.
+   * Dialog and native-drop entry points share this exact sequence so neither
+   * can weaken the known-row hash check, fresh-row backend hash comparison, or
+   * final post-registration read.
    */
-  const openPdf = useCallback(async (): Promise<boolean> => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const selected = await openFile({
-        multiple: false,
-        filters: [FILE_FILTERS.PDF],
-      });
-
-      // User cancelled the dialog.
-      if (!selected) {
-        return false;
-      }
-
-      const filePath = selected as string;
+  const openAuthorizedPath = useCallback(
+    async (filePath: string): Promise<Document> => {
       const known = await libraryGetDocumentByPath(filePath);
       // Every open of a KNOWN row binds the bytes to the row's content hash
       // (the id): a file replaced at the same path is a different book and
@@ -169,10 +155,8 @@ export function useOpenPdf() {
 
       // A fresh import is hashed twice: here, over the bytes actually opened,
       // and again in the backend when the row is created. A file swapped
-      // between the two reads would put THIS book on screen under THAT book's
-      // row — progress, highlights and audio all filed against the wrong
-      // document. The row id IS the backend's fingerprint, so comparing them
-      // closes the window.
+      // between those reads must never put one book on screen under another
+      // book's progress, highlights, audio, or session identity.
       if (document.id.toLowerCase() !== sha256) {
         throw new Error(
           "PDF_HASH_MISMATCH: File content changed while the book was being added — the book was not opened.",
@@ -181,14 +165,34 @@ export function useOpenPdf() {
 
       // Fresh imports mutate the row after the first read. Display a final
       // bound read so a post-hash path replacement is never rendered under
-      // the row created for the earlier bytes. Known rows had no path mutation
-      // in this flow, so their already-bound read is the final one.
+      // the row created for the earlier bytes. Known rows had no path mutation.
       const displayPdf = known
         ? pdf
         : await pdfService.loadDocument(filePath, {
             expectedSha256: document.id,
           });
       showInReader(displayPdf, document);
+      return document;
+    },
+    [showInReader],
+  );
+
+  /** Pick a PDF through the native dialog and open it. */
+  const openPdf = useCallback(async (): Promise<boolean> => {
+    if (useDocumentStore.getState().isLoading) {
+      setError("OPEN_BUSY: Wait for the current PDF to finish opening.");
+      return false;
+    }
+    try {
+      setLoading(true);
+      setError(null);
+      const selected = await openFile({
+        multiple: false,
+        filters: [FILE_FILTERS.PDF],
+      });
+      if (!selected) return false;
+
+      await openAuthorizedPath(selected as string);
       return true;
     } catch (error: unknown) {
       const message =
@@ -199,7 +203,42 @@ export function useOpenPdf() {
     } finally {
       setLoading(false);
     }
-  }, [openFile, setLoading, setError, showInReader]);
+  }, [openAuthorizedPath, openFile, setError, setLoading]);
+
+  /**
+   * Open a path received from Tauri's native drop stream.
+   *
+   * Tauri's native drop pipeline grants plugin-fs access before emitting the
+   * event. This entry point still rejects a non-PDF path before any read, then
+   * reuses the same hash-bound import sequence as `openPdf`.
+   */
+  const openDroppedPdf = useCallback(
+    async (filePath: string): Promise<Document | null> => {
+      if (useDocumentStore.getState().isLoading) {
+        setError("OPEN_BUSY: Wait for the current PDF to finish opening.");
+        return null;
+      }
+      try {
+        setLoading(true);
+        setError(null);
+        if (!/\.pdf$/i.test(filePath)) {
+          throw new Error(
+            "DROP_INVALID: Drop exactly one PDF to create a reading session.",
+          );
+        }
+        return await openAuthorizedPath(filePath);
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error ? error.message : "Failed to open dropped PDF";
+        setError(message);
+        console.error("Error opening dropped PDF:", error);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [openAuthorizedPath, setError, setLoading],
+  );
 
   /**
    * Open a document the library already holds, at the page it was left on.
@@ -283,5 +322,5 @@ export function useOpenPdf() {
     [setLoading, setError, showInReader, reauthorizeAccess],
   );
 
-  return { openPdf, resumeDocument };
+  return { openPdf, openDroppedPdf, resumeDocument };
 }

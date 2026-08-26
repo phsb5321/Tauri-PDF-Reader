@@ -1,0 +1,56 @@
+{
+  "date": "2026-08-25",
+  "headBeforeCommit": "aa91a67157789caf3871820e9e0247ddb8920821",
+  "status": "passed",
+  "gates": {
+    "pnpmVerify": {
+      "status": "passed",
+      "gates": 11,
+      "durationSeconds": 548
+    },
+    "fuzz": {
+      "status": "passed",
+      "seed": 20260825,
+      "runs": 2000,
+      "tests": 2
+    },
+    "frontend": {
+      "status": "passed",
+      "files": 119,
+      "tests": 1188
+    },
+    "nativePlay": {
+      "status": "passed",
+      "actor": "real packaged Play button",
+      "observer": "real backend marks advanced the karaoke index"
+    },
+    "localTts": {
+      "status": "passed",
+      "actor": "real packaged Play button",
+      "provider": "local fixture",
+      "claims": [
+        "keyless local initialization",
+        "sentence audio request",
+        "estimated read-along active",
+        "CSS current-word highlight active",
+        "no floating debug pill",
+        "natural sink completion returned idle"
+      ]
+    },
+    "libraryCompleteness": {
+      "status": "passed",
+      "phases": ["bootstrap", "verify", "reader", "drop"],
+      "claims": [
+        "Settings",
+        "real/fallback covers",
+        "real OS PDF drag",
+        "active one-document session",
+        "Chapters drawer",
+        "Back to library",
+        "Ctrl+wheel zoom",
+        "ordinary wheel preserves zoom"
+      ]
+    }
+  },
+  "note": "The exact committed SHA and independent gate are added after commit; this receipt binds the pre-commit working tree by its retained evidence files and command results."
+}

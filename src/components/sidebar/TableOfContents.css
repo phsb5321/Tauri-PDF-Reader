@@ -16,9 +16,10 @@
 .toc-panel {
   position: absolute;
   left: 0;
-  top: 0;
+  top: var(--height-toolbar);
   bottom: 0;
-  width: 320px;
+  width: var(--width-panel);
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
   max-width: 90vw;
   background: var(--bg-primary, #fff);
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
@@ -42,8 +43,8 @@
 }
 
 .toc-close {
-  width: 32px;
-  height: 32px;
+  width: var(--button-height);
+  height: var(--button-height);
   border: none;
   background: transparent;
   border-radius: 6px;

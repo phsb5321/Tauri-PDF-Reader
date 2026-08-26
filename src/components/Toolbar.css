@@ -18,6 +18,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  min-width: 0;
 }
 
 .toolbar-left {
@@ -37,6 +38,8 @@
 .toolbar-button {
   display: flex;
   align-items: center;
+  flex-shrink: 0;
+  white-space: nowrap;
   gap: var(--space-2);
   height: var(--button-height);
   padding: 0 var(--space-3);
@@ -50,7 +53,7 @@
   transition: all var(--transition-fast);
 }
 
-.toolbar-button:hover:not(:disabled) {
+.toolbar-button:hover:not(:disabled):not([aria-disabled="true"]) {
   background: var(--color-button-bg-hover);
   border-color: var(--color-accent);
 }
@@ -60,11 +63,12 @@
   box-shadow: var(--shadow-focus);
 }
 
-.toolbar-button:active:not(:disabled) {
+.toolbar-button:active:not(:disabled):not([aria-disabled="true"]) {
   transform: scale(0.98);
 }
 
-.toolbar-button:disabled {
+.toolbar-button:disabled,
+.toolbar-button[aria-disabled="true"] {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -84,9 +88,13 @@
 }
 
 .document-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-left: var(--space-2);
   font-size: var(--text-sm);
-  color: var(--color-text-secondary);
-  max-width: 200px;
+  font-weight: var(--font-medium);
+  color: var(--color-text-primary);
+  max-width: none;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -95,4 +103,67 @@
 .open-button .toolbar-icon {
   fill: var(--color-accent);
   stroke: var(--color-accent);
+}
+
+/* Reader navigation is icon-first: the document title, not four repeated
+   labels, owns the horizontal reading context. Accessible names and native
+   tooltips remain on every button. */
+.toolbar-left > .toolbar-button .button-text {
+  display: none;
+}
+
+.toolbar-right::before {
+  content: "";
+  width: 1px;
+  height: var(--button-height-sm);
+  margin-right: var(--space-2);
+  background: var(--color-border);
+}
+
+/* At compact widths the direct page and zoom controls move to a second row
+   instead of disappearing from keyboard/assistive-technology navigation. */
+@media (max-width: 900px) {
+  .toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    height: auto;
+    min-height: var(--height-toolbar);
+    gap: var(--space-1) var(--space-2);
+    padding: var(--space-1) var(--space-2);
+  }
+
+  .toolbar-left {
+    grid-column: 1;
+  }
+
+  .toolbar-right {
+    grid-column: 2;
+  }
+
+  .toolbar-right::before {
+    display: none;
+  }
+
+  .toolbar-center {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 700px) {
+  .toolbar {
+    padding: 0 var(--space-2);
+  }
+
+  .toolbar-button .button-text,
+  .document-title {
+    display: none;
+  }
+
+  .toolbar-button {
+    width: var(--button-height);
+    padding: 0;
+    justify-content: center;
+  }
 }

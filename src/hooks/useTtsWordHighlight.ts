@@ -18,7 +18,10 @@ import {
   selectIsHighlighting,
 } from "../stores/tts-highlight-store";
 import { useAiTtsStore } from "../stores/ai-tts-store";
-import { findWordIndexAtTime, isPlaybackComplete } from "../lib/tts-tracking";
+import {
+  buildWordFallbackTimings,
+  findWordIndexAtTime,
+} from "../lib/tts-tracking";
 
 export interface UseTtsWordHighlightOptions {
   /** Callback when a new word becomes active */
@@ -37,6 +40,10 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
   // Guard against double-calls from React StrictMode
   const speakingRef = useRef<boolean>(false);
   const requestIdRef = useRef<number>(0);
+  const playbackStartTimeRef = useRef<number | null>(null);
+  const playbackGenerationRef = useRef<number | null>(null);
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
   // For debug logging throttling
   const lastLoggedSecond = useRef<number>(-1);
 
@@ -51,15 +58,18 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
       if (!useTtsHighlightStore.getState().isActive) return;
       console.debug(`[TtsWordHighlight] Playback complete (${reason})`);
       speakingRef.current = false;
+      requestIdRef.current += 1;
+      playbackStartTimeRef.current = null;
+      playbackGenerationRef.current = null;
       if (animationFrameRef.current !== null) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
       }
       highlightStore.stopHighlighting();
       ttsStore.setPlaybackState("idle");
-      options.onComplete?.();
+      optionsRef.current.onComplete?.();
     },
-    [highlightStore, ttsStore, options],
+    [highlightStore, ttsStore],
   );
 
   // Animation loop that updates current word based on elapsed time
@@ -82,8 +92,11 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
     // Word timings are 1×-relative, but at speed S the audio plays S× faster, so
     // after `elapsed` real seconds the spoken position is `elapsed · S` into the
     // 1× timeline. Select + complete against that audio-time (spec 039, FR-009).
-    const speed = useAiTtsStore.getState().speed;
-    const audioElapsed = elapsed * speed;
+    const ttsState = useAiTtsStore.getState();
+    // Local audio is already synthesized at the requested speed. ElevenLabs
+    // returns a 1× timeline and uses the player-side stretch ratio.
+    const timelineRate = ttsState.provider === "local" ? 1 : ttsState.speed;
+    const audioElapsed = elapsed * timelineRate;
 
     // Debug: log every 60 frames (~1 second) to avoid spam
     if (
@@ -100,14 +113,10 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
       });
     }
 
-    // Timer-estimated completion. Guards totalDuration > 0 so a missing-alignment
-    // response (totalDuration 0) does NOT instantly "complete" on the first frame
-    // and (with auto-page) skip the page while audio just started. The unknown-
-    // duration case completes instead off the real `ai-tts:finished` event below.
-    if (isPlaybackComplete(audioElapsed, state.totalDuration)) {
-      completePlayback("duration reached");
-      return;
-    }
+    // Completion is deliberately NOT inferred from this visual clock. Only the
+    // native sink-drained event may advance a sentence/page; otherwise decode
+    // latency or estimated marks can cut the clip and a late old event can
+    // terminate its successor.
 
     // Find current word based on audio time (pure, unit-tested selection).
     const newWordIndex = findWordIndexAtTime(audioElapsed, state.wordTimings);
@@ -119,14 +128,14 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
 
       if (newWordIndex < state.wordTimings.length) {
         const word = state.wordTimings[newWordIndex];
-        options.onWordChange?.(newWordIndex, word.word);
-        options.onScrollNeeded?.(newWordIndex, word.word);
+        optionsRef.current.onWordChange?.(newWordIndex, word.word);
+        optionsRef.current.onScrollNeeded?.(newWordIndex, word.word);
       }
     }
 
     // Continue animation loop
     animationFrameRef.current = requestAnimationFrame(updateHighlight);
-  }, [highlightStore, ttsStore, options, completePlayback]);
+  }, [highlightStore]);
 
   // Start animation loop when highlighting becomes active
   useEffect(() => {
@@ -153,10 +162,6 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
     };
   }, [isHighlighting, updateHighlight]);
 
-  // Store the playback start time from the event
-  // This ref captures the exact moment audio starts (from backend event)
-  const playbackStartTimeRef = useRef<number | null>(null);
-
   // Listen for playback-starting event to capture the exact audio start time
   // This event is emitted by the backend RIGHT BEFORE audio starts playing.
   useEffect(() => {
@@ -166,6 +171,7 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
       // Capture the exact moment - this is when audio is about to start
       const startTime = performance.now();
       playbackStartTimeRef.current = startTime;
+      playbackGenerationRef.current = event.generation;
 
       console.debug("[TtsWordHighlight] Playback starting event received", {
         duration: event.duration,
@@ -207,7 +213,15 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
   useEffect(() => {
     let unlistenFn: (() => void) | null = null;
 
-    onAiTtsFinished(() => {
+    onAiTtsFinished((event) => {
+      const activeGeneration = playbackGenerationRef.current;
+      if (activeGeneration !== null && event?.generation !== activeGeneration) {
+        console.debug("[TtsWordHighlight] Ignoring stale finished event", {
+          activeGeneration,
+          finishedGeneration: event?.generation,
+        });
+        return;
+      }
       completePlaybackRef.current("ai-tts:finished event");
     }).then((unlisten) => {
       unlistenFn = unlisten;
@@ -222,7 +236,12 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
 
   // Speak text with word highlighting
   const speakWithHighlight = useCallback(
-    async (text: string, pageNumber: number, voiceId?: string) => {
+    async (
+      text: string,
+      pageNumber: number,
+      voiceId?: string,
+      baseOffset = 0,
+    ) => {
       if (!ttsStore.initialized) {
         console.warn("[TtsWordHighlight] TTS not initialized");
         return false;
@@ -275,12 +294,27 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
             duration: result.totalDuration,
           });
 
+          // Local providers publish a measured WAV duration but no word marks.
+          // Keep the overlay and bottom progress on the real audio clock with
+          // deterministic per-word estimates rather than starting an empty
+          // timeline that remains stuck at 0%.
+          const usingFallback = result.wordTimings.length === 0;
+          const relativeTimings = usingFallback
+            ? buildWordFallbackTimings(text, result.totalDuration)
+            : result.wordTimings;
+          const wordTimings = relativeTimings.map((timing) => ({
+            ...timing,
+            charStart: timing.charStart + baseOffset,
+            charEnd: timing.charEnd + baseOffset,
+          }));
+
           // Start highlighting - this triggers the animation loop via useEffect
           highlightStore.startHighlighting(
             text,
-            result.wordTimings,
+            wordTimings,
             result.totalDuration,
             pageNumber,
+            usingFallback,
           );
 
           // If we captured a playback start time from the event (which fires before response),
@@ -331,6 +365,9 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
   const stop = useCallback(async () => {
     try {
       speakingRef.current = false;
+      requestIdRef.current += 1;
+      playbackStartTimeRef.current = null;
+      playbackGenerationRef.current = null;
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;

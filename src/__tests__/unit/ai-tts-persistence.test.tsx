@@ -46,6 +46,7 @@ vi.mock("../../lib/tauri-invoke", () => ({
   })),
   onAiTtsStarted: mocks.listen,
   onAiTtsFinished: mocks.listen,
+  onAiTtsPlaybackStarting: mocks.listen,
   onAiTtsStopped: mocks.listen,
   onAiTtsPaused: mocks.listen,
   onAiTtsResumed: mocks.listen,
@@ -125,6 +126,37 @@ function clearInMemorySession(): void {
     speed: 1,
     autoPageEnabled: true,
     cacheCoverage: null,
+    maxTextUtf8Bytes: 10_000,
+    providerVoiceIds: {
+      elevenlabs: "21m00Tcm4TlvDq8ikWAM",
+      local: null,
+      groq: "autumn",
+    },
+    providerOperationGeneration: 0,
+    switchingProvider: null,
+    connections: {
+      elevenlabs: {
+        status: "setup",
+        error: null,
+        destination: "https://api.elevenlabs.io",
+        supportsWordTimings: true,
+        maxTextUtf8Bytes: 10_000,
+      },
+      local: {
+        status: "setup",
+        error: null,
+        destination: null,
+        supportsWordTimings: false,
+        maxTextUtf8Bytes: 8_192,
+      },
+      groq: {
+        status: "setup",
+        error: null,
+        destination: "https://api.groq.com/openai/v1/audio/speech",
+        supportsWordTimings: false,
+        maxTextUtf8Bytes: 200,
+      },
+    },
   });
 }
 
@@ -204,8 +236,11 @@ describe("AI TTS session-secret persistence", () => {
           selectedVoiceId: voice,
           speed: 1.75,
           autoPageEnabled: false,
+          providerVoiceIds: {
+            elevenlabs: voice,
+          },
         },
-        version: 1,
+        version: 2,
       });
       expect(persistenceEvidence()).not.toContain(PERSISTENCE_TEST_MARKER);
     },
@@ -246,8 +281,11 @@ describe("AI TTS session-secret persistence", () => {
         selectedVoiceId: "safe-current-voice",
         speed: 2.25,
         autoPageEnabled: false,
+        providerVoiceIds: {
+          elevenlabs: "safe-current-voice",
+        },
       },
-      version: 1,
+      version: 2,
     });
     expect(persistedPayload.state).not.toHaveProperty("apiKey");
     expect(persistenceEvidence()).not.toContain(PERSISTENCE_TEST_MARKER);

@@ -1,0 +1,19 @@
+{
+  "testedAt": "2026-08-25T23:54:05-03:00",
+  "endpoint": "https://api.groq.com/openai/v1/audio/speech",
+  "model": "canopylabs/orpheus-v1-english",
+  "voice": "autumn",
+  "inputCharacters": 49,
+  "httpStatus": 200,
+  "responseBytes": 161350,
+  "requestSeconds": 0.84283,
+  "audioSeconds": 3.3598333333333334,
+  "channels": 1,
+  "sampleRate": 24000,
+  "sampleWidthBytes": 2,
+  "format": "audio/wav",
+  "modelVisibleInCatalog": true,
+  "credentialSource": "rbw (value not retained)",
+  "streamingSizeSentinel": true,
+  "validation": "bounded EOF-normalized streaming PCM16 WAV"
+}

@@ -22,19 +22,19 @@
  * re-implementing selection in the test.
  */
 
-import { renderHook, act } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { WordTiming } from '../../lib/api/ai-tts';
+import { renderHook, act } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { WordTiming } from "../../lib/api/ai-tts";
 import {
   kokoroToWordTimings,
   uniformApproximationError,
   type KokoroCapture,
-} from '../../lib/kokoro-word-timings';
-import { useTtsWordHighlight } from '../../hooks/useTtsWordHighlight';
-import { useTtsHighlightStore } from '../../stores/tts-highlight-store';
-import { useAiTtsStore } from '../../stores/ai-tts-store';
-import singleChunk from '../fixtures/kokoro-af-heart-single-chunk.json';
-import multiChunk from '../fixtures/kokoro-af-heart-multi-chunk.json';
+} from "../../lib/kokoro-word-timings";
+import { useTtsWordHighlight } from "../../hooks/useTtsWordHighlight";
+import { useTtsHighlightStore } from "../../stores/tts-highlight-store";
+import { useAiTtsStore } from "../../stores/ai-tts-store";
+import singleChunk from "../fixtures/kokoro-af-heart-single-chunk.json";
+import multiChunk from "../fixtures/kokoro-af-heart-multi-chunk.json";
 
 const SINGLE = singleChunk as unknown as KokoroCapture;
 const MULTI = multiChunk as unknown as KokoroCapture;
@@ -49,7 +49,7 @@ const h = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('../../lib/api/ai-tts', () => ({
+vi.mock("../../lib/api/ai-tts", () => ({
   onAiTtsPlaybackStarting: vi.fn((cb: (e: { duration: number }) => void) => {
     h.playbackStartingCb = cb;
     return Promise.resolve(() => {});
@@ -59,23 +59,23 @@ vi.mock('../../lib/api/ai-tts', () => ({
     return Promise.resolve(() => {});
   }),
 }));
-vi.mock('../../lib/tauri-invoke', () => ({
+vi.mock("../../lib/tauri-invoke", () => ({
   aiTtsSpeakWithTimestamps: vi.fn(() => Promise.resolve(h.speakResult)),
   aiTtsStop: vi.fn(() => Promise.resolve({ success: true })),
   aiTtsPause: vi.fn(() => Promise.resolve({ success: true })),
   aiTtsResume: vi.fn(() => Promise.resolve({ success: true })),
 }));
 
-describe('kokoro capture fixtures are the real thing', () => {
-  it('carry per-token marks for every word, in both captures', () => {
+describe("kokoro capture fixtures are the real thing", () => {
+  it("carry per-token marks for every word, in both captures", () => {
     for (const capture of [SINGLE, MULTI]) {
       expect(capture.sample_rate).toBe(24000);
       expect(capture.chunks.length).toBeGreaterThan(0);
       const tokens = capture.chunks.flatMap((c) => c.tokens);
       expect(tokens.length).toBeGreaterThan(0);
       for (const token of tokens) {
-        expect(typeof token.start_ts).toBe('number');
-        expect(typeof token.end_ts).toBe('number');
+        expect(typeof token.start_ts).toBe("number");
+        expect(typeof token.end_ts).toBe("number");
       }
     }
     // The multi-chunk capture must actually be multi-chunk or it proves nothing
@@ -84,10 +84,10 @@ describe('kokoro capture fixtures are the real thing', () => {
   });
 });
 
-describe('kokoroToWordTimings — spans are monotonic and cover the text', () => {
+describe("kokoroToWordTimings — spans are monotonic and cover the text", () => {
   for (const [name, capture] of [
-    ['single chunk', SINGLE],
-    ['multi chunk', MULTI],
+    ["single chunk", SINGLE],
+    ["multi chunk", MULTI],
   ] as const) {
     it(`${name}: every word advances and never overlaps the next`, () => {
       const { wordTimings, totalDuration, skippedTokens } =
@@ -103,9 +103,11 @@ describe('kokoroToWordTimings — spans are monotonic and cover the text', () =>
         expect(w.endTime).toBeLessThanOrEqual(totalDuration);
         if (i > 0) {
           expect(w.startTime).toBeGreaterThanOrEqual(
-            wordTimings[i - 1].startTime
+            wordTimings[i - 1].startTime,
           );
-          expect(w.startTime).toBeGreaterThanOrEqual(wordTimings[i - 1].endTime);
+          expect(w.startTime).toBeGreaterThanOrEqual(
+            wordTimings[i - 1].endTime,
+          );
         }
       }
     });
@@ -131,7 +133,7 @@ describe('kokoroToWordTimings — spans are monotonic and cover the text', () =>
     });
   }
 
-  it('offsets each chunk by the audio that precedes it, because Kokoro restarts the clock', () => {
+  it("offsets each chunk by the audio that precedes it, because Kokoro restarts the clock", () => {
     const { wordTimings, totalDuration } = kokoroToWordTimings(MULTI);
 
     const firstChunkSeconds = MULTI.chunks[0].audio_samples / MULTI.sample_rate;
@@ -139,40 +141,40 @@ describe('kokoroToWordTimings — spans are monotonic and cover the text', () =>
 
     // The raw mark restarts near zero…
     expect(firstOfSecondChunk.start_ts as number).toBeLessThan(
-      firstChunkSeconds
+      firstChunkSeconds,
     );
 
     // …and the conversion must place it after all of chunk 0's audio instead.
     const converted = wordTimings.find(
-      (w) => w.word === MULTI.chunks[1].tokens[0].text
+      (w) => w.word === MULTI.chunks[1].tokens[0].text,
     );
     expect(converted).toBeDefined();
     expect(converted!.startTime).toBeCloseTo(
       firstChunkSeconds + (firstOfSecondChunk.start_ts as number),
-      6
+      6,
     );
     expect(converted!.startTime).toBeGreaterThan(firstChunkSeconds);
 
     expect(totalDuration).toBeCloseTo(
       MULTI.chunks.reduce((s, c) => s + c.audio_samples, 0) / MULTI.sample_rate,
-      6
+      6,
     );
   });
 
-  it('refuses to guess when a chunk is not found in the source text', () => {
+  it("refuses to guess when a chunk is not found in the source text", () => {
     const corrupted: KokoroCapture = {
       ...MULTI,
       chunks: [
-        { ...MULTI.chunks[0], graphemes: 'text that was never spoken' },
+        { ...MULTI.chunks[0], graphemes: "text that was never spoken" },
         ...MULTI.chunks.slice(1),
       ],
     };
     expect(() => kokoroToWordTimings(corrupted)).toThrow(
-      /does not occur in the source text/
+      /does not occur in the source text/,
     );
   });
 
-  it('refuses to skip source text that no chunk spoke', () => {
+  it("refuses to skip source text that no chunk spoke", () => {
     // Kokoro returning only the second segment would otherwise convert
     // "cleanly" — indexOf would find it, and the missing words would just be
     // absent from the timeline with nothing to notice them.
@@ -180,7 +182,7 @@ describe('kokoroToWordTimings — spans are monotonic and cover the text', () =>
     expect(() => kokoroToWordTimings(dropped)).toThrow(/kokoro skipped/);
   });
 
-  it('refuses marks that fall outside their own chunk audio', () => {
+  it("refuses marks that fall outside their own chunk audio", () => {
     // The offsetting scheme assumes marks and audio share a timebase. Halve a
     // chunk's audio and its own last mark no longer fits inside it.
     const shortened: KokoroCapture = {
@@ -191,13 +193,13 @@ describe('kokoroToWordTimings — spans are monotonic and cover the text', () =>
       ],
     };
     expect(() => kokoroToWordTimings(shortened)).toThrow(
-      /outside that chunk's .*s of audio/
+      /outside that chunk's .*s of audio/,
     );
   });
 });
 
-describe('what a timestamp-less runtime would cost', () => {
-  it('measures the per-chunk approximation error rather than describing it', () => {
+describe("what a timestamp-less runtime would cost", () => {
+  it("measures the per-chunk approximation error rather than describing it", () => {
     const single = uniformApproximationError(SINGLE);
     const multi = uniformApproximationError(MULTI);
 
@@ -210,13 +212,13 @@ describe('what a timestamp-less runtime would cost', () => {
     // The error is bounded by one chunk's duration — it cannot accumulate
     // across chunks, because each chunk is re-anchored to real audio length.
     const longestChunk = Math.max(
-      ...MULTI.chunks.map((c) => c.audio_samples / MULTI.sample_rate)
+      ...MULTI.chunks.map((c) => c.audio_samples / MULTI.sample_rate),
     );
     expect(multi).toBeLessThan(longestChunk);
   });
 });
 
-describe('the highlight index derives from the converted start times', () => {
+describe("the highlight index derives from the converted start times", () => {
   const store = () => useTtsHighlightStore.getState();
   const idx = () => store().currentWordIndex;
 
@@ -240,19 +242,19 @@ describe('the highlight index derives from the converted start times', () => {
     h.playbackStartingCb = null;
     h.finishedCb = null;
     h.speakResult = { success: true, wordTimings: [], totalDuration: 0 };
-    vi.spyOn(performance, 'now').mockImplementation(() => nowMs);
-    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+    vi.spyOn(performance, "now").mockImplementation(() => nowMs);
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
       const id = ++nextId;
       frames.push({ id, cb });
       return id;
     });
-    vi.stubGlobal('cancelAnimationFrame', (id: number) => {
+    vi.stubGlobal("cancelAnimationFrame", (id: number) => {
       frames = frames.filter((f) => f.id !== id);
     });
     useTtsHighlightStore.getState().reset();
     useAiTtsStore.setState({
       initialized: true,
-      playbackState: 'idle',
+      playbackState: "idle",
       error: null,
       speed: 1.0,
     });
@@ -263,7 +265,7 @@ describe('the highlight index derives from the converted start times', () => {
     vi.unstubAllGlobals();
   });
 
-  it('walks the multi-chunk capture word by word through the production loop', async () => {
+  it("walks the multi-chunk capture word by word through the production loop", async () => {
     const { wordTimings, totalDuration } = kokoroToWordTimings(MULTI);
     const { result } = renderHook(() => useTtsWordHighlight());
 
@@ -289,8 +291,8 @@ describe('the highlight index derives from the converted start times', () => {
       expect(idx()).toBe(i);
     }
 
-    // The last word holds until the audio actually ends (trailing silence),
-    // then the duration guard completes exactly once.
+    // The last word holds through trailing silence; only the real sink-drained
+    // event completes playback, never the visual timing estimate.
     const last = wordTimings[wordTimings.length - 1];
     expect(totalDuration).toBeGreaterThan(last.endTime);
     tick(Math.round(last.endTime * 1000) + 10);
@@ -298,6 +300,8 @@ describe('the highlight index derives from the converted start times', () => {
     expect(store().isActive).toBe(true);
 
     tick(Math.round(totalDuration * 1000) + 10);
+    expect(store().isActive).toBe(true);
+    act(() => h.finishedCb?.());
     expect(store().isActive).toBe(false);
   });
 });

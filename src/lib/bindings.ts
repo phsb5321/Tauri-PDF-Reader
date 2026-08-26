@@ -482,6 +482,29 @@ async aiTtsInitLocal() : Promise<Result<InitLocalResponse, string>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+/**
+ * Connect Groq with a session-only API key. The production destination/model
+ * are pinned inside the adapter and cannot be supplied by the WebView.
+ */
+async aiTtsInitGroq(apiKey: string) : Promise<Result<InitGroqResponse, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("ai_tts_init_groq", { apiKey }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Stop the old route before selecting an already-connected provider.
+ */
+async aiTtsSwitchProvider(provider: TtsProvider) : Promise<Result<SwitchProviderResponse, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("ai_tts_switch_provider", { provider }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -628,7 +651,8 @@ default_color?: string;
  * SQLite `highlight.colors`
  */
 colors?: string[] }
-export type InitLocalResponse = { success: boolean; voicesCount: number; provider: string; supportsWordTimings: boolean; destination: string }
+export type InitGroqResponse = { success: boolean; voicesCount: number; provider: TtsProvider; supportsWordTimings: boolean; maxTextUtf8Bytes: number }
+export type InitLocalResponse = { success: boolean; voicesCount: number; provider: string; supportsWordTimings: boolean; maxTextUtf8Bytes: number; destination: string }
 /**
  * Response types for commands
  */
@@ -676,6 +700,7 @@ export type SessionRestoreResponse = { success: boolean; session: ReadingSession
  * Summary of a session for list operations
  */
 export type SessionSummary = { id: string; name: string; documentCount: number; lastAccessedAt: string; createdAt: string }
+export type SwitchProviderResponse = { success: boolean; provider: TtsProvider; voicesCount: number; supportsWordTimings: boolean; maxTextUtf8Bytes: number }
 /**
  * Both fields default to `false`, which is exactly `#[derive(Default)]` — the
  * only section whose defaults are the type's own, so it is the only one that
@@ -704,6 +729,10 @@ voice?: string | null;
  * SQLite `tts.followAlong`
  */
 follow_along?: boolean }
+/**
+ * Supported TTS providers
+ */
+export type TtsProvider = "elevenlabs" | "local" | "groq"
 
 /** tauri-specta globals **/
 

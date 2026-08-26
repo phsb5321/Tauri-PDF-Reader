@@ -6,7 +6,26 @@ import type {
 } from "../lib/tauri-invoke";
 import type { CoverageResponse } from "../lib/api/audio-cache";
 
-export type AiTtsProvider = "elevenlabs" | "local";
+export type AiTtsProvider = "elevenlabs" | "local" | "groq";
+export const AI_TTS_PROVIDERS: readonly AiTtsProvider[] = [
+  "local",
+  "elevenlabs",
+  "groq",
+];
+
+export type AiTtsConnectionStatus =
+  | "setup"
+  | "connecting"
+  | "connected"
+  | "error";
+
+export interface AiTtsConnectionState {
+  status: AiTtsConnectionStatus;
+  error: string | null;
+  destination: string | null;
+  supportsWordTimings: boolean;
+  maxTextUtf8Bytes: number;
+}
 
 export type AiTtsPlaybackState =
   | "idle"
@@ -15,53 +34,56 @@ export type AiTtsPlaybackState =
   | "loading"
   | "error";
 
-/**
- * Valid state transitions for TTS playback (T025)
- *
- * State machine ensures predictable UI behavior and prevents invalid states.
- * Format: fromState -> [validNextStates]
- */
 const VALID_TRANSITIONS: Record<AiTtsPlaybackState, AiTtsPlaybackState[]> = {
-  idle: ["loading", "error"], // Can start loading or enter error
-  loading: ["playing", "idle", "error"], // Can start playing, cancel, or error
-  playing: ["paused", "idle", "error"], // Can pause, stop, or error
-  paused: ["playing", "idle", "error"], // Can resume, stop, or error
-  error: ["idle", "loading"], // Can reset to idle or retry
+  idle: ["loading", "error"],
+  loading: ["playing", "idle", "error"],
+  playing: ["paused", "idle", "error"],
+  paused: ["playing", "idle", "error"],
+  error: ["idle", "loading"],
 };
 
+export type ProviderVoiceIds = Record<AiTtsProvider, string | null>;
+
 interface AiTtsState {
-  // Initialization
   initialized: boolean;
   apiKey: string | null;
   initError: string | null;
   provider: AiTtsProvider;
   localUrl: string | null;
   supportsWordTimings: boolean;
+  maxTextUtf8Bytes: number;
+  connections: Record<AiTtsProvider, AiTtsConnectionState>;
+  providerVoiceIds: ProviderVoiceIds;
+  providerOperationGeneration: number;
+  switchingProvider: AiTtsProvider | null;
 
-  // Playback state
   playbackState: AiTtsPlaybackState;
   currentText: string | null;
   error: string | null;
   naturalCompletionCount: number;
+  backendPlaybackGeneration: number | null;
 
-  // Voice settings
   voices: AiVoiceInfo[];
   selectedVoiceId: string | null;
   speed: number;
-
-  // Playback settings (T033)
   autoPageEnabled: boolean;
-
-  // Cache coverage (T042)
   cacheCoverage: CoverageResponse | null;
 
-  // Actions
   setApiKey: (key: string | null) => void;
   setProviderConfig: (
     provider: AiTtsProvider,
     localUrl: string | null,
     supportsWordTimings?: boolean,
+    maxTextUtf8Bytes?: number,
   ) => void;
+  setConnectionStatus: (
+    provider: AiTtsProvider,
+    status: AiTtsConnectionStatus,
+    patch?: Partial<Omit<AiTtsConnectionState, "status">>,
+  ) => void;
+  beginProviderOperation: (provider: AiTtsProvider) => number;
+  isCurrentProviderOperation: (generation: number) => boolean;
+  setSwitchingProvider: (provider: AiTtsProvider | null) => void;
   setInitialized: (initialized: boolean, error?: string) => void;
   setVoices: (voices: AiVoiceInfo[]) => void;
   setSelectedVoice: (voiceId: string | null) => void;
@@ -69,10 +91,11 @@ interface AiTtsState {
   setAutoPageEnabled: (enabled: boolean) => void;
   setCacheCoverage: (coverage: CoverageResponse | null) => void;
   setPlaybackState: (state: AiTtsPlaybackState) => void;
-  /** Transition to next state with validation (T026) */
   transitionTo: (nextState: AiTtsPlaybackState, force?: boolean) => boolean;
   setCurrentText: (text: string | null) => void;
   setError: (error: string | null) => void;
+  setBackendPlaybackGeneration: (generation: number | null) => void;
+  consumeBackendCompletion: (generation: number) => boolean;
   markNaturalCompletion: () => void;
   clearError: () => void;
   updateFromBackend: (state: BackendTtsState) => void;
@@ -81,11 +104,34 @@ interface AiTtsState {
 
 const DEFAULT_SPEED = 1.0;
 const MIN_SPEED = 0.5;
-// Pitch-preserving range (spec 039): speed up to 4.5× without pitch shift.
 const MAX_SPEED = 4.5;
-
-// Default ElevenLabs voice (Rachel - good for narration)
 const DEFAULT_VOICE_ID = "21m00Tcm4TlvDq8ikWAM";
+
+function initialConnections(): Record<AiTtsProvider, AiTtsConnectionState> {
+  return {
+    elevenlabs: {
+      status: "setup",
+      error: null,
+      destination: "https://api.elevenlabs.io",
+      supportsWordTimings: true,
+      maxTextUtf8Bytes: 10_000,
+    },
+    local: {
+      status: "setup",
+      error: null,
+      destination: null,
+      supportsWordTimings: false,
+      maxTextUtf8Bytes: 8_192,
+    },
+    groq: {
+      status: "setup",
+      error: null,
+      destination: "https://api.groq.com/openai/v1/audio/speech",
+      supportsWordTimings: false,
+      maxTextUtf8Bytes: 200,
+    },
+  };
+}
 
 const initialState = {
   initialized: false,
@@ -94,40 +140,69 @@ const initialState = {
   provider: "elevenlabs" as AiTtsProvider,
   localUrl: null as string | null,
   supportsWordTimings: true,
+  maxTextUtf8Bytes: 10_000,
+  connections: initialConnections(),
+  providerVoiceIds: {
+    elevenlabs: DEFAULT_VOICE_ID,
+    local: null,
+    groq: "autumn",
+  } as ProviderVoiceIds,
+  providerOperationGeneration: 0,
+  switchingProvider: null as AiTtsProvider | null,
   playbackState: "idle" as AiTtsPlaybackState,
   currentText: null as string | null,
   error: null as string | null,
   naturalCompletionCount: 0,
+  backendPlaybackGeneration: null as number | null,
   voices: [] as AiVoiceInfo[],
   selectedVoiceId: DEFAULT_VOICE_ID,
   speed: DEFAULT_SPEED,
-  autoPageEnabled: true, // T033: Default to enabled for multi-page TTS
-  cacheCoverage: null as CoverageResponse | null, // T042: Audio cache coverage for current document
+  autoPageEnabled: true,
+  cacheCoverage: null as CoverageResponse | null,
 };
 
 interface PersistedAiTtsPreferences {
   selectedVoiceId: string | null;
+  providerVoiceIds: ProviderVoiceIds;
   speed: number;
   autoPageEnabled: boolean;
 }
 
-const PERSISTENCE_VERSION = 1;
+const PERSISTENCE_VERSION = 2;
 const PERSISTENCE_KEY = "ai-tts-storage";
+
+function safeVoice(value: unknown, fallback: string | null): string | null {
+  return typeof value === "string" || value === null ? value : fallback;
+}
 
 function sanitizePersistedPreferences(
   persistedState: unknown,
 ): PersistedAiTtsPreferences {
   const candidate =
     persistedState && typeof persistedState === "object"
-      ? (persistedState as Partial<PersistedAiTtsPreferences>)
+      ? (persistedState as Partial<
+          PersistedAiTtsPreferences & { apiKey?: unknown }
+        >)
       : {};
+  const legacyVoice = safeVoice(
+    candidate.selectedVoiceId,
+    initialState.selectedVoiceId,
+  );
+  const providerVoices =
+    candidate.providerVoiceIds && typeof candidate.providerVoiceIds === "object"
+      ? candidate.providerVoiceIds
+      : ({} as Partial<ProviderVoiceIds>);
 
   return {
-    selectedVoiceId:
-      typeof candidate.selectedVoiceId === "string" ||
-      candidate.selectedVoiceId === null
-        ? candidate.selectedVoiceId
-        : initialState.selectedVoiceId,
+    selectedVoiceId: legacyVoice,
+    providerVoiceIds: {
+      elevenlabs: safeVoice(providerVoices.elevenlabs, legacyVoice),
+      local: safeVoice(
+        providerVoices.local,
+        initialState.providerVoiceIds.local,
+      ),
+      groq: safeVoice(providerVoices.groq, initialState.providerVoiceIds.groq),
+    },
     speed:
       typeof candidate.speed === "number" && Number.isFinite(candidate.speed)
         ? Math.max(MIN_SPEED, Math.min(MAX_SPEED, candidate.speed))
@@ -150,31 +225,105 @@ export const useAiTtsStore = create<AiTtsState>()(
         provider,
         localUrl,
         supportsWordTimings = provider === "elevenlabs",
+        maxTextUtf8Bytes = get().connections[provider].maxTextUtf8Bytes,
       ) => {
         console.debug("[AiTtsStore] provider:", get().provider, "->", provider);
-        set({ provider, localUrl, supportsWordTimings });
-      },
-
-      setInitialized: (initialized, error) =>
+        const rememberedVoice = get().providerVoiceIds[provider];
         set({
-          initialized,
-          initError: error ?? null,
-          playbackState: initialized ? "idle" : "error",
-        }),
-
-      setVoices: (voices) => {
-        const { selectedVoiceId } = get();
-        // If current voice isn't in the list, select the first one
-        const voiceExists = voices.some((v) => v.id === selectedVoiceId);
-        set({
-          voices,
-          selectedVoiceId: voiceExists
-            ? selectedVoiceId
-            : (voices[0]?.id ?? null),
+          provider,
+          localUrl,
+          supportsWordTimings,
+          maxTextUtf8Bytes,
+          selectedVoiceId: rememberedVoice,
+          connections: {
+            ...get().connections,
+            [provider]: {
+              ...get().connections[provider],
+              destination:
+                provider === "local"
+                  ? localUrl
+                  : get().connections[provider].destination,
+              supportsWordTimings,
+              maxTextUtf8Bytes,
+            },
+          },
         });
       },
 
-      setSelectedVoice: (voiceId) => set({ selectedVoiceId: voiceId }),
+      setConnectionStatus: (provider, status, patch = {}) => {
+        console.debug(
+          "[AiTtsStore] connection:",
+          provider,
+          get().connections[provider].status,
+          "->",
+          status,
+        );
+        set({
+          connections: {
+            ...get().connections,
+            [provider]: {
+              ...get().connections[provider],
+              ...patch,
+              status,
+            },
+          },
+        });
+      },
+
+      beginProviderOperation: (provider) => {
+        const generation = get().providerOperationGeneration + 1;
+        set({
+          providerOperationGeneration: generation,
+          switchingProvider: null,
+        });
+        get().setConnectionStatus(
+          provider,
+          get().connections[provider].status === "connected"
+            ? "connected"
+            : "connecting",
+          { error: null },
+        );
+        return generation;
+      },
+
+      isCurrentProviderOperation: (generation) =>
+        get().providerOperationGeneration === generation,
+
+      setSwitchingProvider: (provider) => set({ switchingProvider: provider }),
+
+      setInitialized: (initialized, error) => {
+        const provider = get().provider;
+        get().setConnectionStatus(
+          provider,
+          initialized ? "connected" : error ? "error" : "setup",
+          { error: error ?? null },
+        );
+        set({
+          initialized,
+          initError: error ?? null,
+          playbackState: initialized ? "idle" : error ? "error" : "idle",
+        });
+      },
+
+      setVoices: (voices) => {
+        const provider = get().provider;
+        const remembered = get().providerVoiceIds[provider];
+        const selectedVoiceId = voices.some((voice) => voice.id === remembered)
+          ? remembered
+          : (voices[0]?.id ?? null);
+        set({ voices, selectedVoiceId });
+      },
+
+      setSelectedVoice: (voiceId) => {
+        const provider = get().provider;
+        set({
+          selectedVoiceId: voiceId,
+          providerVoiceIds: {
+            ...get().providerVoiceIds,
+            [provider]: voiceId,
+          },
+        });
+      },
 
       setSpeed: (speed) => {
         const clampedSpeed = Math.max(MIN_SPEED, Math.min(MAX_SPEED, speed));
@@ -182,12 +331,9 @@ export const useAiTtsStore = create<AiTtsState>()(
       },
 
       setAutoPageEnabled: (enabled) => set({ autoPageEnabled: enabled }),
-
       setCacheCoverage: (coverage) => set({ cacheCoverage: coverage }),
 
       setPlaybackState: (state) => {
-        // Direct state set - for backward compatibility and event-driven updates
-        // Prefer transitionTo() for validated state changes
         const currentState = get().playbackState;
         console.debug(
           "[AiTtsStore] setPlaybackState:",
@@ -195,18 +341,15 @@ export const useAiTtsStore = create<AiTtsState>()(
           "->",
           state,
         );
-        // Debug: Log stack trace when transitioning from playing to idle
         if (currentState === "playing" && state === "idle") {
           console.debug("[AiTtsStore] playing->idle stack:", new Error().stack);
         }
         set({ playbackState: state });
       },
 
-      /** Transition to next state with validation (T026) */
       transitionTo: (nextState, force = false) => {
         const currentState = get().playbackState;
         const validNextStates = VALID_TRANSITIONS[currentState];
-
         if (!force && !validNextStates.includes(nextState)) {
           console.warn(
             `[AiTtsStore] Invalid state transition: ${currentState} -> ${nextState}. ` +
@@ -214,7 +357,6 @@ export const useAiTtsStore = create<AiTtsState>()(
           );
           return false;
         }
-
         console.debug(
           "[AiTtsStore] transitionTo:",
           currentState,
@@ -227,21 +369,23 @@ export const useAiTtsStore = create<AiTtsState>()(
       },
 
       setCurrentText: (text) => set({ currentText: text }),
-
       setError: (error) =>
+        set({ error, playbackState: error ? "error" : get().playbackState }),
+      setBackendPlaybackGeneration: (generation) =>
+        set({ backendPlaybackGeneration: generation }),
+      consumeBackendCompletion: (generation) => {
+        if (get().backendPlaybackGeneration !== generation) return false;
         set({
-          error,
-          playbackState: error ? "error" : get().playbackState,
-        }),
-
+          backendPlaybackGeneration: null,
+          naturalCompletionCount: get().naturalCompletionCount + 1,
+          playbackState: "idle",
+          currentText: null,
+        });
+        return true;
+      },
       markNaturalCompletion: () =>
         set({ naturalCompletionCount: get().naturalCompletionCount + 1 }),
-
-      clearError: () =>
-        set({
-          error: null,
-          playbackState: "idle",
-        }),
+      clearError: () => set({ error: null, playbackState: "idle" }),
 
       updateFromBackend: (backendState) => {
         set({
@@ -255,21 +399,29 @@ export const useAiTtsStore = create<AiTtsState>()(
         });
       },
 
-      reset: () =>
+      reset: () => {
+        const current = get();
+        const connections = initialConnections();
+        connections.local.destination = current.localUrl;
         set({
           ...initialState,
-          // Reset only the current session; native config remains authoritative.
-          selectedVoiceId: get().selectedVoiceId,
-          provider: get().provider,
-          localUrl: get().localUrl,
-          supportsWordTimings: get().supportsWordTimings,
-        }),
+          connections,
+          provider: current.provider,
+          localUrl: current.localUrl,
+          supportsWordTimings: current.supportsWordTimings,
+          maxTextUtf8Bytes: current.maxTextUtf8Bytes,
+          selectedVoiceId: current.providerVoiceIds[current.provider],
+          providerVoiceIds: current.providerVoiceIds,
+          providerOperationGeneration: current.providerOperationGeneration + 1,
+        });
+      },
     }),
     {
       name: PERSISTENCE_KEY,
       version: PERSISTENCE_VERSION,
       partialize: (state) => ({
         selectedVoiceId: state.selectedVoiceId,
+        providerVoiceIds: state.providerVoiceIds,
         speed: state.speed,
         autoPageEnabled: state.autoPageEnabled,
       }),
@@ -277,21 +429,19 @@ export const useAiTtsStore = create<AiTtsState>()(
       merge: (persistedState, currentState) => ({
         ...currentState,
         ...sanitizePersistedPreferences(persistedState),
+        apiKey: null,
       }),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
           localStorage.removeItem(PERSISTENCE_KEY);
           return;
         }
-
-        // A store action uses persist's wrapped set to rewrite canonical bytes.
         state?.setApiKey(null);
       },
     },
   ),
 );
 
-// Derived selectors
 export const selectIsPlaying = (state: AiTtsState) =>
   state.playbackState === "playing";
 export const selectIsPaused = (state: AiTtsState) =>
@@ -301,9 +451,15 @@ export const selectIsLoading = (state: AiTtsState) =>
 export const selectCanPlay = (state: AiTtsState) =>
   state.initialized && !state.error;
 export const selectNeedsApiKey = (state: AiTtsState) =>
-  state.provider === "elevenlabs" && !state.apiKey;
+  (state.provider === "elevenlabs" || state.provider === "groq") &&
+  !state.apiKey &&
+  state.connections[state.provider].status !== "connected";
+export const selectConnectedProviders = (state: AiTtsState) =>
+  AI_TTS_PROVIDERS.filter(
+    (provider) => state.connections[provider].status === "connected",
+  );
 export const selectSelectedVoice = (state: AiTtsState) =>
-  state.voices.find((v) => v.id === state.selectedVoiceId) ?? null;
+  state.voices.find((voice) => voice.id === state.selectedVoiceId) ?? null;
 export const selectCacheCoverage = (state: AiTtsState) => state.cacheCoverage;
 export const selectCacheCoveragePercent = (state: AiTtsState) =>
   state.cacheCoverage?.coveragePercent ?? 0;

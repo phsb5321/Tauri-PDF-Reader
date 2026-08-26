@@ -28,9 +28,10 @@ macOS receipt.
 
 - Packaged E2E drives a **deterministic fixture engine** (`e2e-tts-fixture`
   Cargo feature, opt-in; never in `default`) — no network, no audio output.
-- The **live ElevenLabs path** (the `elevenlabs-tts` default feature) is not
-  exercised in CI: it needs an API key and real network. Its egress contract
-  is documented in `SECURITY.md` with file:line receipts.
+- The **live ElevenLabs and Groq paths** (compiled under the current
+  `elevenlabs-tts` default feature) are not exercised in CI: each needs a
+  session API key and real network. Their egress contracts are documented in
+  `SECURITY.md`; deterministic fixtures gate internal routing separately.
 - **Native TTS** (Speech Dispatcher) is a Cargo feature that is **not enabled
   by default** and not part of any shipped build. The README's feature list
   reflects AI TTS only.
@@ -85,9 +86,10 @@ reasons above are what would have to change to unblock it.
 
 ## Egress
 
-The **only** outbound network call in the app is to ElevenLabs when a speak
-action runs ([#97] removed the jsDelivr CDN egress; there is no update-check
-egress). Contract and file:line receipts: `SECURITY.md`.
+The only outbound calls are the selected narration routes: ElevenLabs, Groq,
+or the exact configured Local TTS loopback service, and only after a public
+narration action ([#97] removed the jsDelivr CDN egress; there is no
+update-check egress). Contract and file:line receipts: `SECURITY.md`.
 
 ## Platform-scoped runtime
 

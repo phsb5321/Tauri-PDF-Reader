@@ -30,12 +30,12 @@ The format is **TOML**. The reasoning, from the SOTA survey:
 
 ### Location and lifecycle (settled)
 
-| Decision | Value | Rationale |
-|---|---|---|
-| Path | `$XDG_CONFIG_HOME/lectrice/config.toml` via `dirs::config_dir()` | NOT `app_config_dir` — that couples the path to the Tauri bundle identifier (`com.lectrice.reader`). The user's config path must be stable and predictable, independent of packaging. |
-| Override | `LECTRICE_CONFIG=/path/to/file.toml` | Testing, multi-profile, and `nix run` experiments. |
-| Absent file | Built-in defaults, **no file is created** | A config file the app wrote is a file the user did not write. Creating it on first run would fight `home-manager` (which owns a read-only symlink) and would present the user with a file they never chose. |
-| Template | `--generate-config` prints a fully commented template to stdout | The user redirects it where they want: `lectrice --generate-config > ~/.config/lectrice/config.toml`. |
+| Decision    | Value                                                            | Rationale                                                                                                                                                                                                   |
+| ----------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Path        | `$XDG_CONFIG_HOME/lectrice/config.toml` via `dirs::config_dir()` | NOT `app_config_dir` — that couples the path to the Tauri bundle identifier (`com.lectrice.reader`). The user's config path must be stable and predictable, independent of packaging.                       |
+| Override    | `LECTRICE_CONFIG=/path/to/file.toml`                             | Testing, multi-profile, and `nix run` experiments.                                                                                                                                                          |
+| Absent file | Built-in defaults, **no file is created**                        | A config file the app wrote is a file the user did not write. Creating it on first run would fight `home-manager` (which owns a read-only symlink) and would present the user with a file they never chose. |
+| Template    | `--generate-config` prints a fully commented template to stdout  | The user redirects it where they want: `lectrice --generate-config > ~/.config/lectrice/config.toml`.                                                                                                       |
 
 ### The two-writers problem (settled — the hard part)
 
@@ -56,13 +56,13 @@ needed.
 
 ### Robustness rules (settled)
 
-| Rule | Mechanism | Why |
-|---|---|---|
-| Unknown keys **warn**, never fail | `serde_ignored` | Never `deny_unknown_fields`: one typo (or a key from a newer version) must not brick the config. |
-| Type errors name the key **and** `file:line:col` | `toml` crate spans | "invalid type: string, expected boolean" with no location is a bad error. |
-| Schema evolution | top-level `schema_version` + migrations on raw `toml::Value` **before** deserialization | Migrating typed structs cannot express a shape change. |
-| Field evolution | `#[serde(default)]` everywhere, `#[serde(alias = "old_name")]` for renames | An old file must keep working. |
-| Secrets | **never** in the config file | The ElevenLabs API key is entered at runtime and is not persisted today; it stays that way. A config file is version-controlled and world-readable in a Nix store. |
+| Rule                                             | Mechanism                                                                               | Why                                                                                                                                                                |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Unknown keys **warn**, never fail                | `serde_ignored`                                                                         | Never `deny_unknown_fields`: one typo (or a key from a newer version) must not brick the config.                                                                   |
+| Type errors name the key **and** `file:line:col` | `toml` crate spans                                                                      | "invalid type: string, expected boolean" with no location is a bad error.                                                                                          |
+| Schema evolution                                 | top-level `schema_version` + migrations on raw `toml::Value` **before** deserialization | Migrating typed structs cannot express a shape change.                                                                                                             |
+| Field evolution                                  | `#[serde(default)]` everywhere, `#[serde(alias = "old_name")]` for renames              | An old file must keep working.                                                                                                                                     |
+| Secrets                                          | **never** in the config file                                                            | The ElevenLabs API key is entered at runtime and is not persisted today; it stays that way. A config file is version-controlled and world-readable in a Nix store. |
 
 ## The schema — enumerated from settings that ACTUALLY exist today
 
@@ -72,37 +72,37 @@ Read from `src/stores/settings-store.ts`, `src-tauri/src/db/migrations.rs`,
 
 ### Source 1 — SQLite `settings` table (key/value, JSON-encoded values)
 
-| Existing key | TOML path | Type | Default (today) |
-|---|---|---|---|
-| `theme` | `appearance.theme` | `"light" \| "dark" \| "system"` | `"system"` |
-| `highlight.defaultColor` | `highlight.default_color` | hex string | `"#FFEB3B"` |
-| `highlight.colors` | `highlight.colors` | array of hex string | `["#FFEB3B", "#4CAF50", "#2196F3", "#F44336"]` |
-| `tts.rate` | `tts.rate` | float, 0.5–3.0 (clamped in store) | `1.0` |
-| `tts.voice` | `tts.voice` | string \| null | `null` |
-| `tts.followAlong` | `tts.follow_along` | bool | `true` |
-| `telemetry.analytics` | `telemetry.analytics` | bool | `false` |
-| `telemetry.errors` | `telemetry.errors` | bool | `false` |
-| `render.qualityMode` | `render.quality_mode` | `"performance" \| "balanced" \| "ultra"` | `"balanced"` ⚠️ |
-| `render.maxMegapixels` | `render.max_megapixels` | integer, validated 8–48 on write | `24` ⚠️ |
-| `render.hwAccelerationEnabled` | `render.hw_acceleration` | bool | `true` |
-| `render.debugOverlayEnabled` | `render.debug_overlay` | bool | `false` |
+| Existing key                   | TOML path                 | Type                                     | Default (today)                                |
+| ------------------------------ | ------------------------- | ---------------------------------------- | ---------------------------------------------- |
+| `theme`                        | `appearance.theme`        | `"light" \| "dark" \| "system"`          | `"system"`                                     |
+| `highlight.defaultColor`       | `highlight.default_color` | hex string                               | `"#FFEB3B"`                                    |
+| `highlight.colors`             | `highlight.colors`        | array of hex string                      | `["#FFEB3B", "#4CAF50", "#2196F3", "#F44336"]` |
+| `tts.rate`                     | `tts.rate`                | float, 0.5–3.0 (clamped in store)        | `1.0`                                          |
+| `tts.voice`                    | `tts.voice`               | string \| null                           | `null`                                         |
+| `tts.followAlong`              | `tts.follow_along`        | bool                                     | `true`                                         |
+| `telemetry.analytics`          | `telemetry.analytics`     | bool                                     | `false`                                        |
+| `telemetry.errors`             | `telemetry.errors`        | bool                                     | `false`                                        |
+| `render.qualityMode`           | `render.quality_mode`     | `"performance" \| "balanced" \| "ultra"` | `"balanced"` ⚠️                                |
+| `render.maxMegapixels`         | `render.max_megapixels`   | integer, validated 8–48 on write         | `24` ⚠️                                        |
+| `render.hwAccelerationEnabled` | `render.hw_acceleration`  | bool                                     | `true`                                         |
+| `render.debugOverlayEnabled`   | `render.debug_overlay`    | bool                                     | `false`                                        |
 
 ### Source 2 — SQLite `cache_settings` table
 
-| Existing key | TOML path | Type | Default (today) |
-|---|---|---|---|
-| `max_size_bytes` | `cache.max_size_bytes` | integer (bytes) | `5368709120` (5 GiB) |
-| `eviction_policy` | `cache.eviction_policy` | `"lru"` | `"lru"` |
+| Existing key      | TOML path               | Type            | Default (today)      |
+| ----------------- | ----------------------- | --------------- | -------------------- |
+| `max_size_bytes`  | `cache.max_size_bytes`  | integer (bytes) | `5368709120` (5 GiB) |
+| `eviction_policy` | `cache.eviction_policy` | `"lru"`         | `"lru"`              |
 
 ### Source 3 — `localStorage` (zustand `ai-tts-storage`, persisted preferences)
 
-| Existing key | TOML path | Type | Default (today) |
-|---|---|---|---|
-| `selectedVoiceId` | `ai_tts.voice_id` | string \| null | `"21m00Tcm4TlvDq8ikWAM"` |
-| `speed` | `ai_tts.speed` | float, 0.5–4.5 (clamped) | `1.0` |
-| `autoPageEnabled` | `ai_tts.auto_page` | bool | `true` |
+| Existing key      | TOML path          | Type                     | Default (today)          |
+| ----------------- | ------------------ | ------------------------ | ------------------------ |
+| `selectedVoiceId` | `ai_tts.voice_id`  | string \| null           | `"21m00Tcm4TlvDq8ikWAM"` |
+| `speed`           | `ai_tts.speed`     | float, 0.5–4.5 (clamped) | `1.0`                    |
+| `autoPageEnabled` | `ai_tts.auto_page` | bool                     | `true`                   |
 
-**17 config keys total.**
+**17 keys in the original Spec 078 scope.** Later TTS specs add provider and exact-loopback destination keys to the live schema.
 
 ### ⚠️ Pre-existing divergence found while enumerating (recorded, not fixed here)
 
@@ -169,11 +169,11 @@ self-write reload loop.
 
 ## Slice boundaries
 
-| Slice | Scope | Branch |
-|---|---|---|
+| Slice           | Scope                                                                                                                                                                                                         | Branch            |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
 | **1 (this PR)** | **Read-only**: resolve path, parse at startup, apply to settings, warn on unknown keys, honest errors with line/col, `schema_version` + migration hook, `--generate-config`. **No UI writer, no hot reload.** | `148-config-file` |
-| 2 | Comment-preserving UI writer (`toml_edit`); SQLite demoted to data. | later |
-| 3 | Hot reload (debounced watcher, parse-error retention, self-write guard). | later |
+| 2               | Comment-preserving UI writer (`toml_edit`); SQLite demoted to data.                                                                                                                                           | later             |
+| 3               | Hot reload (debounced watcher, parse-error retention, self-write guard).                                                                                                                                      | later             |
 
 ## Success Criteria
 

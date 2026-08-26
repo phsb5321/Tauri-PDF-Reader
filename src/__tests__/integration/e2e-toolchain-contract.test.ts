@@ -18,7 +18,7 @@
  *     CI redirects CARGO_TARGET_DIR.
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -30,6 +30,7 @@ const LANES = [
   "e2e/run-critical-loop.sh",
   "scripts/e2e-home.sh",
   "scripts/e2e-native.sh",
+  "scripts/e2e-tts-connections.sh",
   "e2e/run-open-journey.sh",
   "e2e/run-session-journey.sh",
   "e2e/run-reader-journey.sh",
@@ -44,6 +45,7 @@ const APP_OBSERVERS = [
 const TOOLCHAIN = join(REPO_ROOT, "scripts/e2e-toolchain.sh");
 const PROFILE = join(REPO_ROOT, "scripts/e2e-profile.sh");
 const FLAKE = join(REPO_ROOT, "flake.nix");
+const DEV_HOT_RELOAD = join(REPO_ROOT, "scripts/dev-hot-reload.sh");
 
 describe("e2e toolchain provisioning (101)", () => {
   it("no lane carries its own package list or nix-shell invocation", () => {
@@ -76,6 +78,8 @@ describe("e2e toolchain provisioning (101)", () => {
     expect(toolchain).not.toMatch(/nix-shell\s+-p/);
     expect(toolchain).toContain("E2E_APP_PATH");
     expect(toolchain).toContain("CARGO_TARGET_DIR");
+    expect(toolchain).toContain("--option min-free 0");
+    expect(toolchain).toContain("--option max-free 0");
   });
 
   it("every process observer follows the shared app path", () => {
@@ -87,11 +91,34 @@ describe("e2e toolchain provisioning (101)", () => {
     }
   });
 
+  it("makes GTK file-chooser schemas visible inside the devShell", () => {
+    const flake = readFileSync(FLAKE, "utf8");
+    expect(flake).toMatch(
+      /shellHook\s*=\s*''[\s\S]*export XDG_DATA_DIRS="\$GSETTINGS_SCHEMAS_PATH/,
+    );
+  });
+
+  it("the dev wrapper reaps only its exact escaped native child", () => {
+    const wrapper = readFileSync(DEV_HOT_RELOAD, "utf8");
+    expect(statSync(DEV_HOT_RELOAD).mode & 0o111).not.toBe(0);
+    expect(wrapper).toContain('pgrep -f -- "^${APP}$"');
+    expect(wrapper).toContain("trap shutdown INT TERM");
+    expect(wrapper).not.toMatch(/pkill\s/);
+  });
+
   it("the flake devShell declares every package the lanes need", () => {
     const flake = readFileSync(FLAKE, "utf8");
     // Deleting any executable used by a lane must fail here and, via the
     // shared entry point, in the packaged matrix.
-    for (const pkg of ["perl", "speechd", "xvfb", "sqlite", "pnpm_10"]) {
+    for (const pkg of [
+      "perl",
+      "speechd",
+      "xvfb",
+      "sqlite",
+      "xdotool",
+      "dragon-drop",
+      "pnpm_10",
+    ]) {
       expect(flake, `flake.nix devShell must declare ${pkg}`).toContain(pkg);
     }
   });

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   initLocal: vi.fn(),
+  switchProvider: vi.fn(),
   listVoices: vi.fn(),
   setVoice: vi.fn(),
   setSpeed: vi.fn(),
@@ -10,7 +11,10 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../lib/bindings", () => ({
-  commands: { aiTtsInitLocal: mocks.initLocal },
+  commands: {
+    aiTtsInitLocal: mocks.initLocal,
+    aiTtsSwitchProvider: mocks.switchProvider,
+  },
 }));
 
 vi.mock("../../lib/tauri-invoke", () => ({
@@ -25,6 +29,7 @@ vi.mock("../../lib/tauri-invoke", () => ({
   aiTtsGetState: vi.fn(),
   onAiTtsStarted: mocks.listen,
   onAiTtsFinished: mocks.listen,
+  onAiTtsPlaybackStarting: mocks.listen,
   onAiTtsStopped: mocks.listen,
   onAiTtsPaused: mocks.listen,
   onAiTtsResumed: mocks.listen,
@@ -48,6 +53,15 @@ describe("local TTS initialization", () => {
       voices: [],
       selectedVoiceId: "F1-pt",
       speed: 1,
+      connections: {
+        ...useAiTtsStore.getState().connections,
+        local: {
+          ...useAiTtsStore.getState().connections.local,
+          status: "setup",
+          error: null,
+          destination: "http://127.0.0.1:5301",
+        },
+      },
     });
     mocks.initLocal.mockResolvedValue({
       status: "ok",
@@ -56,7 +70,18 @@ describe("local TTS initialization", () => {
         voicesCount: 1,
         provider: "local",
         supportsWordTimings: false,
+        maxTextUtf8Bytes: 8192,
         destination: "http://127.0.0.1:5301",
+      },
+    });
+    mocks.switchProvider.mockResolvedValue({
+      status: "ok",
+      data: {
+        success: true,
+        provider: "local",
+        voicesCount: 1,
+        supportsWordTimings: false,
+        maxTextUtf8Bytes: 8192,
       },
     });
     mocks.listVoices.mockResolvedValue({

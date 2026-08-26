@@ -2,6 +2,7 @@
 
 **Feature Branch**: `170-local-tts`  
 **Created**: 2026-08-23  
+**Last amended**: 2026-08-25
 **Status**: Draft
 
 ## Outcome
@@ -35,7 +36,7 @@ As a reader, I am never told local narration works when the service is missing, 
 1. An unavailable destination shows a local-service connection error and does not fall back to cloud synthesis.
 2. An empty catalog blocks initialization.
 3. A non-WAV or structurally invalid response is rejected before playback or cache write.
-4. A local provider that publishes no marks does not display word-level progress or move the karaoke highlight.
+4. A local provider that publishes no native marks labels its read-along as estimated and derives duration-bound focus/progress from the measured WAV rather than claiming provider precision.
 
 ### User Story 3 — Understand the privacy boundary (P2)
 
@@ -53,13 +54,13 @@ As a reader, I can see that PDF-derived text goes to the local destination I con
 - **FR-006** — Synthesis MUST use the existing reader-operated-host contract: health, capabilities, idempotent WAV synthesis, bounded input, and explicit voice/speed.
 - **FR-007** — There MUST be no post-dispatch fallback to ElevenLabs.
 - **FR-008** — Cache identity MUST include provider, service/model revision, voice, speed, and media type so WAV and MP3 entries cannot collide; cache size, count, clear, and retention behavior MUST include both formats.
-- **FR-009** — A provider with no word marks MUST produce no `WordTiming` rows; UI MUST fall back to ordinary playback state rather than fabricate karaoke precision.
+- **FR-009** — A provider with no native word marks MUST NOT claim provider precision. Lectrice MAY derive deterministic `WordTiming` estimates from the measured WAV duration and original text offsets only when the UI/status names them as estimated; sentence advancement MUST remain driven by the real sink-drained event.
 - **FR-010** — The local setup/status surface MUST name the destination and state that PDF-derived text is sent there.
 - **FR-011** — Existing ElevenLabs initialization, timestamps, caching, and playback behavior MUST remain unchanged.
 - **FR-012** — A live verifier MUST synthesize one sentence from Mac.Pro through the configured loopback tunnel, validate WAV structure, and prove zero cloud credential is required.
 - **FR-013** — Mac installation MUST NOT occur until backend contract tests, targeted frontend tests, packaged public-control Play, live Mac-origin synthesis, independent review, AND a safe Mac app actor prove the staged candidate. Because no safe Mac app actor exists today, installation remains BLOCKED and the restored bundle stays installed.
 - **FR-014** — Local requests MUST have explicit connect and total deadlines, be cancelled by Stop/close/page change, and retry at most once with the identical idempotency key only after an ambiguous transport timeout.
-- **FR-015** — The first slice MUST reject text above the service's published or hard UTF-8 bound with `TEXT_TOO_LONG`; it MUST NOT truncate or silently split. Sentence chunking is a separately specified follow-up.
+- **FR-015** — The initial slice rejects text above the published/hard UTF-8 bound. The 25/08 follow-up MAY split a page at source-preserving sentence boundaries after public Play, synthesize sentence zero first, and prebuffer one successor. Each request MUST remain within the bound, preserve order/offsets, and never silently truncate.
 - **FR-016** — Provider and destination MUST be read-only WebView status derived from native config. No typed IPC command may mutate the destination.
 - **FR-017** — The Mac tunnel MUST use key-only SSH, `ExitOnForwardFailure`, keepalives, launchd restart, loopback bind, and a health oracle. Its unload/removal command MUST be retained.
 
@@ -77,9 +78,9 @@ As a reader, I can see that PDF-derived text goes to the local destination I con
 ## Success Criteria
 
 - **SC-001** — Local adapter contract tests cover readiness, voices, request body, idempotency, media type, WAV validation, response bound, and all named failures.
-- **SC-002** — Packaged user gate reaches public Play with local mode and records one local WAV request plus zero ElevenLabs requests.
+- **SC-002** — Packaged user gate reaches public Play with local mode, records ordered sentence-sized WAV requests plus zero ElevenLabs requests, and proves no local request occurs before Play.
 - **SC-003** — Local mode renders no API-key requirement and names its exact destination.
-- **SC-004** — No-mark mode renders no word-progress claim while audio playback state remains correct through play, pause/resume, finish, and stop.
+- **SC-004** — No-native-mark mode renders an explicitly estimated read-along/progress timeline on the measured audio clock; Play, pause/resume, sentence finish, Stop, final completion, and auto-page remain exactly-once and ordered.
 - **SC-005** — A Mac-origin live probe against the desktop service returns a valid WAV for a PT-BR sentence and exact configured voice through a healthy key-only tunnel.
 - **SC-006** — Existing targeted ElevenLabs suites and the full repository verification gate remain green.
 - **SC-007** — The restored Mac bundle remains installed while the Mac app actor is unavailable; a staged candidate is not an installation.

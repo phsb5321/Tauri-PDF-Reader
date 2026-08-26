@@ -29,6 +29,7 @@ import { useDocumentStore } from "../../stores/document-store";
 import { useLibraryStore } from "../../stores/library-store";
 import { useCollectionsStore } from "../../stores/collections-store";
 import { useAiTtsStore } from "../../stores/ai-tts-store";
+import { useTtsHighlightStore } from "../../stores/tts-highlight-store";
 import type { Document } from "../../lib/schemas";
 
 vi.mock("../../services/pdf-service", () => ({
@@ -66,6 +67,7 @@ beforeEach(() => {
   useLibraryStore.getState().reset();
   useCollectionsStore.getState().reset();
   useAiTtsStore.getState().reset();
+  useTtsHighlightStore.getState().reset();
   useAiTtsStore.setState({
     provider: "elevenlabs",
     localUrl: null,
@@ -90,7 +92,7 @@ beforeEach(() => {
         return Promise.resolve({
           success: true,
           wordTimings: [],
-          totalDuration: 0,
+          totalDuration: 2.4,
         });
       case "ai_tts_get_state":
         return Promise.resolve({
@@ -110,7 +112,7 @@ async function shelf() {
 }
 
 describe("resume and play", () => {
-  it("uses plain playback for a keyless local provider with no word marks", async () => {
+  it("builds a duration-bound read-along for a keyless local provider", async () => {
     useAiTtsStore.setState({
       provider: "local",
       localUrl: "http://127.0.0.1:5301",
@@ -127,15 +129,19 @@ describe("resume and play", () => {
     fireEvent.click(row);
 
     await waitFor(() =>
-      expect(mockInvoke).toHaveBeenCalledWith("ai_tts_speak", {
+      expect(mockInvoke).toHaveBeenCalledWith("ai_tts_speak_with_timestamps", {
         text: "It was the best of times.",
         voiceId: "F1-pt",
       }),
     );
     expect(mockInvoke).not.toHaveBeenCalledWith(
-      "ai_tts_speak_with_timestamps",
+      "ai_tts_speak",
       expect.anything(),
     );
+    await waitFor(() =>
+      expect(useTtsHighlightStore.getState().wordTimings).toHaveLength(6),
+    );
+    expect(useTtsHighlightStore.getState().totalDuration).toBe(2.4);
     expect(useAiTtsStore.getState().playbackState).not.toBe("idle");
     expect(
       screen.queryByText(/AI TTS requires an ElevenLabs API key/),

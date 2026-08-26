@@ -18,18 +18,31 @@ use crate::ports::{
     AudioMediaType, SynthesisProvider, SynthesisRequest, SynthesisVoice, SynthesizerPort,
 };
 use serde::{Deserialize, Serialize};
+use specta::Type;
+use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use tokio::sync::{watch, RwLock};
+use tokio::sync::{watch, Mutex, RwLock};
 
 /// Supported TTS providers
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Type, Default)]
 #[serde(rename_all = "lowercase")]
-#[derive(Default)]
 pub enum TtsProvider {
     #[default]
     ElevenLabs,
     Local,
+    Groq,
+}
+
+impl From<SynthesisProvider> for TtsProvider {
+    fn from(provider: SynthesisProvider) -> Self {
+        match provider {
+            SynthesisProvider::ElevenLabs => Self::ElevenLabs,
+            SynthesisProvider::Local => Self::Local,
+            SynthesisProvider::Groq => Self::Groq,
+        }
+    }
 }
 
 /// Voice information
@@ -48,7 +61,6 @@ pub struct VoiceInfo {
 #[serde(rename_all = "camelCase")]
 pub struct TtsConfig {
     pub provider: TtsProvider,
-    pub api_key: Option<String>,
     pub voice_id: Option<String>,
     pub model_id: Option<String>,
     pub stability: f32,
@@ -60,7 +72,6 @@ impl Default for TtsConfig {
     fn default() -> Self {
         Self {
             provider: TtsProvider::ElevenLabs,
-            api_key: None,
             voice_id: None,
             model_id: Some("eleven_monolingual_v1".to_string()),
             stability: 0.5,
@@ -100,27 +111,112 @@ pub struct PrebufferResult {
     pub total_duration: f64,
 }
 
-/// Main TTS engine that coordinates providers and playback
+#[derive(Clone)]
+struct ProviderConnection {
+    synthesizer: Arc<dyn SynthesizerPort>,
+    voices: Vec<SynthesisVoice>,
+}
+
+#[derive(Default)]
+struct ProviderRegistry {
+    active: Option<TtsProvider>,
+    connections: HashMap<TtsProvider, ProviderConnection>,
+}
+
+#[cfg(feature = "e2e-tts-fixture")]
+struct FixtureSynthesizer {
+    provider: SynthesisProvider,
+}
+
+#[cfg(feature = "e2e-tts-fixture")]
+#[async_trait::async_trait]
+impl SynthesizerPort for FixtureSynthesizer {
+    fn provider(&self) -> SynthesisProvider {
+        self.provider
+    }
+
+    fn provider_revision(&self) -> &str {
+        "e2e-fixture-1"
+    }
+
+    fn max_text_utf8_bytes(&self) -> usize {
+        if self.provider == SynthesisProvider::Groq {
+            200
+        } else {
+            10_000
+        }
+    }
+
+    fn supports_word_timings(&self) -> bool {
+        self.provider == SynthesisProvider::ElevenLabs
+    }
+
+    async fn list_voices(&self) -> Result<Vec<SynthesisVoice>, String> {
+        let ids: &[&str] = if self.provider == SynthesisProvider::Groq {
+            &["autumn", "diana", "hannah", "austin", "daniel", "troy"]
+        } else {
+            &["e2e-fixture-voice"]
+        };
+        Ok(ids
+            .iter()
+            .map(|id| SynthesisVoice {
+                id: (*id).to_string(),
+                name: (*id).to_string(),
+                language: Some("en".to_string()),
+                provider: self.provider,
+                preview_url: None,
+                labels: None,
+            })
+            .collect())
+    }
+
+    async fn synthesize(
+        &self,
+        _request: SynthesisRequest,
+    ) -> Result<crate::ports::SynthesisResult, String> {
+        Err("E2E_FIXTURE: synthesis is handled by the command fixture".to_string())
+    }
+}
+
+pub struct PreparedTtsWithTimings {
+    pub output: TtsWithTimings,
+    pub generation: u64,
+}
+
+/// Main TTS engine that coordinates connected providers and playback.
 pub struct AiTtsEngine {
     config: Arc<RwLock<TtsConfig>>,
     state: Arc<RwLock<TtsState>>,
     player: Arc<AudioPlayer>,
-    synthesizer: Option<Arc<dyn SynthesizerPort>>,
+    providers: Arc<RwLock<ProviderRegistry>>,
+    playback_gate: Arc<Mutex<()>>,
+    playback_generation: Arc<AtomicU64>,
     cancel_tx: watch::Sender<u64>,
     cache: Option<AudioCacheAdapter>,
 }
 
 impl AiTtsEngine {
     pub fn new() -> Self {
+        Self::with_player(AudioPlayer::new())
+    }
+
+    fn with_player(player: AudioPlayer) -> Self {
         let (cancel_tx, _) = watch::channel(0_u64);
         Self {
             config: Arc::new(RwLock::new(TtsConfig::default())),
             state: Arc::new(RwLock::new(TtsState::default())),
-            player: Arc::new(AudioPlayer::new()),
-            synthesizer: None,
+            player: Arc::new(player),
+            providers: Arc::new(RwLock::new(ProviderRegistry::default())),
+            playback_gate: Arc::new(Mutex::new(())),
+            playback_generation: Arc::new(AtomicU64::new(0)),
             cancel_tx,
             cache: None,
         }
+    }
+
+    #[cfg(test)]
+    fn for_test() -> Self {
+        Self::with_player(AudioPlayer::for_test())
     }
 
     /// Rebuild the audio player so it invokes `on_finished` when playback ends
@@ -130,8 +226,11 @@ impl AiTtsEngine {
     ///
     /// Called once at startup before any playback, so swapping the player (the
     /// `new()` one was idle) is safe — its dropped thread joins cleanly.
-    pub fn set_finished_callback(&mut self, on_finished: Box<dyn Fn() + Send>) {
-        self.player = Arc::new(AudioPlayer::with_finished_callback(on_finished));
+    pub fn set_finished_callback(&mut self, on_finished: Box<dyn Fn(u64) + Send>) {
+        let playback_generation = Arc::clone(&self.playback_generation);
+        self.player = Arc::new(AudioPlayer::with_finished_callback(Box::new(move || {
+            on_finished(playback_generation.load(Ordering::Acquire));
+        })));
     }
 
     /// Initialize cache with app cache directory
@@ -140,90 +239,219 @@ impl AiTtsEngine {
         tracing::info!("TTS audio cache initialized");
     }
 
-    /// Initialize with an ElevenLabs API key.
-    pub async fn init(&mut self, api_key: String) -> Result<(), String> {
-        let client = Arc::new(ElevenLabsClient::new(api_key.clone()));
-        client
-            .list_voices()
+    /// Initialize and register an ElevenLabs connection. Credentials remain
+    /// inside the provider client and are never copied into readable config.
+    pub async fn init(&self, api_key: String) -> Result<(), String> {
+        let client = Arc::new(ElevenLabsClient::new(api_key));
+        let voices = SynthesizerPort::list_voices(client.as_ref())
             .await
-            .map_err(|e| format!("Failed to initialize ElevenLabs: {e}"))?;
-        self.synthesizer = Some(client);
-        let mut config = self.config.write().await;
-        config.provider = TtsProvider::ElevenLabs;
-        config.api_key = Some(api_key);
-        tracing::info!("AI TTS engine initialized with ElevenLabs");
+            .map_err(|error| format!("Failed to initialize ElevenLabs: {error}"))?;
+        self.install_provider(client, voices).await?;
+        tracing::info!("AI TTS engine connected ElevenLabs");
         Ok(())
     }
 
-    /// Install a preflighted local client. Commands perform network preflight
-    /// before taking the engine write lock, so Stop cannot queue behind HTTP.
-    pub async fn install_local(&mut self, client: LocalTtsClient) -> Result<(), String> {
+    /// Install a preflighted local client without replacing other connections.
+    pub async fn install_local(&self, client: LocalTtsClient) -> Result<(), String> {
         let client = Arc::new(client);
         let voices = client.list_voices().await?;
+        self.install_provider(client, voices).await?;
+        tracing::info!("AI TTS engine connected local provider");
+        Ok(())
+    }
+
+    /// Install a preflighted Groq client without replacing other connections.
+    pub async fn install_groq(&self, client: crate::adapters::GroqTtsClient) -> Result<(), String> {
+        let client = Arc::new(client);
+        let voices = client.list_voices().await?;
+        self.install_provider(client, voices).await?;
+        tracing::info!("AI TTS engine connected Groq");
+        Ok(())
+    }
+
+    #[cfg(feature = "e2e-tts-fixture")]
+    pub async fn install_fixture(&self, provider: TtsProvider) -> Result<(), String> {
+        let synthesis_provider = match provider {
+            TtsProvider::ElevenLabs => SynthesisProvider::ElevenLabs,
+            TtsProvider::Local => SynthesisProvider::Local,
+            TtsProvider::Groq => SynthesisProvider::Groq,
+        };
+        let synthesizer = Arc::new(FixtureSynthesizer {
+            provider: synthesis_provider,
+        });
+        let voices = synthesizer.list_voices().await?;
+        self.install_provider(synthesizer, voices).await
+    }
+
+    async fn install_provider(
+        &self,
+        synthesizer: Arc<dyn SynthesizerPort>,
+        voices: Vec<SynthesisVoice>,
+    ) -> Result<(), String> {
         let first_voice = voices
             .first()
             .map(|voice| voice.id.clone())
-            .ok_or("LOCAL_TTS_NO_VOICES")?;
-        self.synthesizer = Some(client);
+            .ok_or("TTS_NO_VOICES: provider returned no voices")?;
+        let provider = TtsProvider::from(synthesizer.provider());
+        let activate = {
+            let mut registry = self.providers.write().await;
+            let activate = registry.active.is_none() || registry.active == Some(provider);
+            registry.connections.insert(
+                provider,
+                ProviderConnection {
+                    synthesizer,
+                    voices: voices.clone(),
+                },
+            );
+            if activate {
+                registry.active = Some(provider);
+            }
+            activate
+        };
+        if activate {
+            let mut config = self.config.write().await;
+            config.provider = provider;
+            if !voices
+                .iter()
+                .any(|voice| config.voice_id.as_deref() == Some(&voice.id))
+            {
+                config.voice_id = Some(first_voice);
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn switch_provider(&self, provider: TtsProvider) -> Result<(), String> {
+        let _gate = self.playback_gate.lock().await;
+        self.cancel_synthesis();
+        self.player.stop()?;
+        let voices = {
+            let mut registry = self.providers.write().await;
+            let connection = registry
+                .connections
+                .get(&provider)
+                .cloned()
+                .ok_or_else(|| {
+                    format!("TTS_PROVIDER_NOT_CONNECTED: {provider:?} is not connected")
+                })?;
+            registry.active = Some(provider);
+            connection.voices
+        };
         let mut config = self.config.write().await;
-        config.provider = TtsProvider::Local;
-        config.api_key = None;
+        config.provider = provider;
         if !voices
             .iter()
             .any(|voice| config.voice_id.as_deref() == Some(&voice.id))
         {
-            config.voice_id = Some(first_voice);
+            config.voice_id = voices.first().map(|voice| voice.id.clone());
         }
-        tracing::info!("AI TTS engine initialized with local provider");
+        let player_speed = if provider == TtsProvider::Local {
+            1.0
+        } else {
+            config.speed
+        };
+        self.player.set_speed(player_speed)?;
+        drop(config);
+        let mut state = self.state.write().await;
+        state.is_playing = false;
+        state.is_paused = false;
+        state.current_text = None;
+        state.current_voice_id = None;
         Ok(())
     }
 
-    /// Check if initialized.
+    /// Check if an active provider is connected.
     pub async fn is_initialized(&self) -> bool {
-        self.synthesizer.is_some()
+        self.providers.read().await.active.is_some()
     }
 
-    pub fn supports_word_timings(&self) -> bool {
-        self.synthesizer
-            .as_ref()
-            .is_some_and(|provider| provider.supports_word_timings())
+    #[cfg(test)]
+    pub async fn connected_providers(&self) -> Vec<TtsProvider> {
+        let registry = self.providers.read().await;
+        [
+            TtsProvider::Local,
+            TtsProvider::ElevenLabs,
+            TtsProvider::Groq,
+        ]
+        .into_iter()
+        .filter(|provider| registry.connections.contains_key(provider))
+        .collect()
+    }
+
+    #[cfg(any(test, feature = "e2e-tts-fixture"))]
+    pub async fn active_provider(&self) -> Option<TtsProvider> {
+        self.providers.read().await.active
+    }
+
+    pub async fn provider_capabilities(
+        &self,
+        provider: TtsProvider,
+    ) -> Option<(bool, usize, usize)> {
+        self.providers
+            .read()
+            .await
+            .connections
+            .get(&provider)
+            .map(|connection| {
+                (
+                    connection.synthesizer.supports_word_timings(),
+                    connection.synthesizer.max_text_utf8_bytes(),
+                    connection.voices.len(),
+                )
+            })
     }
 
     fn voice_info(voice: SynthesisVoice) -> VoiceInfo {
         VoiceInfo {
             id: voice.id,
             name: voice.name,
-            provider: match voice.provider {
-                SynthesisProvider::ElevenLabs => TtsProvider::ElevenLabs,
-                SynthesisProvider::Local => TtsProvider::Local,
-            },
+            provider: TtsProvider::from(voice.provider),
             preview_url: voice.preview_url,
             labels: voice.labels,
         }
     }
 
-    /// Get available voices.
-    pub async fn list_voices(&self) -> Result<Vec<VoiceInfo>, String> {
-        let provider = self
-            .synthesizer
-            .as_ref()
-            .ok_or("NOT_INITIALIZED: initialize a TTS provider first")?;
-        provider
-            .list_voices()
-            .await
-            .map(|voices| voices.into_iter().map(Self::voice_info).collect())
+    async fn active_connection(&self) -> Option<ProviderConnection> {
+        let registry = self.providers.read().await;
+        registry
+            .active
+            .and_then(|provider| registry.connections.get(&provider).cloned())
     }
 
-    async fn synthesize(
+    /// Get the active provider's available voices from its preflighted catalog.
+    pub async fn list_voices(&self) -> Result<Vec<VoiceInfo>, String> {
+        self.active_connection()
+            .await
+            .ok_or_else(|| "NOT_INITIALIZED: initialize a TTS provider first".to_string())
+            .map(|connection| {
+                connection
+                    .voices
+                    .into_iter()
+                    .map(Self::voice_info)
+                    .collect()
+            })
+    }
+
+    async fn synthesis_context(
         &self,
+    ) -> Result<(u64, ProviderConnection, watch::Receiver<u64>), String> {
+        // Subscribe before reading the active connection. A concurrent switch
+        // therefore either selects the new provider or changes this receiver
+        // and cancels the old snapshot; it cannot escape between the two.
+        let cancelled = self.cancel_tx.subscribe();
+        let generation = *cancelled.borrow();
+        let connection = self
+            .active_connection()
+            .await
+            .ok_or("NOT_INITIALIZED: initialize a TTS provider first")?;
+        Ok((generation, connection, cancelled))
+    }
+
+    async fn synthesize_with(
+        provider: Arc<dyn SynthesizerPort>,
         request: SynthesisRequest,
+        mut cancelled: watch::Receiver<u64>,
     ) -> Result<crate::ports::SynthesisResult, String> {
-        let provider = Arc::clone(
-            self.synthesizer
-                .as_ref()
-                .ok_or("NOT_INITIALIZED: initialize a TTS provider first")?,
-        );
-        let mut cancelled = self.cancel_tx.subscribe();
         tokio::select! {
             result = provider.synthesize(request) => result,
             changed = cancelled.changed() => {
@@ -233,56 +461,98 @@ impl AiTtsEngine {
         }
     }
 
-    fn cache_coordinates(
+    #[cfg(test)]
+    async fn synthesize(
         &self,
+        request: SynthesisRequest,
+    ) -> Result<crate::ports::SynthesisResult, String> {
+        let (_, connection, cancelled) = self.synthesis_context().await?;
+        Self::synthesize_with(connection.synthesizer, request, cancelled).await
+    }
+
+    fn cache_coordinates(
+        provider: &dyn SynthesizerPort,
         text: &str,
         voice: &str,
         config: &TtsConfig,
         with_word_timings: bool,
-    ) -> Result<(String, AudioMediaType), String> {
-        let provider = self
-            .synthesizer
-            .as_ref()
-            .ok_or("NOT_INITIALIZED: initialize a TTS provider first")?;
-        if provider.provider() == SynthesisProvider::ElevenLabs {
-            let model_id = config
-                .model_id
-                .clone()
-                .unwrap_or_else(|| "eleven_monolingual_v1".to_string());
-            let suffix = if with_word_timings { "_ts" } else { "" };
-            let settings_hash = format!(
-                "{:.2}_{:.2}{suffix}",
-                config.stability, config.similarity_boost
-            );
-            return Ok((
-                AudioCacheAdapter::generate_cache_key(text, voice, &model_id, &settings_hash),
-                AudioMediaType::Mp3,
-            ));
-        }
-        let settings_hash = format!(
-            "local_{}_{}",
-            config.speed,
-            AudioMediaType::Wav.content_type()
-        );
-        Ok((
-            AudioCacheAdapter::generate_cache_key(
-                text,
-                voice,
-                provider.provider_revision(),
-                &settings_hash,
+    ) -> (String, AudioMediaType) {
+        match provider.provider() {
+            SynthesisProvider::ElevenLabs => {
+                let model_id = config
+                    .model_id
+                    .clone()
+                    .unwrap_or_else(|| "eleven_monolingual_v1".to_string());
+                let suffix = if with_word_timings { "_ts" } else { "" };
+                let settings_hash = format!(
+                    "{:.2}_{:.2}{suffix}",
+                    config.stability, config.similarity_boost
+                );
+                (
+                    AudioCacheAdapter::generate_cache_key(text, voice, &model_id, &settings_hash),
+                    AudioMediaType::Mp3,
+                )
+            }
+            SynthesisProvider::Local => {
+                let settings_hash = format!(
+                    "local_{}_{}",
+                    config.speed,
+                    AudioMediaType::Wav.content_type()
+                );
+                (
+                    AudioCacheAdapter::generate_cache_key(
+                        text,
+                        voice,
+                        provider.provider_revision(),
+                        &settings_hash,
+                    ),
+                    AudioMediaType::Wav,
+                )
+            }
+            SynthesisProvider::Groq => (
+                AudioCacheAdapter::generate_cache_key(
+                    text,
+                    voice,
+                    provider.provider_revision(),
+                    "groq_audio/wav",
+                ),
+                AudioMediaType::Wav,
             ),
-            AudioMediaType::Wav,
-        ))
+        }
+    }
+
+    async fn play_if_current(&self, audio_data: &[u8], generation: u64) -> Result<(), String> {
+        let _gate = self.playback_gate.lock().await;
+        if *self.cancel_tx.borrow() != generation {
+            return Err("TTS_CANCELLED: provider changed before playback".to_string());
+        }
+        self.playback_generation
+            .store(generation, Ordering::Release);
+        self.player.play_mp3(audio_data)
     }
 
     /// Speak text (with provider-aware caching support).
-    pub async fn speak(&self, text: &str, voice_id: Option<&str>) -> Result<(), String> {
+    pub async fn speak(&self, text: &str, voice_id: Option<&str>) -> Result<u64, String> {
+        let (generation, connection, cancelled) = self.synthesis_context().await?;
         let config = self.config.read().await.clone();
         let voice = voice_id
             .map(str::to_string)
             .or_else(|| config.voice_id.clone())
             .ok_or("NO_VOICE: No voice ID specified")?;
-        let (cache_key, expected_media) = self.cache_coordinates(text, &voice, &config, false)?;
+        if !connection
+            .voices
+            .iter()
+            .any(|candidate| candidate.id == voice)
+        {
+            return Err(format!("UNKNOWN_VOICE: {voice}"));
+        }
+        let (cache_key, expected_media) = Self::cache_coordinates(
+            connection.synthesizer.as_ref(),
+            text,
+            &voice,
+            &config,
+            false,
+        );
 
         {
             let mut state = self.state.write().await;
@@ -305,15 +575,18 @@ impl AiTtsEngine {
         let audio_data = match cached {
             Some(data) => data,
             None => {
-                let result = match self
-                    .synthesize(SynthesisRequest {
+                let result = match Self::synthesize_with(
+                    connection.synthesizer,
+                    SynthesisRequest {
                         text: text.to_string(),
                         voice_id: voice,
                         model_id: config.model_id.clone(),
                         speed: config.speed,
                         with_word_timings: false,
-                    })
-                    .await
+                    },
+                    cancelled,
+                )
+                .await
                 {
                     Ok(result) => result,
                     Err(error) => {
@@ -336,8 +609,8 @@ impl AiTtsEngine {
                 result.audio_data
             }
         };
-        self.player.play_mp3(&audio_data)?;
-        Ok(())
+        self.play_if_current(&audio_data, generation).await?;
+        Ok(generation)
     }
 
     /// Synthesize audio plus provider marks when available.
@@ -345,13 +618,22 @@ impl AiTtsEngine {
         &self,
         text: &str,
         voice_id: Option<&str>,
-    ) -> Result<TtsWithTimings, String> {
+    ) -> Result<PreparedTtsWithTimings, String> {
+        let (generation, connection, cancelled) = self.synthesis_context().await?;
         let config = self.config.read().await.clone();
         let voice = voice_id
             .map(str::to_string)
             .or_else(|| config.voice_id.clone())
             .ok_or("NO_VOICE: No voice ID specified")?;
-        let (cache_key, media_type) = self.cache_coordinates(text, &voice, &config, true)?;
+        if !connection
+            .voices
+            .iter()
+            .any(|candidate| candidate.id == voice)
+        {
+            return Err(format!("UNKNOWN_VOICE: {voice}"));
+        }
+        let (cache_key, media_type) =
+            Self::cache_coordinates(connection.synthesizer.as_ref(), text, &voice, &config, true);
 
         {
             let mut state = self.state.write().await;
@@ -376,10 +658,13 @@ impl AiTtsEngine {
                             char_end: timing.char_end,
                         })
                         .collect();
-                    return Ok(TtsWithTimings {
-                        audio_data: cached.audio_data,
-                        word_timings,
-                        total_duration: cached.total_duration,
+                    return Ok(PreparedTtsWithTimings {
+                        output: TtsWithTimings {
+                            audio_data: cached.audio_data,
+                            word_timings,
+                            total_duration: cached.total_duration,
+                        },
+                        generation,
                     });
                 }
                 Ok(None) => {}
@@ -387,15 +672,18 @@ impl AiTtsEngine {
             }
         }
 
-        let result = match self
-            .synthesize(SynthesisRequest {
+        let result = match Self::synthesize_with(
+            connection.synthesizer,
+            SynthesisRequest {
                 text: text.to_string(),
                 voice_id: voice,
                 model_id: config.model_id.clone(),
                 speed: config.speed,
                 with_word_timings: true,
-            })
-            .await
+            },
+            cancelled,
+        )
+        .await
         {
             Ok(result) => result,
             Err(error) => {
@@ -408,13 +696,13 @@ impl AiTtsEngine {
         if result.media_type != media_type {
             return Err("TTS_MEDIA_MISMATCH: provider returned an unexpected format".into());
         }
-        let tts_result = TtsWithTimings {
+        let output = TtsWithTimings {
             audio_data: result.audio_data,
             word_timings: result.word_timings,
             total_duration: result.total_duration,
         };
         if let Some(cache) = &self.cache {
-            let cached_timings = tts_result
+            let cached_timings = output
                 .word_timings
                 .iter()
                 .map(|timing| CachedWordTiming {
@@ -427,23 +715,21 @@ impl AiTtsEngine {
                 .collect::<Vec<_>>();
             if let Err(error) = cache.set_with_timestamps_media(
                 &cache_key,
-                &tts_result.audio_data,
+                &output.audio_data,
                 &cached_timings,
-                tts_result.total_duration,
+                output.total_duration,
                 media_type,
             ) {
                 tracing::warn!("Failed to cache TTS: {error}");
             }
         }
-        Ok(tts_result)
+        Ok(PreparedTtsWithTimings { output, generation })
     }
 
-    /// Play raw MP3 audio data
-    ///
-    /// This is called after speak_with_timestamps returns, allowing the command
-    /// to emit a sync event right before playback starts.
-    pub fn play_audio(&self, audio_data: &[u8]) -> Result<(), String> {
-        self.player.play_mp3(audio_data)
+    /// Play prepared audio only if no Stop/provider switch superseded it.
+    pub async fn play_audio(&self, prepared: &PreparedTtsWithTimings) -> Result<(), String> {
+        self.play_if_current(&prepared.output.audio_data, prepared.generation)
+            .await
     }
 
     fn cancel_synthesis(&self) {
@@ -453,12 +739,15 @@ impl AiTtsEngine {
 
     /// Stop playback
     pub async fn stop(&self) -> Result<(), String> {
+        let _gate = self.playback_gate.lock().await;
         self.cancel_synthesis();
         let result = self.player.stop();
         if result.is_ok() {
             let mut state = self.state.write().await;
             state.is_playing = false;
             state.is_paused = false;
+            state.current_text = None;
+            state.current_voice_id = None;
             tracing::debug!("TTS state: stop -> is_playing=false, is_paused=false");
         }
         result
@@ -488,8 +777,15 @@ impl AiTtsEngine {
         result
     }
 
-    /// Set voice
+    /// Set voice for the active provider.
     pub async fn set_voice(&self, voice_id: &str) -> Result<(), String> {
+        let connection = self
+            .active_connection()
+            .await
+            .ok_or("NOT_INITIALIZED: initialize a TTS provider first")?;
+        if !connection.voices.iter().any(|voice| voice.id == voice_id) {
+            return Err(format!("UNKNOWN_VOICE: {voice_id}"));
+        }
         let mut config = self.config.write().await;
         config.voice_id = Some(voice_id.to_string());
         Ok(())
@@ -504,9 +800,17 @@ impl AiTtsEngine {
                 stretch::MAX_SPEED
             ));
         }
-        let mut config = self.config.write().await;
-        config.speed = speed;
-        Ok(())
+        let player_speed = {
+            let mut config = self.config.write().await;
+            config.speed = speed;
+            if config.provider == TtsProvider::Local {
+                // The loopback service already renders the requested speed.
+                1.0
+            } else {
+                speed
+            }
+        };
+        self.player.set_speed(player_speed)
     }
 
     /// Get current state
@@ -519,21 +823,27 @@ impl AiTtsEngine {
         self.config.read().await.clone()
     }
 
-    /// Pre-buffer TTS audio without playing
-    ///
-    /// Fetches audio from ElevenLabs API (or cache) and stores in disk cache.
-    /// Does NOT play the audio - just ensures it's cached for instant playback later.
+    /// Pre-buffer TTS audio without playing.
     pub async fn prebuffer(
         &self,
         text: &str,
         voice_id: Option<&str>,
     ) -> Result<PrebufferResult, String> {
+        let (_, connection, cancelled) = self.synthesis_context().await?;
         let config = self.config.read().await.clone();
         let voice = voice_id
             .map(str::to_string)
             .or_else(|| config.voice_id.clone())
             .ok_or("NO_VOICE: No voice ID specified")?;
-        let (cache_key, media_type) = self.cache_coordinates(text, &voice, &config, true)?;
+        if !connection
+            .voices
+            .iter()
+            .any(|candidate| candidate.id == voice)
+        {
+            return Err(format!("UNKNOWN_VOICE: {voice}"));
+        }
+        let (cache_key, media_type) =
+            Self::cache_coordinates(connection.synthesizer.as_ref(), text, &voice, &config, true);
         if let Some(cache) = &self.cache {
             match cache.get_with_timestamps_media(&cache_key, media_type) {
                 Ok(Some(cached)) => {
@@ -547,15 +857,18 @@ impl AiTtsEngine {
                 Err(error) => tracing::warn!("Pre-buffer cache error: {error}"),
             }
         }
-        let result = self
-            .synthesize(SynthesisRequest {
+        let result = Self::synthesize_with(
+            connection.synthesizer,
+            SynthesisRequest {
                 text: text.to_string(),
                 voice_id: voice,
                 model_id: config.model_id.clone(),
                 speed: config.speed,
                 with_word_timings: true,
-            })
-            .await?;
+            },
+            cancelled,
+        )
+        .await?;
         if result.media_type != media_type {
             return Err("TTS_MEDIA_MISMATCH: provider returned an unexpected format".into());
         }
@@ -638,6 +951,18 @@ mod tests {
     use super::*;
     use crate::ports::{SynthesisResult, SynthesisVoice};
     use async_trait::async_trait;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    fn voice(provider: SynthesisProvider, id: &str) -> SynthesisVoice {
+        SynthesisVoice {
+            id: id.to_string(),
+            name: id.to_string(),
+            language: None,
+            provider,
+            preview_url: None,
+            labels: None,
+        }
+    }
 
     struct PendingSynthesizer;
 
@@ -656,20 +981,191 @@ mod tests {
             false
         }
         async fn list_voices(&self) -> Result<Vec<SynthesisVoice>, String> {
-            Ok(Vec::new())
+            Ok(vec![voice(SynthesisProvider::Local, "local-voice")])
         }
         async fn synthesize(&self, _request: SynthesisRequest) -> Result<SynthesisResult, String> {
             std::future::pending().await
         }
     }
 
+    struct CountingSynthesizer {
+        provider: SynthesisProvider,
+        calls: Arc<AtomicUsize>,
+        failure: &'static str,
+    }
+
+    #[async_trait]
+    impl SynthesizerPort for CountingSynthesizer {
+        fn provider(&self) -> SynthesisProvider {
+            self.provider
+        }
+        fn provider_revision(&self) -> &str {
+            "counting-1"
+        }
+        fn max_text_utf8_bytes(&self) -> usize {
+            200
+        }
+        fn supports_word_timings(&self) -> bool {
+            false
+        }
+        async fn list_voices(&self) -> Result<Vec<SynthesisVoice>, String> {
+            Ok(vec![voice(self.provider, "voice")])
+        }
+        async fn synthesize(&self, _request: SynthesisRequest) -> Result<SynthesisResult, String> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            Err(self.failure.to_string())
+        }
+    }
+
+    async fn install_counting(
+        engine: &AiTtsEngine,
+        provider: SynthesisProvider,
+        calls: Arc<AtomicUsize>,
+        failure: &'static str,
+    ) {
+        engine
+            .install_provider(
+                Arc::new(CountingSynthesizer {
+                    provider,
+                    calls,
+                    failure,
+                }),
+                vec![voice(provider, "voice")],
+            )
+            .await
+            .unwrap();
+    }
+
     #[tokio::test]
-    async fn cancellation_drops_a_pending_provider_without_fallback() {
-        let mut engine = AiTtsEngine::new();
-        engine.synthesizer = Some(Arc::new(PendingSynthesizer));
+    async fn registry_retains_connections_and_switch_rejects_unknown_provider() {
+        let engine = AiTtsEngine::for_test();
+        install_counting(
+            &engine,
+            SynthesisProvider::Local,
+            Arc::new(AtomicUsize::new(0)),
+            "local failure",
+        )
+        .await;
+        install_counting(
+            &engine,
+            SynthesisProvider::Groq,
+            Arc::new(AtomicUsize::new(0)),
+            "groq failure",
+        )
+        .await;
+
+        assert_eq!(
+            engine.connected_providers().await,
+            vec![TtsProvider::Local, TtsProvider::Groq]
+        );
+        assert_eq!(engine.active_provider().await, Some(TtsProvider::Local));
+        engine.switch_provider(TtsProvider::Groq).await.unwrap();
+        assert_eq!(engine.active_provider().await, Some(TtsProvider::Groq));
+        assert!(engine
+            .switch_provider(TtsProvider::ElevenLabs)
+            .await
+            .is_err());
+        assert_eq!(engine.active_provider().await, Some(TtsProvider::Groq));
+    }
+
+    #[tokio::test]
+    async fn provider_failure_never_falls_back_to_another_connection() {
+        let engine = AiTtsEngine::for_test();
+        let local_calls = Arc::new(AtomicUsize::new(0));
+        let groq_calls = Arc::new(AtomicUsize::new(0));
+        install_counting(
+            &engine,
+            SynthesisProvider::Local,
+            Arc::clone(&local_calls),
+            "LOCAL_SHOULD_NOT_RUN",
+        )
+        .await;
+        install_counting(
+            &engine,
+            SynthesisProvider::Groq,
+            Arc::clone(&groq_calls),
+            "GROQ_EXPECTED_FAILURE",
+        )
+        .await;
+        engine.switch_provider(TtsProvider::Groq).await.unwrap();
+
+        let error = engine
+            .synthesize(SynthesisRequest {
+                text: "route once".to_string(),
+                voice_id: "voice".to_string(),
+                model_id: None,
+                speed: 1.0,
+                with_word_timings: false,
+            })
+            .await
+            .unwrap_err();
+        assert_eq!(error, "GROQ_EXPECTED_FAILURE");
+        assert_eq!(groq_calls.load(Ordering::SeqCst), 1);
+        assert_eq!(local_calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn cache_identity_is_provider_scoped_and_only_rendered_speed_changes_audio() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let local = CountingSynthesizer {
+            provider: SynthesisProvider::Local,
+            calls: Arc::clone(&calls),
+            failure: "unused",
+        };
+        let groq = CountingSynthesizer {
+            provider: SynthesisProvider::Groq,
+            calls: Arc::clone(&calls),
+            failure: "unused",
+        };
+        let elevenlabs = CountingSynthesizer {
+            provider: SynthesisProvider::ElevenLabs,
+            calls,
+            failure: "unused",
+        };
+        let mut config = TtsConfig {
+            speed: 1.0,
+            ..TtsConfig::default()
+        };
+        let (local_one, _) = AiTtsEngine::cache_coordinates(&local, "text", "voice", &config, true);
+        let (groq_one, _) = AiTtsEngine::cache_coordinates(&groq, "text", "voice", &config, true);
+        let (elevenlabs_one, _) =
+            AiTtsEngine::cache_coordinates(&elevenlabs, "text", "voice", &config, true);
+        config.speed = 2.0;
+        let (local_two, _) = AiTtsEngine::cache_coordinates(&local, "text", "voice", &config, true);
+        let (groq_two, _) = AiTtsEngine::cache_coordinates(&groq, "text", "voice", &config, true);
+        let (elevenlabs_two, _) =
+            AiTtsEngine::cache_coordinates(&elevenlabs, "text", "voice", &config, true);
+
+        assert_ne!(local_one, groq_one, "provider identities cannot collide");
+        assert_ne!(local_one, local_two, "Local renders speed into its WAV");
+        assert_eq!(groq_one, groq_two, "Groq speed is player-side stretch");
+        assert_eq!(
+            elevenlabs_one, elevenlabs_two,
+            "ElevenLabs speed is player-side stretch"
+        );
+    }
+
+    #[tokio::test]
+    async fn switch_cancels_a_pending_old_provider_before_activation() {
+        let engine = AiTtsEngine::for_test();
+        engine
+            .install_provider(
+                Arc::new(PendingSynthesizer),
+                vec![voice(SynthesisProvider::Local, "local-voice")],
+            )
+            .await
+            .unwrap();
+        install_counting(
+            &engine,
+            SynthesisProvider::Groq,
+            Arc::new(AtomicUsize::new(0)),
+            "unused",
+        )
+        .await;
+
         let future = engine.synthesize(SynthesisRequest {
             text: "cancel me".to_string(),
-            voice_id: "F1-pt".to_string(),
+            voice_id: "local-voice".to_string(),
             model_id: None,
             speed: 1.0,
             with_word_timings: false,
@@ -677,11 +1173,12 @@ mod tests {
         tokio::pin!(future);
         assert!(futures::poll!(&mut future).is_pending());
 
-        engine.cancel_synthesis();
+        engine.switch_provider(TtsProvider::Groq).await.unwrap();
 
         assert_eq!(
             future.await.unwrap_err(),
             "TTS_CANCELLED: synthesis was cancelled"
         );
+        assert_eq!(engine.active_provider().await, Some(TtsProvider::Groq));
     }
 }

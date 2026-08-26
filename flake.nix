@@ -54,6 +54,10 @@
           # any client close request) — a process kill would prove nothing
           # about CloseRequested.
           xdotool
+          # Drag-session lane (177): one-purpose visible X11 drag source for
+          # the real PDF fixture. Unlike a synthetic DOM/Tauri event, dragon
+          # exercises the same OS file drag a user performs from a file manager.
+          dragon-drop
           # Close-journey lane (125): windowquit's WM_DELETE_WINDOW only
           # reaches the app when a REAL window manager is running — without
           # one the client message never arrives (lane-9: zero CloseRequested
@@ -115,6 +119,14 @@
 
           # bindgen (used transitively by several -sys crates) needs libclang.
           LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
+
+          # GTK's compiled schemas live under Nix's share/gsettings-schemas
+          # roots, not the ordinary package share roots setup.sh adds to
+          # XDG_DATA_DIRS. Without this bridge, opening the native file chooser
+          # aborts the whole app with "No GSettings schemas are installed".
+          shellHook = ''
+            export XDG_DATA_DIRS="$GSETTINGS_SCHEMAS_PATH''${XDG_DATA_DIRS:+:$XDG_DATA_DIRS}"
+          '';
 
           # Headless GL on a NON-NixOS lane host (143). The nix-built WebKit
           # resolves GL through libglvnd, which looks for drivers in

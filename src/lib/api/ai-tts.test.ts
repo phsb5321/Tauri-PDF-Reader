@@ -8,7 +8,7 @@
  * (e2e/critical-loop.spec.ts) loads this real module (previously mocked away).
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { listen } from "@tauri-apps/api/event";
 import { mockInvoke } from "../../../tests/setup";
 import * as api from "./ai-tts";
@@ -114,11 +114,15 @@ describe("ai-tts event subscriptions", () => {
     }
   });
 
-  it("onAiTtsFinished subscribes to the ai-tts:finished channel", async () => {
-    await api.onAiTtsFinished(() => {});
+  it("onAiTtsFinished preserves the native playback generation", async () => {
+    const callback = vi.fn();
+    await api.onAiTtsFinished(callback);
     expect(listen).toHaveBeenCalledWith(
       "ai-tts:finished",
       expect.any(Function),
     );
+    const listener = vi.mocked(listen).mock.calls.at(-1)?.[1];
+    listener?.({ payload: 42 } as never);
+    expect(callback).toHaveBeenCalledWith({ generation: 42 });
   });
 });

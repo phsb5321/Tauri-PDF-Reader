@@ -1,0 +1,7 @@
+Observed: 24/08/2026 22:27 BRT
+Replay method: run scripts/e2e-library-completeness.sh with src-tauri/src/commands/library/mod.rs restored from origin/main while retaining the fail-first journey.
+Exit: 1 (expected pre-fix failure)
+Assertion: readable legacy card expected ready, received fallback.
+Receipt excerpt:
+LIBRARY_COMPLETENESS {"titles":[{"text":"Legacy readable book","displayed":true},{"text":"Missing book control","displayed":true}],"realCover":{"state":"fallback","cardAccessibleName":"Select Legacy readable book; press Enter or double-click to open"},"missingCover":{"state":"fallback","cardAccessibleName":"Select Missing book control; press Enter or double-click to open"}}
+Source restoration: exact SHA-256 b136fa296ba5221d28f926b3ec819c46c82bf5ca9354a172d832fcbb50e39fd8 before/after.

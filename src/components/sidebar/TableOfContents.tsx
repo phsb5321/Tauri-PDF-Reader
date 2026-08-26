@@ -3,6 +3,7 @@ import { useDialogBackdropClose } from "../../hooks/useDialogBackdropClose";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { useDocumentStore } from "../../stores/document-store";
 import { pdfService, OutlineItem } from "../../services/pdf-service";
+import { navigateToPage } from "../../hooks/usePageNavigation";
 import "./TableOfContents.css";
 
 interface TableOfContentsProps {
@@ -11,7 +12,7 @@ interface TableOfContentsProps {
 }
 
 export function TableOfContents({ isOpen, onClose }: TableOfContentsProps) {
-  const { pdfDocument, currentPage, setCurrentPage } = useDocumentStore();
+  const { pdfDocument, currentPage } = useDocumentStore();
   const [outline, setOutline] = useState<OutlineItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
@@ -49,12 +50,12 @@ export function TableOfContents({ isOpen, onClose }: TableOfContentsProps) {
   }, [pdfDocument, isOpen]);
 
   const handleItemClick = useCallback(
-    (pageNumber: number | null) => {
-      if (pageNumber !== null) {
-        setCurrentPage(pageNumber);
-      }
+    async (pageNumber: number | null) => {
+      if (pageNumber === null) return;
+      await navigateToPage(pageNumber);
+      onClose();
     },
-    [setCurrentPage],
+    [onClose],
   );
 
   const toggleExpanded = useCallback((key: string) => {
@@ -158,7 +159,8 @@ function OutlineList({
                 <button
                   className={`toc-expand-btn ${isExpanded ? "expanded" : ""}`}
                   onClick={() => onToggleExpand(itemKey)}
-                  aria-label={isExpanded ? "Collapse" : "Expand"}
+                  aria-expanded={isExpanded}
+                  aria-label={`${isExpanded ? "Collapse" : "Expand"} ${item.title}`}
                 >
                   <ChevronIcon />
                 </button>
@@ -167,6 +169,7 @@ function OutlineList({
                 className="toc-item-btn"
                 onClick={() => onItemClick(item.pageNumber)}
                 disabled={item.pageNumber === null}
+                aria-current={isCurrent ? "page" : undefined}
               >
                 <span className="toc-item-title">{item.title}</span>
                 {item.pageNumber !== null && (

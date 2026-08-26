@@ -5,13 +5,15 @@
  * Tracks word timings, current playback position, and active word index.
  */
 
-import { create } from 'zustand';
-import type { WordTiming } from '../lib/api/ai-tts';
+import { create } from "zustand";
+import type { WordTiming } from "../lib/api/ai-tts";
 
 export interface TtsHighlightState {
   // Word timing data from ElevenLabs
   wordTimings: WordTiming[];
   totalDuration: number;
+  /** Estimated marks complete only from the real sink-drained event. */
+  timingsEstimated: boolean;
 
   // Playback tracking
   isActive: boolean;
@@ -29,7 +31,8 @@ export interface TtsHighlightState {
     text: string,
     wordTimings: WordTiming[],
     totalDuration: number,
-    pageNumber: number
+    pageNumber: number,
+    timingsEstimated?: boolean,
   ) => void;
   stopHighlighting: () => void;
   pauseHighlighting: () => void;
@@ -42,6 +45,7 @@ export interface TtsHighlightState {
 const initialState = {
   wordTimings: [] as WordTiming[],
   totalDuration: 0,
+  timingsEstimated: false,
   isActive: false,
   isPaused: false,
   currentWordIndex: -1,
@@ -54,8 +58,14 @@ const initialState = {
 export const useTtsHighlightStore = create<TtsHighlightState>((set, get) => ({
   ...initialState,
 
-  startHighlighting: (text, wordTimings, totalDuration, pageNumber) => {
-    console.debug('[TtsHighlightStore] Starting highlighting', {
+  startHighlighting: (
+    text,
+    wordTimings,
+    totalDuration,
+    pageNumber,
+    timingsEstimated = false,
+  ) => {
+    console.debug("[TtsHighlightStore] Starting highlighting", {
       wordCount: wordTimings.length,
       duration: totalDuration,
       pageNumber,
@@ -63,6 +73,7 @@ export const useTtsHighlightStore = create<TtsHighlightState>((set, get) => ({
     set({
       wordTimings,
       totalDuration,
+      timingsEstimated,
       currentText: text,
       pageNumber,
       isActive: true,
@@ -74,13 +85,18 @@ export const useTtsHighlightStore = create<TtsHighlightState>((set, get) => ({
   },
 
   stopHighlighting: () => {
-    console.debug('[TtsHighlightStore] Stopping highlighting');
+    console.debug("[TtsHighlightStore] Stopping highlighting");
     set({
       isActive: false,
       isPaused: false,
       currentWordIndex: -1,
       playbackStartTime: null,
       pausedAtTime: null,
+      wordTimings: [],
+      totalDuration: 0,
+      timingsEstimated: false,
+      currentText: null,
+      pageNumber: null,
     });
   },
 
@@ -89,7 +105,7 @@ export const useTtsHighlightStore = create<TtsHighlightState>((set, get) => ({
     // Only pause if active and not already paused
     if (isActive && playbackStartTime !== null && pausedAtTime === null) {
       const elapsed = performance.now() - playbackStartTime;
-      console.debug('[TtsHighlightStore] Pausing at', elapsed);
+      console.debug("[TtsHighlightStore] Pausing at", elapsed);
       set({
         isPaused: true,
         pausedAtTime: elapsed,
@@ -100,7 +116,7 @@ export const useTtsHighlightStore = create<TtsHighlightState>((set, get) => ({
   resumeHighlighting: () => {
     const { pausedAtTime, isActive } = get();
     if (isActive && pausedAtTime !== null) {
-      console.debug('[TtsHighlightStore] Resuming from', pausedAtTime);
+      console.debug("[TtsHighlightStore] Resuming from", pausedAtTime);
       // Adjust start time to account for pause
       set({
         isPaused: false,
@@ -125,8 +141,13 @@ export const useTtsHighlightStore = create<TtsHighlightState>((set, get) => ({
 }));
 
 // Selectors
-export const selectCurrentWord = (state: TtsHighlightState): WordTiming | null => {
-  if (state.currentWordIndex >= 0 && state.currentWordIndex < state.wordTimings.length) {
+export const selectCurrentWord = (
+  state: TtsHighlightState,
+): WordTiming | null => {
+  if (
+    state.currentWordIndex >= 0 &&
+    state.currentWordIndex < state.wordTimings.length
+  ) {
     return state.wordTimings[state.currentWordIndex];
   }
   return null;

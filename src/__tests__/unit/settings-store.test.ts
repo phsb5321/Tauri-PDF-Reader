@@ -15,7 +15,12 @@ vi.mock("../../lib/tauri-invoke", () => ({
   settingsSetBatch: vi.fn(() => Promise.resolve()),
 }));
 
-import { useSettingsStore } from "../../stores/settings-store";
+import {
+  useSettingsStore,
+  UI_SCALE_DEFAULT,
+  UI_SCALE_MAX,
+  UI_SCALE_MIN,
+} from "../../stores/settings-store";
 import { settingsGetAll, settingsSetBatch } from "../../lib/tauri-invoke";
 import { DEFAULT_TTS_RATE } from "../../lib/constants";
 
@@ -41,6 +46,20 @@ describe("settings-store", () => {
     it("leaves an in-range rate unchanged", () => {
       useSettingsStore.getState().setTtsRate(1.5);
       expect(useSettingsStore.getState().ttsRate).toBe(1.5);
+    });
+  });
+
+  describe("UI scale", () => {
+    it("defaults to a larger desktop scale", () => {
+      expect(useSettingsStore.getState().uiScale).toBe(UI_SCALE_DEFAULT);
+    });
+
+    it("clamps the adjustable scale to its supported range", () => {
+      useSettingsStore.getState().setUiScale(0.5);
+      expect(useSettingsStore.getState().uiScale).toBe(UI_SCALE_MIN);
+
+      useSettingsStore.getState().setUiScale(9);
+      expect(useSettingsStore.getState().uiScale).toBe(UI_SCALE_MAX);
     });
   });
 
@@ -79,6 +98,7 @@ describe("settings-store", () => {
       const after = useSettingsStore.getState();
       expect(after.theme).toBe("system");
       expect(after.ttsRate).toBe(DEFAULT_TTS_RATE);
+      expect(after.uiScale).toBe(UI_SCALE_DEFAULT);
       expect(after.telemetryErrors).toBe(false); // slice 103: default flipped to match the DB seed
       expect(after.telemetryAnalytics).toBe(false);
     });
@@ -89,6 +109,7 @@ describe("settings-store", () => {
       vi.mocked(settingsGetAll).mockResolvedValue({
         settings: {
           theme: "dark",
+          uiScale: 1.4,
           "tts.rate": 2.0,
           "tts.followAlong": false,
           "telemetry.analytics": true,
@@ -97,6 +118,7 @@ describe("settings-store", () => {
       await useSettingsStore.getState().loadFromDatabase();
       const s = useSettingsStore.getState();
       expect(s.theme).toBe("dark");
+      expect(s.uiScale).toBe(1.4);
       expect(s.ttsRate).toBe(2.0);
       expect(s.ttsFollowAlong).toBe(false);
       expect(s.telemetryAnalytics).toBe(true);
@@ -132,7 +154,11 @@ describe("settings-store", () => {
       await s.syncToDatabase();
       expect(vi.mocked(settingsSetBatch)).toHaveBeenCalledTimes(1);
       expect(vi.mocked(settingsSetBatch)).toHaveBeenCalledWith(
-        expect.objectContaining({ theme: "dark", "tts.rate": 2.0 }),
+        expect.objectContaining({
+          theme: "dark",
+          uiScale: UI_SCALE_DEFAULT,
+          "tts.rate": 2.0,
+        }),
       );
     });
   });

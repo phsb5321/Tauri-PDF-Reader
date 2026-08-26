@@ -1,0 +1,144 @@
+[gen-e2e-fixtures] wrote 5-page A + 3-page B into /tmp/lectrice-audit-profile.KXeITT/com.lectrice.reader
+==> Building frontend (VITE_E2E_NATIVE=true, seed=cover)
+
+> lectrice@0.2.0 build /home/notroot/Documents/Code/personal/tauri-pdf-reader-177-library-completeness
+> tsc && vite build
+
+vite v6.4.1 building for production...
+transforming...
+✓ 214 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                                       0.46 kB │ gzip:   0.29 kB
+dist/assets/space-grotesk-vietnamese-700-normal-DMty7AZE.woff2        4.20 kB
+dist/assets/space-grotesk-vietnamese-500-normal-BmEvtly_.woff2        4.32 kB
+dist/assets/cursor-editorTextHighlight-kG3uUOwL.svg                   5.40 kB │ gzip:   2.20 kB
+dist/assets/space-grotesk-vietnamese-700-normal-Duxec5Rn.woff         5.59 kB
+dist/assets/ibm-plex-mono-vietnamese-500-normal-C8zxqsMH.woff         5.62 kB
+dist/assets/ibm-plex-mono-vietnamese-400-normal-DDuiU_S-.woff         5.62 kB
+dist/assets/space-grotesk-vietnamese-500-normal-BTqKIpxg.woff         5.72 kB
+dist/assets/ibm-plex-mono-cyrillic-ext-500-normal-BIfNGwUT.woff       5.77 kB
+dist/assets/ibm-plex-mono-cyrillic-ext-400-normal-DMdlQ8Kv.woff       5.82 kB
+dist/assets/ibm-plex-mono-vietnamese-400-normal-BulugwFq.woff2        5.87 kB
+dist/assets/ibm-plex-mono-vietnamese-500-normal-DZ4AoWbu.woff2        6.04 kB
+dist/assets/ibm-plex-sans-vietnamese-400-normal-fK1oJ5dG.woff         6.39 kB
+dist/assets/ibm-plex-sans-vietnamese-600-normal-DgdngZtN.woff         6.58 kB
+dist/assets/ibm-plex-sans-vietnamese-500-normal-BEb3_waV.woff         6.59 kB
+dist/assets/ibm-plex-mono-cyrillic-ext-400-normal-xuaO2J-f.woff2      6.91 kB
+dist/assets/ibm-plex-mono-cyrillic-ext-500-normal-BqneJy0T.woff2      6.97 kB
+dist/assets/ibm-plex-mono-cyrillic-400-normal-CEL4l2ZJ.woff           7.20 kB
+dist/assets/ibm-plex-mono-cyrillic-500-normal-Ael50iVv.woff           7.21 kB
+dist/assets/ibm-plex-sans-vietnamese-400-normal-DG4YqDda.woff2        8.20 kB
+dist/assets/ibm-plex-mono-cyrillic-400-normal-BSMlKf0J.woff2          8.36 kB
+dist/assets/ibm-plex-sans-vietnamese-500-normal-e4dixQRQ.woff2        8.42 kB
+dist/assets/ibm-plex-sans-vietnamese-600-normal-DpPYBSTl.woff2        8.46 kB
+dist/assets/ibm-plex-mono-cyrillic-500-normal-Bq9vWWag.woff2          8.46 kB
+dist/assets/ibm-plex-sans-greek-400-normal-D9ESIMu3.woff              8.76 kB
+dist/assets/ibm-plex-sans-greek-500-normal-CuWXN6rf.woff              9.15 kB
+dist/assets/ibm-plex-sans-greek-600-normal-D-CqTdkO.woff              9.22 kB
+dist/assets/ibm-plex-sans-greek-400-normal-_efipK4i.woff2             9.94 kB
+dist/assets/ibm-plex-sans-cyrillic-ext-400-normal-Dsrv2Tcn.woff      10.29 kB
+dist/assets/ibm-plex-sans-greek-600-normal-DzTrcv_p.woff2            10.37 kB
+dist/assets/ibm-plex-sans-greek-500-normal-JMMifIXV.woff2            10.38 kB
+dist/assets/ibm-plex-sans-cyrillic-ext-500-normal-DB5PtV2g.woff      10.59 kB
+dist/assets/ibm-plex-sans-cyrillic-ext-600-normal-Bz0x94Yp.woff      10.62 kB
+dist/assets/ibm-plex-mono-latin-ext-400-normal-D3D2R8hC.woff         11.77 kB
+dist/assets/ibm-plex-mono-latin-ext-500-normal-CZ70TYgx.woff         11.77 kB
+dist/assets/space-grotesk-latin-ext-700-normal-BQnZhY3m.woff2        11.99 kB
+dist/assets/ibm-plex-sans-cyrillic-ext-400-normal-g30qAdWV.woff2     12.15 kB
+dist/assets/space-grotesk-latin-ext-500-normal-DUe3BAxM.woff2        12.27 kB
+dist/assets/ibm-plex-sans-cyrillic-ext-600-normal-DUMzJB7m.woff2     12.30 kB
+dist/assets/ibm-plex-sans-cyrillic-ext-500-normal-Cs5J6C77.woff2     12.31 kB
+dist/assets/space-grotesk-latin-700-normal-RjhwGPKo.woff2            12.84 kB
+dist/assets/ibm-plex-mono-latin-400-normal-CvHOgSBP.woff             13.14 kB
+dist/assets/ibm-plex-mono-latin-500-normal-CB9ihrfo.woff             13.16 kB
+dist/assets/space-grotesk-latin-500-normal-lFbtlQH6.woff2            13.31 kB
+dist/assets/ibm-plex-mono-latin-ext-400-normal-BmRBH3aV.woff2        13.35 kB
+dist/assets/ibm-plex-mono-latin-ext-500-normal-CAhNIIs5.woff2        13.43 kB
+dist/assets/ibm-plex-sans-cyrillic-400-normal-BTotfTJu.woff          13.51 kB
+dist/assets/ibm-plex-sans-cyrillic-500-normal-ByOcLdNv.woff          13.86 kB
+dist/assets/ibm-plex-sans-cyrillic-600-normal-BGq0mW3O.woff          13.89 kB
+dist/assets/ibm-plex-sans-latin-ext-400-normal-RBey6euL.woff         14.36 kB
+dist/assets/ibm-plex-mono-latin-400-normal-DMJ8VG8y.woff2            14.71 kB
+dist/assets/ibm-plex-sans-latin-ext-500-normal-D0aIdm-b.woff         14.74 kB
+dist/assets/ibm-plex-sans-latin-ext-600-normal-DIrixKbi.woff         14.77 kB
+dist/assets/ibm-plex-sans-cyrillic-400-normal-DZqxrq2p.woff2         14.80 kB
+dist/assets/ibm-plex-mono-latin-500-normal-DSY6xOcd.woff2            14.89 kB
+dist/assets/ibm-plex-sans-cyrillic-500-normal-CocWQlwt.woff2         15.00 kB
+dist/assets/ibm-plex-sans-cyrillic-600-normal-71GNu3SW.woff2         15.04 kB
+dist/assets/ibm-plex-sans-latin-ext-400-normal-C5H60-Va.woff2        15.98 kB
+dist/assets/space-grotesk-latin-700-normal-CwsQ-cCU.woff             16.42 kB
+dist/assets/ibm-plex-sans-latin-ext-600-normal-DOrvGEcy.woff2        16.45 kB
+dist/assets/ibm-plex-sans-latin-ext-500-normal-DakdToA3.woff2        16.46 kB
+dist/assets/space-grotesk-latin-ext-700-normal-HVCqSBdx.woff         16.46 kB
+dist/assets/space-grotesk-latin-ext-500-normal-3dgZTiw9.woff         16.79 kB
+dist/assets/space-grotesk-latin-500-normal-CNSSEhBt.woff             16.99 kB
+dist/assets/ibm-plex-sans-latin-400-normal-CYLoc0-x.woff             22.10 kB
+dist/assets/ibm-plex-sans-latin-400-normal-CDDApCn2.woff2            22.59 kB
+dist/assets/ibm-plex-sans-latin-600-normal-Cu4Hd6ag.woff             23.88 kB
+dist/assets/ibm-plex-sans-latin-500-normal-BgVn5rGT.woff             23.92 kB
+dist/assets/ibm-plex-sans-latin-500-normal-6ng42L7E.woff2            24.18 kB
+dist/assets/ibm-plex-sans-latin-600-normal-CuJfVYMP.woff2            24.25 kB
+dist/assets/pdf.worker.min-yatZIOMy.mjs                           1,375.84 kB
+dist/assets/index-D77FFTgk.css                                      225.43 kB │ gzip:  39.75 kB
+dist/assets/index-Bi4rTSD-.js                                         1.07 kB │ gzip:   0.58 kB
+dist/assets/e2e-native-bootstrap-CvvBTdrY.js                          3.74 kB │ gzip:   1.41 kB
+dist/assets/index-CyfZq8hF.js                                       782.68 kB │ gzip: 225.92 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 3.67s
+==> Building debug binary (--features e2e-tts-fixture) + running audit capture
+warning: Git tree '/home/notroot/Documents/Code/personal/tauri-pdf-reader-177-library-completeness' is dirty
+   Compiling tauri-pdf-reader v0.2.0 (/home/notroot/Documents/Code/personal/tauri-pdf-reader-177-library-completeness/src-tauri)
+warning: methods `init`, `speak_with_timestamps`, and `play_audio` are never used
+   --> src/ai_tts/mod.rs:144:18
+    |
+113 | impl AiTtsEngine {
+    | ---------------- methods in this implementation
+...
+144 |     pub async fn init(&mut self, api_key: String) -> Result<(), String> {
+    |                  ^^^^
+...
+344 |     pub async fn speak_with_timestamps(
+    |                  ^^^^^^^^^^^^^^^^^^^^^
+...
+445 |     pub fn play_audio(&self, audio_data: &[u8]) -> Result<(), String> {
+    |            ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `tauri-pdf-reader` (lib) generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 43.12s
+Xvfb ready on DISPLAY=:1 profile=/tmp/lectrice-audit-profile.KXeITT
+
+> lectrice@0.2.0 test:e2e /home/notroot/Documents/Code/personal/tauri-pdf-reader-177-library-completeness
+> wdio run wdio.conf.mjs
+
+
+Execution of 1 workers started at 2026-08-25T16:05:18.300Z
+
+[0-0] RUNNING in undefined - file:///e2e/home-audit-capture.e2e.mjs
+[0-0] PROBE light-1200 {"gridCols":"259.985107px 259.985107px 259.985107px","bodyOverflowX":"visible","scrollW":1153,"cardRects":[{"title":{"x":253,"right":487,"w":234,"y":977,"bottom":1000,"h":23},"card":{"x":240,"right":500,"w":260,"y":576,"bottom":1053,"h":477},"content":{"x":241,"right":499,"w":258,"y":965,"bottom":1052,"h":87}},{"title":{"x":529,"right":763,"w":234,"y":977,"bottom":1000,"h":23},"card":{"x":516,"right":776,"w":260,"y":576,"bottom":1053,"h":477},"content":{"x":517,"right":775,"w":258,"y":965,"bottom":1052,"h":87}},{"title":{"x":805,"right":1039,"w":234,"y":977,"bottom":1000,"h":23},"card":{"x":792,"right":1052,"w":260,"y":576,"bottom":1053,"h":477},"content":{"x":793,"right":1051,"w":258,"y":965,"bottom":1052,"h":87}}],"hScroll":false,"headingOrder":["H1:Library","H2:Continue reading","H3:Also in progress","H2:Your library","H3:E2E Coverless","H3:E2E Resume Fixture A","H3:E2E Resume Fixture B"],"emptyState":null,"vScroll":true,"legibility":{"search":{"fontSize":15.75,"color":"rgb(76, 79, 105)","appearance":"none","backgroundColor":"rgb(230, 233, 239)"},"cardTitle":{"fontSize":15.75,"color":"rgb(76, 79, 105)","appearance":"none","backgroundColor":"rgba(0, 0, 0, 0)"},"body":{"fontSize":18,"color":"rgb(76, 79, 105)","appearance":"none","backgroundColor":"rgb(239, 241, 245)"},"sort":{"fontSize":15.75,"color":"rgb(76, 79, 105)","appearance":"none","backgroundColor":"rgb(230, 233, 239)"},"root":{"fontSize":18,"color":"rgb(76, 79, 105)","appearance":"none","backgroundColor":"rgb(239, 241, 245)"}},"covers":[{"w":120,"ratio":0.667,"state":"ready","h":180},{"w":44,"ratio":0.667,"state":"ready","h":66},{"w":258,"ratio":0.667,"state":"fallback","h":387},{"w":258,"ratio":0.667,"state":"ready","h":387},{"w":258,"ratio":0.667,"state":"loading","h":387}],"resumeCoverCount":2,"viewport":{"w":1152,"h":768},"gridColumnCount":3,"hOverflowPx":1,"rects":{"emptyState":null,"libraryBody":{"x":24,"w":1105,"y":576,"h":124,"right":1129},"toolbar":{"x":0,"w":1153,"y":0,"h":48,"right":1153},"libraryView":{"x":0,"w":1153,"y":49,"h":674,"right":1153},"grid":{"x":240,"w":889,"y":576,"h":124,"right":1129},"shelfSidebar":{"x":24,"w":200,"y":576,"h":124,"right":224},"resumeLine":{"x":24,"w":1105,"y":170,"h":180,"right":1129}},"cards":3}
+[0-0] PROBE dark-1200 {"gridCols":"259.985107px 259.985107px 259.985107px","bodyOverflowX":"visible","scrollW":1153,"cardRects":[{"title":{"x":253,"right":487,"w":234,"y":977,"bottom":1000,"h":23},"card":{"x":240,"right":500,"w":260,"y":576,"bottom":1053,"h":477},"content":{"x":241,"right":499,"w":258,"y":965,"bottom":1052,"h":87}},{"title":{"x":529,"right":763,"w":234,"y":977,"bottom":1000,"h":23},"card":{"x":516,"right":776,"w":260,"y":576,"bottom":1053,"h":477},"content":{"x":517,"right":775,"w":258,"y":965,"bottom":1052,"h":87}},{"title":{"x":805,"right":1039,"w":234,"y":977,"bottom":1000,"h":23},"card":{"x":792,"right":1052,"w":260,"y":576,"bottom":1053,"h":477},"content":{"x":793,"right":1051,"w":258,"y":965,"bottom":1052,"h":87}}],"hScroll":false,"headingOrder":["H1:Library","H2:Continue reading","H3:Also in progress","H2:Your library","H3:E2E Coverless","H3:E2E Resume Fixture A","H3:E2E Resume Fixture B"],"emptyState":null,"vScroll":true,"legibility":{"search":{"fontSize":15.75,"color":"rgb(205, 214, 244)","appearance":"none","backgroundColor":"rgb(49, 50, 68)"},"cardTitle":{"fontSize":15.75,"color":"rgb(205, 214, 244)","appearance":"none","backgroundColor":"rgba(0, 0, 0, 0)"},"body":{"fontSize":18,"color":"rgb(205, 214, 244)","appearance":"none","backgroundColor":"rgb(30, 30, 46)"},"sort":{"fontSize":15.75,"color":"rgb(205, 214, 244)","appearance":"none","backgroundColor":"rgb(49, 50, 68)"},"root":{"fontSize":18,"color":"rgb(205, 214, 244)","appearance":"none","backgroundColor":"rgb(30, 30, 46)"}},"covers":[{"w":120,"ratio":0.667,"state":"ready","h":180},{"w":44,"ratio":0.667,"state":"ready","h":66},{"w":258,"ratio":0.667,"state":"fallback","h":387},{"w":258,"ratio":0.667,"state":"ready","h":387},{"w":258,"ratio":0.667,"state":"ready","h":387}],"resumeCoverCount":2,"viewport":{"w":1152,"h":768},"gridColumnCount":3,"hOverflowPx":1,"rects":{"emptyState":null,"libraryBody":{"x":24,"w":1105,"y":576,"h":124,"right":1129},"toolbar":{"x":0,"w":1153,"y":0,"h":48,"right":1153},"libraryView":{"x":0,"w":1153,"y":49,"h":674,"right":1153},"grid":{"x":240,"w":889,"y":576,"h":124,"right":1129},"shelfSidebar":{"x":24,"w":200,"y":576,"h":124,"right":224},"resumeLine":{"x":24,"w":1105,"y":170,"h":180,"right":1129}},"cards":3}
+[0-0] PROBE light-640 {"gridCols":"259.985107px","bodyOverflowX":"visible","scrollW":615,"cardRects":[{"title":{"x":253,"right":487,"w":234,"y":1079,"bottom":1102,"h":23},"card":{"x":240,"right":500,"w":260,"y":678,"bottom":1155,"h":477},"content":{"x":241,"right":499,"w":258,"y":1067,"bottom":1154,"h":87}},{"title":{"x":253,"right":487,"w":234,"y":1572,"bottom":1595,"h":23},"card":{"x":240,"right":500,"w":260,"y":1171,"bottom":1648,"h":477},"content":{"x":241,"right":499,"w":258,"y":1560,"bottom":1647,"h":87}},{"title":{"x":253,"right":487,"w":234,"y":2065,"bottom":2088,"h":23},"card":{"x":240,"right":500,"w":260,"y":1664,"bottom":2141,"h":477},"content":{"x":241,"right":499,"w":258,"y":2053,"bottom":2140,"h":87}}],"hScroll":false,"headingOrder":["H1:Library","H2:Continue reading","H3:Also in progress","H2:Your library","H3:E2E Coverless","H3:E2E Resume Fixture A","H3:E2E Resume Fixture B"],"emptyState":null,"vScroll":true,"legibility":{"search":{"fontSize":15.75,"color":"rgb(76, 79, 105)","appearance":"none","backgroundColor":"rgb(230, 233, 239)"},"cardTitle":{"fontSize":15.75,"color":"rgb(76, 79, 105)","appearance":"none","backgroundColor":"rgba(0, 0, 0, 0)"},"body":{"fontSize":18,"color":"rgb(76, 79, 105)","appearance":"none","backgroundColor":"rgb(239, 241, 245)"},"sort":{"fontSize":15.75,"color":"rgb(76, 79, 105)","appearance":"none","backgroundColor":"rgb(230, 233, 239)"},"root":{"fontSize":18,"color":"rgb(76, 79, 105)","appearance":"none","backgroundColor":"rgb(239, 241, 245)"}},"covers":[{"w":120,"ratio":0.667,"state":"ready","h":180},{"w":44,"ratio":0.667,"state":"ready","h":66},{"w":258,"ratio":0.667,"state":"fallback","h":387},{"w":258,"ratio":0.667,"state":"ready","h":387},{"w":258,"ratio":0.667,"state":"ready","h":387}],"resumeCoverCount":2,"viewport":{"w":614,"h":768},"gridColumnCount":1,"hOverflowPx":1,"rects":{"emptyState":null,"libraryBody":{"x":24,"w":567,"y":678,"h":22,"right":591},"toolbar":{"x":0,"w":615,"y":0,"h":48,"right":615},"libraryView":{"x":0,"w":615,"y":49,"h":674,"right":615},"grid":{"x":240,"w":351,"y":678,"h":24,"right":591},"shelfSidebar":{"x":24,"w":200,"y":678,"h":22,"right":224},"resumeLine":{"x":24,"w":567,"y":272,"h":180,"right":591}},"cards":3}
+[0-0] PROBE dark-640 {"gridCols":"259.985107px","bodyOverflowX":"visible","scrollW":615,"cardRects":[{"title":{"x":253,"right":487,"w":234,"y":1079,"bottom":1102,"h":23},"card":{"x":240,"right":500,"w":260,"y":678,"bottom":1155,"h":477},"content":{"x":241,"right":499,"w":258,"y":1067,"bottom":1154,"h":87}},{"title":{"x":253,"right":487,"w":234,"y":1572,"bottom":1595,"h":23},"card":{"x":240,"right":500,"w":260,"y":1171,"bottom":1648,"h":477},"content":{"x":241,"right":499,"w":258,"y":1560,"bottom":1647,"h":87}},{"title":{"x":253,"right":487,"w":234,"y":2065,"bottom":2088,"h":23},"card":{"x":240,"right":500,"w":260,"y":1664,"bottom":2141,"h":477},"content":{"x":241,"right":499,"w":258,"y":2053,"bottom":2140,"h":87}}],"hScroll":false,"headingOrder":["H1:Library","H2:Continue reading","H3:Also in progress","H2:Your library","H3:E2E Coverless","H3:E2E Resume Fixture A","H3:E2E Resume Fixture B"],"emptyState":null,"vScroll":true,"legibility":{"search":{"fontSize":15.75,"color":"rgb(205, 214, 244)","appearance":"none","backgroundColor":"rgb(49, 50, 68)"},"cardTitle":{"fontSize":15.75,"color":"rgb(205, 214, 244)","appearance":"none","backgroundColor":"rgba(0, 0, 0, 0)"},"body":{"fontSize":18,"color":"rgb(205, 214, 244)","appearance":"none","backgroundColor":"rgb(30, 30, 46)"},"sort":{"fontSize":15.75,"color":"rgb(205, 214, 244)","appearance":"none","backgroundColor":"rgb(49, 50, 68)"},"root":{"fontSize":18,"color":"rgb(205, 214, 244)","appearance":"none","backgroundColor":"rgb(30, 30, 46)"}},"covers":[{"w":120,"ratio":0.667,"state":"ready","h":180},{"w":44,"ratio":0.667,"state":"ready","h":66},{"w":258,"ratio":0.667,"state":"fallback","h":387},{"w":258,"ratio":0.667,"state":"ready","h":387},{"w":258,"ratio":0.667,"state":"ready","h":387}],"resumeCoverCount":2,"viewport":{"w":614,"h":768},"gridColumnCount":1,"hOverflowPx":1,"rects":{"emptyState":null,"libraryBody":{"x":24,"w":567,"y":678,"h":22,"right":591},"toolbar":{"x":0,"w":615,"y":0,"h":48,"right":615},"libraryView":{"x":0,"w":615,"y":49,"h":674,"right":615},"grid":{"x":240,"w":351,"y":678,"h":24,"right":591},"shelfSidebar":{"x":24,"w":200,"y":678,"h":22,"right":224},"resumeLine":{"x":24,"w":567,"y":272,"h":180,"right":591}},"cards":3}
+[0-0] PROBE dark-list-640 {"gridCols":"350.854553px","bodyOverflowX":"visible","scrollW":615,"cardRects":[{"title":{"x":313,"right":446,"w":133,"y":701,"bottom":724,"h":23},"card":{"x":240,"right":591,"w":351,"y":678,"bottom":769,"h":92},"content":{"x":257,"right":530,"w":273,"y":690,"bottom":756,"h":66}},{"title":{"x":313,"right":446,"w":133,"y":809,"bottom":832,"h":23},"card":{"x":240,"right":591,"w":351,"y":785,"bottom":877,"h":92},"content":{"x":257,"right":530,"w":273,"y":798,"bottom":864,"h":66}},{"title":{"x":313,"right":446,"w":133,"y":917,"bottom":940,"h":23},"card":{"x":240,"right":591,"w":351,"y":893,"bottom":985,"h":92},"content":{"x":257,"right":530,"w":273,"y":906,"bottom":972,"h":66}}],"hScroll":false,"headingOrder":["H1:Library","H2:Continue reading","H3:Also in progress","H2:Your library"],"emptyState":null,"vScroll":true,"legibility":{"search":{"fontSize":15.75,"color":"rgb(205, 214, 244)","appearance":"none","backgroundColor":"rgb(49, 50, 68)"},"cardTitle":{"fontSize":15.75,"color":"rgb(205, 214, 244)","appearance":"none","backgroundColor":"rgba(0, 0, 0, 0)"},"body":{"fontSize":18,"color":"rgb(205, 214, 244)","appearance":"none","backgroundColor":"rgb(30, 30, 46)"},"sort":{"fontSize":15.75,"color":"rgb(205, 214, 244)","appearance":"none","backgroundColor":"rgb(49, 50, 68)"},"root":{"fontSize":18,"color":"rgb(205, 214, 244)","appearance":"none","backgroundColor":"rgb(30, 30, 46)"}},"covers":[{"w":120,"ratio":0.667,"state":"ready","h":180},{"w":44,"ratio":0.667,"state":"ready","h":66},{"w":44,"ratio":0.667,"state":"fallback","h":66},{"w":44,"ratio":0.667,"state":"ready","h":66},{"w":44,"ratio":0.667,"state":"ready","h":66}],"resumeCoverCount":2,"viewport":{"w":614,"h":768},"gridColumnCount":1,"hOverflowPx":1,"rects":{"emptyState":null,"libraryBody":{"x":24,"w":567,"y":678,"h":22,"right":591},"toolbar":{"x":0,"w":615,"y":0,"h":48,"right":615},"libraryView":{"x":0,"w":615,"y":49,"h":674,"right":615},"grid":{"x":240,"w":351,"y":678,"h":24,"right":591},"shelfSidebar":{"x":24,"w":200,"y":678,"h":22,"right":224},"resumeLine":{"x":24,"w":567,"y":272,"h":180,"right":591}},"cards":3}
+[0-0] PROBE dark-2560 {"gridCols":"259.985107px 259.985107px 259.985107px 259.985107px 259.985107px 259.985107px 259.985107px 259.985107px","bodyOverflowX":"visible","scrollW":2460,"cardRects":[{"title":{"x":253,"right":487,"w":234,"y":977,"bottom":1000,"h":23},"card":{"x":240,"right":500,"w":260,"y":576,"bottom":1053,"h":477},"content":{"x":241,"right":499,"w":258,"y":965,"bottom":1052,"h":87}},{"title":{"x":529,"right":763,"w":234,"y":977,"bottom":1000,"h":23},"card":{"x":516,"right":776,"w":260,"y":576,"bottom":1053,"h":477},"content":{"x":517,"right":775,"w":258,"y":965,"bottom":1052,"h":87}},{"title":{"x":805,"right":1039,"w":234,"y":977,"bottom":1000,"h":23},"card":{"x":792,"right":1052,"w":260,"y":576,"bottom":1053,"h":477},"content":{"x":793,"right":1051,"w":258,"y":965,"bottom":1052,"h":87}}],"hScroll":false,"headingOrder":["H1:Library","H2:Continue reading","H3:Also in progress","H2:Your library","H3:E2E Coverless","H3:E2E Resume Fixture A","H3:E2E Resume Fixture B"],"emptyState":null,"vScroll":true,"legibility":{"search":{"fontSize":15.75,"color":"rgb(205, 214, 244)","appearance":"none","backgroundColor":"rgb(49, 50, 68)"},"cardTitle":{"fontSize":15.75,"color":"rgb(205, 214, 244)","appearance":"none","backgroundColor":"rgba(0, 0, 0, 0)"},"body":{"fontSize":18,"color":"rgb(205, 214, 244)","appearance":"none","backgroundColor":"rgb(30, 30, 46)"},"sort":{"fontSize":15.75,"color":"rgb(205, 214, 244)","appearance":"none","backgroundColor":"rgb(49, 50, 68)"},"root":{"fontSize":18,"color":"rgb(205, 214, 244)","appearance":"none","backgroundColor":"rgb(30, 30, 46)"}},"covers":[{"w":120,"ratio":0.667,"state":"ready","h":180},{"w":44,"ratio":0.667,"state":"ready","h":66},{"w":258,"ratio":0.667,"state":"fallback","h":387},{"w":258,"ratio":0.667,"state":"ready","h":387},{"w":258,"ratio":0.667,"state":"ready","h":387}],"resumeCoverCount":2,"viewport":{"w":2459,"h":1037},"gridColumnCount":8,"hOverflowPx":1,"rects":{"emptyState":null,"libraryBody":{"x":24,"w":2411,"y":576,"h":393,"right":2435},"toolbar":{"x":0,"w":2459,"y":0,"h":48,"right":2459},"libraryView":{"x":0,"w":2459,"y":49,"h":943,"right":2459},"grid":{"x":240,"w":2195,"y":576,"h":393,"right":2435},"shelfSidebar":{"x":24,"w":200,"y":576,"h":393,"right":224},"resumeLine":{"x":24,"w":2411,"y":170,"h":180,"right":2435}},"cards":3}
+[0-0] PASSED in undefined - file:///e2e/home-audit-capture.e2e.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[wry 0.53.5 linux #0-0] Running: wry (v0.53.5) on linux
+[wry 0.53.5 linux #0-0] Session ID: 7b8befe5-70b4-48ba-bfad-ed74e40ac3f7
+[wry 0.53.5 linux #0-0]
+[wry 0.53.5 linux #0-0] » e2e/home-audit-capture.e2e.mjs
+[wry 0.53.5 linux #0-0] Home/library audit capture
+[wry 0.53.5 linux #0-0]    ✓ seed=cover: captures home in light/dark at 1200×800 and 640×800 with probes
+[wry 0.53.5 linux #0-0]
+[wry 0.53.5 linux #0-0] 1 passing (3.2s)
+
+
+Spec Files:	 1 passed, 1 total (100% completed) in 00:00:05

@@ -28,7 +28,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 export TMPDIR=/tmp
-SEED="${AUDIT_SEED:-empty}"
+# Geometry is the default contract, so default to a multi-card profile. The
+# empty-state audit remains available explicitly as AUDIT_SEED=empty.
+SEED="${AUDIT_SEED:-cover}"
 case "$SEED" in
   empty)  TTS_ENV="none"; SEED_ENV="" ;;
   single) TTS_ENV="none"; SEED_ENV="single" ;;
@@ -51,6 +53,10 @@ if [ "$SEED" = "cover" ]; then
     > "$APP_DIR/e2e-coverless.pdf"
 fi
 
+# The receipt label must determine the baked seed. Do not inherit a caller's
+# unrelated E2E mode/seed into an audit with a different name.
+unset VITE_E2E VITE_E2E_NATIVE VITE_E2E_NATIVE_TTS VITE_E2E_NATIVE_SEED VITE_E2E_PROFILE_DIR
+
 echo "==> Building frontend (VITE_E2E_NATIVE=true, seed=${SEED_ENV:-<none>})"
 build_env=(VITE_E2E_NATIVE=true VITE_E2E_NATIVE_TTS="$TTS_ENV")
 [ -n "$SEED_ENV" ] && build_env+=(VITE_E2E_NATIVE_SEED="$SEED_ENV")
@@ -66,7 +72,7 @@ toolchain_exec '
   export WEBKIT_DISABLE_COMPOSITING_MODE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1 LIBGL_ALWAYS_SOFTWARE=1
   export GDK_BACKEND=x11
   DISPNUM_FILE=$(mktemp)
-  Xvfb -displayfd 3 -screen 0 1280x1024x24 3>$DISPNUM_FILE >/tmp/lectrice-audit-xvfb.log 2>&1 &
+  Xvfb -displayfd 3 -screen 0 2560x1440x24 3>$DISPNUM_FILE >/tmp/lectrice-audit-xvfb.log 2>&1 &
   XVFB_PID=$!
   trap "kill $XVFB_PID 2>/dev/null || true" EXIT
   for _ in $(seq 1 100); do [ -s $DISPNUM_FILE ] && break; sleep 0.1; done

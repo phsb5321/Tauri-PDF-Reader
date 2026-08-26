@@ -56,9 +56,9 @@ export interface Chord {
  * indistinguishable from a broken one, so the honest form of "not built yet" is
  * silence rather than a key that swallows itself.
  *
- * That is why `settings`, `toggle-highlights` and `find` are absent — they have
- * no panel to open. Their menu items remain, already documented as inert in
- * `useMenuActions`.
+ * Settings and Highlights already have visible/menu destinations but no global
+ * chord is promised for them; `find` remains absent because it still has no
+ * destination. The table advertises only implemented, conflict-free bindings.
  */
 export const COMMAND_CHORDS: readonly Chord[] = [
   { action: "open", key: "o", ctrl: true, label: "Ctrl+O" },

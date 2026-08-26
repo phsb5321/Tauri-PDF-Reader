@@ -88,6 +88,7 @@ export {
   // Event listeners
   onAiTtsStarted,
   onAiTtsFinished,
+  onAiTtsPlaybackStarting,
   onAiTtsStopped,
   onAiTtsPaused,
   onAiTtsResumed,
@@ -100,6 +101,8 @@ export {
   type AiTtsCacheClearResult,
   type AiTtsPrebufferResponse,
   type AiTtsStartedEvent,
+  type AiTtsFinishedEvent,
+  type AiTtsPlaybackStartingEvent,
   type AiTtsErrorEvent,
   type WordTiming,
   type SpeakWithTimestampsResponse,

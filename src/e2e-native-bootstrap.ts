@@ -45,6 +45,7 @@
  * normal.
  */
 
+import { listen } from "@tauri-apps/api/event";
 import { aiTtsInit } from "./lib/tauri-invoke";
 import { commands } from "./lib/bindings";
 import { pdfService } from "./services/pdf-service";
@@ -63,12 +64,18 @@ export interface E2ENativeRead {
   isActive: () => boolean;
   /** Number of marks the real backend returned (0 before play). */
   wordCount: () => number;
+  /** Current word text from the production highlight store. */
+  currentWordText: () => string | null;
   /** Real TTS playback state machine value. */
   playbackState: () => string;
-  /** Whether this lane launched with a TTS key (fixture-initialized). */
+  /** Whether ElevenLabs is connected for this native process. */
   hasKey: () => boolean;
   /** Active TTS provider from native config/session state. */
   provider: () => string;
+  /** Runtime connection statuses, never credentials. */
+  connections: () => Record<string, string>;
+  /** Provider-tagged synthesis counts emitted by the native fixture route. */
+  providerRoutes: () => Record<string, number>;
   /** Real document-store current page (read-only page oracle). */
   currentPage: () => number;
   /** Store-side highlights array (read-only; the load-path oracle). */
@@ -204,6 +211,11 @@ async function seedLibraryProfile(): Promise<void> {
 
 /** The seeded document id (home lane) — the highlight read oracle targets it. */
 let seededDocId: string | null = null;
+const providerRouteCounts: Record<string, number> = {
+  local: 0,
+  elevenlabs: 0,
+  groq: 0,
+};
 
 export async function installE2ENativeBootstrap(): Promise<void> {
   const read: E2ENativeRead = {
@@ -212,9 +224,21 @@ export async function installE2ENativeBootstrap(): Promise<void> {
     currentWordIndex: () => useTtsHighlightStore.getState().currentWordIndex,
     isActive: () => useTtsHighlightStore.getState().isActive,
     wordCount: () => useTtsHighlightStore.getState().wordTimings.length,
+    currentWordText: () => {
+      const state = useTtsHighlightStore.getState();
+      return state.wordTimings[state.currentWordIndex]?.word ?? null;
+    },
     playbackState: () => useAiTtsStore.getState().playbackState,
-    hasKey: () => useAiTtsStore.getState().apiKey !== null,
+    hasKey: () =>
+      useAiTtsStore.getState().connections.elevenlabs.status === "connected",
     provider: () => useAiTtsStore.getState().provider,
+    connections: () =>
+      Object.fromEntries(
+        Object.entries(useAiTtsStore.getState().connections).map(
+          ([provider, connection]) => [provider, connection.status],
+        ),
+      ),
+    providerRoutes: () => ({ ...providerRouteCounts }),
     currentPage: () => useDocumentStore.getState().currentPage,
     storeHighlights: () => useDocumentStore.getState().highlights,
     storeError: () => useDocumentStore.getState().error,
@@ -290,13 +314,20 @@ export async function installE2ENativeBootstrap(): Promise<void> {
   }
 
   try {
+    await listen<string>("ai-tts:fixture-routed", (event) => {
+      providerRouteCounts[event.payload] =
+        (providerRouteCounts[event.payload] ?? 0) + 1;
+    });
+
     // 1) Real init command → e2e-tts-fixture backend (no network) — unless the
     //    lane is `none`, in which case the launch state is exactly a real
     //    fresh launch: session-only key absent, TTS not initialized.
     if (TTS_LANE === "fixture") {
       await aiTtsInit("e2e-fixture-key");
       const tts = useAiTtsStore.getState();
-      tts.setApiKey("e2e-fixture-key");
+      tts.setConnectionStatus("elevenlabs", "connected");
+      tts.setProviderConfig("elevenlabs", null, true, 10_000);
+      tts.setApiKey(null);
       tts.setInitialized(true);
     }
 

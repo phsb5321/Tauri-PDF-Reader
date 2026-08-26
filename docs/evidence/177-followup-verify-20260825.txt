@@ -1,0 +1,53 @@
+warning: Git tree '/home/notroot/Documents/Code/personal/tauri-pdf-reader-177-library-completeness' is dirty
+
+> lectrice@0.2.0 verify /home/notroot/Documents/Code/personal/tauri-pdf-reader-177-library-completeness
+> ./scripts/verify.sh
+
+[0;34m======================================[0m
+[0;34m  Tauri PDF Reader - Full Verification[0m
+[0;34m======================================[0m
+
+[0;34m── Frontend Checks ──[0m
+
+[1;33m▶ harness-policy[0m
+[0;32m✓ harness-policy[0m
+
+[1;33m▶ dependencies[0m
+[0;32m✓ dependencies[0m
+
+[1;33m▶ typecheck[0m
+[0;32m✓ typecheck[0m
+
+[1;33m▶ lint[0m
+[0;32m✓ lint[0m
+
+[1;33m▶ lint-boundaries[0m
+[0;32m✓ lint-boundaries[0m
+
+[1;33m▶ frontend-tests[0m
+[0;32m✓ frontend-tests[0m
+
+[1;33m▶ architecture-tests[0m
+[0;32m✓ architecture-tests[0m
+
+[0;34m── Backend Checks ──[0m
+
+[1;33m▶ rust-format[0m
+[0;32m✓ rust-format[0m
+
+[1;33m▶ Clippy linting...[0m
+[0;32m✓ clippy[0m
+
+[1;33m▶ rust-tests[0m
+[0;32m✓ rust-tests[0m
+
+[1;33m▶ contract-tests[0m
+[0;32m✓ contract-tests[0m
+
+[0;34m======================================[0m
+[0;32m  All checks passed![0m
+[0;34m======================================[0m
+
+Total time: 536s
+
+[1;33m⚠ Verification took longer than 2 minutes[0m
