@@ -17,13 +17,13 @@ Actions changes require Pedro's merge.
 
 ## Slice B — arm64 macOS CI (Pedro-gated workflow PR)
 
-- [ ] T008 — Branch from merged Slice A and add `.github/workflows/macos-flake.yml`: protected-main-only read-only build on the repo-scoped M5, then checkout-free vm103 fast-forward promotion to `macos-green`. (FR-006, FR-007)
-- [ ] T009 — Add malformed-bundle and no-force/no-PR/no-checkout workflow controls without exposing signing or application credentials. (FR-005–FR-007)
+- [ ] T008 — Branch from merged Slice A and add `.github/workflows/macos-flake.yml`: protected-main-only read-only build under the repo-scoped M5's isolated runner account. (FR-006, FR-007)
+- [ ] T009 — Add malformed-bundle, no-PR-trigger, read-only-token, and locked-input controls without exposing signing/application credentials. (FR-005–FR-007)
 - [ ] T010 — Open the workflow PR, obtain green CI and different-family review, then mark `[pending] Pedro: merge workflow PR`; never self-merge. (SC-004)
 
 ## Slice C — Mac continuous update and rollback
 
 - [ ] T011 — After Slice B is on base/required, install the merged flake into the dedicated Mac profile, migrate only the stale manual app copies to dated backups, and establish `~/Applications/Lectrice.app`. (FR-008, FR-011)
-- [ ] T012 — Add a declarative user LaunchAgent in the NixOS repository that runs the profile updater on a bounded schedule and records source/output/generation without document content. (FR-008–FR-012)
+- [ ] T012 — Add the isolated repo runner and a declarative updater schedule in the NixOS repository; record source/output/generation without document content. (FR-006–FR-012)
 - [ ] T013 — Prove an invalid revision leaves generation and target unchanged, then prove valid upgrade and one-generation rollback; retain the receipt. (SC-005, SC-006)
 - [ ] T014 — Update issue #190, the fleet ledger, and project backlog state with exact merged heads, Mac receipt, pending signing boundary, and one-line reversal paths.

@@ -24,6 +24,7 @@ in
 
     nativeBuildInputs = [
       pkgs.cargo-tauri.hook
+      pkgs.makeWrapper
       pkgs.nodejs_22
       pkgs.perl
       pkgs.pkg-config
@@ -55,6 +56,10 @@ in
       ln -s "$executable" "$out/bin/lectrice"
       install -m 755 ${src}/scripts/verify-macos-flake.sh "$out/bin/verify-macos-flake.sh"
       install -m 755 ${src}/scripts/manage-macos-flake.sh "$out/bin/manage-macos-flake.sh"
+      wrapProgram "$out/bin/verify-macos-flake.sh" \
+        --prefix PATH : ${lib.makeBinPath [pkgs.nix pkgs.jq]}
+      wrapProgram "$out/bin/manage-macos-flake.sh" \
+        --prefix PATH : ${lib.makeBinPath [pkgs.nix pkgs.jq pkgs.curl]}
     '';
 
     # Apple silicon requires signed Mach-O code. The linker already ad-hoc

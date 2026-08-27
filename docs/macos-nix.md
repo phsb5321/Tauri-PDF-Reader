@@ -27,7 +27,7 @@ nix run github:phsb5321/Tauri-PDF-Reader/main#manage -- install
 
 This command:
 
-1. realizes `github:phsb5321/Tauri-PDF-Reader/macos-green#lectrice` (the newest commit promoted by a successful Mac build);
+1. queries the public workflow API for the newest successful protected-`main` Mac build and realizes that immutable SHA as `github:phsb5321/Tauri-PDF-Reader/<sha>#lectrice`;
 2. installs it into `~/.local/state/nix/profiles/lectrice`;
 3. verifies the bundle before exposing it;
 4. moves an existing non-symlink `~/Applications/Lectrice.app` to a dated
@@ -57,7 +57,7 @@ PROFILE="$HOME/.local/state/nix/profiles/lectrice"
 "$PROFILE/bin/manage-macos-flake.sh" update
 ```
 
-The profile remembers the unlocked `macos-green` GitHub source. Only a successful exact-revision Mac build advances that branch; the token-holding promotion job never checks out or executes application code. `nix profile upgrade` realizes the promoted candidate before switching the generation. The manager then checks
+The manager queries only successful `push` runs of `macos-flake.yml` on `main`, validates the returned 40-character SHA and repository identity, then builds that immutable revision in a temporary profile. It verifies the candidate before creating one active generation with `nix-env --set`. The manager then checks
 the app identity/signature/architecture. A failed realization leaves the active
 generation unchanged; a failed post-build check triggers rollback before the
 stable app link is touched.
@@ -71,7 +71,7 @@ The last machine-readable operation receipt is:
 It contains only channel, generation, app-link, result, and timestamp—not PDF
 names, text, credentials, or application state.
 
-Automatic scheduling is enabled only after the self-hosted arm64 macOS build and `macos-green` promotion workflow are on the protected branch. Until then, run the explicit update command above. The
+Automatic scheduling is enabled only after the self-hosted arm64 macOS workflow is on the protected branch and has produced a successful exact-main run. Until then, run the explicit update command above. The
 scheduled job uses this same command; it does not implement a second updater.
 
 ## Rollback
