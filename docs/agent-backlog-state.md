@@ -2,6 +2,16 @@
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
+## Iteration #77 — 26/08/2026 (Apple-silicon Nix package and continuous-delivery path)
+
+- **User outcome / issue:** Pedro requested a flake-backed MacBook install that can stay current; issue #190 and `specs/190-macos-flake/` bind the outcome to reproducible package, macOS CI, atomic profile update, and rollback oracles.
+- **Package candidate:** the existing Linux-only flake is split lazily by platform. `aarch64-darwin` uses nixpkgs' pinned `cargo-tauri.hook`, fixed `fetchPnpmDeps` hash, committed Cargo lock, Node 22/pnpm 10, bindgen, and post-fixup ad-hoc bundle sealing. Linux `tauri-driver` and dev-shell derivation paths are byte-identical to main.
+- **Measured Mac proof:** on macOS 26.6.1/M5, the Nix build produced one `Lectrice.app`, bundle `com.lectrice.reader`, version `0.2.0`, strict-valid ad-hoc signature, thin arm64 executable, and only system frameworks plus one store-absolute libiconv dependency. The public `open -n` actor created exactly one exact-bundle process; CoreGraphics observed one 1200×800 Quartz window; only that process was terminated.
+- **Update mechanics:** `manage-macos-flake.sh` owns a dedicated profile, verifies before exposing a stable `~/Applications` link, retains a pre-existing manual app under a dated backup, records content-free operation receipts, and rolls a changed generation back after post-build verification failure. `verify-macos-flake.sh` provides static and opt-in launch oracles; a missing-app fixture is a proven negative control.
+- **CI falsifier changed the design:** PR #192's first `macos-15` run (`33029452134`) received no runner and no steps; GitHub annotated it “account is locked due to a billing issue.” The package was not at fault. The revised workflow never sends PR head code to Pedro's public-repo Mac: protected-main pushes build read-only under a hidden isolated account. The updater needs no write token or mutable branch; it validates the public workflow result and realizes only its immutable successful SHA.
+- **Security gate repaired live drift:** the independent workflow review discovered this repo had no branch protection despite the operating policy. Ruleset `21615185` now actively requires PRs, signed linear history, resolved threads, strict current checks, and blocks deletion/force-push on `main`.
+- **Truth boundary / next:** this is Pedro's ad-hoc-signed Nix channel, not an Apple-notarized public DMG and not full macOS reader E2E. Land the package/docs safe slice, provision the isolated Mac runner, and have Pedro merge the separately gated workflow PR; only then enable scheduled successful-workflow updates and migrate the stale manual Mac app copies.
+
 ## Iteration #76 — 24/08/2026 (niri native-Wayland viewport corruption reproduced and bounded)
 
 - **User-visible failure:** a clean current-main debug build opened on the desktop with the entire library UI compressed into a few pixels. Rebuilding without the stale E2E fixture did not change it, disproving the initial artifact hypothesis.

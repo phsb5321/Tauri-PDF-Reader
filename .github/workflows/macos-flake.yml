@@ -1,0 +1,67 @@
+name: macOS Flake
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: macos-flake-main
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: macOS flake package
+    # This public repository never sends pull-request head code to the Mac.
+    # Protected-main pushes run under a hidden, isolated build account rather
+    # than Pedro's personal user.
+    runs-on: [self-hosted, macOS, ARM64, lectrice-mac]
+    timeout-minutes: 90
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Build locked Apple-silicon app
+        id: build
+        run: |
+          set -euo pipefail
+          output="$(caffeinate -dimsu nix build .#lectrice \
+            --no-update-lock-file \
+            --no-link --print-out-paths \
+            --max-jobs 1 --cores 3)"
+          [ "$(printf '%s\n' "$output" | grep -c .)" -eq 1 ]
+          echo "output=$output" >> "$GITHUB_OUTPUT"
+
+      - name: Verify immutable bundle identity
+        env:
+          LECTRICE_OUT: ${{ steps.build.outputs.output }}
+          SOURCE_REVISION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          ./scripts/verify-macos-flake.sh \
+            --output "$LECTRICE_OUT" \
+            --expected-version "$(jq -er .version package.json)" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Negative control rejects a missing app
+        env:
+          SOURCE_REVISION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          empty="$RUNNER_TEMP/empty-lectrice-output"
+          mkdir -p "$empty"
+          if ./scripts/verify-macos-flake.sh --output "$empty" \
+            >"$RUNNER_TEMP/negative.stdout" \
+            2>"$RUNNER_TEMP/negative.stderr"; then
+            echo "FAIL: malformed package passed the macOS verifier" >&2
+            exit 1
+          fi
+          grep -Fq 'package has no Applications directory' \
+            "$RUNNER_TEMP/negative.stderr"
+          echo 'Negative control: malformed package refused.' >> "$GITHUB_STEP_SUMMARY"

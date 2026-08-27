@@ -4,8 +4,8 @@ Truthful inventory of what the current tree does **not** do, and what is not
 yet proven. Every item names its evidence. If a release note claims a
 platform or a feature, it must not contradict this page.
 
-Last reviewed: 15/08/2026, after the release-preparation train, against `main`
-at commit `8c31cfc`.
+Last reviewed: 26/08/2026 for the Apple-silicon Nix package. The Linux
+release claims remain scoped to `v0.2.0`.
 
 ## Fast-close verification position
 
@@ -39,10 +39,10 @@ macOS receipt.
 
 - The release workflow builds and publishes **AppImage + deb only**
   (`.github/workflows/release.yml`), on a **self-hosted Linux runner**.
-- **macOS and Windows have no packaged build and no packaged E2E in this
-  repository.** The app is Tauri 2.x and the upstream prerequisites are
-  documented in the README, but "works on macOS/Windows" is **not a claim this
-  repo can back** today. Cutting a tag produces Linux artifacts only.
+- Windows has no packaged build or packaged E2E in this repository.
+- macOS has a personal Apple-silicon Nix package and a deterministic
+  bundle/process/Quartz-window launch gate. It still has no public signed DMG
+  or full reader E2E. Cutting a tag continues to produce Linux artifacts only.
 
 The published Linux artifacts are verified on the platform they target rather
 than on the NixOS build host: for `v0.2.0-rc.0`, the `.deb` installed into a
@@ -53,41 +53,40 @@ AppImage instead aborts with `EGL_BAD_PARAMETER`, because the app enables GPU
 compositing on Linux and Xvfb offers no EGL display — an environment mismatch,
 not an artifact defect.
 
-## macOS is buildable but not drivable
+## macOS personal Nix channel is launch-verified, not publicly distributed
 
-macOS is **not a shipped artifact** and no release note claims it. What has
-been measured, on macOS 26.6.1 / arm64 at commit `3d68d0e`:
+On macOS 26.6.1 / arm64, the flake's locked package produces
+`Applications/Lectrice.app`, version `0.2.0`, bundle id
+`com.lectrice.reader`, and a thin arm64 Mach-O. The derivation seals the bundle
+with an ad-hoc signature after Nix fixups. `scripts/verify-macos-flake.sh`
+checks the immutable identity/signature, launches that exact bundle through
+`open -n`, requires exactly one new process, and observes one 1200×800 Quartz
+window before terminating only that process.
 
-- The app **builds** (`pnpm tauri build --bundles app`) once `SDKROOT` and
-  `LIBRARY_PATH` point at the Command Line Tools SDK; without them the link
-  fails on `-liconv`.
-- The bundle **launches**: `Lectrice.app` version `0.2.0`, bundle id
-  `com.lectrice.reader`, exactly one process, and a real 1176x784 window in
-  the Quartz window list.
+That supports Pedro's managed-Mac Nix channel. It does **not** support a public
+macOS download claim:
 
-What is **not** proven on macOS, and why it is not merely "pending":
+- the bundle is ad-hoc signed, not Developer ID signed or Apple notarized;
+- no DMG is published by the tag release workflow;
+- the wry/WKWebView controls still expose no usable accessibility window tree;
+- `tauri-driver` still has no macOS native WebDriver host, so the Linux reader
+  journeys cannot be replayed there; and
+- there remains no file-association/open-event actor for a deterministic PDF
+  open journey.
 
-- The wry/WKWebView window exposes **no AX windows** (`count of windows` is 0;
-  only the menu bar is exposed), so an accessibility actor cannot reach the
-  reader's controls.
-- The app registers **no file association and handles no open event** —
-  `fileAssociations` appears nowhere in `src-tauri/`, and nothing in
-  `src-tauri/src/` matches `RunEvent` — so there is no non-GUI way to hand it
-  a document.
-- The pinned `tauri-driver` proxies to a **platform WebDriver that macOS does
-  not have** (its own `--help` marks the native-host option Linux-only), so
-  the packaged lanes cannot run there at all.
-
-That leaves only synthetic keystrokes aimed at whatever is frontmost on a live
-desktop, which is neither a controlled oracle nor a safe action. So the macOS
-open/render/restart journey is **BLOCKED**, not skipped-green, and the three
-reasons above are what would have to change to unblock it.
+The Nix package therefore proves reproducible install identity and native
+launch/window health, not full feature parity. Public distribution requires
+Apple credentials and notarization; deeper packaged behavior requires a safe
+macOS actor rather than frontmost-window synthetic keystrokes.
 
 ## Egress
 
 The **only** outbound network call in the app is to ElevenLabs when a speak
-action runs ([#97] removed the jsDelivr CDN egress; there is no update-check
-egress). Contract and file:line receipts: `SECURITY.md`.
+action runs ([#97] removed the jsDelivr CDN egress; there is no in-app
+update-check egress). The external Nix profile manager queries the public
+GitHub workflow API and fetches the selected immutable flake only when
+install/update is invoked. Contract and file:line receipts:
+`SECURITY.md`.
 
 ## Platform-scoped runtime
 
