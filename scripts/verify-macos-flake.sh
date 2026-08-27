@@ -142,7 +142,7 @@ if [ "$launch" -eq 1 ]; then
         pid = $1
         sub(/^[[:space:]]*[0-9]+[[:space:]]+/, "")
         if ($0 == expected) print pid
-      }' | sort -n
+      }' | LC_ALL=C sort
   }
   before_pids_file="$(mktemp "${TMPDIR:-/tmp}/lectrice-before.XXXXXX")"
   current_pids_file="$(mktemp "${TMPDIR:-/tmp}/lectrice-current.XXXXXX")"
@@ -151,7 +151,7 @@ if [ "$launch" -eq 1 ]; then
   open -n "$app"
   for _ in {1..20}; do
     exact_pids >"$current_pids_file"
-    comm -13 "$before_pids_file" "$current_pids_file" >"$new_pids_file"
+    LC_ALL=C comm -13 "$before_pids_file" "$current_pids_file" >"$new_pids_file"
     pid_count="$(grep -c . "$new_pids_file" || true)"
     if [ "$pid_count" -eq 1 ]; then
       launched_pid="$(cat "$new_pids_file")"
