@@ -46,7 +46,7 @@ rollback generations.
 3. **Build on ARM64**: GitHub currently documents `macos-15` as a standard M1
    arm64 runner and standard public-repository runners as free/unlimited.
 4. **Do not add signing secrets**: Tauri requires an Apple Developer identity and notarization for general direct distribution. After all Nix fixups, the derivation uses macOS `codesign -s -` to seal the executable and bundle with a strict-verifiable ad-hoc signature. The managed Nix-store app is a personal channel and is not represented as a public DMG.
-5. **Atomic profile channel**: `nix profile install/upgrade --profile` realizes the candidate before switching the profile generation. The manager then verifies bundle identity/signature/architecture and automatically rolls back a changed generation on post-build failure. A stable symlink into that profile is exposed only after verification.
+5. **Atomic profile channel**: `nix profile install/upgrade --profile` realizes the candidate before switching the profile generation. The manager keeps the public app link pinned to the previous immutable generation, verifies the candidate, restores the exact prior profile version on failure, and only then repoints the app link to a successful immutable generation.
 6. **No self-updater in app code**: Nix owns package updates and rollback; an
    application updater would duplicate state and weaken reproducibility.
 

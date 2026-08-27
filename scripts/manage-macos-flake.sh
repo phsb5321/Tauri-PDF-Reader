@@ -43,6 +43,25 @@ profile_target() {
   fi
 }
 
+profile_version() {
+  printf '%s\n' "$1" | sed -n 's/.*-\([0-9][0-9]*\)-link$/\1/p'
+}
+
+immutable_app_path() {
+  [ -d "$profile/Applications/Lectrice.app" ] || return 1
+  applications="$(cd "$profile/Applications" && pwd -P)"
+  printf '%s/Lectrice.app\n' "$applications"
+}
+
+restore_profile() {
+  wanted="$1"
+  [ "$(profile_target)" = "$wanted" ] && return 0
+  version="$(profile_version "$wanted")"
+  [ -n "$version" ] || return 1
+  nix profile rollback --profile "$profile" --to "$version" || return 1
+  [ "$(profile_target)" = "$wanted" ]
+}
+
 write_receipt() {
   action="$1"
   before="$2"
@@ -72,7 +91,10 @@ verify_profile() {
 }
 
 link_verified_profile() {
-  expected="$profile/Applications/Lectrice.app"
+  # Pin the public app link to the immutable, already-verified generation.
+  # Pointing it at the mutable profile would expose a candidate during the
+  # interval between `nix profile upgrade` and post-build verification.
+  expected="$(immutable_app_path)"
   mkdir -p "$(dirname "$app_link")"
   if [ -L "$app_link" ]; then
     rm "$app_link"
@@ -87,17 +109,20 @@ link_verified_profile() {
 if [ "$command" = status ]; then
   target="$(profile_target)"
   link_target="$(readlink "$app_link" 2>/dev/null || printf absent)"
+  expected_target="$(immutable_app_path 2>/dev/null || printf absent)"
   valid=false
-  if [ "$target" != absent ] && verify_profile; then valid=true; fi
+  if [ "$target" != absent ] && [ "$link_target" = "$expected_target" ] && verify_profile; then valid=true; fi
   jq -n \
     --arg profile "$profile" \
     --arg generation "$target" \
     --arg appLink "$app_link" \
     --arg appTarget "$link_target" \
+    --arg expectedAppTarget "$expected_target" \
     --argjson valid "$valid" \
     --argjson elements "$(nix profile list --profile "$profile" --json 2>/dev/null || printf '{"elements":{}}')" \
     '{profile:$profile, generation:$generation, appLink:$appLink,
-      appTarget:$appTarget, valid:$valid, elements:$elements.elements}'
+      appTarget:$appTarget, expectedAppTarget:$expectedAppTarget,
+      valid:$valid, elements:$elements.elements}'
   [ "$valid" = true ]
   exit
 fi
@@ -125,13 +150,9 @@ case "$command" in
   update)
     [ "$before" != absent ] || { echo "FAIL: install the Lectrice profile before updating" >&2; exit 1; }
     if ! nix profile upgrade --profile "$profile" lectrice; then
-      failed_target="$(profile_target)"
-      if [ "$failed_target" != "$before" ]; then
-        nix profile rollback --profile "$profile"
-      fi
-      restored="$(profile_target)"
       status=FAILED
-      [ "$restored" = "$before" ] || status=ROLLBACK_FAILED
+      restore_profile "$before" || status=ROLLBACK_FAILED
+      restored="$(profile_target)"
       write_receipt "$command" "$before" "$restored" "$status"
       [ "$status" = FAILED ] || echo "FAIL: update failure did not restore $before" >&2
       exit 1
@@ -149,18 +170,14 @@ esac
 after="$(profile_target)"
 if ! verify_profile; then
   echo "FAIL: candidate profile did not pass bundle verification" >&2
-  if [ "$command" = update ] && [ "$after" != "$before" ]; then
-    nix profile rollback --profile "$profile"
-    restored="$(profile_target)"
-    [ "$restored" = "$before" ] || {
-      write_receipt "$command" "$before" "$restored" ROLLBACK_FAILED
-      echo "FAIL: automatic rollback did not restore $before" >&2
-      exit 1
-    }
-    write_receipt "$command" "$before" "$restored" ROLLED_BACK
-  else
-    write_receipt "$command" "$before" "$after" FAILED
+  status=FAILED
+  if [ "$before" != absent ] && [ "$after" != "$before" ]; then
+    status=ROLLED_BACK
+    restore_profile "$before" || status=ROLLBACK_FAILED
   fi
+  restored="$(profile_target)"
+  write_receipt "$command" "$before" "$restored" "$status"
+  [ "$status" != ROLLBACK_FAILED ] || echo "FAIL: automatic rollback did not restore $before" >&2
   exit 1
 fi
 

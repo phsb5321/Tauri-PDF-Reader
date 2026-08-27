@@ -32,7 +32,7 @@ This command:
 3. verifies the bundle before exposing it;
 4. moves an existing non-symlink `~/Applications/Lectrice.app` to a dated
    `.manual-YYYYMMDD-HHMMSS` backup; and
-5. creates `~/Applications/Lectrice.app` as a stable link through the profile.
+5. creates `~/Applications/Lectrice.app` as a stable link to that verified, immutable generation.
 
 A separately hand-copied `/Applications/Lectrice.app` is not deleted by the
 script. Once the managed app is verified, move that duplicate to a dated backup
@@ -83,9 +83,11 @@ PROFILE="$HOME/.local/state/nix/profiles/lectrice"
 "$PROFILE/bin/manage-macos-flake.sh" rollback
 ```
 
-The stable app link points at the profile, not a store generation, so rollback
-changes the next launch without rewriting the link. A currently running process
-continues from its old retained closure and can be closed normally.
+The stable app link is pinned to the last verified immutable generation. The
+manager verifies a rollback target first and only then rewrites the link, so the
+mutable profile cannot expose an unverified candidate between switch and check.
+A currently running process continues from its retained closure and can be
+closed normally.
 
 Do not run `nix profile wipe-history --profile "$PROFILE"` or a global garbage
 collection that removes old generations before the rollback window has passed.
