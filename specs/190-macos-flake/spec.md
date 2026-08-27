@@ -12,8 +12,9 @@ has been built and launched manually on the M5 MacBook, but the two app copies
 are stale, hand-copied, and outside a reproducible update or rollback path.
 
 “Latest” in this feature means the newest revision of the protected `main`
-branch that passes the macOS package gate. It does not mean an unreviewed branch
-or a build that failed after merge. The personal Nix channel is distinct from
+branch that passes the macOS package gate and is fast-forward promoted to
+`macos-green`. It does not mean an unreviewed branch or a build that failed
+after merge. The personal Nix channel is distinct from
 public distribution: Apple Developer signing and notarization remain outside
 this feature because they require external credentials and are unnecessary for
 a non-quarantined Nix-store app on Pedro's managed Mac.
@@ -42,24 +43,28 @@ visible Quartz window.
 3. **Given** the built bundle, **when** it is opened, **then** one new Lectrice
    process owns a non-zero on-screen Quartz window.
 
-### User Story 2 — Reject macOS packaging regressions in CI (Priority: P1)
+### User Story 2 — Promote only Mac-verified revisions (Priority: P1)
 
-As the maintainer, every pull request and `main` revision is built on an arm64
-macOS runner so a Linux-only success cannot silently break the Mac package.
+As the maintainer, every protected-`main` candidate is built by the repo-scoped
+Apple-silicon Mac runner. A successful build advances `macos-green`; a failed or
+unrun candidate never reaches the Mac update channel.
 
-**Independent Test**: The workflow builds the package, runs the static bundle
-verifier, and uploads an identity receipt. A negative-control flake missing the
-app bundle must fail the verifier.
+**Independent Test**: The read-only Mac job builds and verifies an exact `main`
+commit. Only after success, a separate checkout-free token job fast-forwards
+`macos-green` to that SHA. A malformed bundle must fail before promotion.
 
 **Acceptance Scenarios**:
 
-1. **Given** a same-repository pull request, **when** the macOS workflow runs,
-   **then** it has read-only permissions and builds on an arm64 GitHub-hosted
-   macOS runner without repository secrets.
+1. **Given** a push to protected `main`, **when** the macOS workflow runs,
+   **then** the build job has read-only permissions and runs on the repo-scoped
+   self-hosted arm64 Mac without application/signing secrets.
 2. **Given** a malformed package output, **when** the verifier runs, **then**
-   the workflow fails rather than publishing a skipped-green result.
-3. **Given** a successful build, **when** CI records evidence, **then** the
-   receipt names the source commit, Nix output, bundle id, version, executable
+   the workflow fails and `macos-green` remains byte-for-byte unchanged.
+3. **Given** a successful exact-SHA build, **when** the promotion job runs on
+   the Linux runner, **then** it checks out no candidate code and fast-forwards
+   `macos-green` without force.
+4. **Given** a successful build, **when** CI records evidence, **then** the
+   receipt names source commit, Nix output, bundle id, version, executable
    architecture, and unsigned/notarization truth boundary.
 
 ### User Story 3 — Receive updates without losing rollback (Priority: P2)
@@ -86,6 +91,11 @@ and roll back one generation.
 
 ### Edge Cases
 
+- GitHub-hosted jobs are account billing-locked despite the repository being
+  public: CI uses the repo-scoped Mac only after merge and never executes PR
+  head code there.
+- The Mac is asleep/offline: the exact-main job stays queued; `macos-green` and
+  the installed app remain on the last successful revision.
 - The app is running while the profile upgrades: the old process continues from
   its retained closure; only the next launch uses the new generation.
 - GitHub or the Nix substituter is unavailable: update fails closed and keeps
@@ -113,10 +123,12 @@ and roll back one generation.
 - **FR-005**: A deterministic verifier MUST fail on a missing bundle, wrong
   identifier, wrong version, non-arm64 executable, duplicate process, or absent
   Quartz window where a live-window check is requested.
-- **FR-006**: CI MUST run the static macOS package verifier on an arm64
-  GitHub-hosted macOS runner for pull requests and `main` pushes.
-- **FR-007**: CI MUST use least privilege, no application/signing secrets, and
-  SHA-pinned third-party actions.
+- **FR-006**: CI MUST run the static macOS package verifier on the repo-scoped
+  self-hosted arm64 Mac for protected `main` pushes; it MUST NOT execute pull
+  request head code on that personal-data host.
+- **FR-007**: The build job MUST be read-only and secret-free. A separate
+  checkout-free Linux job MAY receive `contents: write` only to fast-forward
+  `macos-green` after build success; force updates are forbidden.
 - **FR-008**: The Mac installation MUST use a dedicated named Nix profile and a
   stable `~/Applications/Lectrice.app` symlink.
 - **FR-009**: Update MUST be atomic: verification precedes symlink/profile
@@ -136,8 +148,9 @@ and roll back one generation.
   dependencies and passes bundle identifier/version/arm64 checks.
 - **SC-003**: The Mac launch receipt reports one new process and a non-zero
   Quartz window for the exact Nix output.
-- **SC-004**: The required macOS CI check is green on the exact merged package
-  revision.
+- **SC-004**: The macOS CI check is green on the exact merged package revision
+  and `macos-green` equals that SHA; a failed candidate leaves the branch
+  unchanged.
 - **SC-005**: An invalid update leaves profile generation and app symlink hash
   byte-for-byte unchanged.
 - **SC-006**: Upgrade and rollback each change the active dedicated-profile

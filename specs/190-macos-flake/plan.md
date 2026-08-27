@@ -9,16 +9,17 @@ its current development outputs. `aarch64-darwin` receives a Tauri package built
 with nixpkgs' native `cargo-tauri.hook`, `rustPlatform.buildRustPackage`,
 `fetchPnpmDeps`, and the committed Cargo/pnpm lockfiles. A platform verifier
 checks the app's immutable identity and optionally performs a real Mac launch.
-A separate workflow-only slice runs the static package gate on GitHub's arm64
-macOS runner. A dedicated Nix profile on `Mac.Pro` provides atomic update and
-rollback generations.
+A separate workflow-only slice runs the static package gate on the repo-scoped
+M5 runner after protected-main pushes, then uses a checkout-free Linux job to
+fast-forward `macos-green`. A dedicated Nix profile on `Mac.Pro` tracks that
+verified branch and provides atomic update and rollback generations.
 
 ## Technical Context
 
 **Languages**: Nix, Bash, GitHub Actions YAML; existing Rust 2021 + TypeScript 5.6 application.
 **Build primitives**: nixpkgs `cargo-tauri.hook`, `rustPlatform.buildRustPackage`, `fetchPnpmDeps`, `pnpmConfigHook`, pnpm 10, Node 22.
 **Target**: `aarch64-darwin` / M5 MacBook, macOS 26.6.1.
-**CI**: standard `macos-15` arm64 GitHub-hosted runner plus a SHA-pinned Nix installer; public repositories receive unlimited standard hosted use according to GitHub's current runner reference.
+**CI**: repo-scoped self-hosted M5 runner for read-only builds; existing vm103 Linux runner for checkout-free branch promotion. GitHub-hosted execution is unusable because the live job was refused before allocation with the account billing-lock annotation.
 **Distribution**: personal Nix profile, no browser download/quarantine; no Apple signing/notarization claim.
 **Verification**: Nix evaluation/build, plist identity, Mach-O architecture, `codesign` structural verification when present, process-delta observation, CoreGraphics window ownership, profile generation negative control and rollback.
 **Constraints**: preserve Linux outputs; no app source/capability/egress changes; workflow changes are Pedro-gated; application data is outside Nix generations.
@@ -43,8 +44,7 @@ rollback generations.
 2. **Use fixed pnpm/Cargo stores**: `fetchPnpmDeps` + `pnpmConfigHook` is the
    current nixpkgs-supported pnpm path. `cargoLock.lockFile` avoids an unrelated
    vendor hash because the lock contains registry dependencies only.
-3. **Build on ARM64**: GitHub currently documents `macos-15` as a standard M1
-   arm64 runner and standard public-repository runners as free/unlimited.
+3. **Build on ARM64 without exposing the Mac**: the initial `macos-15` design was falsified by run `33029452134`, which received zero runner/steps and the annotation “account is locked due to a billing issue.” The repo-scoped M5 runner therefore runs only on protected-main pushes, never pull-request head code. It receives read-only permissions and no signing/deploy secret.
 4. **Do not add signing secrets**: Tauri requires an Apple Developer identity and notarization for general direct distribution. After all Nix fixups, the derivation uses macOS `codesign -s -` to seal the executable and bundle with a strict-verifiable ad-hoc signature. The managed Nix-store app is a personal channel and is not represented as a public DMG.
 5. **Atomic profile channel**: `nix profile install/upgrade --profile` realizes the candidate before switching the profile generation. The manager keeps the public app link pinned to the previous immutable generation, verifies the candidate, restores the exact prior profile version on failure, and only then repoints the app link to a successful immutable generation.
 6. **No self-updater in app code**: Nix owns package updates and rollback; an
@@ -60,19 +60,20 @@ rollback generations.
 - Document install/update/rollback and update truthful platform support.
 - Build and launch on `Mac.Pro`; independently review, merge, and install.
 
-### Slice B — macOS CI (workflow-gated)
+### Slice B — macOS CI and green-channel promotion (workflow-gated)
 
-- Add a standalone least-privilege arm64 workflow with a SHA-pinned Nix installer.
-- Build `.#lectrice`, run static verifier, negative control, and upload a small
-  identity receipt only on failure/success as appropriate.
-- Add the check to the ruleset only after the workflow exists on base.
-- Open green PR; do not self-merge because it changes GitHub Actions.
+- Add a protected-main-only workflow: a read-only build on the repo-scoped M5
+  runner, followed by a checkout-free vm103 promotion job.
+- Build `.#lectrice`, run the static verifier and negative control, and retain a
+  bounded identity receipt in the job summary.
+- Fast-forward `macos-green` only after success; never force-update it.
+- Open the reviewed PR; do not self-merge because it changes GitHub Actions.
 
 ### Slice C — continuous Mac update
 
 - Maintain a dedicated `lectrice` profile and stable user Applications symlink.
-- Schedule a user-level update after Slice B becomes required, so `main` is a
-  green channel rather than merely a moving branch.
+- Schedule a user-level update only after Slice B can promote `macos-green`;
+  the updater follows that unlocked branch rather than moving `main`.
 - Verify failed-candidate preservation and one-generation rollback.
 
 ## Files
