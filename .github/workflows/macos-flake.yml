@@ -1,14 +1,11 @@
 name: macOS Flake
 
 on:
-  pull_request:
-    branches: [main, develop]
   push:
-    branches: [main, develop]
+    branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: macos-flake-${{ github.ref }}
@@ -17,21 +14,23 @@ concurrency:
 jobs:
   package:
     name: macOS flake package
-    runs-on: macos-15
+    # This public repository never sends pull-request head code to Pedro's
+    # personal-data host. Only protected-main pushes and explicit dispatches
+    # reach the repo-scoped runner.
+    runs-on: [self-hosted, macOS, ARM64, lectrice-mac]
     timeout-minutes: 90
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout exact revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - name: Install Determinate Nix
-        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
-
       - name: Build locked Apple-silicon app
         id: build
         run: |
           set -euo pipefail
-          output="$(nix build .#lectrice \
+          output="$(caffeinate -dimsu nix build .#lectrice \
             --no-link --print-out-paths \
             --max-jobs 1 --cores 3)"
           [ "$(printf '%s\n' "$output" | grep -c .)" -eq 1 ]
@@ -66,3 +65,49 @@ jobs:
           grep -Fq 'package has no Applications directory' \
             "$RUNNER_TEMP/negative.stderr"
           echo 'Negative control: malformed package refused.' >> "$GITHUB_STEP_SUMMARY"
+
+  promote:
+    name: Promote macos-green
+    needs: package
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Linux, X64, vm103]
+    timeout-minutes: 5
+    permissions:
+      contents: write
+
+    # Token-bearing job checks out and executes no repository code. It only
+    # performs a non-force fast-forward after the Mac build has succeeded.
+    steps:
+      - name: Fast-forward verified channel
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          VERIFIED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          current="$(gh api "repos/$REPO/git/ref/heads/macos-green" \
+            --jq '.object.sha' 2>/dev/null || true)"
+          if [ -z "$current" ]; then
+            gh api "repos/$REPO/git/refs" --method POST \
+              -f ref="refs/heads/macos-green" \
+              -f sha="$VERIFIED_SHA" >/dev/null
+          else
+            relation="$(gh api "repos/$REPO/compare/$current...$VERIFIED_SHA" \
+              --jq '.status')"
+            case "$relation" in
+              ahead)
+                gh api "repos/$REPO/git/refs/heads/macos-green" --method PATCH \
+                  -f sha="$VERIFIED_SHA" -F force=false >/dev/null
+                ;;
+              identical) ;;
+              *)
+                echo "FAIL: refusing non-fast-forward promotion ($relation)" >&2
+                exit 1
+                ;;
+            esac
+          fi
+          promoted="$(gh api "repos/$REPO/git/ref/heads/macos-green" \
+            --jq '.object.sha')"
+          [ "$promoted" = "$VERIFIED_SHA" ]
+          printf 'Promoted %s to macos-green.\n' "$promoted" \
+            >> "$GITHUB_STEP_SUMMARY"
