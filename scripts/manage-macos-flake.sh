@@ -4,7 +4,7 @@ set -euo pipefail
 
 profile="${LECTRICE_PROFILE:-$HOME/.local/state/nix/profiles/lectrice}"
 app_link="${LECTRICE_APP_LINK:-$HOME/Applications/Lectrice.app}"
-channel="${LECTRICE_CHANNEL:-github:phsb5321/Tauri-PDF-Reader/main#lectrice}"
+channel="${LECTRICE_CHANNEL:-github:phsb5321/Tauri-PDF-Reader/macos-green#lectrice}"
 state_dir="${LECTRICE_STATE_DIR:-$HOME/.local/state/lectrice}"
 receipt="$state_dir/update-receipt.json"
 script_dir="$(cd -- "$(dirname -- "$0")" >/dev/null && pwd -P)"

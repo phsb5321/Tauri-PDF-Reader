@@ -81,7 +81,7 @@ sudo apt install -y \
 # One-time install into a dedicated rollback-capable profile.
 nix run github:phsb5321/Tauri-PDF-Reader/main#manage -- install
 
-# Upgrade to the newest protected-main package, or roll back one generation.
+# Upgrade to the newest Mac-verified main revision, or roll back one generation.
 PROFILE="$HOME/.local/state/nix/profiles/lectrice"
 "$PROFILE/bin/manage-macos-flake.sh" update
 "$PROFILE/bin/manage-macos-flake.sh" rollback
