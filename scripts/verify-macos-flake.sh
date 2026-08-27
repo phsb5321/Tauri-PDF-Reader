@@ -40,7 +40,7 @@ for command in nix jq plutil file codesign shasum; do
 done
 
 if [ -z "$output" ]; then
-  build_outputs="$(nix build "$installable" --no-link --print-out-paths --cores 1)"
+  build_outputs="$(nix build "$installable" --no-update-lock-file --no-link --print-out-paths --cores 1)"
   output_count="$(printf '%s\n' "$build_outputs" | grep -c . || true)"
   [ "$output_count" -eq 1 ] || {
     echo "FAIL: expected one Nix output, got $output_count" >&2

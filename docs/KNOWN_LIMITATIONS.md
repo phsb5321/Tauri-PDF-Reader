@@ -83,8 +83,9 @@ macOS actor rather than frontmost-window synthetic keystrokes.
 
 The **only** outbound network call in the app is to ElevenLabs when a speak
 action runs ([#97] removed the jsDelivr CDN egress; there is no in-app
-update-check egress). The external Nix profile manager fetches the public Git
-flake only when install/update is invoked. Contract and file:line receipts:
+update-check egress). The external Nix profile manager queries the public
+GitHub workflow API and fetches the selected immutable flake only when
+install/update is invoked. Contract and file:line receipts:
 `SECURITY.md`.
 
 ## Platform-scoped runtime

@@ -11,10 +11,10 @@ The repository flake currently exposes only Linux development tooling. Lectrice
 has been built and launched manually on the M5 MacBook, but the two app copies
 are stale, hand-copied, and outside a reproducible update or rollback path.
 
-“Latest” in this feature means the newest revision of the protected `main`
-branch that passes the macOS package gate and is fast-forward promoted to
-`macos-green`. It does not mean an unreviewed branch or a build that failed
-after merge. The personal Nix channel is distinct from
+“Latest” in this feature means the newest revision of protected `main` whose
+exact-SHA `macos-flake.yml` push run succeeded. The updater resolves that
+immutable SHA from GitHub's public workflow API. It does not mean an unreviewed
+branch or a build that failed after merge. The personal Nix channel is distinct from
 public distribution: Apple Developer signing and notarization remain outside
 this feature because they require external credentials and are unnecessary for
 a non-quarantined Nix-store app on Pedro's managed Mac.
@@ -43,26 +43,27 @@ visible Quartz window.
 3. **Given** the built bundle, **when** it is opened, **then** one new Lectrice
    process owns a non-zero on-screen Quartz window.
 
-### User Story 2 — Promote only Mac-verified revisions (Priority: P1)
+### User Story 2 — Select only Mac-verified revisions (Priority: P1)
 
 As the maintainer, every protected-`main` candidate is built by the repo-scoped
-Apple-silicon Mac runner. A successful build advances `macos-green`; a failed or
-unrun candidate never reaches the Mac update channel.
+Apple-silicon Mac runner. The updater selects only successful exact-SHA workflow
+runs; a failed or unrun candidate never reaches the active profile.
 
 **Independent Test**: The read-only Mac job builds and verifies an exact `main`
-commit. Only after success, a separate checkout-free token job fast-forwards
-`macos-green` to that SHA. A malformed bundle must fail before promotion.
+commit. The updater accepts that workflow result, rejects malformed/non-success
+API results, builds the locked SHA in a temporary profile, and exposes it only
+after verification.
 
 **Acceptance Scenarios**:
 
 1. **Given** a push to protected `main`, **when** the macOS workflow runs,
-   **then** the build job has read-only permissions and runs on the repo-scoped
-   self-hosted arm64 Mac without application/signing secrets.
+   **then** it has read-only permissions and runs on the repo-scoped isolated
+   arm64 build user without application/signing secrets.
 2. **Given** a malformed package output, **when** the verifier runs, **then**
-   the workflow fails and `macos-green` remains byte-for-byte unchanged.
-3. **Given** a successful exact-SHA build, **when** the promotion job runs on
-   the Linux runner, **then** it checks out no candidate code and fast-forwards
-   `macos-green` without force.
+   the workflow fails and the installed profile remains byte-for-byte unchanged.
+3. **Given** a successful exact-SHA push run, **when** the updater queries the
+   public workflow API, **then** it validates repository, branch, event,
+   conclusion, and SHA before realizing the locked commit.
 4. **Given** a successful build, **when** CI records evidence, **then** the
    receipt names source commit, Nix output, bundle id, version, executable
    architecture, and unsigned/notarization truth boundary.
@@ -94,8 +95,8 @@ and roll back one generation.
 - GitHub-hosted jobs are account billing-locked despite the repository being
   public: CI uses the repo-scoped Mac only after merge and never executes PR
   head code there.
-- The Mac is asleep/offline: the exact-main job stays queued; `macos-green` and
-  the installed app remain on the last successful revision.
+- The Mac is asleep/offline: the exact-main job stays queued and the updater
+  continues selecting the last successful workflow SHA.
 - The app is running while the profile upgrades: the old process continues from
   its retained closure; only the next launch uses the new generation.
 - GitHub or the Nix substituter is unavailable: update fails closed and keeps
@@ -126,9 +127,9 @@ and roll back one generation.
 - **FR-006**: CI MUST run the static macOS package verifier on the repo-scoped
   self-hosted arm64 Mac for protected `main` pushes; it MUST NOT execute pull
   request head code on that personal-data host.
-- **FR-007**: The build job MUST be read-only and secret-free. A separate
-  checkout-free Linux job MAY receive `contents: write` only to fast-forward
-  `macos-green` after build success; force updates are forbidden.
+- **FR-007**: The build job MUST be read-only and secret-free. The update
+  channel MUST require no mutable promotion branch or write token; it resolves
+  only immutable SHAs from successful public workflow results.
 - **FR-008**: The Mac installation MUST use a dedicated named Nix profile and a
   stable `~/Applications/Lectrice.app` symlink.
 - **FR-009**: Update MUST be atomic: verification precedes symlink/profile
@@ -148,9 +149,8 @@ and roll back one generation.
   dependencies and passes bundle identifier/version/arm64 checks.
 - **SC-003**: The Mac launch receipt reports one new process and a non-zero
   Quartz window for the exact Nix output.
-- **SC-004**: The macOS CI check is green on the exact merged package revision
-  and `macos-green` equals that SHA; a failed candidate leaves the branch
-  unchanged.
+- **SC-004**: The macOS CI check is green on the exact merged package revision,
+  and the updater resolves that SHA; a failed/unrun candidate is never selected.
 - **SC-005**: An invalid update leaves profile generation and app symlink hash
   byte-for-byte unchanged.
 - **SC-006**: Upgrade and rollback each change the active dedicated-profile
