@@ -8,6 +8,9 @@ expected_version=""
 receipt=""
 launch=0
 launched_pid=""
+before_pids_file=""
+current_pids_file=""
+new_pids_file=""
 
 usage() {
   cat >&2 <<'EOF'
@@ -58,6 +61,9 @@ fi
   echo "FAIL: package has no Applications directory: $output" >&2
   exit 1
 }
+# A named Nix profile is a two-hop symlink. Canonicalize before matching the
+# launched process, whose argv contains the immutable store executable path.
+output="$(cd "$output" && pwd -P)"
 
 shopt -s nullglob
 apps=("$output"/Applications/*.app)
@@ -66,7 +72,7 @@ shopt -u nullglob
   echo "FAIL: expected exactly one app bundle, got ${#apps[@]}" >&2
   exit 1
 }
-app="${apps[0]}"
+app="$(cd "${apps[0]}" && pwd -P)"
 [ "$(basename "$app")" = Lectrice.app ] || {
   echo "FAIL: unexpected app bundle: $app" >&2
   exit 1
@@ -108,37 +114,54 @@ cleanup() {
   if [ -n "$launched_pid" ] && kill -0 "$launched_pid" 2>/dev/null; then
     kill "$launched_pid" 2>/dev/null || true
     for _ in 1 2 3 4 5; do
-      kill -0 "$launched_pid" 2>/dev/null || return 0
+      kill -0 "$launched_pid" 2>/dev/null || break
       sleep 1
     done
-    kill -KILL "$launched_pid" 2>/dev/null || true
+    kill -0 "$launched_pid" 2>/dev/null && kill -KILL "$launched_pid" 2>/dev/null || true
   fi
+  for path in "$before_pids_file" "$current_pids_file" "$new_pids_file"; do
+    [ -z "$path" ] || rm -f "$path"
+  done
 }
 trap cleanup EXIT
 
 if [ "$launch" -eq 1 ]; then
-  for command in open pgrep swift; do
+  for command in open ps awk swift comm sort; do
     command -v "$command" >/dev/null || {
       echo "BLOCKED: live launch requires $command" >&2
       exit 1
     }
   done
 
-  # `open -n` is the real user launch path. Match the exact immutable bundle
-  # executable, so a stale hand-copied Lectrice process cannot satisfy it.
+  # `open -n` is the real user launch path. Match the exact immutable bundle,
+  # but identify the PID delta so a pre-existing managed Lectrice process can
+  # neither satisfy the oracle nor be killed by its cleanup.
+  exact_pids() {
+    ps -axo pid=,command= | awk -v expected="$executable" '
+      {
+        pid = $1
+        sub(/^[[:space:]]*[0-9]+[[:space:]]+/, "")
+        if ($0 == expected) print pid
+      }' | sort -n
+  }
+  before_pids_file="$(mktemp "${TMPDIR:-/tmp}/lectrice-before.XXXXXX")"
+  current_pids_file="$(mktemp "${TMPDIR:-/tmp}/lectrice-current.XXXXXX")"
+  new_pids_file="$(mktemp "${TMPDIR:-/tmp}/lectrice-new.XXXXXX")"
+  exact_pids >"$before_pids_file"
   open -n "$app"
-  escaped_executable="$(printf '%s' "$executable" | sed 's/[][\\.^$*+?{}|()]/\\&/g')"
   for _ in {1..20}; do
-    pids="$(pgrep -f "^${escaped_executable}$" || true)"
-    pid_count="$(printf '%s\n' "$pids" | grep -c . || true)"
+    exact_pids >"$current_pids_file"
+    comm -13 "$before_pids_file" "$current_pids_file" >"$new_pids_file"
+    pid_count="$(grep -c . "$new_pids_file" || true)"
     if [ "$pid_count" -eq 1 ]; then
-      launched_pid="$pids"
+      launched_pid="$(cat "$new_pids_file")"
       break
     fi
-    [ "$pid_count" -le 1 ] || {
-      echo "FAIL: launch created $pid_count exact-bundle processes" >&2
+    if [ "$pid_count" -gt 1 ]; then
+      while IFS= read -r pid; do kill "$pid" 2>/dev/null || true; done <"$new_pids_file"
+      echo "FAIL: launch created $pid_count new exact-bundle processes" >&2
       exit 1
-    }
+    fi
     sleep 1
   done
   [ -n "$launched_pid" ] || {
