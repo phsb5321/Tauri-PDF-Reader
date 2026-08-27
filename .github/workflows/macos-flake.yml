@@ -1,0 +1,68 @@
+name: macOS Flake
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-flake-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: macOS flake package
+    runs-on: macos-15
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install Determinate Nix
+        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
+
+      - name: Build locked Apple-silicon app
+        id: build
+        run: |
+          set -euo pipefail
+          output="$(nix build .#lectrice \
+            --no-link --print-out-paths \
+            --max-jobs 1 --cores 3)"
+          [ "$(printf '%s\n' "$output" | grep -c .)" -eq 1 ]
+          echo "output=$output" >> "$GITHUB_OUTPUT"
+
+      - name: Verify immutable bundle identity
+        env:
+          LECTRICE_OUT: ${{ steps.build.outputs.output }}
+          SOURCE_REVISION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p ci-evidence
+          ./scripts/verify-macos-flake.sh \
+            --output "$LECTRICE_OUT" \
+            --expected-version "$(jq -er .version package.json)" \
+            --receipt ci-evidence/macos-flake.json \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Negative control rejects a missing app
+        env:
+          SOURCE_REVISION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          empty="$RUNNER_TEMP/empty-lectrice-output"
+          mkdir -p "$empty"
+          if ./scripts/verify-macos-flake.sh --output "$empty" \
+            >"$RUNNER_TEMP/negative.stdout" \
+            2>"$RUNNER_TEMP/negative.stderr"; then
+            echo "FAIL: malformed package passed the macOS verifier" >&2
+            exit 1
+          fi
+          grep -Fq 'package has no Applications directory' \
+            "$RUNNER_TEMP/negative.stderr"
+          echo 'Negative control: malformed package refused.' >> "$GITHUB_STEP_SUMMARY"

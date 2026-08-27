@@ -17,8 +17,8 @@ Actions changes require Pedro's merge.
 
 ## Slice B — arm64 macOS CI (Pedro-gated workflow PR)
 
-- [ ] T008 — Branch from merged Slice A and add `.github/workflows/macos-flake.yml` with arm64 hosted runner, SHA-pinned actions, read-only permissions, concurrency, static package verification, and bounded evidence. (FR-006, FR-007)
-- [ ] T009 — Add workflow contract/negative-control checks without exposing signing or deployment credentials. (FR-005–FR-007)
+- [x] T008 — Branch from merged Slice A and add `.github/workflows/macos-flake.yml` with arm64 hosted runner, SHA-pinned actions, read-only permissions, concurrency, static package verification, and bounded evidence. (FR-006, FR-007)
+- [x] T009 — Add workflow contract/negative-control checks without exposing signing or deployment credentials. (FR-005–FR-007)
 - [ ] T010 — Open the workflow PR, obtain green CI and different-family review, then mark `[pending] Pedro: merge workflow PR`; never self-merge. (SC-004)
 
 ## Slice C — Mac continuous update and rollback
