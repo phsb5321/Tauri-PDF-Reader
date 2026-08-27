@@ -206,4 +206,13 @@ assert_eq "$(profile_target)" "$before_profile"
 assert_eq "$(app_target)" "$before_app"
 assert_eq "$(receipt_status)" FAILED
 
-printf 'manage-macos-flake: 7/7 PASS\n'
+# A contender must not remove the incumbent operation's lock on exit.
+mkdir "$LECTRICE_STATE_DIR/update.lock"
+expect_failure "$manager" update >/dev/null 2>&1
+[ -d "$LECTRICE_STATE_DIR/update.lock" ] || {
+  echo "contender removed the incumbent update lock" >&2
+  exit 1
+}
+rmdir "$LECTRICE_STATE_DIR/update.lock"
+
+printf 'manage-macos-flake: 8/8 PASS\n'
