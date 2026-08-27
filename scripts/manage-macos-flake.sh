@@ -179,11 +179,14 @@ if [ "$action" = status ]; then
 fi
 
 mkdir -p "$state_dir" "$(dirname "$profile")"
-lock="$state_dir/update.lock"
-if ! mkdir "$lock" 2>/dev/null; then
-  echo "BLOCKED: another Lectrice profile operation holds $lock" >&2
+lock_dir="$state_dir/update.lock"
+if ! mkdir "$lock_dir" 2>/dev/null; then
+  echo "BLOCKED: another Lectrice profile operation holds $lock_dir" >&2
   exit 1
 fi
+# Publish ownership to the EXIT trap only after acquisition succeeds. A
+# contender must never remove the incumbent's lock.
+lock="$lock_dir"
 
 before="$(profile_target)"
 if [ "$action" = rollback ]; then
@@ -208,7 +211,10 @@ fi
 
 if [ "$action" = install ] && [ "$before" != absent ]; then
   echo "Lectrice profile already exists; validating it without replacement."
-  verify_output "$profile"
+  if ! verify_output "$profile"; then
+    write_receipt "$before" "$before" FAILED
+    exit 1
+  fi
   link_verified_profile
   write_receipt "$before" "$before" PASS
   cat "$receipt"
@@ -225,7 +231,10 @@ resolved_channel="$(resolve_channel)" || {
   exit 1
 }
 if [ "$before" != absent ] && [ "$(current_channel)" = "$resolved_channel" ]; then
-  verify_output "$profile"
+  if ! verify_output "$profile"; then
+    write_receipt "$before" "$before" FAILED
+    exit 1
+  fi
   link_verified_profile
   write_receipt "$before" "$before" PASS
   cat "$receipt"

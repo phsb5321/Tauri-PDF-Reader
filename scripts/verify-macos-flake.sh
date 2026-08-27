@@ -40,6 +40,12 @@ for command in nix jq plutil file codesign shasum; do
 done
 
 if [ -z "$output" ]; then
+  # Only a source build may infer its expected version from the current tree.
+  # An explicit --output can be an older rollback generation and must not be
+  # compared with an unrelated caller CWD.
+  if [ -z "$expected_version" ] && [ -f package.json ]; then
+    expected_version="$(jq -er '.version' package.json)"
+  fi
   build_outputs="$(nix build "$installable" --no-update-lock-file --no-link --print-out-paths --cores 1)"
   output_count="$(printf '%s\n' "$build_outputs" | grep -c . || true)"
   [ "$output_count" -eq 1 ] || {
@@ -77,9 +83,6 @@ executable="$app/Contents/MacOS/$executable_name"
   echo "FAIL: bundle identifier is $bundle_id" >&2
   exit 1
 }
-if [ -z "$expected_version" ] && [ -f package.json ]; then
-  expected_version="$(jq -er '.version' package.json)"
-fi
 if [ -n "$expected_version" ] && [ "$version" != "$expected_version" ]; then
   echo "FAIL: bundle version $version != expected $expected_version" >&2
   exit 1
