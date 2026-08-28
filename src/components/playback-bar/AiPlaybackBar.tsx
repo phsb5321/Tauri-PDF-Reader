@@ -9,11 +9,14 @@ import { pdfService } from "../../services/pdf-service";
 import { reducedMotionScrollBehavior } from "../../lib/reduced-motion";
 import { aiTtsPrebuffer } from "../../lib/api/ai-tts";
 import {
-  segmentSpeechWithOffsets,
-  type SentenceSpan,
-} from "../../lib/tts-tracking";
+  planProsodyRuns,
+  type AlignmentSegment,
+  type ProsodyBoundary,
+  type ProsodySource,
+  type SpokenRun,
+} from "../../lib/prosody-plan";
 import { AI_TTS_SETUP_MESSAGE } from "../../lib/constants";
-import { buildPdfText } from "../../lib/pdf-text";
+import { buildPdfText, type BuiltPdfText } from "../../lib/pdf-text";
 import { AiVoiceSelector } from "./AiVoiceSelector";
 import { AiSpeedSlider } from "./AiSpeedSlider";
 import { AiTtsSettings } from "./AiTtsSettings";
@@ -37,9 +40,21 @@ export function consumeNaturalCompletion(
   };
 }
 
+type NarrationSource = string | BuiltPdfText;
+
+function sourceText(source: NarrationSource): string {
+  return typeof source === "string" ? source : source.text;
+}
+
+function prosodySource(source: NarrationSource): ProsodySource {
+  return typeof source === "string"
+    ? { text: source }
+    : { text: source.text, boundaries: source.boundaries };
+}
+
 interface SentencePlaybackQueue {
   pageNumber: number;
-  sentences: SentenceSpan[];
+  sentences: SpokenRun[];
   index: number;
   generation: number;
   baseOffset: number;
@@ -48,7 +63,7 @@ interface SentencePlaybackQueue {
 }
 
 interface AiPlaybackBarProps {
-  getText: () => Promise<string | null>;
+  getText: () => Promise<NarrationSource | null>;
   getTextBaseOffset?: () => number;
   enableHighlighting?: boolean;
   /**
@@ -109,6 +124,8 @@ export function AiPlaybackBar({
         pageNumber: number,
         voiceId?: string,
         baseOffset?: number,
+        alignment?: readonly AlignmentSegment[],
+        boundaryAfter?: ProsodyBoundary,
       ) => Promise<boolean>)
     | null
   >(null);
@@ -145,12 +162,13 @@ export function AiPlaybackBar({
 
   // Get text for a specific page
   const getPageText = useCallback(
-    async (pageNum: number): Promise<string | null> => {
+    async (pageNum: number): Promise<BuiltPdfText | null> => {
       if (!pdfDocument) return null;
       try {
         const page = await pdfService.getPage(pdfDocument, pageNum);
         const textContent = await page.getTextContent();
-        return buildPdfText(textContent.items).text || null;
+        const built = buildPdfText(textContent.items);
+        return built.text ? built : null;
       } catch (err) {
         console.error("Error extracting text for page", pageNum, err);
         return null;
@@ -197,8 +215,9 @@ export function AiPlaybackBar({
       const sentence = queue.sentences[index];
       queue.prefetchIndex = index;
       queue.prefetch = aiTtsPrebuffer(
-        sentence.text,
+        sentence.spokenText,
         selectedVoiceId ?? undefined,
+        sentence.boundaryAfter,
       )
         .then(() => undefined)
         .catch((error) => {
@@ -210,11 +229,15 @@ export function AiPlaybackBar({
 
   const startNoMarkSentenceSequence = useCallback(
     async (
-      text: string,
+      source: NarrationSource,
       pageNumber: number,
       baseOffset = 0,
     ): Promise<boolean> => {
-      const sentences = segmentSpeechWithOffsets(text, maxTextUtf8Bytes);
+      const text = sourceText(source);
+      const sentences = planProsodyRuns(
+        prosodySource(source),
+        maxTextUtf8Bytes,
+      );
       if (sentences.length === 0) {
         if (text.trim()) {
           useAiTtsStore
@@ -241,7 +264,7 @@ export function AiPlaybackBar({
         completedWords: 0,
         totalWords: sentences.reduce(
           (total, sentence) =>
-            total + sentence.text.split(/\s+/u).filter(Boolean).length,
+            total + sentence.spokenText.split(/\s+/u).filter(Boolean).length,
           0,
         ),
       });
@@ -249,10 +272,12 @@ export function AiPlaybackBar({
       const first = sentences[0];
       const started =
         (await speakWithHighlightRef.current?.(
-          first.text,
+          first.spokenText,
           pageNumber,
           selectedVoiceId ?? undefined,
-          baseOffset + first.charStart,
+          baseOffset + first.sourceStart,
+          first.alignment,
+          first.boundaryAfter,
         )) ?? false;
       if (generation !== playbackGenerationRef.current) return false;
       if (started) prefetchSentence(queue, 1);
@@ -289,17 +314,19 @@ export function AiPlaybackBar({
               ...progress,
               completedWords:
                 progress.completedWords +
-                completed.text.split(/\s+/u).filter(Boolean).length,
+                completed.spokenText.split(/\s+/u).filter(Boolean).length,
             }
           : null,
       );
       const next = queue.sentences[nextIndex];
       const started =
         (await speakWithHighlightRef.current?.(
-          next.text,
+          next.spokenText,
           queue.pageNumber,
           selectedVoiceId ?? undefined,
-          queue.baseOffset + next.charStart,
+          queue.baseOffset + next.sourceStart,
+          next.alignment,
+          next.boundaryAfter,
         )) ?? false;
       if (
         queue.generation !== playbackGenerationRef.current ||
@@ -352,9 +379,12 @@ export function AiPlaybackBar({
             if (!supportsWordTimings) {
               await startNoMarkSentenceSequence(nextText, nextPage, 0);
             } else if (usesWordHighlighting) {
-              await speakWithHighlightRef.current?.(nextText, nextPage);
+              await speakWithHighlightRef.current?.(
+                sourceText(nextText),
+                nextPage,
+              );
             } else {
-              await speak(nextText);
+              await speak(sourceText(nextText));
             }
           } else {
             playingRef.current = false;
@@ -469,11 +499,12 @@ export function AiPlaybackBar({
     } else {
       if (supportsWordTimings) playbackGenerationRef.current += 1;
       playingRef.current = true;
-      const text = await getText();
+      const source = await getText();
       const baseOffset = getTextBaseOffset?.() ?? 0;
-      if (text) {
+      if (source) {
+        const text = sourceText(source);
         const started = !supportsWordTimings
-          ? await startNoMarkSentenceSequence(text, currentPage, baseOffset)
+          ? await startNoMarkSentenceSequence(source, currentPage, baseOffset)
           : usesWordHighlighting
             ? await speakWithHighlight(text, currentPage, undefined, baseOffset)
             : await speak(text);

@@ -123,9 +123,23 @@ describe("local sentence playback", () => {
         1,
         "F1-en",
         0,
+        [
+          {
+            spokenStart: 0,
+            spokenEnd: 15,
+            sourceStart: 0,
+            sourceEnd: 15,
+            kind: "copy",
+          },
+        ],
+        "sentence",
       ),
     );
-    expect(h.prebuffer).toHaveBeenCalledWith("Second sentence.", "F1-en");
+    expect(h.prebuffer).toHaveBeenCalledWith(
+      "Second sentence.",
+      "F1-en",
+      "sentence",
+    );
 
     await act(async () => h.complete?.());
     await waitFor(() =>
@@ -134,6 +148,16 @@ describe("local sentence playback", () => {
         1,
         "F1-en",
         16,
+        [
+          {
+            spokenStart: 0,
+            spokenEnd: 16,
+            sourceStart: 0,
+            sourceEnd: 16,
+            kind: "copy",
+          },
+        ],
+        "sentence",
       ),
     );
     expect(h.speakWithHighlight).toHaveBeenCalledTimes(2);
@@ -141,6 +165,79 @@ describe("local sentence playback", () => {
 
     await act(async () => h.complete?.());
     await waitFor(() => expect(h.announce).toHaveBeenCalledWith("stopped"));
+  });
+
+  it("keeps first audio short and prefetches later sentences in one context", async () => {
+    render(
+      <AiPlaybackBar
+        getText={() => Promise.resolve("First. Second. Third.")}
+      />,
+    );
+
+    fireEvent.click(screen.getByTitle("Play (Ctrl+Space)"));
+    await waitFor(() =>
+      expect(h.speakWithHighlight).toHaveBeenCalledWith(
+        "First.",
+        1,
+        "F1-en",
+        0,
+        expect.any(Array),
+        "sentence",
+      ),
+    );
+    expect(h.prebuffer).toHaveBeenCalledWith(
+      "Second. Third.",
+      "F1-en",
+      "sentence",
+    );
+
+    await act(async () => h.complete?.());
+    await waitFor(() =>
+      expect(h.speakWithHighlight).toHaveBeenLastCalledWith(
+        "Second. Third.",
+        1,
+        "F1-en",
+        7,
+        expect.any(Array),
+        "sentence",
+      ),
+    );
+  });
+
+  it("synthesizes a spoken-only period while retaining source queue offsets", async () => {
+    const text =
+      "storage, ingestion, transformation, and serving Since the dawn";
+    render(<AiPlaybackBar getText={() => Promise.resolve(text)} />);
+
+    fireEvent.click(screen.getByTitle("Play (Ctrl+Space)"));
+    await waitFor(() =>
+      expect(h.speakWithHighlight).toHaveBeenCalledWith(
+        "storage, ingestion, transformation, and serving.",
+        1,
+        "F1-en",
+        0,
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: "insert",
+            sourceStart: null,
+            sourceEnd: null,
+          }),
+        ]),
+        "sentence",
+      ),
+    );
+
+    await act(async () => h.complete?.());
+    await waitFor(() =>
+      expect(h.speakWithHighlight).toHaveBeenLastCalledWith(
+        "Since the dawn",
+        1,
+        "F1-en",
+        48,
+        expect.any(Array),
+        "clause",
+      ),
+    );
   });
 
   it("surfaces a provider-bound error when one grapheme cannot be split", async () => {

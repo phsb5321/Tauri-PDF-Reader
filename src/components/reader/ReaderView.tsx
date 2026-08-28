@@ -41,7 +41,7 @@ import { useCommandKeys } from "../../hooks/useCommandKeys";
 import { usePageNavigation } from "../../hooks/usePageNavigation";
 import { aiTtsPause, aiTtsResume } from "../../lib/tauri-invoke";
 import { libraryGetDocument } from "../../lib/api/library";
-import { buildPdfText } from "../../lib/pdf-text";
+import { buildPdfText, type BuiltPdfText } from "../../lib/pdf-text";
 import { useSessionStore } from "../../stores/session-store";
 import type { Document, Highlight } from "../../lib/schemas";
 import "./ReaderView.css";
@@ -313,7 +313,9 @@ export function ReaderView() {
   });
 
   // Get text content from current page for TTS
-  const getCurrentPageText = useCallback(async (): Promise<string | null> => {
+  const getCurrentPageText = useCallback(async (): Promise<
+    string | BuiltPdfText | null
+  > => {
     const selectedTail = pendingNarrationRef.current;
     if (selectedTail) {
       pendingNarrationRef.current = null;
@@ -327,7 +329,8 @@ export function ReaderView() {
       const page = await pdfService.getPage(pdfDocument, currentPage);
       const textContent = await page.getTextContent();
 
-      return buildPdfText(textContent.items).text || null;
+      const built = buildPdfText(textContent.items);
+      return built.text ? built : null;
     } catch (error) {
       console.error("Error extracting text:", error);
       return null;
