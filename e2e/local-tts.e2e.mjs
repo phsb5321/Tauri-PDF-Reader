@@ -18,6 +18,11 @@ async function openPerformance() {
   await $(".performance-settings").waitForDisplayed({ timeout: 10000 });
 }
 
+async function closeSettings() {
+  await browser.keys(["Escape"]);
+  await $(".settings-backdrop").waitForExist({ reverse: true, timeout: 5000 });
+}
+
 describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
   it("plays through local sentence audio with an estimated read-along", async () => {
     await browser.waitUntil(
@@ -71,11 +76,11 @@ describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
       timeout: 5000,
       timeoutMsg: "Continuous performance policy did not become selected",
     });
-    await $(".settings-close").click();
+    await closeSettings();
 
     await openPerformance();
     expect(await $('input[value="continuous"]').isSelected()).toBe(true);
-    await $(".settings-close").click();
+    await closeSettings();
 
     const play = await $(".ai-playback-button");
     await play.waitForExist({ timeout: 15000 });
@@ -196,7 +201,7 @@ describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
     expect(await $(".performance-measurement").getText()).toContain(
       "Sustains continuous playback",
     );
-    await $(".settings-close").click();
+    await closeSettings();
 
     const completed = await readFixtureRequests();
     expect(completed.requests.map((request) => request.body.input)).toEqual([
