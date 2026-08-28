@@ -322,6 +322,11 @@ impl SynthesizerPort for LocalTtsClient {
         if !response.status().is_success() {
             return Err(format!("LOCAL_TTS_HTTP_{}", response.status().as_u16()));
         }
+        let from_cache = response
+            .headers()
+            .get("x-cache-hit")
+            .and_then(|value| value.to_str().ok())
+            .is_some_and(|value| value.eq_ignore_ascii_case("true"));
         let content_type = response
             .headers()
             .get(reqwest::header::CONTENT_TYPE)
@@ -344,6 +349,7 @@ impl SynthesizerPort for LocalTtsClient {
             word_timings: Vec::new(),
             total_duration,
             provider_revision: self.revision.clone(),
+            from_cache,
         })
     }
 }
@@ -424,9 +430,14 @@ mod tests {
                     ),
                     _ => ("audio/wav", wav.clone()),
                 };
+                let cache_header = if index == 2 {
+                    "X-Cache-Hit: true\r\n"
+                } else {
+                    ""
+                };
                 write!(
                     stream,
-                    "HTTP/1.1 200 OK\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    "HTTP/1.1 200 OK\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\n{cache_header}Connection: close\r\n\r\n",
                     body.len()
                 )
                 .unwrap();
@@ -471,6 +482,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(result.media_type, AudioMediaType::Wav);
+        assert!(result.from_cache);
         assert!(result.word_timings.is_empty());
         assert!((result.total_duration - 0.1).abs() < 0.000_001);
         let requests = requests.lock().unwrap();

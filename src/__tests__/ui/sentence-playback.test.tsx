@@ -13,8 +13,10 @@ import { useDocumentStore } from "../../stores/document-store";
 const h = vi.hoisted(() => ({
   complete: null as (() => void) | null,
   maxTextUtf8Bytes: 8192,
+  playbackState: "idle" as "idle" | "playing",
   announce: vi.fn(),
   speakWithHighlight: vi.fn(() => Promise.resolve(true)),
+  stop: vi.fn(() => Promise.resolve()),
   prebuffer: vi.fn(() =>
     Promise.resolve({
       success: true,
@@ -28,11 +30,11 @@ const h = vi.hoisted(() => ({
 vi.mock("../../hooks/useAiTts", () => ({
   useAiTts: () => ({
     initialized: true,
-    playbackState: "idle",
+    playbackState: h.playbackState,
     needsApiKey: false,
     error: null,
     speak: vi.fn(),
-    stop: vi.fn(),
+    stop: h.stop,
     pause: vi.fn(),
     resume: vi.fn(),
     clearError: vi.fn(),
@@ -87,6 +89,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   h.complete = null;
   h.maxTextUtf8Bytes = 8192;
+  h.playbackState = "idle";
   useAiTtsStore.setState({
     provider: "local",
     supportsWordTimings: false,
@@ -234,6 +237,45 @@ describe("local sentence playback", () => {
     await act(async () => releaseFirst?.());
     await waitFor(() => expect(h.prebuffer).toHaveBeenCalledTimes(2));
     expect(h.prebuffer.mock.calls[1]?.[0]).toMatch(/^Three /u);
+  });
+
+  it("invalidates queued and future prefetch work on a reader page turn", async () => {
+    h.playbackState = "playing";
+    let releaseFirst: (() => void) | undefined;
+    h.prebuffer.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseFirst = () =>
+            resolve({
+              success: true,
+              cached: false,
+              wordCount: 0,
+              totalDuration: 8,
+            });
+        }),
+    );
+    useAiTtsStore.setState({ performanceProfile: "continuous" });
+    const unit = (label: string) =>
+      `${label} ${"bounded context ".repeat(11)}ends.`;
+    render(
+      <AiPlaybackBar
+        getText={() =>
+          Promise.resolve(
+            [unit("One"), unit("Two"), unit("Three"), unit("Four")].join(" "),
+          )
+        }
+      />,
+    );
+
+    fireEvent.click(screen.getByTitle("Play (Ctrl+Space)"));
+    await waitFor(() => expect(h.prebuffer).toHaveBeenCalledTimes(1));
+    act(() => useDocumentStore.getState().setCurrentPage(2));
+    await waitFor(() => expect(h.stop).toHaveBeenCalledTimes(1));
+    await act(async () => releaseFirst?.());
+    await act(async () => h.complete?.());
+
+    expect(h.prebuffer).toHaveBeenCalledTimes(1);
+    expect(h.speakWithHighlight).toHaveBeenCalledTimes(1);
   });
 
   it("synthesizes a spoken-only period while retaining source queue offsets", async () => {

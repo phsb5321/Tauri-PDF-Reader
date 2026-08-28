@@ -120,6 +120,23 @@ describe("narration Performance settings", () => {
     ).toBeVisible();
   });
 
+  it("never renders missing duration as a perfect zero RTF", async () => {
+    h.performance.mockResolvedValue({
+      status: "ok",
+      data: {
+        ...SNAPSHOT,
+        latestUncached: { ...SNAPSHOT.latestUncached, standardRtf: null },
+      },
+    });
+    render(<PerformanceSettings />);
+
+    expect(await screen.findByText("RTF unavailable")).toBeVisible();
+    expect(
+      screen.getByText("Generated-audio duration was unavailable"),
+    ).toBeVisible();
+    expect(screen.queryByText("0.000 RTF")).not.toBeInTheDocument();
+  });
+
   it("is reachable as a named Settings navigation section", async () => {
     render(<SettingsPanel isOpen onClose={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: "Performance" }));

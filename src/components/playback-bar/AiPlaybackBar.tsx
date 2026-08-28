@@ -150,6 +150,20 @@ export function AiPlaybackBar({
     setSentenceProgress(null);
   }, [switchingProvider]);
 
+  // A reader-driven page turn can arrive through several public surfaces, not
+  // all of which call this component's handleStop. Invalidate the private
+  // no-mark queue at the shared page authority. Natural auto-page clears the
+  // completed queue before changing currentPage, so it is not cancelled here.
+  useEffect(() => {
+    const queue = sentenceQueueRef.current;
+    if (!queue || queue.pageNumber === currentPage) return;
+    playingRef.current = false;
+    playbackGenerationRef.current += 1;
+    sentenceQueueRef.current = null;
+    setSentenceProgress(null);
+    if (playbackState !== "idle") void stop();
+  }, [currentPage, playbackState, stop]);
+
   // T050: Audio cache coverage for current document
   const documentId = currentDocument?.id ?? null;
   useAudioCache(documentId);

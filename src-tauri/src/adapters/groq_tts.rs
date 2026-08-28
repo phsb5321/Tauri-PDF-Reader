@@ -236,6 +236,7 @@ impl SynthesizerPort for GroqTtsClient {
             word_timings: Vec::new(),
             total_duration,
             provider_revision: GROQ_ORPHEUS_MODEL.to_string(),
+            from_cache: false,
         })
     }
 }

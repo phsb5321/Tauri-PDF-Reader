@@ -149,7 +149,7 @@ pub struct LastSynthesisPerformance {
     pub request_utf8_bytes: usize,
     pub generation_ms: f64,
     pub audio_duration: f64,
-    pub standard_rtf: f64,
+    pub standard_rtf: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
@@ -569,21 +569,20 @@ impl AiTtsEngine {
             }
         };
         if let Ok(output) = &result {
-            let generation_ms = started.elapsed().as_secs_f64() * 1000.0;
-            let standard_rtf = if output.total_duration > 0.0 {
-                generation_ms / 1000.0 / output.total_duration
-            } else {
-                0.0
-            };
-            self.performance.write().await.insert(
-                provider_kind,
-                LastSynthesisPerformance {
-                    request_utf8_bytes,
-                    generation_ms,
-                    audio_duration: output.total_duration,
-                    standard_rtf,
-                },
-            );
+            if !output.from_cache {
+                let generation_ms = started.elapsed().as_secs_f64() * 1000.0;
+                let standard_rtf = (output.total_duration > 0.0)
+                    .then_some(generation_ms / 1000.0 / output.total_duration);
+                self.performance.write().await.insert(
+                    provider_kind,
+                    LastSynthesisPerformance {
+                        request_utf8_bytes,
+                        generation_ms,
+                        audio_duration: output.total_duration,
+                        standard_rtf,
+                    },
+                );
+            }
         }
         result
     }
@@ -1181,7 +1180,9 @@ mod tests {
         }
     }
 
-    struct SuccessfulSynthesizer;
+    struct SuccessfulSynthesizer {
+        from_cache: bool,
+    }
 
     #[async_trait]
     impl SynthesizerPort for SuccessfulSynthesizer {
@@ -1221,6 +1222,7 @@ mod tests {
                 word_timings: Vec::new(),
                 total_duration: 2.0,
                 provider_revision: self.provider_revision().to_string(),
+                from_cache: self.from_cache,
             })
         }
     }
@@ -1310,7 +1312,7 @@ mod tests {
         let engine = AiTtsEngine::for_test();
         engine
             .install_provider(
-                Arc::new(SuccessfulSynthesizer),
+                Arc::new(SuccessfulSynthesizer { from_cache: false }),
                 vec![voice(SynthesisProvider::Local, "voice")],
             )
             .await
@@ -1336,7 +1338,35 @@ mod tests {
         assert_eq!(latest.request_utf8_bytes, 4);
         assert_eq!(latest.audio_duration, 2.0);
         assert!(latest.generation_ms >= 10.0, "{latest:?}");
-        assert!((latest.standard_rtf - latest.generation_ms / 2_000.0).abs() < 1e-9);
+        assert!((latest.standard_rtf.unwrap() - latest.generation_ms / 2_000.0).abs() < 1e-9);
+
+        engine
+            .install_provider(
+                Arc::new(SuccessfulSynthesizer { from_cache: true }),
+                vec![voice(SynthesisProvider::Local, "voice")],
+            )
+            .await
+            .unwrap();
+        engine
+            .synthesize(SynthesisRequest {
+                text: "cached replay must not replace the measurement".to_string(),
+                voice_id: "voice".to_string(),
+                model_id: None,
+                speed: 1.0,
+                with_word_timings: false,
+            })
+            .await
+            .unwrap();
+        assert_eq!(
+            engine
+                .performance_snapshot()
+                .await
+                .unwrap()
+                .latest_uncached
+                .unwrap()
+                .request_utf8_bytes,
+            4
+        );
     }
 
     #[tokio::test]

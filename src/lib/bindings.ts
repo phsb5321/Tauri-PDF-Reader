@@ -664,7 +664,7 @@ default_color?: string;
 colors?: string[] }
 export type InitGroqResponse = { success: boolean; voicesCount: number; provider: TtsProvider; supportsWordTimings: boolean; maxTextUtf8Bytes: number }
 export type InitLocalResponse = { success: boolean; voicesCount: number; provider: string; supportsWordTimings: boolean; maxTextUtf8Bytes: number; destination: string }
-export type LastSynthesisPerformance = { requestUtf8Bytes: number; generationMs: number; audioDuration: number; standardRtf: number }
+export type LastSynthesisPerformance = { requestUtf8Bytes: number; generationMs: number; audioDuration: number; standardRtf: number | null }
 /**
  * Response types for commands
  */

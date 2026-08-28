@@ -84,6 +84,7 @@ pub struct SynthesisResult {
     pub word_timings: Vec<WordTiming>,
     pub total_duration: f64,
     pub provider_revision: String,
+    pub from_cache: bool,
 }
 
 #[async_trait]

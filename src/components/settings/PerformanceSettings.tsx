@@ -64,6 +64,7 @@ export function PerformanceSettings() {
 
   const runtime = snapshot?.runtime;
   const latest = snapshot?.latestUncached;
+  const standardRtf = latest?.standardRtf ?? null;
   const profileLocked = playbackState !== "idle" && playbackState !== "error";
 
   return (
@@ -141,7 +142,11 @@ export function PerformanceSettings() {
         <h4 id="last-generation-heading">Latest uncached synthesis</h4>
         {latest ? (
           <div className="performance-measurement">
-            <strong>{latest.standardRtf.toFixed(3)} RTF</strong>
+            <strong>
+              {standardRtf === null
+                ? "RTF unavailable"
+                : `${standardRtf.toFixed(3)} RTF`}
+            </strong>
             <span>
               {latest.requestUtf8Bytes} bytes ·{" "}
               {formatDuration(latest.generationMs)}
@@ -149,9 +154,11 @@ export function PerformanceSettings() {
               {latest.audioDuration.toFixed(2)} s audio
             </span>
             <span>
-              {latest.standardRtf <= 0.8
-                ? "Sustains continuous playback on this sample"
-                : "This sample may outrun the playback buffer"}
+              {standardRtf === null
+                ? "Generated-audio duration was unavailable"
+                : standardRtf <= 0.8
+                  ? "Sustains continuous playback on this sample"
+                  : "This sample may outrun the playback buffer"}
             </span>
           </div>
         ) : (
