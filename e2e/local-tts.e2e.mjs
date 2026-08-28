@@ -62,8 +62,12 @@ describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
     );
     expect(await $(".performance-facts").getText()).toContain("Fixture GPU");
     const continuous = await $('input[value="continuous"]');
+    await continuous.waitForEnabled({ timeout: 10000 });
     await continuous.click();
-    expect(await continuous.isSelected()).toBe(true);
+    await browser.waitUntil(() => continuous.isSelected(), {
+      timeout: 5000,
+      timeoutMsg: "Continuous performance policy did not become selected",
+    });
     await $(".settings-close").click();
 
     await openPerformance();
