@@ -17,4 +17,11 @@ describe("TTS packaged evidence fails closed", () => {
       expect(write).toBeGreaterThan(actor);
     },
   );
+
+  it("starts a fresh Magpie process before the real-model actor", () => {
+    const source = readFileSync("scripts/e2e-magpie.sh", "utf8");
+    expect(source.indexOf("./tools/magpie/start-transient.sh")).toBeLessThan(
+      source.indexOf("pnpm test:e2e"),
+    );
+  });
 });

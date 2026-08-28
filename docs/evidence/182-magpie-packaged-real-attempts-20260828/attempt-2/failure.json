@@ -1,0 +1,8 @@
+{
+  "status": "FAIL",
+  "buildRevision": "f3bd3ee38c852e801d42c131877aaeb5bedd46bb",
+  "stage": "Uncached Performance measurement",
+  "failure": "Every request was a bridge idempotency-cache replay from the prior real-model run, so the repaired engine correctly left latestUncached empty.",
+  "receiptAbsent": true,
+  "repair": "The real-model lane starts a fresh pinned Magpie service itself, clearing only its in-memory response cache before the actor begins."
+}

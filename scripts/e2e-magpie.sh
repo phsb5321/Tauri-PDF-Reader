@@ -15,6 +15,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Own one fresh model process so an earlier idempotency replay cannot turn the
+# uncached-performance assertion into either a false pass or a false failure.
+./tools/magpie/start-transient.sh
 revision="$(curl -fsS --max-time 3 http://127.0.0.1:5301/health | jq -er '.version')"
 [[ $revision == magpie-q6-vulkan-*-chunk-v1 ]]
 curl -fsS --max-time 3 http://127.0.0.1:5301/v1/capabilities >"$EVIDENCE_DIR/capabilities.json"
