@@ -8,7 +8,7 @@
 - [ ] T004 Add failing TtsWordHighlight race test: A schedules delayed repaint, cursor advances to B, delayed A runs, registry still contains exactly B.
 - [ ] T005 Add failing render-ready continuation tests for exact page success, timeout-visible-error, Stop/manual-page/provider cancellation, and exactly-once start.
 - [ ] T006 Add failing selection tests for outside endpoint and effective whole-page rejection plus legitimate multi-line excerpt/Read-from-here pass.
-- [ ] T007 Add failing cockpit UI tests for four tabs, roving keyboard/Home/End, Escape focus return, active-panel-only mounting, and real Delivery/Selection controls.
+- [x] T007 Add failing cockpit UI tests for four tabs, roving keyboard/Home/End, Escape focus return, active-panel-only mounting, and real Delivery/Selection controls.
 
 ## Phase 2 — Source-aligned speech correctness
 
@@ -29,7 +29,7 @@
 ## Phase 4 — Narration cockpit
 
 - [ ] T018 Add `NarrationDeliverySettings` with speed, follow, auto-page, normalization/language, and Responsive/Balanced/Continuous controls; remove profile ownership from telemetry.
-- [ ] T019 Add the accessible docked `NarrationCockpit` tabs and embedded Voice/Performance/Selection panels using existing controls.
+- [x] T019 Add the accessible docked `NarrationCockpit` tabs and embedded Voice/Performance/Selection panels using existing controls.
 - [ ] T020 Recompose AiPlaybackBar into transport / growing truthful status-progress / quick controls, remove the isolated modal, auto-page icon, broken scroll query, and duplicate CSS.
 - [ ] T021 Add wide/narrow/reduced-motion geometry and design-token assertions at 1920/1440/767/640 widths.
 

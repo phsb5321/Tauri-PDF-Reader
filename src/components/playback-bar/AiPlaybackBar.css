@@ -1,6 +1,6 @@
 .ai-playback-bar {
   display: grid;
-  grid-template-columns: 1fr minmax(8rem, 20rem) 1fr;
+  grid-template-columns: auto minmax(12rem, 1fr) auto;
   align-items: center;
   padding: var(--space-2) var(--space-4);
   background: var(--background-secondary, #1e1e1e);
@@ -179,22 +179,6 @@
   outline-offset: 2px;
 }
 
-.ai-playback-settings-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: var(--z-modal);
-}
-
-.ai-playback-settings-container {
-  max-width: 90vw;
-  max-height: 90vh;
-  overflow: auto;
-}
-
 .ai-playback-error {
   position: absolute;
   top: -40px;
@@ -239,20 +223,6 @@
     width: 100%;
     justify-content: flex-end;
   }
-}
-
-/* Auto-page toggle button */
-.ai-playback-button-toggle {
-  opacity: 0.5;
-}
-
-.ai-playback-button-toggle.active {
-  opacity: 1;
-  color: var(--color-accent-text);
-}
-
-.ai-playback-button-toggle:hover {
-  opacity: 1;
 }
 
 /* Improved progress display */

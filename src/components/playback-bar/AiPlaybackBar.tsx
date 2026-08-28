@@ -20,7 +20,7 @@ import { narrationPerformancePolicy } from "../../lib/narration-performance";
 import { buildPdfText, type BuiltPdfText } from "../../lib/pdf-text";
 import { AiVoiceSelector } from "./AiVoiceSelector";
 import { AiSpeedSlider } from "./AiSpeedSlider";
-import { AiTtsSettings } from "./AiTtsSettings";
+import { NarrationCockpit } from "./NarrationCockpit";
 import { AudioCacheProgress } from "../audio-progress/AudioCacheProgress";
 import { AudioExportDialog } from "../export-dialog/AudioExportDialog";
 import "./AiPlaybackBar.css";
@@ -108,10 +108,14 @@ export function AiPlaybackBar({
     currentDocument,
   } = useDocumentStore();
   const [showSettings, setShowSettings] = useState(false);
+  const settingsButtonRef = useRef<HTMLButtonElement>(null);
   const [showExportDialog, setShowExportDialog] = useState(false);
+  const closeNarrationCockpit = useCallback(() => {
+    setShowSettings(false);
+    window.requestAnimationFrame(() => settingsButtonRef.current?.focus());
+  }, []);
   // T033: Use store for autoPageEnabled (persisted setting)
   const autoPageEnabled = useAiTtsStore((s) => s.autoPageEnabled);
-  const setAutoPageEnabled = useAiTtsStore((s) => s.setAutoPageEnabled);
   const naturalCompletionCount = useAiTtsStore((s) => s.naturalCompletionCount);
   const provider = useAiTtsStore((s) => s.provider);
   const selectedVoiceId = useAiTtsStore((s) => s.selectedVoiceId);
@@ -675,18 +679,17 @@ export function AiPlaybackBar({
           </svg>
           <span>{AI_TTS_SETUP_MESSAGE}</span>
           <button
+            ref={settingsButtonRef}
             className="ai-playback-setup-btn"
             onClick={() => setShowSettings(true)}
+            aria-expanded={showSettings}
+            aria-controls="narration-cockpit"
           >
             Configure
           </button>
         </div>
         {showSettings && (
-          <div className="ai-playback-settings-overlay">
-            <div className="ai-playback-settings-container">
-              <AiTtsSettings onClose={() => setShowSettings(false)} />
-            </div>
-          </div>
+          <NarrationCockpit onClose={closeNarrationCockpit} controlsDisabled />
         )}
       </div>
     );
@@ -745,25 +748,6 @@ export function AiPlaybackBar({
         >
           <svg viewBox="0 0 24 24" className="ai-playback-icon">
             <rect x="4" y="4" width="16" height="16" fill="currentColor" />
-          </svg>
-        </button>
-
-        {/* Auto-page toggle */}
-        <button
-          className={
-            "ai-playback-button ai-playback-button-toggle " +
-            (autoPageEnabled ? "active" : "")
-          }
-          onClick={() => setAutoPageEnabled(!autoPageEnabled)}
-          title={autoPageEnabled ? "Auto-page: ON" : "Auto-page: OFF"}
-        >
-          <svg viewBox="0 0 24 24" className="ai-playback-icon">
-            <path
-              d="M13 5l7 7-7 7M5 5l7 7-7 7"
-              stroke="currentColor"
-              strokeWidth="2"
-              fill="none"
-            />
           </svg>
         </button>
       </div>
@@ -849,10 +833,15 @@ export function AiPlaybackBar({
         </button>
 
         <button
+          ref={settingsButtonRef}
           className="ai-playback-button ai-playback-button-settings"
-          onClick={() => setShowSettings(!showSettings)}
-          title="Voice settings"
-          aria-label="Voice settings"
+          onClick={() =>
+            showSettings ? closeNarrationCockpit() : setShowSettings(true)
+          }
+          title="Narration settings"
+          aria-label="Narration settings"
+          aria-expanded={showSettings}
+          aria-controls="narration-cockpit"
         >
           <svg viewBox="0 0 24 24" className="ai-playback-icon">
             <path
@@ -869,11 +858,12 @@ export function AiPlaybackBar({
       </div>
 
       {showSettings && (
-        <div className="ai-playback-settings-overlay">
-          <div className="ai-playback-settings-container">
-            <AiTtsSettings onClose={() => setShowSettings(false)} />
-          </div>
-        </div>
+        <NarrationCockpit
+          onClose={closeNarrationCockpit}
+          controlsDisabled={
+            isPlaying || isPaused || isLoading || Boolean(switchingProvider)
+          }
+        />
       )}
 
       {error && (
