@@ -1,0 +1,82 @@
+[
+  {
+    "str": "Wow! It’s entirely understandable if you’ve been confused about data",
+    "hasEOL": true,
+    "transform": [15, 0, 0, 15, 76.99219181149186, 145.49999669750127],
+    "width": 417.39991247193007,
+    "height": 15.00000033499996,
+    "fontName": "g_d0_f2"
+  },
+  {
+    "str": "engineering. That’s only a handful of definitions, and they contain an",
+    "hasEOL": true,
+    "transform": [15, 0, 0, 15, 76.99219181149186, 126.74999627875127],
+    "width": 414.887704765824,
+    "height": 15.00000033499996,
+    "fontName": "g_d0_f2"
+  },
+  {
+    "str": "enormous range of opinions about the meaning of",
+    "hasEOL": false,
+    "transform": [15, 0, 0, 15, 76.99219181149186, 107.99999586000149],
+    "width": 298.6816475205558,
+    "height": 15.00000033499996,
+    "fontName": "g_d0_f2"
+  },
+  {
+    "str": "data engineering",
+    "hasEOL": false,
+    "transform": [15, 0, 0, 15, 379.41798356566693, 107.99999586000149],
+    "width": 102.06299072940647,
+    "height": 15.00000033499996,
+    "fontName": "g_d0_f3"
+  },
+  {
+    "str": ".",
+    "hasEOL": false,
+    "transform": [15, 0, 0, 15, 481.4765758449752, 107.99999586000149],
+    "width": 3.75000008374999,
+    "height": 15.00000033499996,
+    "fontName": "g_d0_f2"
+  },
+  {
+    "str": "1",
+    "hasEOL": false,
+    "transform": [11.25, 0, 0, 11.25, 455.15626275715493, 581.2500064292501],
+    "width": 6.256713964733259,
+    "height": 11.25000025124997,
+    "fontName": "g_d0_f4"
+  },
+  {
+    "str": "2",
+    "hasEOL": false,
+    "transform": [11.25, 0, 0, 11.25, 304.35938438935847, 498.0000045700003],
+    "width": 6.256713964733259,
+    "height": 11.25000025124997,
+    "fontName": "g_d0_f5"
+  },
+  {
+    "str": "3",
+    "hasEOL": true,
+    "transform": [11.25, 0, 0, 11.25, 455.15626275715493, 386.2500020742507],
+    "width": 6.256713964733259,
+    "height": 11.25000025124997,
+    "fontName": "g_d0_f4"
+  },
+  {
+    "str": "4",
+    "hasEOL": true,
+    "transform": [11.25, 0, 0, 11.25, 455.15626275715493, 245.24999892525102],
+    "width": 6.256713964733259,
+    "height": 11.25000025124997,
+    "fontName": "g_d0_f4"
+  },
+  {
+    "str": "5",
+    "hasEOL": false,
+    "transform": [11.25, 0, 0, 11.25, 455.15626275715493, 176.24999738425117],
+    "width": 6.256713964733259,
+    "height": 11.25000025124997,
+    "fontName": "g_d0_f4"
+  }
+]

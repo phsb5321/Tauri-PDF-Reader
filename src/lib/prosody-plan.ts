@@ -1,4 +1,4 @@
-import type { PdfTextBoundary } from "./pdf-text";
+import type { PdfTextBoundary, PdfTextSegment } from "./pdf-text";
 import { segmentSpeechWithOffsets } from "./tts-tracking";
 
 export const PROSODY_PLAN_REVISION = "source-aligned-v2";
@@ -19,6 +19,7 @@ export interface AlignmentSegment {
 export interface ProsodySource {
   text: string;
   boundaries?: readonly PdfTextBoundary[];
+  segments?: readonly PdfTextSegment[];
   language?: ProsodyLanguage;
 }
 
@@ -123,41 +124,101 @@ interface AlignedText {
   alignment: AlignmentSegment[];
 }
 
-function buildAlignedText(source: ProsodySource): AlignedText {
+interface SourceEdit {
+  sourceStart: number;
+  sourceEnd: number;
+  spokenText: string;
+  kind: Exclude<AlignmentKind, "copy">;
+}
+
+function median(values: readonly number[]): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((left, right) => left - right);
+  // Use the upper median so a footer containing as many tiny reference runs as
+  // the retained body fixture cannot redefine "body-sized" downward.
+  return sorted[Math.floor(sorted.length / 2)];
+}
+
+/** Geometry, not token text alone, distinguishes PDF superscript references. */
+function superscriptDeletions(source: ProsodySource): SourceEdit[] {
+  const bodyHeight = median(
+    (source.segments ?? [])
+      .map((segment) => segment.height)
+      .filter((height): height is number => height !== null && height > 0),
+  );
+  if (bodyHeight === null) return [];
+
+  return (source.segments ?? [])
+    .filter(
+      (segment) =>
+        /^\d{1,2}$/u.test(segment.text) &&
+        segment.height !== null &&
+        segment.width !== null &&
+        segment.height <= bodyHeight * 0.8 &&
+        segment.width <= segment.height,
+    )
+    .map((segment) => ({
+      sourceStart: segment.start,
+      sourceEnd: segment.end,
+      spokenText: "",
+      kind: "delete" as const,
+    }));
+}
+
+function sourceEdits(source: ProsodySource): SourceEdit[] {
   const insertions = [
     ...structuredInsertions(source),
     ...discourseInsertions(source),
   ]
     .filter((offset, index, all) => offset > 0 && all.indexOf(offset) === index)
-    .sort((a, b) => a - b);
+    .map((offset) => ({
+      sourceStart: offset,
+      sourceEnd: offset,
+      spokenText: ".",
+      kind: "insert" as const,
+    }));
 
+  return [...insertions, ...superscriptDeletions(source)].sort(
+    (left, right) =>
+      left.sourceStart - right.sourceStart || left.sourceEnd - right.sourceEnd,
+  );
+}
+
+function buildAlignedText(source: ProsodySource): AlignedText {
   let sourceCursor = 0;
   let spokenText = "";
   const alignment: AlignmentSegment[] = [];
-  for (const insertion of insertions) {
-    if (insertion < sourceCursor || insertion > source.text.length) continue;
-    if (insertion > sourceCursor) {
-      const copied = source.text.slice(sourceCursor, insertion);
+  for (const edit of sourceEdits(source)) {
+    if (
+      edit.sourceStart < sourceCursor ||
+      edit.sourceEnd < edit.sourceStart ||
+      edit.sourceEnd > source.text.length
+    ) {
+      continue;
+    }
+    if (edit.sourceStart > sourceCursor) {
+      const copied = source.text.slice(sourceCursor, edit.sourceStart);
       const spokenStart = spokenText.length;
       spokenText += copied;
       alignment.push({
         spokenStart,
         spokenEnd: spokenText.length,
         sourceStart: sourceCursor,
-        sourceEnd: insertion,
+        sourceEnd: edit.sourceStart,
         kind: "copy",
       });
     }
+
     const spokenStart = spokenText.length;
-    spokenText += ".";
+    spokenText += edit.spokenText;
     alignment.push({
       spokenStart,
       spokenEnd: spokenText.length,
-      sourceStart: null,
-      sourceEnd: null,
-      kind: "insert",
+      sourceStart: edit.kind === "insert" ? null : edit.sourceStart,
+      sourceEnd: edit.kind === "insert" ? null : edit.sourceEnd,
+      kind: edit.kind,
     });
-    sourceCursor = insertion;
+    sourceCursor = edit.sourceEnd;
   }
   if (sourceCursor < source.text.length) {
     const spokenStart = spokenText.length;
@@ -274,6 +335,50 @@ function mergeRuns(
  * is 300 characters; a 300-byte cap is conservative for every language and
  * also prevents its internal chunker from creating another independent edge.
  */
+const MIN_SPOKEN_RUN_UTF8_BYTES = 12;
+
+function coalesceMicroRuns(
+  source: ProsodySource,
+  runs: SpokenRun[],
+  contextLimit: number,
+): SpokenRun[] {
+  const encoder = new TextEncoder();
+  const coalesced: SpokenRun[] = [];
+  for (let index = 0; index < runs.length; index += 1) {
+    const run = runs[index];
+    if (encoder.encode(run.spokenText).length < MIN_SPOKEN_RUN_UTF8_BYTES) {
+      const next = runs[index + 1];
+      if (
+        next &&
+        run.boundaryAfter !== "paragraph" &&
+        run.boundaryAfter !== "section"
+      ) {
+        const candidate = mergeRuns(source, run, next);
+        if (encoder.encode(candidate.spokenText).length <= contextLimit) {
+          coalesced.push(candidate);
+          index += 1;
+          continue;
+        }
+      }
+
+      const previous = coalesced[coalesced.length - 1];
+      if (
+        previous &&
+        previous.boundaryAfter !== "paragraph" &&
+        previous.boundaryAfter !== "section"
+      ) {
+        const candidate = mergeRuns(source, previous, run);
+        if (encoder.encode(candidate.spokenText).length <= contextLimit) {
+          coalesced[coalesced.length - 1] = candidate;
+          continue;
+        }
+      }
+    }
+    coalesced.push(run);
+  }
+  return coalesced;
+}
+
 function mergeContextRuns(
   source: ProsodySource,
   runs: SpokenRun[],
@@ -356,7 +461,11 @@ export function planProsodyRuns(
       revision: PROSODY_PLAN_REVISION,
     });
   }
-  return mergeContextRuns(source, runs, contextLimit);
+  return mergeContextRuns(
+    source,
+    coalesceMicroRuns(source, runs, contextLimit),
+    contextLimit,
+  );
 }
 
 /** Map a spoken timing range to the run-local unchanged source range. */

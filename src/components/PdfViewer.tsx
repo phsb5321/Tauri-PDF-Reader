@@ -21,6 +21,7 @@ import type { Rect } from "../lib/schemas";
 import { selectionToPageEnd } from "../lib/selection-narration";
 import { nextPdfWheelZoom } from "../lib/pdf-wheel-zoom";
 import { annotatePdfTextLayer } from "../lib/pdf-text";
+import { markPdfPageReady } from "../lib/pdf-page-ready";
 import "./PdfViewer.css";
 
 // Padding around the PDF page
@@ -51,6 +52,7 @@ export function PdfViewer({ onReadFromHere }: Readonly<PdfViewerProps>) {
   const textLayerInstanceRef = useRef<PdfJsTextLayer | null>(null);
   const renderTaskRef = useRef<ReturnType<PDFPageProxy["render"]> | null>(null);
   const renderDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const renderGenerationRef = useRef(0);
 
   const [warningDismissed, setWarningDismissed] = useState(false);
   const [memoryWarningDismissed, setMemoryWarningDismissed] = useState(false);
@@ -235,160 +237,191 @@ export function PdfViewer({ onReadFromHere }: Readonly<PdfViewerProps>) {
   }, [handleWheel]);
 
   // Render the current page with canvas + text layer
-  const renderPage = useCallback(async () => {
-    if (!pdfDocument || !canvasRef.current || !textLayerRef.current) return;
-
-    // Cancel any previous render
-    if (renderTaskRef.current) {
-      try {
-        renderTaskRef.current.cancel();
-      } catch {
-        // Ignore cancellation errors
-      }
-    }
-
-    // Cancel previous text layer
-    if (textLayerInstanceRef.current) {
-      textLayerInstanceRef.current.cancel();
-      textLayerInstanceRef.current = null;
-    }
-
-    // Clear text layer safely
-    clearContainer(textLayerRef.current);
-
-    try {
-      // Get the page
-      const page = await pdfService.getPage(pdfDocument, currentPage);
-      pageRef.current = page;
-
-      const canvas = canvasRef.current;
-      const textLayerDiv = textLayerRef.current;
-
-      // Get base viewport (scale=1) for RenderPolicy calculation
-      const baseViewport = page.getViewport({ scale: 1 });
-
-      // Calculate render plan using RenderPolicy
-      const renderPlan = calculateRenderPlan({
-        pageWidth: baseViewport.width,
-        pageHeight: baseViewport.height,
-        zoomLevel,
-        settings,
-        displayInfo,
-      });
-
-      // Store current render plan for debug overlay
-      setCurrentRenderPlan(renderPlan);
-
-      // Get viewport at the desired zoom level
-      const viewport = page.getViewport({ scale: zoomLevel });
-
-      // Update viewport dimensions for highlight overlay
-      setViewportDimensions({
-        width: Math.floor(viewport.width),
-        height: Math.floor(viewport.height),
-      });
-
-      // Set canvas physical dimensions (scaled for HiDPI based on render plan)
-      canvas.width = renderPlan.canvasWidth;
-      canvas.height = renderPlan.canvasHeight;
-
-      // Set canvas CSS dimensions (logical size)
-      canvas.style.width = `${Math.floor(viewport.width)}px`;
-      canvas.style.height = `${Math.floor(viewport.height)}px`;
-
-      // Set text layer dimensions
-      textLayerDiv.style.width = `${Math.floor(viewport.width)}px`;
-      textLayerDiv.style.height = `${Math.floor(viewport.height)}px`;
-      textLayerDiv.style.setProperty("--scale-factor", String(zoomLevel));
-
-      // Get hardware-accelerated 2D context with optimal settings
-      const context = canvas.getContext("2d", {
-        alpha: false, // Opaque canvas - faster rendering
-        desynchronized: true, // Direct to display - hardware accelerated
-        willReadFrequently: false, // Keep GPU acceleration enabled
-      });
-      if (!context) {
-        throw new Error("Could not get canvas 2D context");
-      }
-
-      // An opaque canvas starts black. Paint the PDF page background before
-      // pdf.js draws so a cancelled/failed render never leaves a black void.
-      context.fillStyle = "#ffffff";
-      context.fillRect(0, 0, canvas.width, canvas.height);
-
-      // Enable high-quality image rendering
-      context.imageSmoothingEnabled = true;
-      context.imageSmoothingQuality = "high";
-
-      // Create transform matrix for HiDPI rendering using render plan's output scale
-      const transform:
-        | [number, number, number, number, number, number]
-        | undefined =
-        renderPlan.outputScale !== 1
-          ? [renderPlan.outputScale, 0, 0, renderPlan.outputScale, 0, 0]
-          : undefined;
-
-      // Render canvas
-      renderTaskRef.current = page.render({
-        canvasContext: context,
-        transform: transform,
-        viewport: viewport,
-      });
-
-      await renderTaskRef.current.promise;
-
-      // Render text layer for selectable text
-      const textContent = await page.getTextContent();
-
-      textLayerInstanceRef.current = new PdfJsTextLayer({
-        container: textLayerDiv,
-        textContentSource: textContent,
-        viewport: viewport,
-      });
-
-      await textLayerInstanceRef.current.render();
-      annotatePdfTextLayer(textLayerDiv, textContent.items);
-
-      console.log(
-        "[PdfViewer] Rendered page",
-        currentPage,
-        "zoom:",
-        zoomLevel,
-        "outputScale:",
-        renderPlan.outputScale,
-        "megapixels:",
-        renderPlan.megapixels.toFixed(2),
-        renderPlan.wasCapped ? "(CAPPED)" : "",
-      );
-    } catch (err) {
-      // Ignore cancellation errors
-      if (err instanceof Error && err.message.includes("cancel")) {
+  const renderPage = useCallback(
+    async (generation: number) => {
+      if (
+        !pdfDocument ||
+        !canvasRef.current ||
+        !textLayerRef.current ||
+        generation !== renderGenerationRef.current
+      ) {
         return;
       }
-      console.error("Error rendering page:", err);
-    }
-  }, [
-    pdfDocument,
-    currentPage,
-    zoomLevel,
-    settings,
-    displayInfo,
-    setCurrentRenderPlan,
-  ]);
+      const pageNumber = currentPage;
+
+      // Cancel any previous render
+      if (renderTaskRef.current) {
+        try {
+          renderTaskRef.current.cancel();
+        } catch {
+          // Ignore cancellation errors
+        }
+      }
+
+      // Cancel previous text layer
+      if (textLayerInstanceRef.current) {
+        textLayerInstanceRef.current.cancel();
+        textLayerInstanceRef.current = null;
+      }
+
+      // Clear text layer safely
+      clearContainer(textLayerRef.current);
+
+      try {
+        // Get the page
+        const page = await pdfService.getPage(pdfDocument, pageNumber);
+        if (generation !== renderGenerationRef.current) return;
+        pageRef.current = page;
+
+        const canvas = canvasRef.current;
+        const textLayerDiv = textLayerRef.current;
+
+        // Get base viewport (scale=1) for RenderPolicy calculation
+        const baseViewport = page.getViewport({ scale: 1 });
+
+        // Calculate render plan using RenderPolicy
+        const renderPlan = calculateRenderPlan({
+          pageWidth: baseViewport.width,
+          pageHeight: baseViewport.height,
+          zoomLevel,
+          settings,
+          displayInfo,
+        });
+
+        // Store current render plan for debug overlay
+        setCurrentRenderPlan(renderPlan);
+
+        // Get viewport at the desired zoom level
+        const viewport = page.getViewport({ scale: zoomLevel });
+
+        // Update viewport dimensions for highlight overlay
+        setViewportDimensions({
+          width: Math.floor(viewport.width),
+          height: Math.floor(viewport.height),
+        });
+
+        // Set canvas physical dimensions (scaled for HiDPI based on render plan)
+        canvas.width = renderPlan.canvasWidth;
+        canvas.height = renderPlan.canvasHeight;
+
+        // Set canvas CSS dimensions (logical size)
+        canvas.style.width = `${Math.floor(viewport.width)}px`;
+        canvas.style.height = `${Math.floor(viewport.height)}px`;
+
+        // Set text layer dimensions
+        textLayerDiv.style.width = `${Math.floor(viewport.width)}px`;
+        textLayerDiv.style.height = `${Math.floor(viewport.height)}px`;
+        textLayerDiv.style.setProperty("--scale-factor", String(zoomLevel));
+
+        // Get hardware-accelerated 2D context with optimal settings
+        const context = canvas.getContext("2d", {
+          alpha: false, // Opaque canvas - faster rendering
+          desynchronized: true, // Direct to display - hardware accelerated
+          willReadFrequently: false, // Keep GPU acceleration enabled
+        });
+        if (!context) {
+          throw new Error("Could not get canvas 2D context");
+        }
+
+        // An opaque canvas starts black. Paint the PDF page background before
+        // pdf.js draws so a cancelled/failed render never leaves a black void.
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Enable high-quality image rendering
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = "high";
+
+        // Create transform matrix for HiDPI rendering using render plan's output scale
+        const transform:
+          | [number, number, number, number, number, number]
+          | undefined =
+          renderPlan.outputScale !== 1
+            ? [renderPlan.outputScale, 0, 0, renderPlan.outputScale, 0, 0]
+            : undefined;
+
+        // Render canvas
+        renderTaskRef.current = page.render({
+          canvasContext: context,
+          transform: transform,
+          viewport: viewport,
+        });
+
+        await renderTaskRef.current.promise;
+        if (generation !== renderGenerationRef.current) return;
+
+        // Render text layer for selectable text
+        const textContent = await page.getTextContent();
+        if (generation !== renderGenerationRef.current) return;
+
+        textLayerInstanceRef.current = new PdfJsTextLayer({
+          container: textLayerDiv,
+          textContentSource: textContent,
+          viewport: viewport,
+        });
+
+        await textLayerInstanceRef.current.render();
+        if (generation !== renderGenerationRef.current) return;
+        annotatePdfTextLayer(textLayerDiv, textContent.items);
+
+        const pageContainer = pageContainerRef.current;
+        if (pageContainer) {
+          pageContainer.dataset.renderReady = "true";
+          pageContainer.setAttribute("aria-busy", "false");
+        }
+        markPdfPageReady(pageNumber);
+
+        console.log(
+          "[PdfViewer] Rendered page",
+          pageNumber,
+          "zoom:",
+          zoomLevel,
+          "outputScale:",
+          renderPlan.outputScale,
+          "megapixels:",
+          renderPlan.megapixels.toFixed(2),
+          renderPlan.wasCapped ? "(CAPPED)" : "",
+        );
+      } catch (err) {
+        // Ignore cancellation errors
+        if (err instanceof Error && err.message.includes("cancel")) {
+          return;
+        }
+        console.error("Error rendering page:", err);
+      }
+    },
+    [
+      pdfDocument,
+      currentPage,
+      zoomLevel,
+      settings,
+      displayInfo,
+      setCurrentRenderPlan,
+    ],
+  );
 
   // Debounced render to prevent thrash during continuous zoom/resize (T019)
   useEffect(() => {
-    // Clear any pending debounced render
+    // Clear any pending debounced render and make readiness fail closed before
+    // React reuses this page container for a new page or zoom.
     if (renderDebounceRef.current) {
       clearTimeout(renderDebounceRef.current);
+    }
+    const generation = ++renderGenerationRef.current;
+    if (pageContainerRef.current) {
+      pageContainerRef.current.dataset.renderReady = "false";
+      pageContainerRef.current.setAttribute("aria-busy", "true");
     }
 
     // Debounce the render call
     renderDebounceRef.current = setTimeout(() => {
-      renderPage();
+      void renderPage(generation);
     }, RENDER_DEBOUNCE_MS);
 
     return () => {
+      if (renderGenerationRef.current === generation) {
+        renderGenerationRef.current += 1;
+      }
       // Cancel debounce timer
       if (renderDebounceRef.current) {
         clearTimeout(renderDebounceRef.current);

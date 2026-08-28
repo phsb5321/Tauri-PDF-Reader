@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import page19FootnoteItems from "../__tests__/fixtures/page-19-footnote-items.json";
+import { buildPdfText } from "./pdf-text";
 import {
   mapSpokenRangeToSource,
   planProsodyRuns,
@@ -159,12 +161,12 @@ describe("source-aligned prosody plan", () => {
   it("maps UTF-16 offsets after an astral character without drift", () => {
     const text = "😀 serving Since then";
     const runs = planProsodyRuns({ text }, 200);
-    expect(runs[0].spokenText).toBe("😀 serving.");
+    expect(runs[0].spokenText).toBe("😀 serving. Since then");
     const start = runs[0].spokenText.indexOf("serving");
     const mapped = mapSpokenRangeToSource(
       runs[0].alignment,
       start,
-      runs[0].spokenText.length,
+      runs[0].spokenText.indexOf(" Since"),
     );
     expect(mapped).toEqual({ start, end: text.indexOf(" Since") });
     expect(runs[0].displayText.slice(mapped?.start, mapped?.end)).toBe(
@@ -205,6 +207,56 @@ describe("source-aligned prosody plan", () => {
         .replace(/\s+/gu, " ")
         .trim(),
     ).toBe(text.replace(/\s+/gu, " ").trim());
+  });
+
+  it("silences real page-19 superscript markers without changing source text", () => {
+    const built = buildPdfText(page19FootnoteItems);
+    const runs = planProsodyRuns(
+      {
+        text: built.text,
+        boundaries: built.boundaries,
+        segments: built.segments,
+      },
+      300,
+    );
+
+    expect(built.text).toMatch(/data engineering \. 1 2 3 4 5$/u);
+    expect(runs.map((run) => run.spokenText).join(" ")).not.toMatch(
+      /(?:^|\s)[1-5](?:[.\s]|$)/u,
+    );
+    expect(runs.every((run) => bytes(run.spokenText) >= 12)).toBe(true);
+    expect(runs.at(-1)?.sourceEnd).toBe(built.text.indexOf(" 1 2 3 4 5"));
+  });
+
+  it("retains an ordinary body-sized standalone number", () => {
+    const built = buildPdfText([
+      {
+        str: "Chapter",
+        height: 15,
+        width: 52,
+        transform: [15, 0, 0, 15, 72, 500],
+        fontName: "body",
+      },
+      {
+        str: "2",
+        height: 15,
+        width: 8,
+        transform: [15, 0, 0, 15, 128, 500],
+        fontName: "body",
+      },
+      {
+        str: "begins here.",
+        height: 15,
+        width: 82,
+        transform: [15, 0, 0, 15, 140, 500],
+        fontName: "body",
+      },
+    ]);
+    expect(
+      planProsodyRuns({ ...built, segments: built.segments }, 300).map(
+        (run) => run.spokenText,
+      ),
+    ).toEqual(["Chapter 2 begins here."]);
   });
 
   it("retains the provider UTF-8 bound and fails closed on an oversized grapheme", () => {

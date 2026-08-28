@@ -17,6 +17,10 @@ import {
 } from "../../lib/prosody-plan";
 import { AI_TTS_SETUP_MESSAGE } from "../../lib/constants";
 import { narrationPerformancePolicy } from "../../lib/narration-performance";
+import {
+  getPdfPageReadyEpoch,
+  waitForPdfPageReady,
+} from "../../lib/pdf-page-ready";
 import { buildPdfText, type BuiltPdfText } from "../../lib/pdf-text";
 import { AiVoiceSelector } from "./AiVoiceSelector";
 import { AiSpeedSlider } from "./AiSpeedSlider";
@@ -41,6 +45,8 @@ export function consumeNaturalCompletion(
   };
 }
 
+const PAGE_READY_TIMEOUT_MS = 8_000;
+
 type NarrationSource = string | BuiltPdfText;
 
 function sourceText(source: NarrationSource): string {
@@ -50,7 +56,11 @@ function sourceText(source: NarrationSource): string {
 function prosodySource(source: NarrationSource): ProsodySource {
   return typeof source === "string"
     ? { text: source }
-    : { text: source.text, boundaries: source.boundaries };
+    : {
+        text: source.text,
+        boundaries: source.boundaries,
+        segments: source.segments,
+      };
 }
 
 interface SentencePlaybackQueue {
@@ -138,6 +148,14 @@ export function AiPlaybackBar({
   >(null);
   const playbackGenerationRef = useRef(0);
   const sentenceQueueRef = useRef<SentencePlaybackQueue | null>(null);
+  const pageContinuationAbortRef = useRef<AbortController | null>(null);
+  const pendingContinuationPageRef = useRef<number | null>(null);
+  const cancelPageContinuation = useCallback(() => {
+    pageContinuationAbortRef.current?.abort();
+    pageContinuationAbortRef.current = null;
+    pendingContinuationPageRef.current = null;
+  }, []);
+  useEffect(() => () => cancelPageContinuation(), [cancelPageContinuation]);
   const [sentenceProgress, setSentenceProgress] = useState<{
     completedWords: number;
     totalWords: number;
@@ -151,14 +169,20 @@ export function AiPlaybackBar({
     playingRef.current = false;
     playbackGenerationRef.current += 1;
     sentenceQueueRef.current = null;
+    cancelPageContinuation();
     setSentenceProgress(null);
-  }, [switchingProvider]);
+  }, [switchingProvider, cancelPageContinuation]);
 
   // A reader-driven page turn can arrive through several public surfaces, not
   // all of which call this component's handleStop. Invalidate the private
   // no-mark queue at the shared page authority. Natural auto-page clears the
   // completed queue before changing currentPage, so it is not cancelled here.
   useEffect(() => {
+    const pendingPage = pendingContinuationPageRef.current;
+    if (pendingPage !== null && pendingPage !== currentPage) {
+      cancelPageContinuation();
+    }
+
     const queue = sentenceQueueRef.current;
     if (!queue || queue.pageNumber === currentPage) return;
     playingRef.current = false;
@@ -166,7 +190,7 @@ export function AiPlaybackBar({
     sentenceQueueRef.current = null;
     setSentenceProgress(null);
     if (playbackState !== "idle") void stop();
-  }, [currentPage, playbackState, stop]);
+  }, [currentPage, playbackState, stop, cancelPageContinuation]);
 
   // T050: Audio cache coverage for current document
   const documentId = currentDocument?.id ?? null;
@@ -414,34 +438,65 @@ export function AiPlaybackBar({
       const nextPage = page + 1;
       console.debug("[AiPlaybackBar] Moving to next page:", nextPage);
 
-      // Navigate to next page
-      setCurrentPage(nextPage);
-
-      // Small delay to let page render, then continue TTS. A Stop or newer
-      // Play invalidates this delayed continuation.
+      const previousReadyEpoch = getPdfPageReadyEpoch(nextPage);
       const generation = playbackGenerationRef.current;
-      setTimeout(async () => {
-        if (
-          playingRef.current &&
-          generation === playbackGenerationRef.current
-        ) {
-          const nextText = await getPageText(nextPage);
-          if (nextText && playingRef.current) {
-            if (!supportsWordTimings) {
-              await startNoMarkSentenceSequence(nextText, nextPage, 0);
-            } else if (usesWordHighlighting) {
-              await speakWithHighlightRef.current?.(
-                sourceText(nextText),
-                nextPage,
-              );
-            } else {
-              await speak(sourceText(nextText));
-            }
-          } else {
-            playingRef.current = false;
-          }
+      cancelPageContinuation();
+      const controller = new AbortController();
+      pageContinuationAbortRef.current = controller;
+      pendingContinuationPageRef.current = nextPage;
+
+      // Navigate, then wait for this exact render's canvas, text layer, and
+      // source annotations. An older ready marker for the same page is stale.
+      setCurrentPage(nextPage);
+      const ready = await waitForPdfPageReady(nextPage, previousReadyEpoch, {
+        signal: controller.signal,
+        timeoutMs: PAGE_READY_TIMEOUT_MS,
+      });
+      if (pageContinuationAbortRef.current === controller) {
+        pageContinuationAbortRef.current = null;
+        pendingContinuationPageRef.current = null;
+      }
+      if (
+        ready.status === "aborted" ||
+        !playingRef.current ||
+        generation !== playbackGenerationRef.current
+      ) {
+        return;
+      }
+      if (ready.status === "timeout") {
+        playingRef.current = false;
+        playbackGenerationRef.current += 1;
+        useAiTtsStore
+          .getState()
+          .setError(
+            `TTS_PAGE_NOT_READY: Page ${nextPage} did not finish rendering`,
+          );
+        return;
+      }
+
+      const nextText = await getPageText(nextPage);
+      if (
+        !nextText ||
+        !playingRef.current ||
+        generation !== playbackGenerationRef.current
+      ) {
+        if (!nextText) {
+          playingRef.current = false;
+          useAiTtsStore
+            .getState()
+            .setError(
+              `TTS_PAGE_TEXT_UNAVAILABLE: Page ${nextPage} has no readable text`,
+            );
         }
-      }, 500);
+        return;
+      }
+      if (!supportsWordTimings) {
+        await startNoMarkSentenceSequence(nextText, nextPage, 0);
+      } else if (usesWordHighlighting) {
+        await speakWithHighlightRef.current?.(sourceText(nextText), nextPage);
+      } else {
+        await speak(sourceText(nextText));
+      }
     } else {
       console.debug("[AiPlaybackBar] Reached last page, stopping");
       playingRef.current = false;
@@ -456,6 +511,7 @@ export function AiPlaybackBar({
     prefetchSentences,
     speak,
     supportsWordTimings,
+    cancelPageContinuation,
   ]);
 
   // Plain/no-mark providers complete from the real sink-drained event recorded
@@ -540,6 +596,7 @@ export function AiPlaybackBar({
 
   const handlePlay = useCallback(async () => {
     if (!canPlay || isLoading) return;
+    cancelPageContinuation();
 
     if (isPaused) {
       if (usesWordHighlighting) {
@@ -578,6 +635,7 @@ export function AiPlaybackBar({
     supportsWordTimings,
     startNoMarkSentenceSequence,
     currentPage,
+    cancelPageContinuation,
   ]);
 
   const handlePause = useCallback(async () => {
@@ -612,13 +670,14 @@ export function AiPlaybackBar({
     playingRef.current = false;
     playbackGenerationRef.current += 1;
     sentenceQueueRef.current = null;
+    cancelPageContinuation();
     setSentenceProgress(null);
     if (usesWordHighlighting) {
       await stopHighlight();
     } else {
       await stop();
     }
-  }, [stop, stopHighlight, usesWordHighlighting]);
+  }, [stop, stopHighlight, usesWordHighlighting, cancelPageContinuation]);
 
   // Keyboard shortcuts
   useEffect(() => {

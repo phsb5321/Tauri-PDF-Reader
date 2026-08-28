@@ -9,6 +9,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AiPlaybackBar } from "../../components/playback-bar/AiPlaybackBar";
 import { useAiTtsStore } from "../../stores/ai-tts-store";
 import { useDocumentStore } from "../../stores/document-store";
+import {
+  markPdfPageReady,
+  resetPdfPageReadyForTests,
+} from "../../lib/pdf-page-ready";
 
 const h = vi.hoisted(() => ({
   complete: null as (() => void) | null,
@@ -17,6 +21,12 @@ const h = vi.hoisted(() => ({
   announce: vi.fn(),
   speakWithHighlight: vi.fn(() => Promise.resolve(true)),
   stop: vi.fn(() => Promise.resolve()),
+  getPage: vi.fn(() =>
+    Promise.resolve({
+      getTextContent: () =>
+        Promise.resolve({ items: [{ str: "Page two sentence." }] }),
+    }),
+  ),
   prebuffer: vi.fn(() =>
     Promise.resolve({
       success: true,
@@ -69,6 +79,9 @@ vi.mock("../../hooks/useAnnounce", () => ({
   },
 }));
 vi.mock("../../lib/api/ai-tts", () => ({ aiTtsPrebuffer: h.prebuffer }));
+vi.mock("../../services/pdf-service", () => ({
+  pdfService: { getPage: h.getPage },
+}));
 vi.mock("../../components/playback-bar/AiVoiceSelector", () => ({
   AiVoiceSelector: () => null,
 }));
@@ -90,6 +103,7 @@ beforeEach(() => {
   h.complete = null;
   h.maxTextUtf8Bytes = 8192;
   h.playbackState = "idle";
+  resetPdfPageReadyForTests();
   useAiTtsStore.setState({
     provider: "local",
     supportsWordTimings: false,
@@ -174,14 +188,16 @@ describe("local sentence playback", () => {
   it("keeps first audio short and prefetches later sentences in one context", async () => {
     render(
       <AiPlaybackBar
-        getText={() => Promise.resolve("First. Second. Third.")}
+        getText={() =>
+          Promise.resolve("First sentence is long enough. Second. Third.")
+        }
       />,
     );
 
     fireEvent.click(screen.getByTitle("Play (Ctrl+Space)"));
     await waitFor(() =>
       expect(h.speakWithHighlight).toHaveBeenCalledWith(
-        "First.",
+        "First sentence is long enough.",
         1,
         "F1-en",
         0,
@@ -201,7 +217,7 @@ describe("local sentence playback", () => {
         "Second. Third.",
         1,
         "F1-en",
-        7,
+        31,
         expect.any(Array),
         "sentence",
       ),
@@ -276,6 +292,86 @@ describe("local sentence playback", () => {
 
     expect(h.prebuffer).toHaveBeenCalledTimes(1);
     expect(h.speakWithHighlight).toHaveBeenCalledTimes(1);
+  });
+
+  it("continues exactly once only after the next page render is ready", async () => {
+    useAiTtsStore.setState({ autoPageEnabled: true });
+    render(<AiPlaybackBar getText={() => Promise.resolve("Page one.")} />);
+
+    fireEvent.click(screen.getByTitle("Play (Ctrl+Space)"));
+    await waitFor(() => expect(h.speakWithHighlight).toHaveBeenCalledTimes(1));
+    await act(async () => h.complete?.());
+    await waitFor(() =>
+      expect(useDocumentStore.getState().currentPage).toBe(2),
+    );
+    expect(h.getPage).not.toHaveBeenCalled();
+    expect(h.speakWithHighlight).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      markPdfPageReady(2);
+    });
+    await waitFor(() =>
+      expect(h.speakWithHighlight).toHaveBeenLastCalledWith(
+        "Page two sentence.",
+        2,
+        "F1-en",
+        0,
+        expect.any(Array),
+        "sentence",
+      ),
+    );
+    expect(h.speakWithHighlight).toHaveBeenCalledTimes(2);
+
+    act(() => {
+      markPdfPageReady(2);
+    });
+    await act(async () => Promise.resolve());
+    expect(h.speakWithHighlight).toHaveBeenCalledTimes(2);
+  });
+
+  it("surfaces TTS_PAGE_NOT_READY instead of silently freezing", async () => {
+    vi.useFakeTimers();
+    try {
+      useAiTtsStore.setState({ autoPageEnabled: true });
+      render(<AiPlaybackBar getText={() => Promise.resolve("Page one.")} />);
+
+      fireEvent.click(screen.getByTitle("Play (Ctrl+Space)"));
+      await act(async () => Promise.resolve());
+      expect(h.speakWithHighlight).toHaveBeenCalledTimes(1);
+      await act(async () => h.complete?.());
+      expect(useDocumentStore.getState().currentPage).toBe(2);
+
+      await act(async () => vi.advanceTimersByTimeAsync(8_000));
+      expect(useAiTtsStore.getState().error).toBe(
+        "TTS_PAGE_NOT_READY: Page 2 did not finish rendering",
+      );
+      expect(h.speakWithHighlight).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("cancels a pending page handoff when navigation moves elsewhere", async () => {
+    h.playbackState = "playing";
+    useAiTtsStore.setState({ autoPageEnabled: true });
+    useDocumentStore.setState({ totalPages: 3 });
+    render(<AiPlaybackBar getText={() => Promise.resolve("Page one.")} />);
+
+    fireEvent.click(screen.getByTitle("Play (Ctrl+Space)"));
+    await waitFor(() => expect(h.speakWithHighlight).toHaveBeenCalledTimes(1));
+    await act(async () => h.complete?.());
+    await waitFor(() =>
+      expect(useDocumentStore.getState().currentPage).toBe(2),
+    );
+
+    act(() => useDocumentStore.getState().setCurrentPage(3));
+    act(() => {
+      markPdfPageReady(2);
+    });
+    await act(async () => Promise.resolve());
+
+    expect(h.speakWithHighlight).toHaveBeenCalledTimes(1);
+    expect(h.getPage).not.toHaveBeenCalled();
   });
 
   it("synthesizes a spoken-only period while retaining source queue offsets", async () => {
