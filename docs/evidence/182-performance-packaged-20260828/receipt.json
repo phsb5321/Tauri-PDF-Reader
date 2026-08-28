@@ -1,9 +1,9 @@
 {
   "status": "PASS",
-  "buildRevision": "d6c66cebfe3a78a23539dc92dc6eea11b4fb7628",
-  "binarySha256": "59a609109d2cefc11fb14eb1a76a0acc715aab5c65f5bc963da069d9ee7bb361",
+  "buildRevision": "4453baaec842da6f8c69c961ffe56b6451870c90",
+  "binarySha256": "1f57210bc4dab5c3401dc0484e0b66efeceed68e4ee8bb18c8aec5a352ac29a7",
   "fixtureSha256": "dfd48160ee42119e5a2a1b8d483f1e41f7e10f05cc817631e82cd8080a48cbb1",
-  "observedAt": "2026-08-28T12:31:19-03:00",
+  "observedAt": "2026-08-28T13:50:17-03:00",
   "journey": "Settings -> Performance -> Continuous -> public Play -> bounded heading/context -> exact source highlight -> public Stop -> measured RTF",
   "assertions": {
     "performanceModel": "Magpie TTS Multilingual 357M",

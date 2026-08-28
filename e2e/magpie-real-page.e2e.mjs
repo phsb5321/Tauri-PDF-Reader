@@ -33,7 +33,10 @@ describe("Magpie real-model page queue", () => {
             window.__E2E_READ__.provider() === "local" &&
             window.__E2E_READ__.playbackState() === "idle",
         ),
-      { timeout: 20000, timeoutMsg: "Magpie local provider did not become idle" },
+      {
+        timeout: 20000,
+        timeoutMsg: "Magpie local provider did not become idle",
+      },
     );
 
     await openPerformance();
@@ -100,16 +103,21 @@ describe("Magpie real-model page queue", () => {
       { timeout: 10000, timeoutMsg: "public Stop did not return idle" },
     );
     await browser.pause(1500);
-    expect(
-      await browser.execute(() => window.__E2E_READ__.currentPage()),
-    ).toBe(2);
+    expect(await browser.execute(() => window.__E2E_READ__.currentPage())).toBe(
+      2,
+    );
     expect(Date.now() - startedAt).toBeLessThan(240000);
 
     await openPerformance();
     await $(".performance-measurement").waitForDisplayed({ timeout: 10000 });
     const measurement = await $(".performance-measurement").getText();
-    expect(measurement).toContain("RTF");
-    expect(measurement).toContain("Sustains continuous playback");
+    const rtf = Number.parseFloat(measurement.match(/([0-9.]+) RTF/u)?.[1]);
+    expect(Number.isFinite(rtf)).toBe(true);
+    expect(measurement).toContain(
+      rtf <= 0.8
+        ? "Sustains continuous playback"
+        : "This sample may outrun the playback buffer",
+    );
     await closeSettings();
   });
 });

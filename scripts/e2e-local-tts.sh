@@ -7,6 +7,7 @@ source ./scripts/e2e-toolchain.sh
 
 EVIDENCE_DIR="${LECTRICE_LOCAL_TTS_EVIDENCE_DIR:-$PWD/ci-evidence/local-tts}"
 mkdir -p "$EVIDENCE_DIR" "$XDG_CONFIG_HOME/lectrice"
+rm -f "$EVIDENCE_DIR/receipt.json"
 REQUEST_LOG="$EVIDENCE_DIR/requests.jsonl"
 READY="$EVIDENCE_DIR/fixture.ready"
 cat >"$XDG_CONFIG_HOME/lectrice/config.toml" <<'TOML'

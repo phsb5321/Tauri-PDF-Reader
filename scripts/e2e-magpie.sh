@@ -8,6 +8,7 @@ source ./scripts/e2e-toolchain.sh
 EVIDENCE_DIR="${LECTRICE_MAGPIE_EVIDENCE_DIR:-$PWD/ci-evidence/magpie-real}"
 FIXTURE="$PWD/public/e2e-magpie-performance.pdf"
 mkdir -p "$EVIDENCE_DIR" "$XDG_CONFIG_HOME/lectrice"
+rm -f "$EVIDENCE_DIR/receipt.json"
 cleanup() {
   [ -z "${SAMPLE_PID:-}" ] || kill "$SAMPLE_PID" 2>/dev/null || true
   rm -f "$FIXTURE"
