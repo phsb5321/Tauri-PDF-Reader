@@ -1,0 +1,26 @@
+   Compiling tauri-pdf-reader v0.2.0 (/home/notroot/Documents/Code/personal/tauri-pdf-reader-182-gpu-performance/src-tauri)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 41.77s
+
+> lectrice@0.2.0 test:e2e /home/notroot/Documents/Code/personal/tauri-pdf-reader-182-gpu-performance
+> wdio run wdio.conf.mjs
+
+
+Execution of 1 workers started at 2026-08-28T15:36:10.746Z
+
+[0-0] RUNNING in undefined - file:///e2e/magpie-real-page.e2e.mjs
+GStreamer element appsink not found. Please install it.
+[0-0] PASSED in undefined - file:///e2e/magpie-real-page.e2e.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[wry 0.53.5 linux #0-0] Running: wry (v0.53.5) on linux
+[wry 0.53.5 linux #0-0] Session ID: 6adfad37-3e72-4c85-adb1-d160e85bbff2
+[wry 0.53.5 linux #0-0]
+[wry 0.53.5 linux #0-0] » e2e/magpie-real-page.e2e.mjs
+[wry 0.53.5 linux #0-0] Magpie real-model page queue
+[wry 0.53.5 linux #0-0]    ✓ narrates bounded units on Vulkan and advances exactly once
+[wry 0.53.5 linux #0-0]
+[wry 0.53.5 linux #0-0] 1 passing (35.1s)
+
+
+Spec Files:	 1 passed, 1 total (100% completed) in 00:00:37

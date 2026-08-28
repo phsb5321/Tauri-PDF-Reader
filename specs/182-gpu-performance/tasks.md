@@ -14,11 +14,11 @@
 - [x] T012 Add focused frontend tests for tab navigation, unavailable metadata, measured data, profile policy, and persistence.
 - [x] T013 Add focused Rust tests for measurement math, cache non-overwrite, cancellation, old capability compatibility, and Magpie metadata.
 - [x] T014 Update the deterministic local fixture and E2E observer with non-secret runtime/performance state.
-- [ ] T015 Add a packaged public-control Performance → Play → bounded requests/highlight → Stop journey and durable receipt.
+- [x] T015 Add a packaged public-control Performance → Play → bounded requests/highlight → Stop journey and durable receipt.
 - [x] T016 Run typecheck, lint, architecture/contracts, rustfmt, clippy, targeted frontend/Rust suites, bindings contract, and harness.
 - [x] T017 Run fuzz seed `20260828` for 2,000 actions and retain replay instructions.
 - [x] T018 Run the pinned Magpie Q6 held-out-page oracle; record chunk trace, valid >30s PCM16 WAV, first-unit latency, aggregate standard RTF, GPU device handles, and VRAM delta.
-- [ ] T019 Run the packaged real-model journey and prove one natural page advance with no stale continuation after Stop.
-- [ ] T020 Update issue #182, fleet ledger, project handoff, and exact-head evidence.
+- [x] T019 Run the packaged real-model journey and prove one natural page advance with no stale continuation after Stop.
+- [x] T020 Update issue #182, fleet ledger, project handoff, and exact-head evidence.
 - [ ] T021 Obtain a capable different-family exact-head ALLOW and repair every BLOCKER/MAJOR.
 - [ ] T022 Push a stacked PR, poll applicable checks, and merge only after parent/gate constraints clear.
