@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "httpStatus": 200,
+  "serviceRevision": "8291ffde2e13e2e9221a000669b5f7814c7ecc858eb0a1a9de8ee77d8da05736",
+  "pageUtf8Bytes": 2232,
+  "pageTextSha256": "bbb2dad4b724e4eda74afd7192ba6b893e57bf3e9b4b71e06f0a1c2202e416e9",
+  "wallSeconds": 64.939243,
+  "audioSeconds": 133.70049886621314,
+  "standardRtf": 0.48570681149799744,
+  "vramBaselineBytes": 1795358720,
+  "vramPeakBytes": 3116269568,
+  "vramDeltaBytes": 1320910848,
+  "gpuHandleSamples": 162,
+  "downloadBytes": 5896236
+}

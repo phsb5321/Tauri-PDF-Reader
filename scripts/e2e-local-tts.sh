@@ -106,8 +106,13 @@ jq -s \
     binarySha256: $binarySha256,
     fixtureSha256: $fixtureSha256,
     observedAt: $observedAt,
-    journey: "public Play -> standalone spoken heading -> connected body context -> exact source highlight -> public Stop",
+    journey: "Settings -> Performance -> Continuous -> public Play -> bounded heading/context -> exact source highlight -> public Stop -> measured RTF",
     assertions: {
+      performanceModel: "Magpie TTS Multilingual 357M",
+      performanceBackend: "Vulkan/RADV fixture",
+      performanceDevice: "Fixture GPU",
+      performanceProfile: "continuous",
+      uncachedRtfVisible: true,
       sourceText: "What This Book Is About / This book aims to fill a gap. It connects the dots. Readers benefit.",
       spokenFirstRun: "What This Book Is About.",
       highlightedSourceRange: "What",
@@ -121,6 +126,8 @@ jq -s \
 jq -e '
   .status == "PASS" and
   .assertions.highlightedSourceRange == "What" and
+  .assertions.performanceProfile == "continuous" and
+  .assertions.uncachedRtfVisible == true and
   (.requests | map(.body.input)) == [
     "What This Book Is About.",
     "This book aims to fill a gap. It connects the dots. Readers benefit."

@@ -505,6 +505,17 @@ async aiTtsSwitchProvider(provider: TtsProvider) : Promise<Result<SwitchProvider
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+/**
+ * Get factual active-engine runtime and the latest uncached synthesis measure.
+ */
+async aiTtsGetPerformance() : Promise<Result<TtsPerformanceSnapshot, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("ai_tts_get_performance") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -653,10 +664,12 @@ default_color?: string;
 colors?: string[] }
 export type InitGroqResponse = { success: boolean; voicesCount: number; provider: TtsProvider; supportsWordTimings: boolean; maxTextUtf8Bytes: number }
 export type InitLocalResponse = { success: boolean; voicesCount: number; provider: string; supportsWordTimings: boolean; maxTextUtf8Bytes: number; destination: string }
+export type LastSynthesisPerformance = { requestUtf8Bytes: number; generationMs: number; audioDuration: number; standardRtf: number }
 /**
  * Response types for commands
  */
 export type ListHighlightsResponse = { highlights: Highlight[] }
+export type ProviderRuntimeInfo = { providerRevision: string; model: string | null; modelRevision: string | null; quantization: string | null; backend: string | null; device: string | null; acceleration: string | null; queueCapacity: number | null; chunkMaxUtf8Bytes: number }
 export type QualityMode = "performance" | "balanced" | "ultra"
 /**
  * A reading session containing multiple documents with saved positions
@@ -729,6 +742,7 @@ voice?: string | null;
  * SQLite `tts.followAlong`
  */
 follow_along?: boolean }
+export type TtsPerformanceSnapshot = { provider: TtsProvider; supportsWordTimings: boolean; maxTextUtf8Bytes: number; runtime: ProviderRuntimeInfo; latestUncached: LastSynthesisPerformance | null }
 /**
  * Supported TTS providers
  */

@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
@@ -53,6 +54,20 @@ pub struct WordTiming {
     pub char_end: usize,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderRuntimeInfo {
+    pub provider_revision: String,
+    pub model: Option<String>,
+    pub model_revision: Option<String>,
+    pub quantization: Option<String>,
+    pub backend: Option<String>,
+    pub device: Option<String>,
+    pub acceleration: Option<String>,
+    pub queue_capacity: Option<usize>,
+    pub chunk_max_utf8_bytes: usize,
+}
+
 #[derive(Debug, Clone)]
 pub struct SynthesisRequest {
     pub text: String,
@@ -77,6 +92,19 @@ pub trait SynthesizerPort: Send + Sync {
     fn provider_revision(&self) -> &str;
     fn max_text_utf8_bytes(&self) -> usize;
     fn supports_word_timings(&self) -> bool;
+    fn runtime_info(&self) -> ProviderRuntimeInfo {
+        ProviderRuntimeInfo {
+            provider_revision: self.provider_revision().to_string(),
+            model: None,
+            model_revision: None,
+            quantization: None,
+            backend: None,
+            device: None,
+            acceleration: None,
+            queue_capacity: None,
+            chunk_max_utf8_bytes: self.max_text_utf8_bytes(),
+        }
+    }
     async fn list_voices(&self) -> Result<Vec<SynthesisVoice>, String>;
     async fn synthesize(&self, request: SynthesisRequest) -> Result<SynthesisResult, String>;
 }

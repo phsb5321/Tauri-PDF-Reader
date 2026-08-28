@@ -16,6 +16,7 @@ import {
   type SpokenRun,
 } from "../../lib/prosody-plan";
 import { AI_TTS_SETUP_MESSAGE } from "../../lib/constants";
+import { narrationPerformancePolicy } from "../../lib/narration-performance";
 import { buildPdfText, type BuiltPdfText } from "../../lib/pdf-text";
 import { AiVoiceSelector } from "./AiVoiceSelector";
 import { AiSpeedSlider } from "./AiSpeedSlider";
@@ -58,8 +59,9 @@ interface SentencePlaybackQueue {
   index: number;
   generation: number;
   baseOffset: number;
-  prefetchIndex: number | null;
-  prefetch: Promise<void> | null;
+  lookaheadUnits: number;
+  prefetches: Map<number, Promise<void>>;
+  prefetchTail: Promise<void>;
 }
 
 interface AiPlaybackBarProps {
@@ -113,6 +115,7 @@ export function AiPlaybackBar({
   const naturalCompletionCount = useAiTtsStore((s) => s.naturalCompletionCount);
   const provider = useAiTtsStore((s) => s.provider);
   const selectedVoiceId = useAiTtsStore((s) => s.selectedVoiceId);
+  const performanceProfile = useAiTtsStore((s) => s.performanceProfile);
   const playingRef = useRef(false);
   // Providers without marks use measured-duration word estimates. The UI must
   // remain on the same real audio clock instead of hiding karaoke and leaving
@@ -209,20 +212,36 @@ export function AiPlaybackBar({
     }
   }, []);
 
-  const prefetchSentence = useCallback(
-    (queue: SentencePlaybackQueue, index: number) => {
-      if (supportsWordTimings || index >= queue.sentences.length) return;
-      const sentence = queue.sentences[index];
-      queue.prefetchIndex = index;
-      queue.prefetch = aiTtsPrebuffer(
-        sentence.spokenText,
-        selectedVoiceId ?? undefined,
-        sentence.boundaryAfter,
-      )
-        .then(() => undefined)
-        .catch((error) => {
-          console.warn("[AiPlaybackBar] Sentence prebuffer failed:", error);
-        });
+  const prefetchSentences = useCallback(
+    (queue: SentencePlaybackQueue, startIndex: number) => {
+      if (supportsWordTimings) return;
+      const endIndex = Math.min(
+        queue.sentences.length,
+        startIndex + queue.lookaheadUnits,
+      );
+      for (let index = startIndex; index < endIndex; index += 1) {
+        if (queue.prefetches.has(index)) continue;
+        const sentence = queue.sentences[index];
+        const task = queue.prefetchTail
+          .then(async () => {
+            if (
+              queue.generation !== playbackGenerationRef.current ||
+              sentenceQueueRef.current !== queue
+            ) {
+              return;
+            }
+            await aiTtsPrebuffer(
+              sentence.spokenText,
+              selectedVoiceId ?? undefined,
+              sentence.boundaryAfter,
+            );
+          })
+          .catch((error) => {
+            console.warn("[AiPlaybackBar] Sentence prebuffer failed:", error);
+          });
+        queue.prefetchTail = task;
+        queue.prefetches.set(index, task);
+      }
     },
     [supportsWordTimings, selectedVoiceId],
   );
@@ -234,9 +253,14 @@ export function AiPlaybackBar({
       baseOffset = 0,
     ): Promise<boolean> => {
       const text = sourceText(source);
+      const policy = narrationPerformancePolicy(
+        performanceProfile,
+        maxTextUtf8Bytes,
+      );
       const sentences = planProsodyRuns(
         prosodySource(source),
         maxTextUtf8Bytes,
+        policy.contextMaxUtf8Bytes,
       );
       if (sentences.length === 0) {
         if (text.trim()) {
@@ -256,8 +280,9 @@ export function AiPlaybackBar({
         index: 0,
         generation,
         baseOffset,
-        prefetchIndex: null,
-        prefetch: null,
+        lookaheadUnits: policy.lookaheadUnits,
+        prefetches: new Map(),
+        prefetchTail: Promise.resolve(),
       };
       sentenceQueueRef.current = queue;
       setSentenceProgress({
@@ -280,10 +305,16 @@ export function AiPlaybackBar({
           first.boundaryAfter,
         )) ?? false;
       if (generation !== playbackGenerationRef.current) return false;
-      if (started) prefetchSentence(queue, 1);
+      if (started) prefetchSentences(queue, 1);
       return started;
     },
-    [maxTextUtf8Bytes, prefetchSentence, provider, selectedVoiceId],
+    [
+      maxTextUtf8Bytes,
+      performanceProfile,
+      prefetchSentences,
+      provider,
+      selectedVoiceId,
+    ],
   );
 
   // Handle multi-page continuation
@@ -299,11 +330,13 @@ export function AiPlaybackBar({
     ) {
       const completed = queue.sentences[queue.index];
       const nextIndex = queue.index + 1;
-      if (queue.prefetchIndex === nextIndex && queue.prefetch) {
+      const prefetched = queue.prefetches.get(nextIndex);
+      if (prefetched) {
         await Promise.race([
-          queue.prefetch,
+          prefetched,
           new Promise<void>((resolve) => setTimeout(resolve, 2_500)),
         ]);
+        queue.prefetches.delete(nextIndex);
       }
       if (queue.generation !== playbackGenerationRef.current) return;
 
@@ -340,7 +373,7 @@ export function AiPlaybackBar({
         setSentenceProgress(null);
         return;
       }
-      prefetchSentence(queue, nextIndex + 1);
+      prefetchSentences(queue, nextIndex + 1);
       return;
     }
 
@@ -402,7 +435,7 @@ export function AiPlaybackBar({
     usesWordHighlighting,
     startNoMarkSentenceSequence,
     selectedVoiceId,
-    prefetchSentence,
+    prefetchSentences,
     speak,
     supportsWordTimings,
   ]);

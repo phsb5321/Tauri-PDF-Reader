@@ -1,0 +1,24 @@
+# Tasks: GPU Narration Performance
+
+- [x] T001 Add a red bridge unit test proving a 2,233-character request is losslessly split into non-empty ≤300-byte semantic chunks.
+- [x] T002 Add red bridge tests for Unicode, overlong tokens, homogeneous PCM16 concatenation, malformed/mismatched WAV rejection, idempotent replay, and changed-body 409.
+- [x] T003 Track the pinned Magpie bridge under `tools/magpie/` with environment-supplied artifact paths, digest verification, runtime metadata, defensive splitting, and sequential WAV assembly.
+- [x] T004 Add a deterministic fake CLI and one-command bridge contract gate that exercises the HTTP surface without the model.
+- [x] T005 Add planner tests for explicit 180/300-byte context ceilings, short first unit, block boundaries, and exact source alignment.
+- [x] T006 Add the persisted Responsive/Balanced/Continuous profile with migration and malformed-storage controls.
+- [x] T007 Replace the one-slot prefetch with a generation-bound sequential look-ahead pump; pin Stop/page/provider-switch stale-result rejection.
+- [x] T008 Add typed provider runtime metadata and uncached synthesis measurements to the native engine.
+- [x] T009 Parse optional local runtime/queue metadata without breaking older Supertonic capability responses.
+- [x] T010 Expose and register `ai_tts_get_performance`; regenerate bindings and update command/security contracts.
+- [x] T011 Add the accessible Settings → Performance section with honest engine/backend/device/limits/RTF state and profile controls.
+- [x] T012 Add focused frontend tests for tab navigation, unavailable metadata, measured data, profile policy, and persistence.
+- [x] T013 Add focused Rust tests for measurement math, cache non-overwrite, cancellation, old capability compatibility, and Magpie metadata.
+- [x] T014 Update the deterministic local fixture and E2E observer with non-secret runtime/performance state.
+- [ ] T015 Add a packaged public-control Performance → Play → bounded requests/highlight → Stop journey and durable receipt.
+- [x] T016 Run typecheck, lint, architecture/contracts, rustfmt, clippy, targeted frontend/Rust suites, bindings contract, and harness.
+- [x] T017 Run fuzz seed `20260828` for 2,000 actions and retain replay instructions.
+- [x] T018 Run the pinned Magpie Q6 held-out-page oracle; record chunk trace, valid >30s PCM16 WAV, first-unit latency, aggregate standard RTF, GPU device handles, and VRAM delta.
+- [ ] T019 Run the packaged real-model journey and prove one natural page advance with no stale continuation after Stop.
+- [ ] T020 Update issue #182, fleet ledger, project handoff, and exact-head evidence.
+- [ ] T021 Obtain a capable different-family exact-head ALLOW and repair every BLOCKER/MAJOR.
+- [ ] T022 Push a stacked PR, poll applicable checks, and merge only after parent/gate constraints clear.

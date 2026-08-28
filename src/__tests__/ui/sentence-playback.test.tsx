@@ -97,6 +97,7 @@ beforeEach(() => {
       local: "F1-en",
     },
     autoPageEnabled: false,
+    performanceProfile: "balanced",
     naturalCompletionCount: 0,
     error: null,
   });
@@ -202,6 +203,37 @@ describe("local sentence playback", () => {
         "sentence",
       ),
     );
+  });
+
+  it("queues two Continuous look-ahead units sequentially", async () => {
+    let releaseFirst: (() => void) | undefined;
+    h.prebuffer.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseFirst = () =>
+            resolve({
+              success: true,
+              cached: false,
+              wordCount: 0,
+              totalDuration: 8,
+            });
+        }),
+    );
+    useAiTtsStore.setState({ performanceProfile: "continuous" });
+    const unit = (label: string) =>
+      `${label} ${"bounded context ".repeat(11)}ends.`;
+    const text = [unit("One"), unit("Two"), unit("Three"), unit("Four")].join(
+      " ",
+    );
+    render(<AiPlaybackBar getText={() => Promise.resolve(text)} />);
+
+    fireEvent.click(screen.getByTitle("Play (Ctrl+Space)"));
+    await waitFor(() => expect(h.prebuffer).toHaveBeenCalledTimes(1));
+    expect(h.prebuffer.mock.calls[0]?.[0]).toMatch(/^Two /u);
+
+    await act(async () => releaseFirst?.());
+    await waitFor(() => expect(h.prebuffer).toHaveBeenCalledTimes(2));
+    expect(h.prebuffer.mock.calls[1]?.[0]).toMatch(/^Three /u);
   });
 
   it("synthesizes a spoken-only period while retaining source queue offsets", async () => {

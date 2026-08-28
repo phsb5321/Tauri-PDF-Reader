@@ -19,8 +19,8 @@ use crate::adapters::{
     AudioCacheAdapter, CacheInfo, CachedWordTiming, ClearResult, LocalTtsClient,
 };
 use crate::ports::{
-    AudioMediaType, SynthesisProvider, SynthesisRequest, SynthesisResult, SynthesisVoice,
-    SynthesizerPort,
+    AudioMediaType, ProviderRuntimeInfo, SynthesisProvider, SynthesisRequest, SynthesisResult,
+    SynthesisVoice, SynthesizerPort,
 };
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -28,6 +28,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::Instant;
 use tokio::sync::{watch, Mutex, RwLock};
 
 /// Cache contract shared with `src/lib/prosody-plan.ts`.
@@ -142,6 +143,25 @@ impl Default for TtsState {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct LastSynthesisPerformance {
+    pub request_utf8_bytes: usize,
+    pub generation_ms: f64,
+    pub audio_duration: f64,
+    pub standard_rtf: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct TtsPerformanceSnapshot {
+    pub provider: TtsProvider,
+    pub supports_word_timings: bool,
+    pub max_text_utf8_bytes: usize,
+    pub runtime: ProviderRuntimeInfo,
+    pub latest_uncached: Option<LastSynthesisPerformance>,
+}
+
 /// Result of pre-buffering TTS audio
 pub struct PrebufferResult {
     pub was_cached: bool,
@@ -178,15 +198,43 @@ impl SynthesizerPort for FixtureSynthesizer {
     }
 
     fn max_text_utf8_bytes(&self) -> usize {
-        if self.provider == SynthesisProvider::Groq {
-            200
-        } else {
-            10_000
+        match self.provider {
+            SynthesisProvider::Groq => 200,
+            SynthesisProvider::Local => 300,
+            SynthesisProvider::ElevenLabs => 10_000,
         }
     }
 
     fn supports_word_timings(&self) -> bool {
         self.provider == SynthesisProvider::ElevenLabs
+    }
+
+    fn runtime_info(&self) -> ProviderRuntimeInfo {
+        if self.provider == SynthesisProvider::Local {
+            ProviderRuntimeInfo {
+                provider_revision: self.provider_revision().to_string(),
+                model: Some("Magpie packaged fixture".to_string()),
+                model_revision: Some("fixture-model".to_string()),
+                quantization: Some("Q6_K".to_string()),
+                backend: Some("Vulkan/RADV fixture".to_string()),
+                device: Some("Fixture GPU".to_string()),
+                acceleration: Some("gpu".to_string()),
+                queue_capacity: Some(1),
+                chunk_max_utf8_bytes: 300,
+            }
+        } else {
+            ProviderRuntimeInfo {
+                provider_revision: self.provider_revision().to_string(),
+                model: None,
+                model_revision: None,
+                quantization: None,
+                backend: None,
+                device: None,
+                acceleration: None,
+                queue_capacity: None,
+                chunk_max_utf8_bytes: self.max_text_utf8_bytes(),
+            }
+        }
     }
 
     async fn list_voices(&self) -> Result<Vec<SynthesisVoice>, String> {
@@ -230,6 +278,7 @@ pub struct AiTtsEngine {
     playback_gate: Arc<Mutex<()>>,
     playback_generation: Arc<AtomicU64>,
     cancel_tx: watch::Sender<u64>,
+    performance: Arc<RwLock<HashMap<TtsProvider, LastSynthesisPerformance>>>,
     cache: Option<AudioCacheAdapter>,
 }
 
@@ -248,6 +297,7 @@ impl AiTtsEngine {
             playback_gate: Arc::new(Mutex::new(())),
             playback_generation: Arc::new(AtomicU64::new(0)),
             cancel_tx,
+            performance: Arc::new(RwLock::new(HashMap::new())),
             cache: None,
         }
     }
@@ -439,6 +489,23 @@ impl AiTtsEngine {
             })
     }
 
+    pub async fn performance_snapshot(&self) -> Option<TtsPerformanceSnapshot> {
+        let (provider, connection) = {
+            let registry = self.providers.read().await;
+            let provider = registry.active?;
+            let connection = registry.connections.get(&provider)?.clone();
+            (provider, connection)
+        };
+        let latest_uncached = self.performance.read().await.get(&provider).cloned();
+        Some(TtsPerformanceSnapshot {
+            provider,
+            supports_word_timings: connection.synthesizer.supports_word_timings(),
+            max_text_utf8_bytes: connection.synthesizer.max_text_utf8_bytes(),
+            runtime: connection.synthesizer.runtime_info(),
+            latest_uncached,
+        })
+    }
+
     fn voice_info(voice: SynthesisVoice) -> VoiceInfo {
         VoiceInfo {
             id: voice.id,
@@ -486,17 +553,39 @@ impl AiTtsEngine {
     }
 
     async fn synthesize_with(
+        &self,
         provider: Arc<dyn SynthesizerPort>,
         request: SynthesisRequest,
         mut cancelled: watch::Receiver<u64>,
     ) -> Result<crate::ports::SynthesisResult, String> {
-        tokio::select! {
+        let provider_kind = TtsProvider::from(provider.provider());
+        let request_utf8_bytes = request.text.len();
+        let started = Instant::now();
+        let result = tokio::select! {
             result = provider.synthesize(request) => result,
             changed = cancelled.changed() => {
                 let _ = changed;
                 Err("TTS_CANCELLED: synthesis was cancelled".to_string())
             }
+        };
+        if let Ok(output) = &result {
+            let generation_ms = started.elapsed().as_secs_f64() * 1000.0;
+            let standard_rtf = if output.total_duration > 0.0 {
+                generation_ms / 1000.0 / output.total_duration
+            } else {
+                0.0
+            };
+            self.performance.write().await.insert(
+                provider_kind,
+                LastSynthesisPerformance {
+                    request_utf8_bytes,
+                    generation_ms,
+                    audio_duration: output.total_duration,
+                    standard_rtf,
+                },
+            );
         }
+        result
     }
 
     #[cfg(test)]
@@ -505,7 +594,8 @@ impl AiTtsEngine {
         request: SynthesisRequest,
     ) -> Result<crate::ports::SynthesisResult, String> {
         let (_, connection, cancelled) = self.synthesis_context().await?;
-        Self::synthesize_with(connection.synthesizer, request, cancelled).await
+        self.synthesize_with(connection.synthesizer, request, cancelled)
+            .await
     }
 
     fn inferred_boundary(text: &str) -> ProsodyBoundary {
@@ -658,18 +748,19 @@ impl AiTtsEngine {
         let audio_data = match cached {
             Some(data) => data,
             None => {
-                let result = match Self::synthesize_with(
-                    connection.synthesizer,
-                    SynthesisRequest {
-                        text: text.to_string(),
-                        voice_id: voice,
-                        model_id: config.model_id.clone(),
-                        speed: config.speed,
-                        with_word_timings: false,
-                    },
-                    cancelled,
-                )
-                .await
+                let result = match self
+                    .synthesize_with(
+                        connection.synthesizer,
+                        SynthesisRequest {
+                            text: text.to_string(),
+                            voice_id: voice,
+                            model_id: config.model_id.clone(),
+                            speed: config.speed,
+                            with_word_timings: false,
+                        },
+                        cancelled,
+                    )
+                    .await
                 {
                     Ok(result) => result,
                     Err(error) => {
@@ -763,18 +854,19 @@ impl AiTtsEngine {
             }
         }
 
-        let result = match Self::synthesize_with(
-            connection.synthesizer,
-            SynthesisRequest {
-                text: text.to_string(),
-                voice_id: voice,
-                model_id: config.model_id.clone(),
-                speed: config.speed,
-                with_word_timings: true,
-            },
-            cancelled,
-        )
-        .await
+        let result = match self
+            .synthesize_with(
+                connection.synthesizer,
+                SynthesisRequest {
+                    text: text.to_string(),
+                    voice_id: voice,
+                    model_id: config.model_id.clone(),
+                    speed: config.speed,
+                    with_word_timings: true,
+                },
+                cancelled,
+            )
+            .await
         {
             Ok(result) => result,
             Err(error) => {
@@ -956,18 +1048,19 @@ impl AiTtsEngine {
                 Err(error) => tracing::warn!("Pre-buffer cache error: {error}"),
             }
         }
-        let result = Self::synthesize_with(
-            connection.synthesizer,
-            SynthesisRequest {
-                text: text.to_string(),
-                voice_id: voice,
-                model_id: config.model_id.clone(),
-                speed: config.speed,
-                with_word_timings: true,
-            },
-            cancelled,
-        )
-        .await?;
+        let result = self
+            .synthesize_with(
+                connection.synthesizer,
+                SynthesisRequest {
+                    text: text.to_string(),
+                    voice_id: voice,
+                    model_id: config.model_id.clone(),
+                    speed: config.speed,
+                    with_word_timings: true,
+                },
+                cancelled,
+            )
+            .await?;
         let result = Self::apply_wav_prosody(text, boundary_after, result)?;
         if result.media_type != media_type {
             return Err("TTS_MEDIA_MISMATCH: provider returned an unexpected format".into());
@@ -1088,6 +1181,50 @@ mod tests {
         }
     }
 
+    struct SuccessfulSynthesizer;
+
+    #[async_trait]
+    impl SynthesizerPort for SuccessfulSynthesizer {
+        fn provider(&self) -> SynthesisProvider {
+            SynthesisProvider::Local
+        }
+        fn provider_revision(&self) -> &str {
+            "magpie-test-1"
+        }
+        fn max_text_utf8_bytes(&self) -> usize {
+            300
+        }
+        fn supports_word_timings(&self) -> bool {
+            false
+        }
+        fn runtime_info(&self) -> ProviderRuntimeInfo {
+            ProviderRuntimeInfo {
+                provider_revision: self.provider_revision().to_string(),
+                model: Some("Magpie test".to_string()),
+                model_revision: Some("model-sha".to_string()),
+                quantization: Some("Q6_K".to_string()),
+                backend: Some("Vulkan/RADV".to_string()),
+                device: Some("Fixture GPU".to_string()),
+                acceleration: Some("gpu".to_string()),
+                queue_capacity: Some(1),
+                chunk_max_utf8_bytes: 300,
+            }
+        }
+        async fn list_voices(&self) -> Result<Vec<SynthesisVoice>, String> {
+            Ok(vec![voice(SynthesisProvider::Local, "voice")])
+        }
+        async fn synthesize(&self, _request: SynthesisRequest) -> Result<SynthesisResult, String> {
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            Ok(SynthesisResult {
+                audio_data: vec![0; 44],
+                media_type: AudioMediaType::Wav,
+                word_timings: Vec::new(),
+                total_duration: 2.0,
+                provider_revision: self.provider_revision().to_string(),
+            })
+        }
+    }
+
     struct CountingSynthesizer {
         provider: SynthesisProvider,
         calls: Arc<AtomicUsize>,
@@ -1166,6 +1303,40 @@ mod tests {
             .await
             .is_err());
         assert_eq!(engine.active_provider().await, Some(TtsProvider::Groq));
+    }
+
+    #[tokio::test]
+    async fn performance_snapshot_reports_runtime_and_uncached_standard_rtf() {
+        let engine = AiTtsEngine::for_test();
+        engine
+            .install_provider(
+                Arc::new(SuccessfulSynthesizer),
+                vec![voice(SynthesisProvider::Local, "voice")],
+            )
+            .await
+            .unwrap();
+
+        engine
+            .synthesize(SynthesisRequest {
+                text: "Olá".to_string(),
+                voice_id: "voice".to_string(),
+                model_id: None,
+                speed: 1.0,
+                with_word_timings: false,
+            })
+            .await
+            .unwrap();
+
+        let snapshot = engine.performance_snapshot().await.unwrap();
+        assert_eq!(snapshot.provider, TtsProvider::Local);
+        assert_eq!(snapshot.max_text_utf8_bytes, 300);
+        assert_eq!(snapshot.runtime.model.as_deref(), Some("Magpie test"));
+        assert_eq!(snapshot.runtime.acceleration.as_deref(), Some("gpu"));
+        let latest = snapshot.latest_uncached.unwrap();
+        assert_eq!(latest.request_utf8_bytes, 4);
+        assert_eq!(latest.audio_duration, 2.0);
+        assert!(latest.generation_ms >= 10.0, "{latest:?}");
+        assert!((latest.standard_rtf - latest.generation_ms / 2_000.0).abs() < 1e-9);
     }
 
     #[tokio::test]
