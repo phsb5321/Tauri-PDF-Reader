@@ -2,7 +2,7 @@
 
 ## Phase 1 — Red-capable contracts
 
-- [ ] T001 Add pure failing normalization tests for EN/PT-BR `2022`, `91,000`, decimals, percentages, currency, clock time, invalid grouping/version/ID rejection, UTF-16 partitions, and spoken-byte bounds.
+- [x] T001 Add pure failing normalization tests for EN/PT-BR `2022`, `91,000`, decimals, percentages, currency, clock time, invalid grouping/version/ID rejection, UTF-16 partitions, and spoken-byte bounds.
 - [x] T002 Add the real page-19 geometry fixture and failing planner assertion that superscript `1 2 3 4 5` produces no narration run below 12 bytes while body numbers remain.
 - [ ] T003 Add failing read-along motion tests for in-band no-op, above/below absolute target, clamp, coalescing, and reduced-motion invariance.
 - [ ] T004 Add failing TtsWordHighlight race test: A schedules delayed repaint, cursor advances to B, delayed A runs, registry still contains exactly B.
@@ -12,7 +12,7 @@
 
 ## Phase 2 — Source-aligned speech correctness
 
-- [ ] T008 Implement `speech-normalization.ts` pure number-to-words/replacement grammar with no dependency or ambient locale.
+- [x] T008 Implement `speech-normalization.ts` pure number-to-words/replacement grammar with no dependency or ambient locale.
 - [ ] T009 Refactor `prosody-plan.ts` to merge replace/insert/delete edits, accept normalization/language options, preserve exact source mapping, and bump planner revision.
 - [x] T010 Extend structured PDF source with segments and suppress only geometry-backed superscript numeric markers; make the page-19 oracle green.
 - [ ] T011 Extend AI-TTS preference state/persistence to v4 with follow, number normalization, and narration language; migrate/sanitize without secrets.
