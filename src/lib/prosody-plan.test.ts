@@ -259,6 +259,62 @@ describe("source-aligned prosody plan", () => {
     ).toEqual(["Chapter 2 begins here."]);
   });
 
+  it("speaks normalized numbers while keeping the digits highlightable", () => {
+    const text =
+      "In early 2022, the search returned over 91,000 unique results.";
+    const runs = planProsodyRuns({ text, language: "en" }, 300);
+
+    expect(runs).toHaveLength(1);
+    expect(runs[0].spokenText).toBe(
+      "In early two thousand twenty-two, the search returned over ninety-one thousand unique results.",
+    );
+    expect(runs[0].displayText).toBe(text);
+
+    const spoken = "two thousand twenty-two";
+    const spokenStart = runs[0].spokenText.indexOf(spoken);
+    expect(
+      mapSpokenRangeToSource(
+        runs[0].alignment,
+        spokenStart,
+        spokenStart + spoken.length,
+      ),
+    ).toEqual({ start: text.indexOf("2022"), end: text.indexOf("2022") + 4 });
+  });
+
+  it("leaves digits raw when number normalization is disabled", () => {
+    const text =
+      "In early 2022, the search returned over 91,000 unique results.";
+    expect(
+      planProsodyRuns(
+        { text, language: "en", normalizeNumbers: false },
+        300,
+      ).map((run) => run.spokenText),
+    ).toEqual([text]);
+  });
+
+  it("never speaks a superscript marker that geometry already silenced", () => {
+    const built = buildPdfText(page19FootnoteItems);
+    const runs = planProsodyRuns(
+      { ...built, segments: built.segments, language: "en" },
+      300,
+    );
+
+    expect(runs.map((run) => run.spokenText).join(" ")).not.toMatch(
+      /\b(?:one|two|three|four|five)\b/u,
+    );
+  });
+
+  it("keeps expanded number speech inside the provider byte bound", () => {
+    const text = "The 2022 report listed 91,000 rows. ".repeat(8);
+    const runs = planProsodyRuns({ text, language: "en" }, 120);
+
+    expect(runs.length).toBeGreaterThan(1);
+    expect(runs.every((run) => bytes(run.spokenText) <= 120)).toBe(true);
+    expect(runs.map((run) => run.spokenText).join(" ")).toContain(
+      "ninety-one thousand",
+    );
+  });
+
   it("retains the provider UTF-8 bound and fails closed on an oversized grapheme", () => {
     const text = `${"alpha ".repeat(40)}Since the end`;
     const runs = planProsodyRuns({ text }, 64);

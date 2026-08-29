@@ -32,7 +32,7 @@ use std::time::Instant;
 use tokio::sync::{watch, Mutex, RwLock};
 
 /// Cache contract shared with `src/lib/prosody-plan.ts`.
-const SOURCE_PROSODY_REVISION: &str = "source-aligned-v2";
+const SOURCE_PROSODY_REVISION: &str = "source-aligned-v3";
 
 /// Supported TTS providers
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Type, Default)]

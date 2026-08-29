@@ -1,7 +1,8 @@
 import type { PdfTextBoundary, PdfTextSegment } from "./pdf-text";
+import { findSpeechNumberReplacements } from "./speech-normalization";
 import { segmentSpeechWithOffsets } from "./tts-tracking";
 
-export const PROSODY_PLAN_REVISION = "source-aligned-v2";
+export const PROSODY_PLAN_REVISION = "source-aligned-v3";
 export const PROSODY_CONTEXT_MAX_UTF8_BYTES = 300;
 
 export type ProsodyLanguage = "auto" | "en" | "pt-BR";
@@ -21,6 +22,8 @@ export interface ProsodySource {
   boundaries?: readonly PdfTextBoundary[];
   segments?: readonly PdfTextSegment[];
   language?: ProsodyLanguage;
+  /** Defaults to enabled; only a resolved language actually rewrites numbers. */
+  normalizeNumbers?: boolean;
 }
 
 export interface SpokenRun {
@@ -165,6 +168,28 @@ function superscriptDeletions(source: ProsodySource): SourceEdit[] {
     }));
 }
 
+/** Numbers become spoken words while their exact source range stays intact. */
+function numberReplacements(source: ProsodySource): SourceEdit[] {
+  if (source.normalizeNumbers === false) return [];
+  // `auto` is unresolved at planning time: the caller maps the voice language
+  // first, because guessing would mis-read locale grouping separators.
+  if (source.language !== "en" && source.language !== "pt-BR") return [];
+  return findSpeechNumberReplacements(source.text, source.language).map(
+    (replacement) => ({
+      sourceStart: replacement.sourceStart,
+      sourceEnd: replacement.sourceEnd,
+      spokenText: replacement.spokenText,
+      kind: "replace" as const,
+    }),
+  );
+}
+
+function overlaps(left: SourceEdit, right: SourceEdit): boolean {
+  return (
+    left.sourceStart < right.sourceEnd && right.sourceStart < left.sourceEnd
+  );
+}
+
 function sourceEdits(source: ProsodySource): SourceEdit[] {
   const insertions = [
     ...structuredInsertions(source),
@@ -178,7 +203,15 @@ function sourceEdits(source: ProsodySource): SourceEdit[] {
       kind: "insert" as const,
     }));
 
-  return [...insertions, ...superscriptDeletions(source)].sort(
+  const deletions = superscriptDeletions(source);
+  // Geometry beats grammar: a superscript reference marker must stay silent
+  // rather than be read aloud as a number.
+  const replacements = numberReplacements(source).filter(
+    (replacement) =>
+      !deletions.some((deletion) => overlaps(deletion, replacement)),
+  );
+
+  return [...insertions, ...deletions, ...replacements].sort(
     (left, right) =>
       left.sourceStart - right.sourceStart || left.sourceEnd - right.sourceEnd,
   );
