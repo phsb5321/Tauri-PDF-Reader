@@ -20,12 +20,30 @@ import type { TextSelection } from "./TextLayer";
 import type { Rect } from "../lib/schemas";
 import { selectionToPageEnd } from "../lib/selection-narration";
 import { nextPdfWheelZoom } from "../lib/pdf-wheel-zoom";
+import { zoomPreview, type ZoomPreview } from "../lib/pdf-zoom-preview";
 import { annotatePdfTextLayer } from "../lib/pdf-text";
 import { markPdfPageReady } from "../lib/pdf-page-ready";
 import "./PdfViewer.css";
 
 // Padding around the PDF page
 const PAGE_PADDING = 40;
+
+/**
+ * Show `preview` on the rendered layers, or clear it when `preview` is null.
+ * Both layers take the same transform so selectable text stays registered with
+ * the glyphs underneath it while the sharp render is in flight.
+ */
+function applyZoomPreview(
+  canvas: HTMLCanvasElement | null,
+  textLayer: HTMLElement | null,
+  preview: ZoomPreview | null,
+): void {
+  for (const element of [canvas, textLayer]) {
+    if (!element) continue;
+    element.style.transform = preview ? preview.transform : "";
+    element.style.transformOrigin = preview ? preview.transformOrigin : "";
+  }
+}
 
 // Debounce delay for render operations (prevents render thrash during zoom/resize)
 const RENDER_DEBOUNCE_MS = 150;
@@ -53,6 +71,10 @@ export function PdfViewer({ onReadFromHere }: Readonly<PdfViewerProps>) {
   const renderTaskRef = useRef<ReturnType<PDFPageProxy["render"]> | null>(null);
   const renderDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const renderGenerationRef = useRef(0);
+  // What the visible canvas actually holds, which is what a zoom preview has
+  // to scale from — not the requested zoom.
+  const renderedZoomRef = useRef(0);
+  const renderedPageRef = useRef(0);
 
   const [warningDismissed, setWarningDismissed] = useState(false);
   const [memoryWarningDismissed, setMemoryWarningDismissed] = useState(false);
@@ -300,21 +322,16 @@ export function PdfViewer({ onReadFromHere }: Readonly<PdfViewerProps>) {
           height: Math.floor(viewport.height),
         });
 
-        // Set canvas physical dimensions (scaled for HiDPI based on render plan)
-        canvas.width = renderPlan.canvasWidth;
-        canvas.height = renderPlan.canvasHeight;
-
-        // Set canvas CSS dimensions (logical size)
-        canvas.style.width = `${Math.floor(viewport.width)}px`;
-        canvas.style.height = `${Math.floor(viewport.height)}px`;
-
-        // Set text layer dimensions
-        textLayerDiv.style.width = `${Math.floor(viewport.width)}px`;
-        textLayerDiv.style.height = `${Math.floor(viewport.height)}px`;
-        textLayerDiv.style.setProperty("--scale-factor", String(zoomLevel));
+        // Rasterize off-screen so the visible page keeps showing its previous
+        // (CSS-scaled) pixels until sharp ones exist. Resizing the live canvas
+        // here would blank it for the whole render, which is the flash the
+        // zoom preview exists to remove.
+        const target = document.createElement("canvas");
+        target.width = renderPlan.canvasWidth;
+        target.height = renderPlan.canvasHeight;
 
         // Get hardware-accelerated 2D context with optimal settings
-        const context = canvas.getContext("2d", {
+        const context = target.getContext("2d", {
           alpha: false, // Opaque canvas - faster rendering
           desynchronized: true, // Direct to display - hardware accelerated
           willReadFrequently: false, // Keep GPU acceleration enabled
@@ -326,7 +343,7 @@ export function PdfViewer({ onReadFromHere }: Readonly<PdfViewerProps>) {
         // An opaque canvas starts black. Paint the PDF page background before
         // pdf.js draws so a cancelled/failed render never leaves a black void.
         context.fillStyle = "#ffffff";
-        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.fillRect(0, 0, target.width, target.height);
 
         // Enable high-quality image rendering
         context.imageSmoothingEnabled = true;
@@ -349,6 +366,22 @@ export function PdfViewer({ onReadFromHere }: Readonly<PdfViewerProps>) {
 
         await renderTaskRef.current.promise;
         if (generation !== renderGenerationRef.current) return;
+
+        // Commit: size the visible canvas, blit the sharp pixels, and drop the
+        // zoom preview in one step so the swap has no intermediate frame.
+        canvas.width = renderPlan.canvasWidth;
+        canvas.height = renderPlan.canvasHeight;
+        canvas.style.width = `${Math.floor(viewport.width)}px`;
+        canvas.style.height = `${Math.floor(viewport.height)}px`;
+        canvas.getContext("2d", { alpha: false })?.drawImage(target, 0, 0);
+
+        textLayerDiv.style.width = `${Math.floor(viewport.width)}px`;
+        textLayerDiv.style.height = `${Math.floor(viewport.height)}px`;
+        textLayerDiv.style.setProperty("--scale-factor", String(zoomLevel));
+
+        applyZoomPreview(canvas, textLayerDiv, null);
+        renderedZoomRef.current = zoomLevel;
+        renderedPageRef.current = pageNumber;
 
         // Render text layer for selectable text
         const textContent = await page.getTextContent();
@@ -387,6 +420,8 @@ export function PdfViewer({ onReadFromHere }: Readonly<PdfViewerProps>) {
         if (err instanceof Error && err.message.includes("cancel")) {
           return;
         }
+        // A failed render must not strand the page under a preview transform.
+        applyZoomPreview(canvasRef.current, textLayerRef.current, null);
         console.error("Error rendering page:", err);
       }
     },
@@ -413,6 +448,16 @@ export function PdfViewer({ onReadFromHere }: Readonly<PdfViewerProps>) {
       pageContainerRef.current.setAttribute("aria-busy", "true");
     }
 
+    // Answer the zoom gesture on this frame by scaling the pixels already on
+    // screen. A page change has no comparable pixels, so it clears instead.
+    applyZoomPreview(
+      canvasRef.current,
+      textLayerRef.current,
+      renderedPageRef.current === currentPage
+        ? zoomPreview(renderedZoomRef.current, zoomLevel)
+        : null,
+    );
+
     // Debounce the render call
     renderDebounceRef.current = setTimeout(() => {
       void renderPage(generation);
@@ -438,7 +483,7 @@ export function PdfViewer({ onReadFromHere }: Readonly<PdfViewerProps>) {
         textLayerInstanceRef.current.cancel();
       }
     };
-  }, [renderPage]);
+  }, [renderPage, currentPage, zoomLevel]);
 
   // Update DisplayInfo on mount and when DPR/viewport changes (T017, T018)
   useEffect(() => {
