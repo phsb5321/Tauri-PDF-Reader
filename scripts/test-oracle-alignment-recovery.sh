@@ -357,10 +357,12 @@ JSON
     git -C "$repo" merge -q --no-ff unrelated-branch -m "fixture: merge unrelated branch after acceptance"
   fi
   if [[ "$variant" == receipt-uncommitted ]]; then
-    # Pre-acceptance topology: the receipt does not exist at HEAD yet, so the
-    # live goal set is still gating evidence rather than a frozen fact.
-    git -C "$repo" rm -q -- docs/alignment-recovery-receipt.json
-    git -C "$repo" commit -q -m "fixture: acceptance not generated yet"
+    # Pre-acceptance topology: HEAD is still accepted main A and the candidate
+    # receipt exists only in the working tree. A worktree-existence predicate
+    # would wrongly read this as a frozen receipt and drop the goal gate; only
+    # a committed-blob predicate keeps it.
+    git -C "$repo" reset -q --hard "$accepted_sha"
+    cp "$receipt" "$repo/docs/alignment-recovery-receipt.json"
   fi
   if [[ "$variant" == receipt-tampered ]]; then
     jq '.generated_at = "2026-08-21T00:00:00-03:00"' "$repo/docs/alignment-recovery-receipt.json" >"$repo/docs/alignment-recovery-receipt.json.tmp"
