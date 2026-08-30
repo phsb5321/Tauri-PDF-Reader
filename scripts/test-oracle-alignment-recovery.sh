@@ -356,6 +356,12 @@ JSON
     git -C "$repo" checkout -q main
     git -C "$repo" merge -q --no-ff unrelated-branch -m "fixture: merge unrelated branch after acceptance"
   fi
+  if [[ "$variant" == receipt-uncommitted ]]; then
+    # Pre-acceptance topology: the receipt does not exist at HEAD yet, so the
+    # live goal set is still gating evidence rather than a frozen fact.
+    git -C "$repo" rm -q -- docs/alignment-recovery-receipt.json
+    git -C "$repo" commit -q -m "fixture: acceptance not generated yet"
+  fi
   if [[ "$variant" == receipt-tampered ]]; then
     jq '.generated_at = "2026-08-21T00:00:00-03:00"' "$repo/docs/alignment-recovery-receipt.json" >"$repo/docs/alignment-recovery-receipt.json.tmp"
     mv "$repo/docs/alignment-recovery-receipt.json.tmp" "$repo/docs/alignment-recovery-receipt.json"
@@ -378,11 +384,37 @@ run_fixture() {
     "$ORACLE"
 }
 
+# The live path (#198) cannot be reached through a fixture file, so stub the one
+# command it reads. The stub serves whatever goal set the case wants pi to report.
+STUB_BIN="$TMP_ROOT/stub-bin"
+mkdir -p "$STUB_BIN"
+
+make_pi_stub() {
+  local goals_file="$1"
+  cat >"$STUB_BIN/pi" <<STUB
+#!/usr/bin/env bash
+[[ "\$*" == "goal status --all --json" ]] || exit 1
+cat -- "$goals_file"
+STUB
+  chmod +x "$STUB_BIN/pi"
+}
+
+run_fixture_live() {
+  env -u ORACLE_GOALS_FILE \
+    ORACLE_REPO_ROOT="$FIXTURE_REPO" \
+    ORACLE_VAULT_ROOT="$FIXTURE_VAULT" \
+    ORACLE_PR_STATES_FILE="$FIXTURE_PRS" \
+    PATH="$STUB_BIN:$PATH" \
+    "$ORACLE"
+}
+
+RUNNER=run_fixture
+
 expect_pass() {
   local name="$1"
   local output="$TMP_ROOT/$name.output"
   case_count=$((case_count + 1))
-  if run_fixture >"$output" 2>&1 && grep -q '^oracle-alignment-recovery: PASS at ' "$output"; then
+  if "$RUNNER" >"$output" 2>&1 && grep -q '^oracle-alignment-recovery: PASS at ' "$output"; then
     printf 'PASS %s\n' "$name"
     pass_count=$((pass_count + 1))
   else
@@ -397,7 +429,7 @@ expect_fail() {
   local output="$TMP_ROOT/$name.output" rc
   case_count=$((case_count + 1))
   set +e
-  run_fixture >"$output" 2>&1
+  "$RUNNER" >"$output" 2>&1
   rc=$?
   set -e
   if [[ "$rc" -ne 0 ]] && grep -q "^FAIL $expected_code:" "$output"; then
@@ -427,6 +459,31 @@ expect_fail pr-open E_PR_OPEN
 
 make_fixture goal-drift missing-goal
 expect_fail goal-drift E_GOAL_DRIFT
+
+# #198: live pi goal state is not committed evidence. Once the receipt exists at
+# HEAD, re-verification must survive a seat losing its goal — the drift is
+# reported and the frozen receipt still passes.
+make_fixture live-goal-drift missing-goal
+make_pi_stub "$TMP_ROOT/live-goal-drift/goals.json"
+RUNNER=run_fixture_live
+expect_pass live-goal-drift
+case_count=$((case_count + 1))
+if grep -q '^WARN fleet-qa no longer carries its accepted role-specific goal' "$TMP_ROOT/live-goal-drift.output"; then
+  printf 'PASS live-goal-drift -> WARN\n'
+  pass_count=$((pass_count + 1))
+else
+  printf 'FAIL live-goal-drift: expected a WARN for the drifted seat\n' >&2
+  cat "$TMP_ROOT/live-goal-drift.output" >&2
+  exit 1
+fi
+
+# …but before the receipt is committed, the same live drift still gates hard.
+make_fixture pre-acceptance-goal-drift receipt-uncommitted
+jq '[.[] | select(.seat != "fleet-qa")]' "$TMP_ROOT/pre-acceptance-goal-drift/goals.json" \
+  >"$TMP_ROOT/pre-acceptance-goal-drift/goals.live.json"
+make_pi_stub "$TMP_ROOT/pre-acceptance-goal-drift/goals.live.json"
+expect_fail pre-acceptance-goal-drift E_GOAL_DRIFT
+RUNNER=run_fixture
 
 make_fixture schema-invalid invalid-schema
 expect_fail schema-invalid E_RECEIPT_SCHEMA
