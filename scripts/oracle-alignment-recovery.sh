@@ -43,6 +43,10 @@ fatal() {
   exit 2
 }
 
+warn() {
+  printf 'WARN %s\n' "$1"
+}
+
 for command in git jq sha256sum sort diff mktemp; do
   command -v "$command" >/dev/null 2>&1 || fatal E_TOOL_MISSING "$command is required"
 done
@@ -123,8 +127,19 @@ fi
 
 # The four acceptance roles use the durable pi-goal JSON surface. A fixture can
 # replace the local tool for bounded tests; it cannot change the expected seats.
+#
+# Live pi goal state is the one input here that is not committed evidence: seats
+# finish, close, and are re-goaled, so a receipt accepted months ago decays into
+# BLOCK for reasons that say nothing about the work (issue #198 — fleet-eng-2
+# lost its goal once its Spec 079 slice finished). Goals are therefore evidence
+# AT FREEZE TIME: a fixture stays authoritative so the bounded falsifier keeps
+# its E_GOAL_DRIFT control, and a live run still gates hard while acceptance is
+# being generated. Once the receipt is committed at HEAD, re-verification checks
+# committed facts alone and live drift is reported as WARN. Same treatment PR
+# #171 gave the vault ref.
 goals_tmp="$(new_tmp)" || fatal E_TMP "cannot allocate goal buffer"
 goals_loaded=false
+goals_authoritative=true
 if [[ -n "${ORACLE_GOALS_FILE:-}" ]]; then
   if jq empty "$ORACLE_GOALS_FILE" >/dev/null 2>&1; then
     cp -- "$ORACLE_GOALS_FILE" "$goals_tmp"
@@ -135,6 +150,7 @@ if [[ -n "${ORACLE_GOALS_FILE:-}" ]]; then
 elif command -v pi >/dev/null 2>&1; then
   if pi goal status --all --json >"$goals_tmp" 2>/dev/null && jq -e 'type == "array"' "$goals_tmp" >/dev/null 2>&1; then
     goals_loaded=true
+    git -C "$REPO_ROOT" cat-file -e "HEAD:$RECEIPT_PATH" 2>/dev/null && goals_authoritative=false
   else
     fail E_GOALS_UNAVAILABLE "pi goal state could not be read"
   fi
@@ -144,12 +160,18 @@ fi
 
 if $goals_loaded; then
   goal_failures=0
+  goal_warnings=0
   while IFS=$'\t' read -r seat expected_goal; do
     if ! jq -e --arg seat "$seat" --arg goal "$expected_goal" \
       '[.[] | select(.seat == $seat and .goal == $goal)] | length == 1' \
       "$goals_tmp" >/dev/null; then
-      fail E_GOAL_DRIFT "$seat does not have its accepted role-specific goal"
-      goal_failures=$((goal_failures + 1))
+      if $goals_authoritative; then
+        fail E_GOAL_DRIFT "$seat does not have its accepted role-specific goal"
+        goal_failures=$((goal_failures + 1))
+      else
+        warn "$seat no longer carries its accepted role-specific goal; live seat state does not gate the committed receipt"
+        goal_warnings=$((goal_warnings + 1))
+      fi
     fi
   done <<'GOALS'
 fleet-po	Lectrice product contract: Spec Kit 079 freezes the user outcome and ranks all current work against it
@@ -157,7 +179,13 @@ fleet-eng-2	Lectrice alignment recovery: one accepted product contract, PRs #147
 fleet-qa	Lectrice QA: independently refute the alignment recovery and gate only exact merged heads
 fleet-eng	Lectrice control plane: a deterministic recovery oracle replaces model-authored done state
 GOALS
-  ((goal_failures == 0)) && pass "Product/Orch/QA/Control durable goals match"
+  if ((goal_failures == 0)); then
+    if ((goal_warnings > 0)); then
+      pass "Product/Orch/QA/Control goals drifted after acceptance; committed receipt is not gated on live seat state"
+    else
+      pass "Product/Orch/QA/Control durable goals match"
+    fi
+  fi
 fi
 
 # Live GitHub is optional to the local test harness, but final acceptance fails
