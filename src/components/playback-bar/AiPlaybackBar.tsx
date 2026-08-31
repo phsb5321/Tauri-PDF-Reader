@@ -145,9 +145,9 @@ export function AiPlaybackBar({
   const closeNarrationCockpit = useCallback((preservePlayback = false) => {
     if (preservePlayback) {
       suppressEscapeStopRef.current = true;
-      window.queueMicrotask(() => {
+      window.setTimeout(() => {
         suppressEscapeStopRef.current = false;
-      });
+      }, 0);
     }
     setShowSettings(false);
     window.requestAnimationFrame(() => settingsButtonRef.current?.focus());
