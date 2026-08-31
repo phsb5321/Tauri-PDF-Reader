@@ -148,10 +148,10 @@ if [ ! -f dist/index.html ]; then
     success "Stub dist written"
 fi
 
-run_gate "rust-format" bash -c "cd src-tauri && cargo fmt --check"
+run_gate "rust-format" bash -c "cd src-tauri && cargo-fmt --check"
 
 step "Clippy linting..."
-if command -v cargo-clippy &> /dev/null || cargo clippy --version &> /dev/null; then
+if command -v cargo-clippy &> /dev/null; then
     # Lint scope is deliberately identical to ci.yml's "Clippy" step (bare, no
     # --all-targets, no features). `-j 1` is a resource flag only; it does not
     # change what is linted. Widening this here would make the script red where
@@ -159,7 +159,7 @@ if command -v cargo-clippy &> /dev/null || cargo clippy --version &> /dev/null; 
     # CI itself never lints the example or the six integration-test targets --
     # that gap is real, but closing it edits .github/workflows, so it is filed
     # in docs/agent-backlog-state.md rather than fixed here.
-    if (cd src-tauri && cargo clippy -j 1 -- -D warnings) >/dev/null 2>&1; then
+    if (cd src-tauri && CARGO_BUILD_JOBS=1 cargo-clippy clippy -- -D warnings) >/dev/null 2>&1; then
         RECEIPT_GATES+=("{\"gate\":\"clippy\",\"status\":\"pass\"}")
         success "clippy"
     else
