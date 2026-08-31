@@ -38,7 +38,7 @@
 - [x] T022 Extend seeded fuzz actions/state assertions for follow, normalization/language, tab changes, page-ready cancellation, and selection limits; retain seed/replay.
 - [x] T023 Extend the deterministic prosody fixture and reused fail-closed local-TTS packaged lane to prove all tabs, selection replacement, professional paragraph action, real committed zoom/anchor/overflow, immediate page-two Play, and Stop (no duplicate runner/spec).
 - [x] T024 Run targeted lint/typecheck/tests, bridge contracts, fuzz seed `20260830`/2,000, and packaged public-control journeys; retain exact-head receipts and screenshots.
-- [ ] T025 Re-run full `pnpm verify`, Gitleaks controls, alignment/harness, and the existing real Magpie packaged journey on the repaired exact head.
+- [x] T025 Re-run full `pnpm verify`, Gitleaks controls, alignment/harness, and the existing real Magpie packaged journey on the repaired exact head.
 - [ ] T026 Obtain a capable different-family exact-head review; repair every BLOCKER/MAJOR and rerun affected executable gates.
 - [ ] T027 Update issue #196, #195, fleet row, Plane LECT parent/children, `docs/agent-backlog-state.md`, and durable save-state with exact evidence and reversal path. Plane writes remain fail-closed while VM105/server is offline; receipt lives under `~/.local/state/fleet-coordination/lectrice-196-overlay-zoom-20260830/`.
 - [ ] T028 Push a draft stacked PR; merge only when CI, review, parent-chain, and safe-class rules permit. Confirm final remote state rather than asserting delivery.
