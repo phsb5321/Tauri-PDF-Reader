@@ -353,6 +353,22 @@ describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
         (await browser.execute(() => window.__E2E_READ__.playbackState())) !==
         "idle",
     );
+    await openNarrationTab("voice");
+    await browser.waitUntil(
+      async () =>
+        (await browser.execute(() => window.__E2E_READ__.playbackState())) ===
+        "playing",
+      {
+        timeout: 5000,
+        timeoutMsg:
+          "narration was not active immediately before cockpit Escape",
+      },
+    );
+    await closeNarrationSettings();
+    expect(
+      await browser.execute(() => window.__E2E_READ__.playbackState()),
+    ).toBe("playing");
+
     let alignedHighlight = null;
     const seenHighlights = [];
     const readHighlight = () =>
@@ -418,22 +434,6 @@ describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
           document.querySelector(".tts-word-debug") === null,
       ),
     ).toBe(true);
-
-    await openNarrationTab("voice");
-    await browser.waitUntil(
-      async () =>
-        (await browser.execute(() => window.__E2E_READ__.playbackState())) ===
-        "playing",
-      {
-        timeout: 5000,
-        timeoutMsg:
-          "narration was not active immediately before cockpit Escape",
-      },
-    );
-    await closeNarrationSettings();
-    expect(
-      await browser.execute(() => window.__E2E_READ__.playbackState()),
-    ).toBe("playing");
 
     const receipt = await readFixtureRequests();
     expect(receipt.requests.length).toBeGreaterThanOrEqual(1);
