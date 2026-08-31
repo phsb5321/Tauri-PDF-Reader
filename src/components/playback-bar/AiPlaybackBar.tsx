@@ -6,12 +6,13 @@ import { useAnnounce, ANNOUNCEMENTS } from "../../hooks/useAnnounce";
 import { useDocumentStore } from "../../stores/document-store";
 import { useAiTtsStore } from "../../stores/ai-tts-store";
 import { pdfService } from "../../services/pdf-service";
-import { reducedMotionScrollBehavior } from "../../lib/reduced-motion";
 import { aiTtsPrebuffer } from "../../lib/api/ai-tts";
 import {
   planProsodyRuns,
+  resolveProsodyLanguage,
   type AlignmentSegment,
   type ProsodyBoundary,
+  type ProsodyLanguage,
   type ProsodySource,
   type SpokenRun,
 } from "../../lib/prosody-plan";
@@ -53,13 +54,19 @@ function sourceText(source: NarrationSource): string {
   return typeof source === "string" ? source : source.text;
 }
 
-function prosodySource(source: NarrationSource): ProsodySource {
+function prosodySource(
+  source: NarrationSource,
+  language: ProsodyLanguage,
+  normalizeNumbers: boolean,
+): ProsodySource {
   return typeof source === "string"
-    ? { text: source }
+    ? { text: source, language, normalizeNumbers }
     : {
         text: source.text,
         boundaries: source.boundaries,
         segments: source.segments,
+        language,
+        normalizeNumbers,
       };
 }
 
@@ -74,9 +81,14 @@ interface SentencePlaybackQueue {
   prefetchTail: Promise<void>;
 }
 
+interface SelectionPlayRequest {
+  token: number;
+  text: string;
+  baseOffset: number;
+}
+
 interface AiPlaybackBarProps {
   getText: () => Promise<NarrationSource | null>;
-  getTextBaseOffset?: () => number;
   enableHighlighting?: boolean;
   /**
    * Incremented by the catch-up shelf's opt-in "Resume & play" action. Any
@@ -85,13 +97,22 @@ interface AiPlaybackBarProps {
    * first even if the first never actually started (e.g. no API key yet).
    */
   autoPlayToken?: number;
+  /**
+   * Immutable “Read from here” intent. Unlike generic Play, it replaces any
+   * paused/active narration and binds text + offset to this exact request.
+   */
+  selectionPlayRequest?: SelectionPlayRequest | null;
+  onAutoPlayConsumed?: (token: number) => void;
+  onSelectionPlayConsumed?: (token: number) => void;
 }
 
 export function AiPlaybackBar({
   getText,
-  getTextBaseOffset,
   enableHighlighting = true,
   autoPlayToken = 0,
+  selectionPlayRequest = null,
+  onAutoPlayConsumed,
+  onSelectionPlayConsumed,
 }: AiPlaybackBarProps) {
   const {
     initialized,
@@ -129,7 +150,19 @@ export function AiPlaybackBar({
   const naturalCompletionCount = useAiTtsStore((s) => s.naturalCompletionCount);
   const provider = useAiTtsStore((s) => s.provider);
   const selectedVoiceId = useAiTtsStore((s) => s.selectedVoiceId);
+  const selectedVoice = useAiTtsStore(
+    (s) => s.voices.find((voice) => voice.id === s.selectedVoiceId) ?? null,
+  );
   const performanceProfile = useAiTtsStore((s) => s.performanceProfile);
+  const numberNormalizationEnabled = useAiTtsStore(
+    (s) => s.numberNormalizationEnabled,
+  );
+  const narrationLanguage = useAiTtsStore((s) => s.narrationLanguage);
+  const resolvedNarrationLanguage = resolveProsodyLanguage(
+    narrationLanguage,
+    selectedVoiceId,
+    selectedVoice?.labels ?? null,
+  );
   const playingRef = useRef(false);
   // Providers without marks use measured-duration word estimates. The UI must
   // remain on the same real audio clock instead of hiding karaoke and leaving
@@ -147,15 +180,23 @@ export function AiPlaybackBar({
     | null
   >(null);
   const playbackGenerationRef = useRef(0);
+  const selectionRestartEpochRef = useRef(0);
   const sentenceQueueRef = useRef<SentencePlaybackQueue | null>(null);
   const pageContinuationAbortRef = useRef<AbortController | null>(null);
   const pendingContinuationPageRef = useRef<number | null>(null);
+  const readerPageRef = useRef(currentPage);
   const cancelPageContinuation = useCallback(() => {
     pageContinuationAbortRef.current?.abort();
     pageContinuationAbortRef.current = null;
     pendingContinuationPageRef.current = null;
   }, []);
-  useEffect(() => () => cancelPageContinuation(), [cancelPageContinuation]);
+  useEffect(
+    () => () => {
+      selectionRestartEpochRef.current += 1;
+      cancelPageContinuation();
+    },
+    [cancelPageContinuation],
+  );
   const [sentenceProgress, setSentenceProgress] = useState<{
     completedWords: number;
     totalWords: number;
@@ -166,6 +207,7 @@ export function AiPlaybackBar({
   // cannot advance a sentence or page while the switch is settling.
   useEffect(() => {
     if (!switchingProvider) return;
+    selectionRestartEpochRef.current += 1;
     playingRef.current = false;
     playbackGenerationRef.current += 1;
     sentenceQueueRef.current = null;
@@ -178,6 +220,10 @@ export function AiPlaybackBar({
   // no-mark queue at the shared page authority. Natural auto-page clears the
   // completed queue before changing currentPage, so it is not cancelled here.
   useEffect(() => {
+    if (readerPageRef.current !== currentPage) {
+      readerPageRef.current = currentPage;
+      selectionRestartEpochRef.current += 1;
+    }
     const pendingPage = pendingContinuationPageRef.current;
     if (pendingPage !== null && pendingPage !== currentPage) {
       cancelPageContinuation();
@@ -222,38 +268,6 @@ export function AiPlaybackBar({
     [pdfDocument],
   );
 
-  /**
-   * Scroll to make the current TTS word visible (T036)
-   *
-   * Finds the word highlight element and scrolls the PDF viewer to show it
-   * when it's near the edge of the viewport.
-   */
-  const scrollToWord = useCallback((_wordIndex: number, _word: string) => {
-    // Find the word highlight element
-    const highlight = document.querySelector(".tts-word-highlight");
-    if (!highlight) return;
-
-    const rect = highlight.getBoundingClientRect();
-    const container = document.querySelector(".pdf-viewer");
-    if (!container) return;
-
-    const containerRect = container.getBoundingClientRect();
-    const margin = 100; // Pixels from edge to trigger scroll
-
-    // Respect prefers-reduced-motion: jump instantly instead of smooth-scrolling
-    // for users who opt out of motion.
-    const behavior = reducedMotionScrollBehavior();
-
-    // Check if word is near bottom edge
-    if (rect.bottom > containerRect.bottom - margin) {
-      highlight.scrollIntoView({ behavior, block: "center" });
-    }
-    // Check if word is near top edge
-    else if (rect.top < containerRect.top + margin) {
-      highlight.scrollIntoView({ behavior, block: "center" });
-    }
-  }, []);
-
   const prefetchSentences = useCallback(
     (queue: SentencePlaybackQueue, startIndex: number) => {
       if (supportsWordTimings) return;
@@ -288,7 +302,7 @@ export function AiPlaybackBar({
     [supportsWordTimings, selectedVoiceId],
   );
 
-  const startNoMarkSentenceSequence = useCallback(
+  const startSentenceSequence = useCallback(
     async (
       source: NarrationSource,
       pageNumber: number,
@@ -300,7 +314,11 @@ export function AiPlaybackBar({
         maxTextUtf8Bytes,
       );
       const sentences = planProsodyRuns(
-        prosodySource(source),
+        prosodySource(
+          source,
+          resolvedNarrationLanguage,
+          numberNormalizationEnabled,
+        ),
         maxTextUtf8Bytes,
         policy.contextMaxUtf8Bytes,
       );
@@ -356,6 +374,8 @@ export function AiPlaybackBar({
       prefetchSentences,
       provider,
       selectedVoiceId,
+      resolvedNarrationLanguage,
+      numberNormalizationEnabled,
     ],
   );
 
@@ -490,10 +510,8 @@ export function AiPlaybackBar({
         }
         return;
       }
-      if (!supportsWordTimings) {
-        await startNoMarkSentenceSequence(nextText, nextPage, 0);
-      } else if (usesWordHighlighting) {
-        await speakWithHighlightRef.current?.(sourceText(nextText), nextPage);
+      if (usesWordHighlighting) {
+        await startSentenceSequence(nextText, nextPage, 0);
       } else {
         await speak(sourceText(nextText));
       }
@@ -506,11 +524,10 @@ export function AiPlaybackBar({
     setCurrentPage,
     getPageText,
     usesWordHighlighting,
-    startNoMarkSentenceSequence,
+    startSentenceSequence,
     selectedVoiceId,
     prefetchSentences,
     speak,
-    supportsWordTimings,
     cancelPageContinuation,
   ]);
 
@@ -545,8 +562,6 @@ export function AiPlaybackBar({
     onWordChange: useCallback((wordIndex: number, word: string) => {
       console.debug("[AiPlaybackBar] Word changed:", wordIndex, word);
     }, []),
-    // Wire up scroll callback to keep current word visible (T037)
-    onScrollNeeded: scrollToWord,
   });
 
   useEffect(() => {
@@ -594,48 +609,58 @@ export function AiPlaybackBar({
     prevPausedRef.current = isPaused;
   }, [isPlaying, isPaused, announce]);
 
+  const startFreshPlayback = useCallback(
+    async (requestedSource?: NarrationSource, requestedBaseOffset = 0) => {
+      if (!canPlay) return;
+      cancelPageContinuation();
+      if (supportsWordTimings) playbackGenerationRef.current += 1;
+      playingRef.current = true;
+      const source = requestedSource ?? (await getText());
+      const baseOffset =
+        requestedSource === undefined ? 0 : requestedBaseOffset;
+      if (source) {
+        const text = sourceText(source);
+        const started = usesWordHighlighting
+          ? await startSentenceSequence(source, currentPage, baseOffset)
+          : await speak(text);
+        if (started === false) playingRef.current = false;
+      } else {
+        playingRef.current = false;
+      }
+    },
+    [
+      canPlay,
+      getText,
+      speak,
+      usesWordHighlighting,
+      supportsWordTimings,
+      startSentenceSequence,
+      currentPage,
+      cancelPageContinuation,
+    ],
+  );
+
   const handlePlay = useCallback(async () => {
     if (!canPlay || isLoading) return;
-    cancelPageContinuation();
-
     if (isPaused) {
+      cancelPageContinuation();
       if (usesWordHighlighting) {
         await resumeHighlight();
       } else {
         await resume();
       }
-    } else {
-      if (supportsWordTimings) playbackGenerationRef.current += 1;
-      playingRef.current = true;
-      const source = await getText();
-      const baseOffset = getTextBaseOffset?.() ?? 0;
-      if (source) {
-        const text = sourceText(source);
-        const started = !supportsWordTimings
-          ? await startNoMarkSentenceSequence(source, currentPage, baseOffset)
-          : usesWordHighlighting
-            ? await speakWithHighlight(text, currentPage, undefined, baseOffset)
-            : await speak(text);
-        if (started === false) playingRef.current = false;
-      } else {
-        playingRef.current = false;
-      }
+      return;
     }
+    await startFreshPlayback();
   }, [
     canPlay,
     isLoading,
     isPaused,
-    getText,
-    getTextBaseOffset,
-    speak,
     resume,
-    speakWithHighlight,
     resumeHighlight,
     usesWordHighlighting,
-    supportsWordTimings,
-    startNoMarkSentenceSequence,
-    currentPage,
     cancelPageContinuation,
+    startFreshPlayback,
   ]);
 
   const handlePause = useCallback(async () => {
@@ -662,11 +687,13 @@ export function AiPlaybackBar({
       !isLoading
     ) {
       consumedAutoPlayToken.current = autoPlayToken;
+      onAutoPlayConsumed?.(autoPlayToken);
       void handlePlay();
     }
-  }, [autoPlayToken, canPlay, isLoading, handlePlay]);
+  }, [autoPlayToken, canPlay, isLoading, handlePlay, onAutoPlayConsumed]);
 
   const handleStop = useCallback(async () => {
+    selectionRestartEpochRef.current += 1;
     playingRef.current = false;
     playbackGenerationRef.current += 1;
     sentenceQueueRef.current = null;
@@ -678,6 +705,54 @@ export function AiPlaybackBar({
       await stop();
     }
   }, [stop, stopHighlight, usesWordHighlighting, cancelPageContinuation]);
+
+  // A selection is a replace request, never a synonym for generic Play. Its
+  // immutable text/offset travels with the token, and an epoch makes any Stop,
+  // page/provider change, unmount, or newer selection cancel the async handoff.
+  const consumedSelectionPlayToken = useRef(0);
+  useEffect(() => {
+    if (!canPlay) selectionRestartEpochRef.current += 1;
+  }, [canPlay]);
+  useEffect(() => {
+    const request = selectionPlayRequest;
+    if (
+      !request ||
+      request.token <= consumedSelectionPlayToken.current ||
+      !canPlay
+    ) {
+      return;
+    }
+    consumedSelectionPlayToken.current = request.token;
+    onSelectionPlayConsumed?.(request.token);
+    const requestedPage = currentPage;
+    const requestedProvider = provider;
+    void (async () => {
+      const stopPromise = handleStop();
+      const restartEpoch = selectionRestartEpochRef.current;
+      await stopPromise;
+      const liveDocument = useDocumentStore.getState();
+      const liveTts = useAiTtsStore.getState();
+      if (
+        restartEpoch !== selectionRestartEpochRef.current ||
+        liveDocument.currentPage !== requestedPage ||
+        liveTts.provider !== requestedProvider ||
+        !liveTts.initialized ||
+        liveTts.error !== null ||
+        liveTts.switchingProvider !== null
+      ) {
+        return;
+      }
+      await startFreshPlayback(request.text, request.baseOffset);
+    })();
+  }, [
+    selectionPlayRequest,
+    canPlay,
+    handleStop,
+    startFreshPlayback,
+    onSelectionPlayConsumed,
+    currentPage,
+    provider,
+  ]);
 
   // Keyboard shortcuts
   useEffect(() => {

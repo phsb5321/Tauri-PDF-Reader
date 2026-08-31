@@ -234,8 +234,8 @@ export function useAiTts() {
               "[TTS] State transition: -> playing (started event)",
               { text: event.text.substring(0, 50) },
             );
-            store.setPlaybackState("playing");
-            store.setCurrentText(event.text);
+            useAiTtsStore.getState().setPlaybackState("playing");
+            useAiTtsStore.getState().setCurrentText(event.text);
           }
         });
         if (mounted) unsubscribers.push(unsub1);
@@ -260,21 +260,33 @@ export function useAiTts() {
         });
         if (mounted) unsubscribers.push(unsub3);
 
-        const unsub4 = await onAiTtsStopped(() => {
-          if (mounted) {
-            console.debug("[TTS] State transition: -> idle (stopped event)");
-            useTtsHighlightStore.getState().stopHighlighting();
-            store.setPlaybackState("idle");
-            store.setCurrentText(null);
-            store.setBackendPlaybackGeneration(null);
+        const unsub4 = await onAiTtsStopped((event) => {
+          if (!mounted) return;
+          const currentGeneration =
+            useAiTtsStore.getState().backendPlaybackGeneration;
+          if (
+            currentGeneration !== null &&
+            event.generation <= currentGeneration
+          ) {
+            console.debug("[TTS] Ignoring stale stopped event", {
+              stoppedGeneration: event.generation,
+              currentGeneration,
+            });
+            return;
           }
+          console.debug("[TTS] State transition: -> idle (stopped event)");
+          useTtsHighlightStore.getState().stopHighlighting();
+          const current = useAiTtsStore.getState();
+          current.setPlaybackState("idle");
+          current.setCurrentText(null);
+          current.setBackendPlaybackGeneration(null);
         });
         if (mounted) unsubscribers.push(unsub4);
 
         const unsub5 = await onAiTtsPaused(() => {
           if (mounted) {
             console.debug("[TTS] State transition: -> paused (paused event)");
-            store.setPlaybackState("paused");
+            useAiTtsStore.getState().setPlaybackState("paused");
           }
         });
         if (mounted) unsubscribers.push(unsub5);
@@ -282,7 +294,7 @@ export function useAiTts() {
         const unsub6 = await onAiTtsResumed(() => {
           if (mounted) {
             console.debug("[TTS] State transition: -> playing (resumed event)");
-            store.setPlaybackState("playing");
+            useAiTtsStore.getState().setPlaybackState("playing");
           }
         });
         if (mounted) unsubscribers.push(unsub6);
@@ -292,8 +304,9 @@ export function useAiTts() {
             console.debug("[TTS] State transition: -> error (error event)", {
               error: event.error,
             });
-            store.setError(event.error);
-            store.setPlaybackState("error");
+            const current = useAiTtsStore.getState();
+            current.setError(event.error);
+            current.setPlaybackState("error");
           }
         });
         if (mounted) unsubscribers.push(unsub7);
@@ -315,7 +328,7 @@ export function useAiTts() {
         }
       });
     };
-  }, [store]);
+  }, []);
 
   // Speak text
   const speak = useCallback(

@@ -107,17 +107,21 @@ async function physicalFileDrag(filePath, onHover) {
   }
 }
 
-function physicalWheel(button, modified) {
+function physicalWheel(button, modified, clientPoint = null) {
   const appWindow = xdotool("search", "--name", "^Lectrice$").split(/\s+/)[0];
   if (!appWindow) throw new Error("Lectrice X11 window not found");
   const geometry = windowGeometry(appWindow);
+  const point = clientPoint ?? {
+    x: Math.floor(geometry.width / 2),
+    y: Math.floor(geometry.height / 2),
+  };
   xdotool("windowraise", appWindow);
   xdotool("windowfocus", "--sync", appWindow);
   xdotool(
     "mousemove",
     "--sync",
-    String(geometry.x + Math.floor(geometry.width / 2)),
-    String(geometry.y + Math.floor(geometry.height / 2)),
+    String(geometry.x + Math.round(point.x)),
+    String(geometry.y + Math.round(point.y)),
   );
   if (modified) xdotool("keydown", "ctrl");
   try {
@@ -125,6 +129,88 @@ function physicalWheel(button, modified) {
   } finally {
     if (modified) xdotool("keyup", "ctrl");
   }
+}
+
+async function zoomSnapshot(clientPoint = null) {
+  return browser.execute((requestedPoint) => {
+    const viewer = document.querySelector(".pdf-viewer");
+    const page = document.querySelector(".pdf-page-container");
+    const canvas = page?.querySelector("canvas.pdf-canvas");
+    const text = page?.querySelector(".textLayer");
+    const firstSpan = text?.querySelector("span");
+    const selected = document.querySelector(".zoom-select option:checked");
+    if (!viewer || !page || !canvas || !text || !firstSpan || !selected) {
+      return null;
+    }
+
+    const viewerRect = viewer.getBoundingClientRect();
+    const pageRect = page.getBoundingClientRect();
+    const canvasRect = canvas.getBoundingClientRect();
+    const textRect = text.getBoundingClientRect();
+    const spanRect = firstSpan.getBoundingClientRect();
+    const point = requestedPoint ?? {
+      x: Math.max(
+        pageRect.left,
+        Math.min(pageRect.right, viewerRect.left + viewerRect.width / 2),
+      ),
+      y: Math.max(
+        pageRect.top,
+        Math.min(pageRect.bottom, viewerRect.top + viewerRect.height / 2),
+      ),
+    };
+
+    return {
+      point,
+      ready: page.getAttribute("data-render-ready"),
+      committedZoom: Number(page.getAttribute("data-render-zoom")),
+      selectedLabel: selected.textContent?.trim() ?? "",
+      viewer: {
+        left: viewerRect.left,
+        top: viewerRect.top,
+        width: viewerRect.width,
+        height: viewerRect.height,
+      },
+      page: {
+        left: pageRect.left,
+        top: pageRect.top,
+        width: pageRect.width,
+        height: pageRect.height,
+      },
+      canvas: {
+        left: canvasRect.left,
+        top: canvasRect.top,
+        width: canvasRect.width,
+        height: canvasRect.height,
+        backingWidth: canvas.width,
+        backingHeight: canvas.height,
+        previewTransform: canvas.style.transform,
+      },
+      text: {
+        left: textRect.left,
+        top: textRect.top,
+        width: textRect.width,
+        height: textRect.height,
+        scale: getComputedStyle(text).getPropertyValue("--scale-factor").trim(),
+        previewTransform: text.style.transform,
+      },
+      span: {
+        x: (spanRect.left - canvasRect.left) / canvasRect.width,
+        y: (spanRect.top - canvasRect.top) / canvasRect.height,
+      },
+      anchor: {
+        x: (point.x - pageRect.left) / pageRect.width,
+        y: (point.y - pageRect.top) / pageRect.height,
+      },
+      scroll: {
+        left: viewer.scrollLeft,
+        top: viewer.scrollTop,
+        width: viewer.scrollWidth,
+        height: viewer.scrollHeight,
+        clientWidth: viewer.clientWidth,
+        clientHeight: viewer.clientHeight,
+      },
+    };
+  }, clientPoint);
 }
 
 async function cardByTitle(title) {
@@ -204,21 +290,113 @@ describe("packaged legacy library completeness", () => {
       );
 
       await browser.setWindowSize(1200, 800);
-      const zoomPercent = async () =>
-        Number.parseInt(await $(".zoom-percentage").getText(), 10);
-      const zoomBeforeWheel = await zoomPercent();
-      physicalWheel(4, true);
       await browser.waitUntil(
-        async () => (await zoomPercent()) > zoomBeforeWheel,
+        async () => (await zoomSnapshot())?.ready === "true",
+        { timeout: 30000, timeoutMsg: "initial PDF geometry never committed" },
+      );
+      const zoomBefore = await zoomSnapshot();
+      expect(zoomBefore).not.toBeNull();
+
+      physicalWheel(4, true, zoomBefore.point);
+      await browser.waitUntil(
+        async () => {
+          const snapshot = await zoomSnapshot(zoomBefore.point);
+          return (
+            snapshot?.ready === "true" &&
+            snapshot.committedZoom > zoomBefore.committedZoom
+          );
+        },
         {
-          timeout: 10000,
-          timeoutMsg: "Ctrl+wheel-up did not zoom the PDF",
+          timeout: 30000,
+          timeoutMsg:
+            "Ctrl+wheel-up changed state but never committed PDF geometry",
         },
       );
-      const zoomAfterCtrlWheel = await zoomPercent();
-      physicalWheel(5, false);
+      const zoomAfter = await zoomSnapshot(zoomBefore.point);
+      expect(zoomAfter).not.toBeNull();
+
+      const ratio = zoomAfter.committedZoom / zoomBefore.committedZoom;
+      expect(
+        Math.abs(zoomAfter.canvas.width - zoomBefore.canvas.width * ratio),
+      ).toBeLessThanOrEqual(2);
+      expect(
+        Math.abs(zoomAfter.canvas.height - zoomBefore.canvas.height * ratio),
+      ).toBeLessThanOrEqual(2);
+      expect(
+        Math.abs(zoomAfter.canvas.left - zoomAfter.text.left),
+      ).toBeLessThanOrEqual(1);
+      expect(
+        Math.abs(zoomAfter.canvas.top - zoomAfter.text.top),
+      ).toBeLessThanOrEqual(1);
+      expect(
+        Math.abs(zoomAfter.canvas.width - zoomAfter.text.width),
+      ).toBeLessThanOrEqual(1);
+      expect(
+        Math.abs(zoomAfter.canvas.height - zoomAfter.text.height),
+      ).toBeLessThanOrEqual(1);
+      expect(
+        Math.max(zoomAfter.canvas.backingWidth, zoomAfter.canvas.backingHeight),
+      ).toBeLessThanOrEqual(8192);
+      expect(zoomAfter.canvas.previewTransform).toBe("");
+      expect(zoomAfter.text.previewTransform).toBe("");
+      expect(Number(zoomAfter.text.scale)).toBeCloseTo(
+        zoomAfter.committedZoom,
+        3,
+      );
+      expect(Number(zoomAfter.selectedLabel.match(/(\d+)%$/)?.[1])).toBe(
+        Math.round(zoomAfter.committedZoom * 100),
+      );
+      expect(
+        Math.abs(zoomAfter.span.x - zoomBefore.span.x),
+      ).toBeLessThanOrEqual(0.005);
+      expect(
+        Math.abs(zoomAfter.span.y - zoomBefore.span.y),
+      ).toBeLessThanOrEqual(0.005);
+      expect(
+        Math.abs(zoomAfter.anchor.x - zoomBefore.anchor.x),
+      ).toBeLessThanOrEqual(0.01);
+      expect(
+        Math.abs(zoomAfter.anchor.y - zoomBefore.anchor.y),
+      ).toBeLessThanOrEqual(0.01);
+      expect(zoomAfter.scroll.width).toBeGreaterThanOrEqual(
+        zoomAfter.page.width,
+      );
+      expect(zoomAfter.scroll.height).toBeGreaterThanOrEqual(
+        zoomAfter.page.height,
+      );
+
+      physicalWheel(5, false, zoomAfter.point);
       await delay(300);
-      expect(await zoomPercent()).toBe(zoomAfterCtrlWheel);
+      expect((await zoomSnapshot(zoomAfter.point)).committedZoom).toBe(
+        zoomAfter.committedZoom,
+      );
+
+      const zoomSelect = await $(".zoom-select");
+      await zoomSelect.selectByAttribute("value", "3");
+      await browser.waitUntil(
+        async () => {
+          const snapshot = await zoomSnapshot();
+          return (
+            snapshot?.ready === "true" &&
+            Math.abs(snapshot.committedZoom - 3) < 0.0001
+          );
+        },
+        {
+          timeout: 30000,
+          timeoutMsg: "300% preset did not produce a real high-zoom commit",
+        },
+      );
+      const highZoom = await zoomSnapshot();
+      expect(highZoom.selectedLabel).toBe("300%");
+      expect(
+        Math.max(highZoom.canvas.backingWidth, highZoom.canvas.backingHeight),
+      ).toBeLessThanOrEqual(8192);
+      expect(highZoom.scroll.width).toBeGreaterThan(
+        highZoom.scroll.clientWidth,
+      );
+      expect(highZoom.scroll.height).toBeGreaterThan(
+        highZoom.scroll.clientHeight,
+      );
 
       await browser.setWindowSize(640, 800);
       const readerNarrow = await browser.execute(() => {
@@ -312,9 +490,22 @@ describe("packaged legacy library completeness", () => {
         viewerDisplayed: true,
         chaptersSurface: true,
         ctrlWheel: {
-          before: zoomBeforeWheel,
-          after: zoomAfterCtrlWheel,
+          before: zoomBefore.committedZoom,
+          after: zoomAfter.committedZoom,
+          exactLabel: zoomAfter.selectedLabel,
+          anchorDelta: {
+            x: Math.abs(zoomAfter.anchor.x - zoomBefore.anchor.x),
+            y: Math.abs(zoomAfter.anchor.y - zoomBefore.anchor.y),
+          },
           ordinaryWheelPreservedZoom: true,
+        },
+        highZoom: {
+          committed: highZoom.committedZoom,
+          label: highZoom.selectedLabel,
+          maxBackingSide: Math.max(
+            highZoom.canvas.backingWidth,
+            highZoom.canvas.backingHeight,
+          ),
         },
         returnedToLibrary: true,
         activeSession: "Legacy readable book",

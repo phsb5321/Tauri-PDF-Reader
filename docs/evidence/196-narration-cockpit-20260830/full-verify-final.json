@@ -1,0 +1,18 @@
+{
+  "status": "passed",
+  "commit": "aec02dc73009707ad0b97bf3bf3118f5de87f25a",
+  "timestamp": "2026-08-31T14:47:29-03:00",
+  "gates": [
+    { "gate": "harness-policy", "status": "pass" },
+    { "gate": "dependencies", "status": "pass" },
+    { "gate": "typecheck", "status": "pass" },
+    { "gate": "lint", "status": "pass" },
+    { "gate": "lint-boundaries", "status": "pass" },
+    { "gate": "frontend-tests", "status": "pass" },
+    { "gate": "architecture-tests", "status": "pass" },
+    { "gate": "rust-format", "status": "pass" },
+    { "gate": "clippy", "status": "pass" },
+    { "gate": "rust-tests", "status": "pass" },
+    { "gate": "contract-tests", "status": "pass" }
+  ]
+}

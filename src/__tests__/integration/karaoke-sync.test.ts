@@ -41,6 +41,8 @@ const h = vi.hoisted(() => ({
     | null,
   /** The `ai-tts:finished` callback the hook registers on mount. */
   finishedCb: null as ((e?: { generation: number }) => void) | null,
+  /** The generation-scoped native Stop callback. */
+  stoppedCb: null as ((e: { generation: number }) => void) | null,
   /** What `aiTtsSpeakWithTimestamps` resolves to for the next speak call. */
   speakResult: {
     success: true,
@@ -58,6 +60,10 @@ vi.mock("../../lib/api/ai-tts", () => ({
   ),
   onAiTtsFinished: vi.fn((cb: (e?: { generation: number }) => void) => {
     h.finishedCb = cb;
+    return Promise.resolve(() => {});
+  }),
+  onAiTtsStopped: vi.fn((cb: (e: { generation: number }) => void) => {
+    h.stoppedCb = cb;
     return Promise.resolve(() => {});
   }),
 }));
@@ -116,11 +122,12 @@ async function startViaProductionPath(
   responseClockMs: number,
   baseOffset = 0,
   alignment?: readonly AlignmentSegment[],
+  generation = 7,
 ): Promise<void> {
   h.speakResult = { success: true, wordTimings, totalDuration };
   // The backend emits playback-starting right before audio begins.
   nowMs = eventClockMs;
-  act(() => h.playbackStartingCb?.({ duration: totalDuration, generation: 7 }));
+  act(() => h.playbackStartingCb?.({ duration: totalDuration, generation }));
   // The timestamps response arrives slightly later.
   nowMs = responseClockMs;
   await act(async () => {
@@ -134,6 +141,7 @@ beforeEach(() => {
   nextId = 0;
   h.playbackStartingCb = null;
   h.finishedCb = null;
+  h.stoppedCb = null;
   h.speakResult = { success: true, wordTimings: [], totalDuration: 0 };
   vi.spyOn(performance, "now").mockImplementation(() => nowMs);
   vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
@@ -305,6 +313,40 @@ describe("karaoke sync — highlight index advances with the timing marks", () =
     act(() => h.finishedCb?.({ generation: 7 }));
     expect(store().isActive).toBe(false);
     expect(onComplete).toHaveBeenCalledOnce();
+  });
+
+  it("ignores a delayed stopped event after its run was replaced", async () => {
+    const { result } = renderHook(() => useTtsWordHighlight());
+    await startViaProductionPath(
+      result.current.speakWithHighlight,
+      "alpha beta",
+      marks().slice(0, 2),
+      2,
+      0,
+      10,
+    );
+    await act(async () => result.current.stop());
+    await startViaProductionPath(
+      result.current.speakWithHighlight,
+      "gamma delta",
+      [
+        { word: "gamma", startTime: 0, endTime: 1, charStart: 0, charEnd: 5 },
+        { word: "delta", startTime: 1, endTime: 2, charStart: 6, charEnd: 11 },
+      ],
+      2,
+      20,
+      30,
+      0,
+      undefined,
+      8,
+    );
+
+    act(() => h.stoppedCb?.({ generation: 8 }));
+    expect(store().isActive).toBe(true);
+    expect(store().currentText).toBe("gamma delta");
+
+    act(() => h.stoppedCb?.({ generation: 9 }));
+    expect(store().isActive).toBe(false);
   });
 
   it("does not resurrect a stopped session when an old response arrives", async () => {

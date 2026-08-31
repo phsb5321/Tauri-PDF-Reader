@@ -3,6 +3,7 @@ import { TextLayer as PdfJsTextLayer } from "pdfjs-dist";
 import type { PDFPageProxy } from "pdfjs-dist";
 import { useDocumentStore } from "../stores/document-store";
 import { useRenderStore } from "../stores/render-store";
+import { useToastStore } from "../stores/toast-store";
 import { pdfService } from "../services/pdf-service";
 import {
   calculateRenderPlan,
@@ -16,12 +17,32 @@ import { PdfSkeleton } from "./pdf-viewer/PdfSkeleton";
 import { useHighlightCreation } from "./pdf-viewer/HighlightCreationHandler";
 import { HighlightOverlay } from "./pdf-viewer/HighlightOverlay";
 import { TtsWordHighlight } from "./pdf-viewer/TtsWordHighlight";
+import {
+  ParagraphActionOverlay,
+  type ParagraphActionLayout,
+} from "./pdf-viewer/ParagraphActionOverlay";
 import type { TextSelection } from "./TextLayer";
 import type { Rect } from "../lib/schemas";
-import { selectionToPageEnd } from "../lib/selection-narration";
+import {
+  isEffectiveWholePageSelection,
+  selectionToPageEnd,
+} from "../lib/selection-narration";
 import { nextPdfWheelZoom } from "../lib/pdf-wheel-zoom";
+import {
+  capturePdfZoomAnchor,
+  restorePdfZoomAnchor,
+  type PdfZoomAnchor,
+} from "../lib/pdf-zoom-anchor";
 import { zoomPreview, type ZoomPreview } from "../lib/pdf-zoom-preview";
-import { annotatePdfTextLayer } from "../lib/pdf-text";
+import {
+  annotatePdfTextLayer,
+  rangeFromAnnotatedPdfText,
+} from "../lib/pdf-text";
+import {
+  nonOverlappingParagraphActionPositions,
+  paragraphActionPosition,
+  pdfParagraphActions,
+} from "../lib/pdf-paragraph-actions";
 import { markPdfPageReady } from "../lib/pdf-page-ready";
 import "./PdfViewer.css";
 
@@ -75,6 +96,7 @@ export function PdfViewer({ onReadFromHere }: Readonly<PdfViewerProps>) {
   // to scale from — not the requested zoom.
   const renderedZoomRef = useRef(0);
   const renderedPageRef = useRef(0);
+  const zoomAnchorRef = useRef<PdfZoomAnchor | null>(null);
 
   const [warningDismissed, setWarningDismissed] = useState(false);
   const [memoryWarningDismissed, setMemoryWarningDismissed] = useState(false);
@@ -110,6 +132,11 @@ export function PdfViewer({ onReadFromHere }: Readonly<PdfViewerProps>) {
     width: 0,
     height: 0,
   });
+  const [paragraphActions, setParagraphActions] = useState<
+    ParagraphActionLayout[]
+  >([]);
+  const warnSelection = useToastStore((state) => state.warning);
+  const reportRenderError = useToastStore((state) => state.error);
 
   // Get highlights for current page
   const highlights = getHighlightsForPage(currentPage);
@@ -150,6 +177,21 @@ export function PdfViewer({ onReadFromHere }: Readonly<PdfViewerProps>) {
     }
     console.debug("[PdfViewer] Selected text:", selectedText.substring(0, 50));
 
+    const textLayer = textLayerRef.current;
+    const narration = textLayer
+      ? selectionToPageEnd(selection, textLayer)
+      : null;
+    if (!textLayer || !narration) {
+      selection.removeAllRanges();
+      warnSelection("Select text entirely within the current PDF page.");
+      return;
+    }
+    if (isEffectiveWholePageSelection(selection, textLayer)) {
+      selection.removeAllRanges();
+      warnSelection("Choose a paragraph or excerpt instead of the whole page.");
+      return;
+    }
+
     // Get selection rects relative to the page container
     const range = selection.getRangeAt(0);
     const clientRects = range.getClientRects();
@@ -168,9 +210,6 @@ export function PdfViewer({ onReadFromHere }: Readonly<PdfViewerProps>) {
     }
 
     if (rects.length > 0) {
-      const narration = textLayerRef.current
-        ? selectionToPageEnd(selection, textLayerRef.current)
-        : null;
       const textSelection: TextSelection = {
         text: selectedText,
         rects,
@@ -187,7 +226,7 @@ export function PdfViewer({ onReadFromHere }: Readonly<PdfViewerProps>) {
     } else {
       console.debug("[PdfViewer] No rects found for selection");
     }
-  }, [zoomLevel, currentPage, handleHighlightTextSelect]);
+  }, [zoomLevel, currentPage, handleHighlightTextSelect, warnSelection]);
 
   // Use document-level mouseup to capture text selection
   useEffect(() => {
@@ -246,9 +285,25 @@ export function PdfViewer({ onReadFromHere }: Readonly<PdfViewerProps>) {
   const handleWheel = useCallback((event: WheelEvent) => {
     if (!event.ctrlKey && !event.metaKey) return;
     event.preventDefault();
-    const { zoomLevel: currentZoom, setZoomLevel } =
-      useDocumentStore.getState();
-    setZoomLevel(nextPdfWheelZoom(currentZoom, event.deltaY));
+    const state = useDocumentStore.getState();
+    const targetZoom = nextPdfWheelZoom(state.zoomLevel, event.deltaY);
+    const viewer = containerRef.current;
+    const page = pageContainerRef.current;
+
+    if (viewer && page && targetZoom !== state.zoomLevel) {
+      const existing = zoomAnchorRef.current;
+      zoomAnchorRef.current =
+        existing?.pageNumber === state.currentPage
+          ? { ...existing, targetZoom }
+          : capturePdfZoomAnchor(
+              page.getBoundingClientRect(),
+              viewer.getBoundingClientRect(),
+              state.currentPage,
+              targetZoom,
+              { x: event.clientX, y: event.clientY },
+            );
+    }
+    state.setZoomLevel(targetZoom);
   }, []);
 
   useEffect(() => {
@@ -380,8 +435,6 @@ export function PdfViewer({ onReadFromHere }: Readonly<PdfViewerProps>) {
         textLayerDiv.style.setProperty("--scale-factor", String(zoomLevel));
 
         applyZoomPreview(canvas, textLayerDiv, null);
-        renderedZoomRef.current = zoomLevel;
-        renderedPageRef.current = pageNumber;
 
         // Render text layer for selectable text
         const textContent = await page.getTextContent();
@@ -395,11 +448,78 @@ export function PdfViewer({ onReadFromHere }: Readonly<PdfViewerProps>) {
 
         await textLayerInstanceRef.current.render();
         if (generation !== renderGenerationRef.current) return;
-        annotatePdfTextLayer(textLayerDiv, textContent.items);
+        const builtText = annotatePdfTextLayer(textLayerDiv, textContent.items);
+        renderedZoomRef.current = zoomLevel;
+        renderedPageRef.current = pageNumber;
 
         const pageContainer = pageContainerRef.current;
         if (pageContainer) {
+          const containerRect = pageContainer.getBoundingClientRect();
+          const rootFontSize =
+            Number.parseFloat(
+              getComputedStyle(document.documentElement).fontSize,
+            ) || 16;
+          const actionMetrics = {
+            targetSize: Math.max(45, rootFontSize * 2.2),
+            viewerGutter: rootFontSize * 2,
+          };
+          const projectedActions = pdfParagraphActions(builtText).flatMap(
+            (action) => {
+              const range = rangeFromAnnotatedPdfText(
+                textLayerDiv,
+                action.sourceStart,
+                action.sourceEnd,
+              );
+              const rects = range ? Array.from(range.getClientRects()) : [];
+              const position = paragraphActionPosition(
+                rects,
+                containerRect,
+                actionMetrics,
+              );
+              if (!position) return [];
+              return [
+                {
+                  index: action.index,
+                  sourceStart: action.sourceStart,
+                  narrationText: action.narrationText,
+                  previewText: action.previewText,
+                  ...position,
+                },
+              ];
+            },
+          );
+          setParagraphActions(
+            nonOverlappingParagraphActionPositions(
+              projectedActions,
+              actionMetrics.targetSize,
+            ),
+          );
+          const anchor = zoomAnchorRef.current;
+          const viewer = containerRef.current;
+          if (
+            viewer &&
+            anchor?.pageNumber === pageNumber &&
+            Math.abs(anchor.targetZoom - zoomLevel) < 0.0001
+          ) {
+            const target = restorePdfZoomAnchor(
+              anchor,
+              pageContainer.getBoundingClientRect(),
+              viewer.getBoundingClientRect(),
+              {
+                left: viewer.scrollLeft,
+                top: viewer.scrollTop,
+                maxLeft: Math.max(0, viewer.scrollWidth - viewer.clientWidth),
+                maxTop: Math.max(0, viewer.scrollHeight - viewer.clientHeight),
+              },
+            );
+            viewer.scrollLeft = target.left;
+            viewer.scrollTop = target.top;
+            zoomAnchorRef.current = null;
+          }
+          pageContainer.dataset.renderPage = String(pageNumber);
+          pageContainer.dataset.renderZoom = String(zoomLevel);
           pageContainer.dataset.renderReady = "true";
+          delete pageContainer.dataset.renderError;
           pageContainer.setAttribute("aria-busy", "false");
         }
         markPdfPageReady(pageNumber);
@@ -420,8 +540,28 @@ export function PdfViewer({ onReadFromHere }: Readonly<PdfViewerProps>) {
         if (err instanceof Error && err.message.includes("cancel")) {
           return;
         }
-        // A failed render must not strand the page under a preview transform.
+        // Never leave requested controls over stale pixels. Roll back to the
+        // last canvas+text commit and make the failure visible.
         applyZoomPreview(canvasRef.current, textLayerRef.current, null);
+        zoomAnchorRef.current = null;
+        const pageContainer = pageContainerRef.current;
+        if (pageContainer) {
+          pageContainer.dataset.renderReady = "false";
+          pageContainer.dataset.renderError = "true";
+          pageContainer.setAttribute("aria-busy", "false");
+        }
+        if (
+          renderedZoomRef.current > 0 &&
+          Math.abs(useDocumentStore.getState().zoomLevel - zoomLevel) < 0.0001
+        ) {
+          useDocumentStore.setState({
+            zoomLevel: renderedZoomRef.current,
+            fitMode: "none",
+          });
+        }
+        reportRenderError(
+          "PDF zoom could not be rendered; restored the last view.",
+        );
         console.error("Error rendering page:", err);
       }
     },
@@ -432,6 +572,7 @@ export function PdfViewer({ onReadFromHere }: Readonly<PdfViewerProps>) {
       settings,
       displayInfo,
       setCurrentRenderPlan,
+      reportRenderError,
     ],
   );
 
@@ -443,6 +584,32 @@ export function PdfViewer({ onReadFromHere }: Readonly<PdfViewerProps>) {
       clearTimeout(renderDebounceRef.current);
     }
     const generation = ++renderGenerationRef.current;
+    const pageChanged =
+      renderedPageRef.current !== 0 && renderedPageRef.current !== currentPage;
+    const zoomChanged =
+      renderedPageRef.current === currentPage &&
+      renderedZoomRef.current > 0 &&
+      Math.abs(renderedZoomRef.current - zoomLevel) >= 0.0001;
+    const viewer = containerRef.current;
+    const page = pageContainerRef.current;
+
+    if (pageChanged) {
+      zoomAnchorRef.current = null;
+      if (viewer) viewer.scrollTop = 0;
+    } else if (
+      zoomChanged &&
+      viewer &&
+      page &&
+      Math.abs((zoomAnchorRef.current?.targetZoom ?? 0) - zoomLevel) >= 0.0001
+    ) {
+      zoomAnchorRef.current = capturePdfZoomAnchor(
+        page.getBoundingClientRect(),
+        viewer.getBoundingClientRect(),
+        currentPage,
+        zoomLevel,
+      );
+    }
+    setParagraphActions([]);
     if (pageContainerRef.current) {
       pageContainerRef.current.dataset.renderReady = "false";
       pageContainerRef.current.setAttribute("aria-busy", "true");
@@ -765,6 +932,12 @@ export function PdfViewer({ onReadFromHere }: Readonly<PdfViewerProps>) {
         <canvas ref={canvasRef} className="pdf-canvas" />
         {/* Text layer - selectable text overlay (native mouseup listener in useEffect) */}
         <div ref={textLayerRef} className="textLayer" />
+        {onReadFromHere && (
+          <ParagraphActionOverlay
+            actions={paragraphActions}
+            onReadFromHere={onReadFromHere}
+          />
+        )}
         {/* TTS word highlight overlay - karaoke-style highlighting */}
         <TtsWordHighlight pageNumber={currentPage} scale={zoomLevel} />
         {/* Highlight overlay */}

@@ -12,9 +12,14 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, act } from "@testing-library/react";
 import { TtsWordHighlight } from "../../components/pdf-viewer/TtsWordHighlight";
 import { useTtsHighlightStore } from "../../stores/tts-highlight-store";
+import { useSettingsStore } from "../../stores/settings-store";
 import type { WordTiming } from "../../lib/api/ai-tts";
 
 const TEXT = "Alpha beta gamma";
+const rangeRectDescriptor = Object.getOwnPropertyDescriptor(
+  Range.prototype,
+  "getBoundingClientRect",
+);
 
 const TIMINGS: WordTiming[] = [
   { word: "Alpha", charStart: 0, charEnd: 5, startTime: 0, endTime: 1 },
@@ -54,6 +59,7 @@ function painted(name: string): string[] {
 function mountTextLayer(): HTMLElement {
   const page = document.createElement("div");
   page.setAttribute("data-page-number", "1");
+  page.className = "pdf-viewer";
   const layer = document.createElement("div");
   layer.className = "textLayer";
   const span = document.createElement("span");
@@ -74,11 +80,25 @@ describe("read-along highlight", () => {
     registry.clear();
     page = mountTextLayer();
     useTtsHighlightStore.getState().reset();
+    useSettingsStore.setState({ ttsFollowAlong: true });
   });
 
   afterEach(() => {
     useTtsHighlightStore.getState().reset();
     page.remove();
+    if (rangeRectDescriptor) {
+      Object.defineProperty(
+        Range.prototype,
+        "getBoundingClientRect",
+        rangeRectDescriptor,
+      );
+    } else {
+      delete (
+        Range.prototype as Range & {
+          getBoundingClientRect?: () => DOMRect;
+        }
+      ).getBoundingClientRect;
+    }
     vi.useRealTimers();
   });
 
@@ -144,6 +164,40 @@ describe("read-along highlight", () => {
     });
 
     expect(painted("tts-current-word")).toEqual(["gamma"]);
+  });
+
+  it("coalesces stale range scrolls and follows the latest out-of-band word", () => {
+    const scrollTo = vi.fn();
+    Object.defineProperties(page, {
+      scrollTop: { configurable: true, writable: true, value: 600 },
+      scrollHeight: { configurable: true, value: 2_000 },
+      clientHeight: { configurable: true, value: 400 },
+      scrollTo: { configurable: true, value: scrollTo },
+    });
+    page.getBoundingClientRect = () => ({ top: 100, bottom: 500 }) as DOMRect;
+    Object.defineProperty(Range.prototype, "getBoundingClientRect", {
+      configurable: true,
+      value(this: Range) {
+        const text = this.toString();
+        const top = text === "beta" ? 120 : text === "gamma" ? 470 : 250;
+        return { top, bottom: top + 20 } as DOMRect;
+      },
+    });
+
+    render(<TtsWordHighlight pageNumber={1} scale={1} />);
+    start();
+    expect(scrollTo).not.toHaveBeenCalled();
+    act(() => {
+      useTtsHighlightStore.getState().updateCurrentWord(1);
+    });
+    act(() => {
+      useTtsHighlightStore.getState().updateCurrentWord(2);
+    });
+    act(() => {
+      vi.runOnlyPendingTimers();
+    });
+    expect(scrollTo).toHaveBeenCalledTimes(1);
+    expect(scrollTo).toHaveBeenCalledWith({ top: 780, behavior: "smooth" });
   });
 
   it("clears both tiers when narration stops", () => {

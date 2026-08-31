@@ -5,15 +5,11 @@
  * Handles loading settings on mount and saving changes to the backend.
  */
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect } from "react";
 // TODO: Migrate to type-safe bindings when render_settings commands are added to tauri-specta
 // eslint-disable-next-line no-restricted-imports
 import { invoke } from "@tauri-apps/api/core";
-import {
-  useRenderStore,
-  selectRenderSettings,
-  selectRenderStoreStatus,
-} from "../stores/render-store";
+import { useRenderStore, selectRenderSettings } from "../stores/render-store";
 import type { RenderSettings } from "../domain/rendering";
 import { RenderSettingsSchema } from "../domain/rendering";
 
@@ -31,28 +27,35 @@ interface UpdateRenderSettingsResponse {
  */
 export function useRenderSettings() {
   const settings = useRenderStore(selectRenderSettings);
-  const { isLoading, error, hasUnsavedChanges, pendingRestart } =
-    useRenderStore(selectRenderStoreStatus);
+  const isLoading = useRenderStore((state) => state.isLoading);
+  const settingsInitialized = useRenderStore(
+    (state) => state.settingsInitialized,
+  );
+  const error = useRenderStore((state) => state.error);
+  const hasUnsavedChanges = useRenderStore((state) => state.hasUnsavedChanges);
+  const pendingRestart = useRenderStore((state) => state.pendingRestart);
 
   const setSettings = useRenderStore((state) => state.setSettings);
   const updateSettings = useRenderStore((state) => state.updateSettings);
   const resetSettings = useRenderStore((state) => state.resetSettings);
   const setLoading = useRenderStore((state) => state.setLoading);
+  const setSettingsInitialized = useRenderStore(
+    (state) => state.setSettingsInitialized,
+  );
   const setError = useRenderStore((state) => state.setError);
   const setHasUnsavedChanges = useRenderStore(
     (state) => state.setHasUnsavedChanges,
   );
   const setPendingRestart = useRenderStore((state) => state.setPendingRestart);
 
-  // Track if initial load has been done
-  const initialLoadDone = useRef(false);
-
   /**
-   * Load settings from backend on mount
+   * Load settings once for the whole app. The live store guard matters because
+   * App and the Rendering panel can mount separate hook instances in one tick.
    */
   useEffect(() => {
-    if (initialLoadDone.current) return;
-    initialLoadDone.current = true;
+    if (settingsInitialized || isLoading) return;
+    const live = useRenderStore.getState();
+    if (live.settingsInitialized || live.isLoading) return;
 
     const loadSettings = async () => {
       setLoading(true);
@@ -60,23 +63,28 @@ export function useRenderSettings() {
 
       try {
         const response = await invoke<RenderSettings>("get_render_settings");
-
-        // Validate response with Zod
-        const validated = RenderSettingsSchema.parse(response);
-        setSettings(validated);
+        setSettings(RenderSettingsSchema.parse(response));
       } catch (err) {
         console.error("Failed to load render settings:", err);
         setError(
           err instanceof Error ? err.message : "Failed to load settings",
         );
-        // Keep default settings on error
+        // Keep the synchronous safe defaults on error.
       } finally {
+        setSettingsInitialized(true);
         setLoading(false);
       }
     };
 
-    loadSettings();
-  }, [setSettings, setLoading, setError]);
+    void loadSettings();
+  }, [
+    isLoading,
+    settingsInitialized,
+    setSettings,
+    setLoading,
+    setSettingsInitialized,
+    setError,
+  ]);
 
   /**
    * Save current settings to backend

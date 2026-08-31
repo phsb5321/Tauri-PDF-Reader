@@ -37,6 +37,16 @@ export function NarrationDeliverySettings({
   const profile = useAiTtsStore((state) => state.performanceProfile);
   const setProfile = useAiTtsStore((state) => state.setPerformanceProfile);
   const maxTextUtf8Bytes = useAiTtsStore((state) => state.maxTextUtf8Bytes);
+  const numberNormalizationEnabled = useAiTtsStore(
+    (state) => state.numberNormalizationEnabled,
+  );
+  const setNumberNormalizationEnabled = useAiTtsStore(
+    (state) => state.setNumberNormalizationEnabled,
+  );
+  const narrationLanguage = useAiTtsStore((state) => state.narrationLanguage);
+  const setNarrationLanguage = useAiTtsStore(
+    (state) => state.setNarrationLanguage,
+  );
   const followAlong = useSettingsStore((state) => state.ttsFollowAlong);
   const setFollowAlong = useSettingsStore((state) => state.setTtsFollowAlong);
 
@@ -58,6 +68,7 @@ export function NarrationDeliverySettings({
         <input
           type="checkbox"
           checked={followAlong}
+          disabled={disabled}
           onChange={(event) => setFollowAlong(event.target.checked)}
         />
       </label>
@@ -70,9 +81,49 @@ export function NarrationDeliverySettings({
         <input
           type="checkbox"
           checked={autoPageEnabled}
+          disabled={disabled}
           onChange={(event) => setAutoPageEnabled(event.target.checked)}
         />
       </label>
+
+      <label className="narration-toggle-row">
+        <span>
+          <strong>Speak written numbers</strong>
+          <small>
+            Pronounce years, grouped numbers, percentages, money, and times
+            without changing the PDF.
+          </small>
+        </span>
+        <input
+          type="checkbox"
+          checked={numberNormalizationEnabled}
+          disabled={disabled}
+          onChange={(event) =>
+            setNumberNormalizationEnabled(event.target.checked)
+          }
+        />
+      </label>
+
+      <div className="narration-setting-row">
+        <label htmlFor="narration-language">
+          <strong>Narration language</strong>
+          <small>
+            Auto follows a declared voice language; it never guesses.
+          </small>
+        </label>
+        <select
+          id="narration-language"
+          value={narrationLanguage}
+          disabled={disabled}
+          onChange={(event) =>
+            setNarrationLanguage(event.target.value as "auto" | "en" | "pt-BR")
+          }
+        >
+          <option value="auto">Auto</option>
+          <option value="en">English</option>
+          <option value="pt-BR">Português (Brasil)</option>
+        </select>
+      </div>
 
       <fieldset className="narration-profile-grid" disabled={disabled}>
         <legend>Delivery profile</legend>

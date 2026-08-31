@@ -38,9 +38,9 @@ export interface QualityModeConfig {
  */
 export const RenderSettingsSchema = z.object({
   /** Selected quality profile */
-  qualityMode: QualityModeSchema.default("ultra"),
-  /** Canvas size cap in megapixels (8-48) */
-  maxMegapixels: z.number().min(0).max(500).default(0),
+  qualityMode: QualityModeSchema.default("balanced"),
+  /** Canvas size cap in megapixels; 0 disables only this configurable cap. */
+  maxMegapixels: z.number().min(0).max(500).default(24),
   /** GPU acceleration toggle (requires restart) */
   hwAccelerationEnabled: z.boolean().default(true),
   /** Show render diagnostics overlay */
@@ -50,11 +50,12 @@ export const RenderSettingsSchema = z.object({
 export type RenderSettings = z.infer<typeof RenderSettingsSchema>;
 
 /**
- * Default render settings - Maximum quality by default
+ * Safe synchronous defaults. These match the backend so the first PDF render
+ * cannot race persisted settings with an uncapped ultra canvas.
  */
 export const DEFAULT_RENDER_SETTINGS: RenderSettings = {
-  qualityMode: "ultra",
-  maxMegapixels: 0,
+  qualityMode: "balanced",
+  maxMegapixels: 24,
   hwAccelerationEnabled: true,
   debugOverlayEnabled: false,
 };
@@ -187,6 +188,8 @@ export const RENDER_CONSTANTS = {
   MEGAPIXEL_DIVISOR: 1_000_000,
   /** Megabyte divisor */
   MEGABYTE_DIVISOR: 1024 * 1024,
+  /** WebKit's supported maximum backing-canvas side (spec 004 research). */
+  MAX_CANVAS_DIMENSION: 8192,
   /** Default debounce delay (ms) */
   RENDER_DEBOUNCE_MS: 150,
 } as const;

@@ -16,6 +16,10 @@
 4. Real page 19 yields terminal runs `1 2 3.`, `4.`, `5` from isolated 11.25 pt superscript markers versus 15 pt body text. Those requests consume roughly ten seconds and mimic a frozen transition.
 5. `prosody-plan` does not normalize body numbers, so `2022` and `91,000` reach Magpie as raw symbols.
 6. The footer's `1fr / fixed center / 1fr` grid creates the reported empty center and its settings control opens only `AiTtsSettings`.
+7. `ZoomControls` selects the nearest fixed preset while printing exact state in a sibling label, so continuous 2.80× state becomes the contradictory `300% 280%` shown in user evidence.
+8. The frontend renders with `ultra` + unlimited megapixels until the user opens Settings → Rendering; persisted backend defaults are `balanced` + 24 MP. At 280% the first path requests 6854×8870, beyond the project's documented 8192 px WebKit side limit.
+9. Packaged zoom checks assert only that percentage text changes. They do not observe committed page/canvas/text/highlight geometry, readiness, scroll extent, preview cleanup, or source-point anchoring.
+10. Paragraph actions use unrelated `min(left)`/`min(top)` rects, a fixed four-pixel text gap, page-wide reveal, low-opacity compositing, and button-relative vertical translation; each defect changes perceived placement or contrast across zoom.
 
 ## Architecture
 
@@ -54,9 +58,11 @@ Refactor `TtsWordHighlight`:
 
 `AiPlaybackBar` replaces the 500 ms continuation timeout with the exact ready handshake. Failure clears playing/queue state and exposes `TTS_PAGE_NOT_READY`.
 
-### 4. Selection policy
+### 4. Selection and paragraph-action policy
 
 Extend `selection-narration.ts` with source-layer selection analysis. `PdfViewer.handleTextSelection` requires both endpoints inside the current annotated layer, computes normalized selected/page coverage, and rejects effective whole-page selection. Rejection clears browser selection and shows a warning toast. Existing excerpt coordinates, highlight creation, and Read from here remain unchanged.
+
+Project structural paragraph starts into a pure, tested margin-layout function using the first line rect in document order. A transparent 44 px target sits wholly before the first glyph or fails closed when page/viewer gutter is insufficient. Its rest state is a paper-safe semantic tick; only that paragraph's hover/focus state becomes a small voice-colour action with a real focus outline. No page-wide reveal, opacity-composited text, scale motion, shadowed 44 px disc, or text-layer mutation remains.
 
 ### 5. Persisted real preferences
 
@@ -82,7 +88,18 @@ Add `NarrationCockpit.tsx/.css` and `NarrationDeliverySettings.tsx`:
 
 Refactor the compact footer to `auto minmax(16rem,1fr) auto`, a full status/progress lane, quick voice/speed, export, and labeled Tune. Remove the ambiguous auto-page icon, special modal overlay, nonexistent scroll callback, and duplicate CSS declarations. Narrow layout becomes two compact rows; the drawer becomes one column with horizontal-scroll-safe tabs.
 
-### 7. Verification
+### 7. Real PDF zoom
+
+Keep the custom single-page renderer because TTS/highlight/source-offset overlays depend on it, but reuse pdf.js's proven two-phase and anchor semantics rather than replacing it with a second viewer.
+
+- `ZoomControls` owns one exact selected label. It injects a dynamic option for continuous values and includes the measured percentage in the selected fit label; the duplicate percentage node is deleted.
+- `RenderPolicy` always applies WebKit's 8192 px backing-side ceiling, even when the configurable megapixel cap is zero. Synchronous frontend defaults match backend defaults, and persisted settings load once at app startup rather than only when Rendering is opened.
+- Before zoom, `PdfViewer` captures a normalized source point under the wheel pointer or viewport centre. The real canvas/text commit restores that point against current page/viewer rects and clamps to measured scroll bounds.
+- Safe centring uses auto margins with start alignment, so a narrow page centres and an oversized page starts at a reachable left edge.
+- Readiness records exact `data-render-page` and `data-render-zoom`; a failed target render cannot leave requested controls over stale geometry.
+- The existing preview remains transient only. Paragraph actions clear until exact text geometry returns; saved highlight layers follow the same preview or remain hidden rather than painting stale coordinates.
+
+### 8. Verification
 
 Red-first targeted tests:
 
@@ -94,7 +111,8 @@ Red-first targeted tests:
 - store v4 migration/persistence and credential absence;
 - whole-page/outside selection rejection and multi-line excerpt pass;
 - cockpit tab semantics/keyboard/focus and real control changes;
-- footer geometry source contract.
+- footer geometry source contract;
+- exact zoom-label, hard canvas-side, source-anchor, safe-overflow centring, and paragraph-action layout/style contracts.
 
 Packaged journey `e2e/narration-cockpit.e2e.mjs` via `scripts/e2e-narration-cockpit.sh`:
 
@@ -104,8 +122,8 @@ Packaged journey `e2e/narration-cockpit.e2e.mjs` via `scripts/e2e-narration-cock
 4. Play; observer asserts original digit source ranges while fixture captures expanded outbound text;
 5. assert exactly one current range and a changed scrollTop after the cursor leaves the band;
 6. wait for natural page 1→2; assert page-two synthesis follows page-two render-ready and occurs once;
-7. zoom through public controls; assert committed dimensions/source mapping and motion/reduced-motion modes;
-8. reject whole-page selection, accept excerpt, invoke Read from here;
+7. zoom through public controls at preset and continuous high values; bind the one selected label to exact ready page/canvas/text geometry, enforce the 8192 backing-side ceiling, preserve pointer/centre anchors, and prove every page edge remains reachable;
+8. assert professional paragraph margin geometry/contrast/focus at 100–400%, reject whole-page selection, accept excerpt, and invoke Read from here at the exact source offset;
 9. Stop and assert idle/no highlight/no stale request.
 
 ## Rollback

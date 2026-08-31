@@ -6,6 +6,7 @@ source ./scripts/e2e-profile.sh
 source ./scripts/e2e-toolchain.sh
 
 EVIDENCE_DIR="${LECTRICE_LOCAL_TTS_EVIDENCE_DIR:-$PWD/ci-evidence/local-tts}"
+export LECTRICE_LOCAL_TTS_EVIDENCE_DIR="$EVIDENCE_DIR"
 mkdir -p "$EVIDENCE_DIR" "$XDG_CONFIG_HOME/lectrice"
 rm -f "$EVIDENCE_DIR/receipt.json"
 REQUEST_LOG="$EVIDENCE_DIR/requests.jsonl"
@@ -107,7 +108,7 @@ jq -s \
     binarySha256: $binarySha256,
     fixtureSha256: $fixtureSha256,
     observedAt: $observedAt,
-    journey: "Settings -> Performance -> Continuous -> public Play -> bounded heading/context -> exact source highlight -> public Stop -> measured RTF",
+    journey: "all Narration tabs -> Continuous + English normalization -> public Play -> Pause -> excerpt Read from here -> Stop -> paragraph margin action -> Stop -> manual next page -> immediate fresh Play -> Stop -> measured RTF",
     assertions: {
       performanceModel: "Magpie TTS Multilingual 357M",
       performanceBackend: "Vulkan/RADV fixture",
@@ -118,6 +119,12 @@ jq -s \
       spokenFirstRun: "What This Book Is About.",
       highlightedSourceRange: "What",
       secondRun: "This book aims to fill a gap. It connects the dots. Readers benefit.",
+      readFromHereReplacedPausedQueue: true,
+      paragraphActionStartedAtChosenParagraph: true,
+      paragraphActionNonOverlapping: true,
+      paragraphActionFocusVisible: true,
+      paragraphActionPaperMarker: true,
+      manualPageFreshPlay: "Second page ready.",
       provider: "local",
       credentialPresent: false,
       finalPlaybackState: "idle"
@@ -129,10 +136,17 @@ jq -e '
   .assertions.highlightedSourceRange == "What" and
   .assertions.performanceProfile == "continuous" and
   .assertions.uncachedRtfVisible == true and
-  (.requests | map(.body.input)) == [
-    "What This Book Is About.",
-    "This book aims to fill a gap. It connects the dots. Readers benefit."
-  ] and
+  .assertions.readFromHereReplacedPausedQueue == true and
+  .assertions.paragraphActionStartedAtChosenParagraph == true and
+  .assertions.paragraphActionNonOverlapping == true and
+  .assertions.paragraphActionFocusVisible == true and
+  .assertions.paragraphActionPaperMarker == true and
+  .assertions.manualPageFreshPlay == "Second page ready." and
+  (.requests | length) >= 4 and
+  .requests[0].body.input == "What This Book Is About." and
+  .requests[1].body.input == "This book aims to fill a gap. It connects the dots. Readers benefit." and
+  (.requests[2].body.input | startswith("This book aims")) and
+  (.requests | any(.[]; .body.input | startswith("Second page ready."))) and
   (.requests | all(.[];
     (.body.voice == "F1-pt") and
     .idempotencyKeyValid))

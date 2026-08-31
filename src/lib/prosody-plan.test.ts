@@ -4,12 +4,23 @@ import { buildPdfText } from "./pdf-text";
 import {
   mapSpokenRangeToSource,
   planProsodyRuns,
+  resolveProsodyLanguage,
   type AlignmentSegment,
 } from "./prosody-plan";
 
 const bytes = (text: string) => new TextEncoder().encode(text).length;
 
 describe("source-aligned prosody plan", () => {
+  it("resolves only explicit or voice-declared narration languages", () => {
+    expect(resolveProsodyLanguage("auto", "John-en", null)).toBe("en");
+    expect(resolveProsodyLanguage("auto", "F1-pt", null)).toBe("pt-BR");
+    expect(resolveProsodyLanguage("auto", "opaque", { locale: "pt_BR" })).toBe(
+      "pt-BR",
+    );
+    expect(resolveProsodyLanguage("auto", "opaque", null)).toBe("auto");
+    expect(resolveProsodyLanguage("en", "Sofia-pt-BR", null)).toBe("en");
+  });
+
   it("keeps ordinary source and spoken text identical", () => {
     const text = "First sentence. Second sentence.";
     const runs = planProsodyRuns({ text }, 200);

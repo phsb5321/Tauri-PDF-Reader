@@ -6,14 +6,27 @@ import { NarrationSelectionSettings } from "./NarrationSelectionSettings";
 import { PerformanceSettings } from "../settings/PerformanceSettings";
 import "./NarrationCockpit.css";
 
-const TABS = [
+export const NARRATION_TABS = [
   { id: "voice", label: "Voice & route" },
   { id: "delivery", label: "Delivery" },
   { id: "performance", label: "Performance" },
   { id: "selection", label: "Selection" },
 ] as const;
 
-type NarrationTab = (typeof TABS)[number]["id"];
+type NarrationTab = (typeof NARRATION_TABS)[number]["id"];
+
+export function nextNarrationTabIndex(
+  index: number,
+  key: string,
+): number | null {
+  if (key === "ArrowRight") return (index + 1) % NARRATION_TABS.length;
+  if (key === "ArrowLeft") {
+    return (index - 1 + NARRATION_TABS.length) % NARRATION_TABS.length;
+  }
+  if (key === "Home") return 0;
+  if (key === "End") return NARRATION_TABS.length - 1;
+  return null;
+}
 
 interface NarrationCockpitProps {
   onClose: () => void;
@@ -28,7 +41,7 @@ export function NarrationCockpit({
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const activateTab = useCallback((index: number, focus: boolean) => {
-    const next = TABS[index];
+    const next = NARRATION_TABS[index];
     if (!next) return;
     setActiveTab(next.id);
     if (focus) tabRefs.current[index]?.focus();
@@ -36,16 +49,7 @@ export function NarrationCockpit({
 
   const handleTabKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
-      let nextIndex: number | null = null;
-      if (event.key === "ArrowRight") {
-        nextIndex = (index + 1) % TABS.length;
-      } else if (event.key === "ArrowLeft") {
-        nextIndex = (index - 1 + TABS.length) % TABS.length;
-      } else if (event.key === "Home") {
-        nextIndex = 0;
-      } else if (event.key === "End") {
-        nextIndex = TABS.length - 1;
-      }
+      const nextIndex = nextNarrationTabIndex(index, event.key);
       if (nextIndex === null) return;
       event.preventDefault();
       activateTab(nextIndex, true);
@@ -93,7 +97,7 @@ export function NarrationCockpit({
         role="tablist"
         aria-label="Narration settings"
       >
-        {TABS.map((tab, index) => (
+        {NARRATION_TABS.map((tab, index) => (
           <button
             key={tab.id}
             ref={(element) => {

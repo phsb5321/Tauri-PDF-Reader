@@ -12,7 +12,11 @@ import {
   aiTtsPause,
   aiTtsResume,
 } from "../lib/tauri-invoke";
-import { onAiTtsPlaybackStarting, onAiTtsFinished } from "../lib/api/ai-tts";
+import {
+  onAiTtsPlaybackStarting,
+  onAiTtsFinished,
+  onAiTtsStopped,
+} from "../lib/api/ai-tts";
 import {
   useTtsHighlightStore,
   selectIsHighlighting,
@@ -200,6 +204,42 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
       if (unlistenFn) {
         unlistenFn();
       }
+    };
+  }, []);
+
+  // A native Stop can come from page navigation or provider switching rather
+  // than this hook's own Stop control. Clear the visual clock and duplicate-
+  // request guard at that shared authority, without treating Stop as natural
+  // completion (which would incorrectly advance a sentence/page).
+  useEffect(() => {
+    let unlistenFn: (() => void) | null = null;
+
+    onAiTtsStopped((event) => {
+      const activeGeneration = playbackGenerationRef.current;
+      if (activeGeneration !== null && event.generation <= activeGeneration) {
+        console.debug("[TtsWordHighlight] Ignoring stale stopped event", {
+          activeGeneration,
+          stoppedGeneration: event.generation,
+        });
+        return;
+      }
+      speakingRef.current = false;
+      requestIdRef.current += 1;
+      playbackStartTimeRef.current = null;
+      playbackGenerationRef.current = null;
+      lastWordIndexRef.current = -1;
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      useTtsHighlightStore.getState().stopHighlighting();
+      useAiTtsStore.getState().setPlaybackState("idle");
+    }).then((unlisten) => {
+      unlistenFn = unlisten;
+    });
+
+    return () => {
+      unlistenFn?.();
     };
   }, []);
 

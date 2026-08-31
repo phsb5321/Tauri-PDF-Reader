@@ -9,6 +9,27 @@ export type ProsodyLanguage = "auto" | "en" | "pt-BR";
 export type ProsodyBoundary = "clause" | "sentence" | "paragraph" | "section";
 export type AlignmentKind = "copy" | "replace" | "insert" | "delete";
 
+/** Resolve only language declarations carried by the selected voice. */
+export function resolveProsodyLanguage(
+  preference: ProsodyLanguage,
+  voiceId: string | null,
+  labels: Record<string, unknown> | null,
+): ProsodyLanguage {
+  if (preference !== "auto") return preference;
+  const declared = [labels?.language, labels?.locale].find(
+    (value): value is string => typeof value === "string",
+  );
+  const idSuffix = voiceId?.match(
+    /(?:^|[-_])(pt(?:[-_]br)?|en(?:[-_](?:us|gb))?)$/iu,
+  )?.[1];
+  const language = (declared ?? idSuffix)?.toLowerCase().replace(/_/gu, "-");
+  if (language === "pt" || language === "pt-br") return "pt-BR";
+  if (language === "en" || language === "en-us" || language === "en-gb") {
+    return "en";
+  }
+  return "auto";
+}
+
 export interface AlignmentSegment {
   spokenStart: number;
   spokenEnd: number;

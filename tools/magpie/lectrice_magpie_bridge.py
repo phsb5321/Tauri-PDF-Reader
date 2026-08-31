@@ -315,14 +315,23 @@ class Handler(BaseHTTPRequestHandler):
 
     def send_payload(
         self, status: int, media_type: str, body: bytes, **headers: str
-    ) -> None:
-        self.send_response(status)
-        self.send_header("Content-Type", media_type)
-        self.send_header("Content-Length", str(len(body)))
-        for key, value in headers.items():
-            self.send_header(key, value)
-        self.end_headers()
-        self.wfile.write(body)
+    ) -> bool:
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", media_type)
+            self.send_header("Content-Length", str(len(body)))
+            for key, value in headers.items():
+                self.send_header(key, value)
+            self.end_headers()
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError) as error:
+            print(
+                "client disconnected before response delivery: "
+                f"{type(error).__name__}",
+                flush=True,
+            )
+            return False
+        return True
 
     def do_GET(self) -> None:
         if self.path == "/health":

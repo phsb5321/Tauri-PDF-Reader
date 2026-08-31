@@ -4,10 +4,10 @@
 
 - [x] T001 Add pure failing normalization tests for EN/PT-BR `2022`, `91,000`, decimals, percentages, currency, clock time, invalid grouping/version/ID rejection, UTF-16 partitions, and spoken-byte bounds.
 - [x] T002 Add the real page-19 geometry fixture and failing planner assertion that superscript `1 2 3 4 5` produces no narration run below 12 bytes while body numbers remain.
-- [ ] T003 Add failing read-along motion tests for in-band no-op, above/below absolute target, clamp, coalescing, and reduced-motion invariance.
+- [x] T003 Add failing read-along motion tests for in-band no-op, above/below absolute target, clamp, coalescing, and reduced-motion invariance.
 - [x] T004 Add failing TtsWordHighlight race test: A schedules delayed repaint, cursor advances to B, delayed A runs, registry still contains exactly B.
 - [x] T005 Add failing render-ready continuation tests for exact page success, timeout-visible-error, Stop/manual-page/provider cancellation, and exactly-once start.
-- [ ] T006 Add failing selection tests for outside endpoint and effective whole-page rejection plus legitimate multi-line excerpt/Read-from-here pass.
+- [x] T006 Add failing selection tests for outside endpoint and effective whole-page rejection plus legitimate multi-line excerpt/Read-from-here pass.
 - [x] T007 Add failing cockpit UI tests for four tabs, roving keyboard/Home/End, Escape focus return, active-panel-only mounting, and real Delivery/Selection controls.
 
 ## Phase 2 — Source-aligned speech correctness
@@ -15,30 +15,30 @@
 - [x] T008 Implement `speech-normalization.ts` pure number-to-words/replacement grammar with no dependency or ambient locale.
 - [x] T009 Refactor `prosody-plan.ts` to merge replace/insert/delete edits, accept normalization/language options, preserve exact source mapping, and bump planner revision.
 - [x] T010 Extend structured PDF source with segments and suppress only geometry-backed superscript numeric markers; make the page-19 oracle green.
-- [ ] T011 Extend AI-TTS preference state/persistence to v4 with follow, number normalization, and narration language; migrate/sanitize without secrets.
-- [ ] T012 Pass selected/explicit narration language and normalization preference through ReaderView/AiPlaybackBar into every page/selection plan.
+- [x] T011 Extend safe preference persistence to v4 with number normalization and narration language; retain follow read-along in its existing canonical persisted settings store and sanitize without secrets.
+- [x] T012 Pass selected/explicit narration language and normalization preference through ReaderView/AiPlaybackBar into every page/selection plan.
 
 ## Phase 3 — Single cursor, scroll, and page authority
 
-- [ ] T013 Implement pure read-along scroll and page-ready helpers with generation cancellation and bounded timeout.
-- [ ] T014 Refactor `TtsWordHighlight` to one setup observer, tracked callbacks, delete-before-set singleton range, and range-driven coalesced follow scroll.
-- [ ] T015 Mark PdfViewer render readiness only after canvas/text/annotation commit; reset page scroll and add reduced-motion-safe page/zoom visual transitions.
+- [x] T013 Implement pure read-along scroll and page-ready helpers with generation cancellation and bounded timeout.
+- [x] T014 Refactor `TtsWordHighlight` to one setup observer, tracked callbacks, delete-before-set singleton range, and range-driven coalesced follow scroll.
+- [x] T015 Complete real PDF zoom after 30/08 user falsification: one exact label, startup settings hydration, hard 8192 px canvas side, exact committed page/zoom readiness, pointer/centre anchor restoration, safe oversized-page centring, and no stale overlay geometry.
 - [x] T016 Replace the fixed 500 ms auto-page continuation with exact ready wait; surface `TTS_PAGE_NOT_READY` and clear stale queue/highlight on failure.
-- [ ] T017 Enforce excerpt-only selection in PdfViewer and provide a public warning without breaking ordinary copy/highlight/Read from here.
+- [x] T017 Finish excerpt-only selection and structural paragraph actions with a pure first-line layout, non-overlapping 44 px targets, paper-safe tick/chip styling, individual hover/focus, visible outline, and exact source offsets at 100–400% zoom.
 
 ## Phase 4 — Narration cockpit
 
-- [ ] T018 Add `NarrationDeliverySettings` with speed, follow, auto-page, normalization/language, and Responsive/Balanced/Continuous controls; remove profile ownership from telemetry.
+- [x] T018 Add `NarrationDeliverySettings` with speed, follow, auto-page, normalization/language, and Responsive/Balanced/Continuous controls; remove profile ownership from telemetry.
 - [x] T019 Add the accessible docked `NarrationCockpit` tabs and embedded Voice/Performance/Selection panels using existing controls.
-- [ ] T020 Recompose AiPlaybackBar into transport / growing truthful status-progress / quick controls, remove the isolated modal, auto-page icon, broken scroll query, and duplicate CSS.
-- [ ] T021 Add wide/narrow/reduced-motion geometry and design-token assertions at 1920/1440/767/640 widths.
+- [x] T020 Recompose AiPlaybackBar into transport / growing truthful status-progress / quick controls, remove the isolated modal, auto-page icon, broken scroll query, and duplicate CSS.
+- [x] T021 Add wide/narrow/reduced-motion and 100/200/280/330/400% geometry assertions: one selected zoom label, canvas/page/text ratios, ≤8192 backing sides, anchor retention, reachable edges, paragraph/text non-intersection, focus outline, and paper-token contrast.
 
 ## Phase 5 — User gate and delivery
 
-- [ ] T022 Extend seeded fuzz actions/state assertions for follow, normalization/language, tab changes, page-ready cancellation, and selection limits; retain seed/replay.
-- [ ] T023 Add deterministic two-page number/read-along fixture, `e2e/narration-cockpit.e2e.mjs`, and fail-closed `scripts/e2e-narration-cockpit.sh` with stale-receipt deletion.
-- [ ] T024 Run targeted lint/typecheck/tests, bridge contracts, fuzz seed `20260828`/2,000, and packaged public-control journey; retain exact-head receipts and screenshots.
-- [ ] T025 Run full `pnpm verify`, Gitleaks controls, alignment/harness, and the existing real Magpie packaged journey to catch playback/provider regressions.
+- [x] T022 Extend seeded fuzz actions/state assertions for follow, normalization/language, tab changes, page-ready cancellation, and selection limits; retain seed/replay.
+- [x] T023 Extend the deterministic prosody fixture and reused fail-closed local-TTS packaged lane to prove all tabs, selection replacement, professional paragraph action, real committed zoom/anchor/overflow, immediate page-two Play, and Stop (no duplicate runner/spec).
+- [x] T024 Run targeted lint/typecheck/tests, bridge contracts, fuzz seed `20260830`/2,000, and packaged public-control journeys; retain exact-head receipts and screenshots.
+- [x] T025 Run full `pnpm verify`, Gitleaks controls, alignment/harness, and the existing real Magpie packaged journey to catch playback/provider regressions.
 - [ ] T026 Obtain a capable different-family exact-head review; repair every BLOCKER/MAJOR and rerun affected executable gates.
-- [ ] T027 Update issue #196, #195, fleet row, `docs/agent-backlog-state.md`, and durable save-state with exact evidence and reversal path.
+- [ ] T027 Update issue #196, #195, fleet row, Plane LECT parent/children, `docs/agent-backlog-state.md`, and durable save-state with exact evidence and reversal path. Plane writes remain fail-closed while VM105/server is offline; receipt lives under `~/.local/state/fleet-coordination/lectrice-196-overlay-zoom-20260830/`.
 - [ ] T028 Push a draft stacked PR; merge only when CI, review, parent-chain, and safe-class rules permit. Confirm final remote state rather than asserting delivery.

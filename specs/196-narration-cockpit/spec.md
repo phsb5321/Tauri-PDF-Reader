@@ -10,6 +10,8 @@ The reader footer reserves most of its width as empty space while separating tra
 
 The narration text path also sends written numbers and PDF superscript footnote markers directly to Magpie. On the reported pages this produced incorrect `2022`/`91,000` speech and 1–6 character synthesis requests (`1 2 3.`, `4.`, `5`) before the next page, which looks like a frozen page turn.
 
+User evidence on 30/08/2026 exposed two incomplete reader refinements. The paragraph action overlay lights every 44 px disc at once, sits only four pixels from text, and changes vertical alignment with line height. Continuous zoom can display `300%` and `280%` simultaneously because the select rounds exact state to a preset; at the same 280% state the default ultra/unlimited render plan requests a 6854×8870 backing canvas beyond WebKit's 8192 px side limit. Existing packaged gates only observe the percentage string, not committed PDF geometry, and no zoom path preserves the cursor or viewport-centre source point.
+
 ## User Scenarios & Testing
 
 ### US1 — Reliable continuous read-along (P1)
@@ -23,7 +25,8 @@ Acceptance scenarios:
 3. Natural completion changes page exactly once, waits for that exact page's annotated text layer, then starts its first eligible unit.
 4. Stop, manual navigation, provider switch, timeout, or a newer generation cancels pending continuation.
 5. A readiness failure becomes a visible error and idle state rather than a silent freeze.
-6. Isolated superscript numeric markers are not spoken; ordinary body numbers remain in the source plan.
+6. Manual page navigation clears native playback, the visual clock, and stale restart work; fresh Play is available as soon as the new page is selected.
+7. Isolated superscript numeric markers are not spoken; ordinary body numbers remain in the source plan.
 
 ### US2 — Correct written-number speech (P1)
 
@@ -47,7 +50,7 @@ Acceptance scenarios:
 2. The drawer provides `Voice & route`, `Delivery`, `Performance`, and `Selection` tabs.
 3. Delivery controls speed, follow read-along, automatic page turn, number normalization/language, and Responsive/Balanced/Continuous policy.
 4. Performance reports factual engine/model/backend/device/RTF data; it does not imply unsupported controls.
-5. Selection reuses the real highlight default controls and explains excerpt limits.
+5. Selection reuses the real highlight default controls, explains excerpt limits, and documents the current-page paragraph actions.
 6. Tabs support Left/Right wrapping and Home/End; Escape in the drawer closes it and returns focus without also stopping audio.
 
 ### US4 — Bounded excerpt selection (P2)
@@ -59,6 +62,8 @@ Acceptance scenarios:
 1. Selection start and end must both belong to the current annotated text layer.
 2. A selection covering at least 95% of normalized page text and anchored near both page edges is cleared with no toolbar.
 3. A legitimate multi-line excerpt still opens Highlight/Read from here and preserves source coordinates at every zoom.
+4. Structurally identified paragraphs expose quiet 44 px margin actions in reading order; each action is individually legible on hover/focus, has a visible focus ring, never overlaps the first glyph at 100–400% zoom, and activating it replaces paused playback from the exact paragraph offset.
+5. A page without paragraph/section evidence—or a paragraph inside a horizontally/vertically dense cluster that cannot hold a non-overlapping ≥44 px target—fails closed to one safe cluster action rather than guessing, covering text, or activating the wrong paragraph.
 
 ### US5 — Calm, accessible motion (P2)
 
@@ -67,8 +72,12 @@ As a reader, read-along scroll, page swaps, and zoom changes feel smooth without
 Acceptance scenarios:
 
 1. Motion uses absolute scroll targets and coalesces newer targets rather than accumulating deltas.
-2. Page/zoom transitions animate opacity/visual transform only after exact render readiness; stored PDF/source coordinates do not change.
+2. Page/zoom transitions use a temporary preview only while an exact, platform-safe pdf.js viewport/canvas/text render is pending; stored PDF/source coordinates do not change.
 3. `prefers-reduced-motion: reduce` makes scroll/page/zoom movement instant while preserving readiness and synchronization.
+4. Manual and fit zoom expose one truthful selected label containing the exact percentage; no nearest preset is shown as current state.
+5. A committed zoom changes page, canvas CSS/backing, text-layer scale, highlight geometry, and scroll extent by the requested ratio, then clears every preview transform.
+6. Ctrl+wheel preserves the source point under the pointer; toolbar/select zoom preserves the source point at the viewport centre. Oversized pages remain pannable from their left/top edge.
+7. Ultra or an explicitly disabled megapixel cap never bypasses WebKit's independent 8192 px backing-canvas side limit.
 
 ## Functional requirements
 
@@ -87,6 +96,14 @@ Acceptance scenarios:
 - **FR-013:** Whole-page selection rejection MUST not affect ordinary copying/highlighting of excerpts.
 - **FR-014:** Explicit Play remains the first point at which PDF text may reach a provider.
 - **FR-015:** Existing provider switching, no-fallback, exact-source highlighting, sink-drained completion, and cache identity guarantees MUST remain intact.
+- **FR-016:** Native Stop from navigation/provider changes MUST synchronously invalidate the read-along clock and duplicate-request guard.
+- **FR-017:** Paragraph actions MUST derive from structural PDF boundaries, retain exact UTF-16 source starts, and never modify the rendered text layer.
+- **FR-018:** Zoom controls MUST expose one selected exact percentage for continuous, preset, and fit modes; a nearest preset MUST NOT impersonate current state.
+- **FR-019:** Render policy MUST enforce the supported WebKit backing-canvas side independently of the configurable megapixel cap while retaining target CSS viewport geometry.
+- **FR-020:** Render readiness MUST identify the exact committed page and zoom only after canvas, text layer, source annotation, and overlay geometry agree; failure MUST visibly roll back or report an error rather than leave requested state over stale pixels.
+- **FR-021:** Ctrl+wheel zoom MUST preserve the pointer's normalized PDF point and non-pointer zoom MUST preserve the viewport-centre point, clamped to real scroll bounds.
+- **FR-022:** Viewer centring MUST remain safe when a zoomed page exceeds the viewport so every edge stays reachable.
+- **FR-023:** Paragraph-action rest/hover/focus styling MUST use paper-safe semantic tokens, individual reveal, no low-opacity contrast laundering, no scale animation, and a visible focus outline.
 
 ## Success criteria
 
@@ -96,6 +113,8 @@ Acceptance scenarios:
 - **SC-004:** Footer geometry passes at 1920, 1440, 767, and 640 CSS px with no horizontal overflow and ≥44 px controls.
 - **SC-005:** Seeded fuzz and the packaged public-control journey pass with exact action trace and replay command.
 - **SC-006:** Reduced-motion packaged assertions observe no smooth scroll or page/zoom animation.
+- **SC-007:** Packaged public controls prove Pause → excerpt Read from here, manual page → immediate fresh Play, and paragraph margin action → exact chosen paragraph.
+- **SC-008:** At 100/200/280/330/400%, packaged assertions bind the single selected label to `data-render-zoom`, measure page/canvas/text ratios within 2 px, keep every backing side ≤8192, prove no overlay/text intersections, and retain pointer/centre anchors within 2 px.
 
 ## Out of scope
 

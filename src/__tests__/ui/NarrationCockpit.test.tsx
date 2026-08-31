@@ -46,6 +46,8 @@ describe("NarrationCockpit", () => {
       playbackState: "idle",
       autoPageEnabled: true,
       performanceProfile: "balanced",
+      numberNormalizationEnabled: true,
+      narrationLanguage: "auto",
     });
     useSettingsStore.setState({ ttsFollowAlong: true });
   });
@@ -73,6 +75,20 @@ describe("NarrationCockpit", () => {
       screen.getByRole("checkbox", { name: /^Follow read-along/ }),
     );
     expect(useSettingsStore.getState().ttsFollowAlong).toBe(false);
+    expect(
+      screen.getByRole("checkbox", { name: /^Speak written numbers/ }),
+    ).toBeChecked();
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: /^Speak written numbers/ }),
+    );
+    fireEvent.change(
+      screen.getByRole("combobox", { name: /^Narration language/ }),
+      { target: { value: "pt-BR" } },
+    );
+    expect(useAiTtsStore.getState()).toMatchObject({
+      numberNormalizationEnabled: false,
+      narrationLanguage: "pt-BR",
+    });
 
     fireEvent.click(screen.getByRole("tab", { name: "Performance" }));
     expect(screen.getByText("Narration performance")).toBeInTheDocument();
@@ -94,6 +110,12 @@ describe("NarrationCockpit", () => {
 
     view.rerender(<NarrationCockpit onClose={vi.fn()} controlsDisabled />);
     expect(screen.getByRole("radio", { name: /^Responsive/ })).toBeDisabled();
+    expect(
+      screen.getByRole("checkbox", { name: /^Speak written numbers/ }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("combobox", { name: /^Narration language/ }),
+    ).toBeDisabled();
     expect(
       screen.getByText("Stop narration before changing speed or queue policy."),
     ).toBeVisible();

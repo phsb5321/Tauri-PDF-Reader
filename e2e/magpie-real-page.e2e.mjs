@@ -15,6 +15,22 @@ async function closeSettings() {
   await $(".settings-backdrop").waitForExist({ reverse: true, timeout: 5000 });
 }
 
+async function focusPublicControl(element) {
+  for (let step = 0; step < 100; step += 1) {
+    if (await element.isFocused()) return;
+    await browser.keys(["Tab"]);
+  }
+  throw new Error("public control was unreachable through keyboard Tab order");
+}
+
+async function activatePublicControl(element, changed) {
+  await element.click();
+  await browser.pause(100);
+  if (await changed()) return;
+  await focusPublicControl(element);
+  await browser.keys(["Enter"]);
+}
+
 describe("Magpie real-model page queue", () => {
   it("narrates bounded units on Vulkan and advances exactly once", async () => {
     await browser.waitUntil(
@@ -31,6 +47,7 @@ describe("Magpie real-model page queue", () => {
         browser.execute(
           () =>
             window.__E2E_READ__.provider() === "local" &&
+            window.__E2E_READ__.connections().local === "connected" &&
             window.__E2E_READ__.playbackState() === "idle",
         ),
       {
@@ -44,6 +61,20 @@ describe("Magpie real-model page queue", () => {
     expect(facts).toContain("Magpie TTS Multilingual 357M");
     expect(facts).toContain("Vulkan/RADV");
     expect(facts).toContain("AMD Radeon RX 5700 XT");
+    await closeSettings();
+
+    const narrationSettings = await $(
+      'button[aria-label="Narration settings"]',
+    );
+    await narrationSettings.waitForClickable({ timeout: 10000 });
+    const cockpit = await $("#narration-cockpit");
+    await activatePublicControl(narrationSettings, () => cockpit.isDisplayed());
+    await cockpit.waitForDisplayed({ timeout: 10000 });
+    const delivery = await $("#narration-tab-delivery");
+    await delivery.waitForClickable({ timeout: 10000 });
+    const deliveryPanel = await $("#narration-panel-delivery");
+    await activatePublicControl(delivery, () => deliveryPanel.isDisplayed());
+    await deliveryPanel.waitForDisplayed({ timeout: 10000 });
     const continuous = await $('input[value="continuous"]');
     await continuous.waitForEnabled({ timeout: 10000 });
     await browser.execute(() =>
@@ -54,7 +85,11 @@ describe("Magpie real-model page queue", () => {
       timeout: 5000,
       timeoutMsg: "Continuous profile did not become selected",
     });
-    await closeSettings();
+    await browser.keys(["Escape"]);
+    await $("#narration-cockpit").waitForExist({
+      reverse: true,
+      timeout: 5000,
+    });
 
     const play = await $('.ai-playback-button[title="Play (Ctrl+Space)"]');
     await play.waitForEnabled({ timeout: 15000 });

@@ -15,7 +15,10 @@ import {
 } from "../../stores/tts-highlight-store";
 import { resolveCharRange } from "../../lib/tts-tracking";
 import { rangeFromAnnotatedPdfText } from "../../lib/pdf-text";
+import { readingBandScrollTarget } from "../../lib/read-along-motion";
+import { reducedMotionScrollBehavior } from "../../lib/reduced-motion";
 import type { WordTiming } from "../../lib/api/ai-tts";
+import { useSettingsStore } from "../../stores/settings-store";
 import "./TtsWordHighlight.css";
 
 interface TtsWordHighlightProps {
@@ -133,6 +136,7 @@ export function TtsWordHighlight({ pageNumber, scale }: TtsWordHighlightProps) {
   // overwriting the current one.
   const epochRef = useRef(0);
   const textLayerRef = useRef<HTMLDivElement | null>(null);
+  const scrollFrameRef = useRef<number | null>(null);
 
   const isActive = useTtsHighlightStore((s) => s.isActive);
   const storePageNumber = useTtsHighlightStore((s) => s.pageNumber);
@@ -140,6 +144,7 @@ export function TtsWordHighlight({ pageNumber, scale }: TtsWordHighlightProps) {
   const currentText = useTtsHighlightStore((s) => s.currentText);
   const wordTimings = useTtsHighlightStore((s) => s.wordTimings);
   const currentWord = useTtsHighlightStore(selectCurrentWord);
+  const followAlong = useSettingsStore((state) => state.ttsFollowAlong);
 
   const isActiveOnThisPage = isActive && storePageNumber === pageNumber;
 
@@ -168,25 +173,62 @@ export function TtsWordHighlight({ pageNumber, scale }: TtsWordHighlightProps) {
     [wordTimings],
   );
 
-  /** Paint the strong mark on the word currently being spoken. */
-  const paintWord = useCallback((word: WordTiming, epoch: number) => {
-    const textLayer = textLayerRef.current;
-    if (!textLayer || epoch !== epochRef.current) return;
+  const scheduleFollowScroll = useCallback(
+    (range: Range, epoch: number) => {
+      if (scrollFrameRef.current !== null) {
+        cancelAnimationFrame(scrollFrameRef.current);
+        scrollFrameRef.current = null;
+      }
+      if (!followAlong || typeof range.getBoundingClientRect !== "function") {
+        return;
+      }
+      const viewer = textLayerRef.current?.closest<HTMLElement>(".pdf-viewer");
+      if (!viewer) return;
+      const rangeRect = range.getBoundingClientRect();
+      const viewportRect = viewer.getBoundingClientRect();
+      const target = readingBandScrollTarget(rangeRect, {
+        top: viewportRect.top,
+        bottom: viewportRect.bottom,
+        scrollTop: viewer.scrollTop,
+        scrollHeight: viewer.scrollHeight,
+        clientHeight: viewer.clientHeight,
+      });
+      if (target === null) return;
+      scrollFrameRef.current = requestAnimationFrame(() => {
+        scrollFrameRef.current = null;
+        if (epoch !== epochRef.current) return;
+        viewer.scrollTo({
+          top: target,
+          behavior: reducedMotionScrollBehavior(),
+        });
+      });
+    },
+    [followAlong],
+  );
 
-    const range = createCharRange(
-      textLayer,
-      word.charStart,
-      word.charEnd - word.charStart,
-    );
-    if (!range) {
-      console.warn(
-        "[TtsHighlight] Could not create range for word:",
-        word.word,
+  /** Paint the strong mark on the word currently being spoken. */
+  const paintWord = useCallback(
+    (word: WordTiming, epoch: number) => {
+      const textLayer = textLayerRef.current;
+      if (!textLayer || epoch !== epochRef.current) return;
+
+      const range = createCharRange(
+        textLayer,
+        word.charStart,
+        word.charEnd - word.charStart,
       );
-      return;
-    }
-    setHighlightRange(WORD_HIGHLIGHT, range, 1);
-  }, []);
+      if (!range) {
+        console.warn(
+          "[TtsHighlight] Could not create range for word:",
+          word.word,
+        );
+        return;
+      }
+      setHighlightRange(WORD_HIGHLIGHT, range, 1);
+      scheduleFollowScroll(range, epoch);
+    },
+    [scheduleFollowScroll],
+  );
 
   // Resolve the text layer once per page/scale/run — never per word — and keep
   // every timer and observer callback cancellable.
@@ -250,6 +292,10 @@ export function TtsWordHighlight({ pageNumber, scale }: TtsWordHighlightProps) {
       stopPolling();
       if (rebuildTimer) clearTimeout(rebuildTimer);
       observer?.disconnect();
+      if (scrollFrameRef.current !== null) {
+        cancelAnimationFrame(scrollFrameRef.current);
+        scrollFrameRef.current = null;
+      }
       clearHighlight();
       textLayerRef.current = null;
     };
@@ -275,6 +321,10 @@ export function TtsWordHighlight({ pageNumber, scale }: TtsWordHighlightProps) {
   useEffect(() => {
     return () => {
       epochRef.current += 1;
+      if (scrollFrameRef.current !== null) {
+        cancelAnimationFrame(scrollFrameRef.current);
+        scrollFrameRef.current = null;
+      }
       clearHighlight();
     };
   }, []);

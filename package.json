@@ -32,7 +32,7 @@
     "test:e2e:home": "bash scripts/e2e-home.sh && E2E_LANE=key bash scripts/e2e-home.sh",
     "test:e2e:north-star": "TMPDIR=/tmp bash e2e/run-north-star-journey.sh",
     "test:e2e:all": "bash scripts/e2e-all.sh",
-    "test:fuzz": "vitest run src/hooks/usePageNavigation.property.test.ts src/hooks/useTtsProviderRouting.property.test.ts --pool=forks --poolOptions.forks.singleFork",
+    "test:fuzz": "vitest run src/hooks/usePageNavigation.property.test.ts src/hooks/useTtsProviderRouting.property.test.ts src/lib/pdf-zoom.property.test.ts src/lib/narration-cockpit.property.test.ts --pool=forks --poolOptions.forks.singleFork",
     "test:user-gate": "pnpm test:fuzz && pnpm test:e2e:native",
     "scan:secrets": "bash tools/gitleaks-scan.sh dir",
     "scan:secrets:git": "bash tools/gitleaks-scan.sh git",

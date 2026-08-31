@@ -43,13 +43,11 @@ export function ZoomControls() {
   };
 
   const zoomPercentage = Math.round(zoomLevel * 100);
-
-  // Find closest zoom level for select dropdown
-  const closestZoomValue = ZOOM_LEVELS.reduce((prev, curr) =>
-    Math.abs(curr.value - zoomLevel) < Math.abs(prev.value - zoomLevel)
-      ? curr
-      : prev,
-  ).value;
+  const exactZoomValue = String(Number(zoomLevel.toFixed(4)));
+  const isPresetZoom = ZOOM_LEVELS.some(
+    (level) => Math.abs(level.value - zoomLevel) < 0.0001,
+  );
+  const selectedValue = fitMode === "none" ? exactZoomValue : fitMode;
 
   return (
     <div className="zoom-controls">
@@ -69,13 +67,24 @@ export function ZoomControls() {
 
       <select
         className="zoom-select"
-        value={fitMode !== "none" ? fitMode : closestZoomValue}
+        value={selectedValue}
         onChange={handleZoomSelect}
         aria-label="Zoom level"
       >
-        <option value="fit-width">Fit Width</option>
-        <option value="fit-page">Fit Page</option>
+        <option value="fit-width">
+          {fitMode === "fit-width"
+            ? `Fit Width · ${zoomPercentage}%`
+            : "Fit Width"}
+        </option>
+        <option value="fit-page">
+          {fitMode === "fit-page"
+            ? `Fit Page · ${zoomPercentage}%`
+            : "Fit Page"}
+        </option>
         <optgroup label="Zoom">
+          {!isPresetZoom && fitMode === "none" && (
+            <option value={exactZoomValue}>{zoomPercentage}%</option>
+          )}
           {ZOOM_LEVELS.map((level) => (
             <option key={level.value} value={level.value}>
               {level.label}
@@ -83,10 +92,6 @@ export function ZoomControls() {
           ))}
         </optgroup>
       </select>
-
-      <span className="zoom-percentage" title="Current zoom level">
-        {zoomPercentage}%
-      </span>
 
       <button
         type="button"
