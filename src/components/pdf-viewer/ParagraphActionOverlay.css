@@ -34,16 +34,17 @@
 
 .paragraph-action-button svg {
   position: absolute;
-  top: 50%;
+  top: 0;
   right: 0;
+  bottom: 0;
   box-sizing: border-box;
   width: 1.4rem;
   height: 1.4rem;
   padding: var(--space-1);
   border-radius: var(--radius-full);
   background: var(--color-paper-speak);
+  margin-block: auto;
   box-shadow: var(--shadow-sm);
-  transform: translateY(-50%);
   visibility: hidden;
 }
 

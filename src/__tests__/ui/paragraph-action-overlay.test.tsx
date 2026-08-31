@@ -70,5 +70,8 @@ describe("paragraph action overlay", () => {
     expect(css).not.toMatch(/opacity:\s*0\./);
     expect(css).not.toContain("scale(");
     expect(css).not.toContain("var(--shadow-md)");
+    expect(css).toMatch(
+      /\.paragraph-action-button svg\s*\{[^}]*top:\s*0;[^}]*bottom:\s*0;[^}]*margin-block:\s*auto;/s,
+    );
   });
 });
