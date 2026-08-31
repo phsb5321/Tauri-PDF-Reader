@@ -353,63 +353,6 @@ describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
         (await browser.execute(() => window.__E2E_READ__.playbackState())) !==
         "idle",
     );
-    await browser.waitUntil(
-      async () =>
-        (await browser.execute(() => window.__E2E_READ__.playbackState())) ===
-        "playing",
-      {
-        timeout: 10000,
-        timeoutMsg: "public Play never reached active audio before settings",
-      },
-    );
-    const cockpitOpenBefore = await browser.execute(() => ({
-      playbackState: window.__E2E_READ__.playbackState(),
-      highlightActive: window.__E2E_READ__.isActive(),
-      word: window.__E2E_READ__.currentWordText(),
-      logCount: window.__E2E_READ__.logs().length,
-    }));
-    await openNarrationTab("voice");
-    try {
-      await browser.waitUntil(
-        async () =>
-          (await browser.execute(() => window.__E2E_READ__.playbackState())) ===
-          "playing",
-        {
-          timeout: 5000,
-          timeoutMsg:
-            "narration was not active immediately before cockpit Escape",
-        },
-      );
-    } catch (error) {
-      const cockpitOpenAfter = await browser.execute(() => ({
-        playbackState: window.__E2E_READ__.playbackState(),
-        highlightActive: window.__E2E_READ__.isActive(),
-        word: window.__E2E_READ__.currentWordText(),
-        logs: window.__E2E_READ__.logs().slice(-40),
-      }));
-      throw new Error(
-        `opening cockpit changed narration: ${JSON.stringify({ cockpitOpenBefore, cockpitOpenAfter })}; ${error}`,
-      );
-    }
-    const escapeBefore = await browser.execute(() => ({
-      playbackState: window.__E2E_READ__.playbackState(),
-      highlightActive: window.__E2E_READ__.isActive(),
-      word: window.__E2E_READ__.currentWordText(),
-      logCount: window.__E2E_READ__.logs().length,
-    }));
-    await closeNarrationSettings();
-    const escapeAfter = await browser.execute(() => ({
-      playbackState: window.__E2E_READ__.playbackState(),
-      highlightActive: window.__E2E_READ__.isActive(),
-      word: window.__E2E_READ__.currentWordText(),
-      logs: window.__E2E_READ__.logs().slice(-30),
-    }));
-    if (escapeAfter.playbackState !== "playing") {
-      throw new Error(
-        `cockpit Escape changed active narration: ${JSON.stringify({ escapeBefore, escapeAfter })}`,
-      );
-    }
-
     let alignedHighlight = null;
     const seenHighlights = [];
     const readHighlight = () =>
