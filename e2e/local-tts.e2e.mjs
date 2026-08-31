@@ -420,6 +420,16 @@ describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
     ).toBe(true);
 
     await openNarrationTab("voice");
+    await browser.waitUntil(
+      async () =>
+        (await browser.execute(() => window.__E2E_READ__.playbackState())) ===
+        "playing",
+      {
+        timeout: 5000,
+        timeoutMsg:
+          "narration was not active immediately before cockpit Escape",
+      },
+    );
     await closeNarrationSettings();
     expect(
       await browser.execute(() => window.__E2E_READ__.playbackState()),
