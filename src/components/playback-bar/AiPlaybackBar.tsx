@@ -775,6 +775,9 @@ export function AiPlaybackBar({
         } else {
           handlePlay();
         }
+      } else if (e.key === "Escape" && showSettings) {
+        e.preventDefault();
+        closeNarrationCockpit();
       } else if (
         e.key === "Escape" &&
         (isPlaying || isPaused || continuationPending)
@@ -790,6 +793,8 @@ export function AiPlaybackBar({
     isPlaying,
     isPaused,
     continuationPending,
+    showSettings,
+    closeNarrationCockpit,
     handlePlay,
     handlePause,
     handleStop,

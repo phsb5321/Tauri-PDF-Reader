@@ -18,9 +18,11 @@ const h = vi.hoisted(() => ({
   complete: null as (() => void) | null,
   maxTextUtf8Bytes: 8192,
   playbackState: "idle" as "idle" | "playing",
+  highlightActive: false,
   announce: vi.fn(),
   speakWithHighlight: vi.fn(() => Promise.resolve(true)),
   stop: vi.fn(() => Promise.resolve()),
+  stopHighlight: vi.fn(() => Promise.resolve()),
   getPage: vi.fn(() =>
     Promise.resolve({
       getTextContent: () =>
@@ -58,10 +60,10 @@ vi.mock("../../hooks/useTtsWordHighlight", () => ({
   useTtsWordHighlight: (options: { onComplete?: () => void }) => {
     h.complete = options.onComplete ?? null;
     return {
-      isActive: false,
+      isActive: h.highlightActive,
       isPaused: false,
       speakWithHighlight: h.speakWithHighlight,
-      stop: vi.fn(),
+      stop: h.stopHighlight,
       pause: vi.fn(),
       resume: vi.fn(),
       currentWordIndex: -1,
@@ -103,6 +105,7 @@ beforeEach(() => {
   h.complete = null;
   h.maxTextUtf8Bytes = 8192;
   h.playbackState = "idle";
+  h.highlightActive = false;
   resetPdfPageReadyForTests();
   useAiTtsStore.setState({
     provider: "local",
@@ -349,6 +352,24 @@ describe("local sentence playback", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("closes an open cockpit with Escape without stopping active narration", async () => {
+    h.highlightActive = true;
+    h.playbackState = "playing";
+    render(<AiPlaybackBar getText={() => Promise.resolve("Page one.")} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Narration settings" }));
+    expect(screen.getByRole("heading", { name: "Narration" })).toBeVisible();
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("heading", { name: "Narration" }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(h.stop).not.toHaveBeenCalled();
+    expect(h.stopHighlight).not.toHaveBeenCalled();
   });
 
   it("keeps Stop operable while the next page render is pending", async () => {
