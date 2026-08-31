@@ -364,10 +364,24 @@ describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
           "narration was not active immediately before cockpit Escape",
       },
     );
+    const escapeBefore = await browser.execute(() => ({
+      playbackState: window.__E2E_READ__.playbackState(),
+      highlightActive: window.__E2E_READ__.isActive(),
+      word: window.__E2E_READ__.currentWordText(),
+      logCount: window.__E2E_READ__.logs().length,
+    }));
     await closeNarrationSettings();
-    expect(
-      await browser.execute(() => window.__E2E_READ__.playbackState()),
-    ).toBe("playing");
+    const escapeAfter = await browser.execute(() => ({
+      playbackState: window.__E2E_READ__.playbackState(),
+      highlightActive: window.__E2E_READ__.isActive(),
+      word: window.__E2E_READ__.currentWordText(),
+      logs: window.__E2E_READ__.logs().slice(-30),
+    }));
+    if (escapeAfter.playbackState !== "playing") {
+      throw new Error(
+        `cockpit Escape changed active narration: ${JSON.stringify({ escapeBefore, escapeAfter })}`,
+      );
+    }
 
     let alignedHighlight = null;
     const seenHighlights = [];
