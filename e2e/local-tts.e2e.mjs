@@ -635,6 +635,9 @@ describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
       Number.parseFloat(focusedAction.outlineWidth),
     ).toBeGreaterThanOrEqual(2);
     expect(focusedAction.iconVisibility).toBe("visible");
+    await browser.saveScreenshot(
+      `${process.env.LECTRICE_LOCAL_TTS_EVIDENCE_DIR}/paragraph-action.png`,
+    );
 
     await activatePublicControl(
       paragraphAction,
@@ -654,18 +657,25 @@ describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
         timeoutMsg: "paragraph action did not start at the chosen paragraph",
       },
     );
-    await browser.saveScreenshot(
-      `${process.env.LECTRICE_LOCAL_TTS_EVIDENCE_DIR}/paragraph-action.png`,
+    const beforeParagraphStopLog = await browser.execute(
+      () => window.__E2E_READ__.logs().length,
     );
-    const paragraphStop = await $('button[title="Stop (Esc)"]');
-    await paragraphStop.waitForEnabled({ timeout: 5000 });
     await browser.keys(["Escape"]);
     await browser.waitUntil(
       async () =>
-        browser.execute(() => window.__E2E_READ__.playbackState() === "idle"),
+        browser.execute(
+          (start) =>
+            window.__E2E_READ__.playbackState() === "idle" &&
+            window.__E2E_READ__
+              .logs()
+              .slice(start)
+              .some((entry) => entry.includes("stopped event")),
+          beforeParagraphStopLog,
+        ),
       {
         timeout: 5000,
-        timeoutMsg: "Stop after paragraph action stayed active",
+        timeoutMsg:
+          "public Escape after paragraph action emitted no stopped event",
       },
     );
 
