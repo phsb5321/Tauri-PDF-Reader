@@ -4,6 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 BUILD_REVISION=$(git rev-parse HEAD)
+export BUILD_REVISION
 [[ "$BUILD_REVISION" =~ ^[0-9a-f]{40}$ ]]
 git diff --quiet HEAD -- || {
   echo "library-completeness: tracked worktree changes make buildRevision dishonest" >&2
@@ -135,6 +136,14 @@ SQL
     echo "OBSERVED upstream #184: rejected native drop was pre-scoped by plugin-fs"
   fi
 
+  receipt_tmp=$(mktemp)
+  jq \
+    --arg buildRevision "$BUILD_REVISION" \
+    --arg observedAt "$(date -Iseconds)" \
+    '\''. + {status: "PASS", buildRevision: $buildRevision, observedAt: $observedAt}'\'' \
+    "$LIBRARY_COMPLETENESS_OUT" >"$receipt_tmp"
+  mv "$receipt_tmp" "$LIBRARY_COMPLETENESS_OUT"
+
   if [ -n "${LIBRARY_COMPLETENESS_EVIDENCE_DIR:-}" ]; then
     mkdir -p "$LIBRARY_COMPLETENESS_EVIDENCE_DIR"
     cp "$RUN_ROOT"/drop-hover.png "$LIBRARY_COMPLETENESS_EVIDENCE_DIR/177-drop-hover.png"
@@ -148,15 +157,3 @@ SQL
 
   echo "PASS receipt=$LIBRARY_COMPLETENESS_OUT scope=$SCOPE"
 '
-
-receipt_tmp=$(mktemp)
-jq \
-  --arg buildRevision "$BUILD_REVISION" \
-  --arg observedAt "$(date -Iseconds)" \
-  '. + {status: "PASS", buildRevision: $buildRevision, observedAt: $observedAt}' \
-  "$LIBRARY_COMPLETENESS_OUT" >"$receipt_tmp"
-mv "$receipt_tmp" "$LIBRARY_COMPLETENESS_OUT"
-if [ -n "${LIBRARY_COMPLETENESS_EVIDENCE_DIR:-}" ]; then
-  cp "$LIBRARY_COMPLETENESS_OUT" \
-    "$LIBRARY_COMPLETENESS_EVIDENCE_DIR/177-library-completeness.json"
-fi
