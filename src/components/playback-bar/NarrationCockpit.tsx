@@ -29,7 +29,7 @@ export function nextNarrationTabIndex(
 }
 
 interface NarrationCockpitProps {
-  onClose: () => void;
+  onClose: (preservePlayback?: boolean) => void;
   controlsDisabled: boolean;
 }
 
@@ -66,7 +66,7 @@ export function NarrationCockpit({
         if (event.key === "Escape") {
           event.preventDefault();
           event.stopPropagation();
-          onClose();
+          onClose(true);
         }
       }}
     >
@@ -78,7 +78,7 @@ export function NarrationCockpit({
         <button
           type="button"
           className="narration-cockpit-close"
-          onClick={onClose}
+          onClick={() => onClose()}
           aria-label="Close narration settings"
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">

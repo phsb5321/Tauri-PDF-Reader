@@ -361,7 +361,9 @@ describe("local sentence playback", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Narration settings" }));
     expect(screen.getByRole("heading", { name: "Narration" })).toBeVisible();
-    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Voice & route" }), {
+      key: "Escape",
+    });
 
     await waitFor(() =>
       expect(
@@ -370,6 +372,9 @@ describe("local sentence playback", () => {
     );
     expect(h.stop).not.toHaveBeenCalled();
     expect(h.stopHighlight).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(h.stopHighlight).toHaveBeenCalledTimes(1));
   });
 
   it("keeps Stop operable while the next page render is pending", async () => {

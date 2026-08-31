@@ -140,8 +140,15 @@ export function AiPlaybackBar({
   } = useDocumentStore();
   const [showSettings, setShowSettings] = useState(false);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
+  const suppressEscapeStopRef = useRef(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
-  const closeNarrationCockpit = useCallback(() => {
+  const closeNarrationCockpit = useCallback((preservePlayback = false) => {
+    if (preservePlayback) {
+      suppressEscapeStopRef.current = true;
+      window.queueMicrotask(() => {
+        suppressEscapeStopRef.current = false;
+      });
+    }
     setShowSettings(false);
     window.requestAnimationFrame(() => settingsButtonRef.current?.focus());
   }, []);
@@ -775,9 +782,12 @@ export function AiPlaybackBar({
         } else {
           handlePlay();
         }
-      } else if (e.key === "Escape" && showSettings) {
+      } else if (
+        e.key === "Escape" &&
+        (showSettings || suppressEscapeStopRef.current)
+      ) {
         e.preventDefault();
-        closeNarrationCockpit();
+        if (showSettings) closeNarrationCockpit(true);
       } else if (
         e.key === "Escape" &&
         (isPlaying || isPaused || continuationPending)
