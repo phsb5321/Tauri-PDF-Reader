@@ -317,6 +317,7 @@ describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
       timeout: 5000,
       timeoutMsg: "Continuous performance policy did not become selected",
     });
+    const selectedPerformanceProfile = await continuous.getAttribute("value");
     const normalizeNumbers = await $(
       '//label[.//strong[normalize-space()="Speak written numbers"]]//input',
     );
@@ -767,9 +768,7 @@ describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
       performanceBackend:
         performanceFactsText.match(/Vulkan\/RADV fixture/u)?.[0],
       performanceDevice: performanceFactsText.match(/Fixture GPU/u)?.[0],
-      performanceProfile: (await continuous.isSelected())
-        ? await continuous.getAttribute("value")
-        : null,
+      performanceProfile: selectedPerformanceProfile,
       uncachedRtfVisible: performanceMeasurementText.includes("RTF"),
       sourceText: initialSourceText,
       spokenFirstRun: receipt.requests[0]?.body.input ?? null,
