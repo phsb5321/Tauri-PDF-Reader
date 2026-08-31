@@ -182,7 +182,12 @@ async function measureCockpitGeometry(width) {
   });
   expect(geometry).not.toBeNull();
   expect(beforeHeight).toBeGreaterThan(0);
-  expect(geometry.viewerHeight / beforeHeight).toBeGreaterThanOrEqual(0.6);
+  const retainedPageRatio = geometry.viewerHeight / beforeHeight;
+  if (retainedPageRatio < 0.6) {
+    throw new Error(
+      `cockpit retained ${retainedPageRatio} at ${geometry.viewport.width}x${geometry.viewport.height}; viewer ${beforeHeight} -> ${geometry.viewerHeight}; cockpit ${geometry.cockpit.height}`,
+    );
+  }
   expect(geometry.cockpit.position).toBe("static");
   expect(geometry.cockpit.backdropFilter).toBe("none");
   expect(geometry.bar.left).toBeGreaterThanOrEqual(-1);
@@ -203,7 +208,7 @@ async function measureCockpitGeometry(width) {
   await closeNarrationSettings();
   return {
     ...geometry,
-    retainedPageRatio: geometry.viewerHeight / beforeHeight,
+    retainedPageRatio,
   };
 }
 

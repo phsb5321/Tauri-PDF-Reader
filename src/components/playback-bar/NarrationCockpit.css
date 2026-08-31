@@ -3,7 +3,7 @@
   align-self: stretch;
   width: 100%;
   height: min(30rem, 28vh);
-  min-height: 12rem;
+  min-height: min(10rem, 24vh);
   overflow: hidden;
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
