@@ -460,10 +460,12 @@ describe("packaged legacy library completeness", () => {
         expect(snapshot.selectedLabel).toBe(`${Math.round(targetZoom * 100)}%`);
         expect(snapshot.intersectionCount).toBe(0);
         expect(
-          Math.abs(snapshot.page.width - baseline.page.width * targetZoom),
+          Math.abs(snapshot.canvas.width - baseline.canvas.width * targetZoom),
         ).toBeLessThanOrEqual(2);
         expect(
-          Math.abs(snapshot.page.height - baseline.page.height * targetZoom),
+          Math.abs(
+            snapshot.canvas.height - baseline.canvas.height * targetZoom,
+          ),
         ).toBeLessThanOrEqual(2);
         expect(
           Math.abs(snapshot.canvas.width - snapshot.page.width),
