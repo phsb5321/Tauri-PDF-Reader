@@ -1520,7 +1520,7 @@ describe("design tokens: WCAG AA contrast floor", () => {
     expect(cockpit).toMatch(
       /\.narration-cockpit\s*\{[^}]*position:\s*static;/s,
     );
-    expect(cockpit).toMatch(/\.narration-cockpit\s*\{[^}]*28vh/s);
+    expect(cockpit).toMatch(/\.narration-cockpit\s*\{[^}]*25vh/s);
     expect(cockpit).not.toMatch(/backdrop-filter\s*:/);
     expect(cockpit).toMatch(
       /\.narration-cockpit-close\s*\{[^}]*min-width:\s*45px;[^}]*min-height:\s*45px;/s,

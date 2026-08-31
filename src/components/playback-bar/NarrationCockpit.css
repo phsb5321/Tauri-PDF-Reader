@@ -2,7 +2,7 @@
   position: static;
   align-self: stretch;
   width: 100%;
-  height: min(30rem, 28vh);
+  height: min(30rem, 25vh);
   min-height: min(10rem, 24vh);
   overflow: hidden;
   display: grid;
@@ -270,7 +270,7 @@
 
 @media (max-width: 767px) {
   .narration-cockpit {
-    height: min(26rem, 28vh);
+    height: min(26rem, 25vh);
   }
 
   .narration-cockpit-header,
