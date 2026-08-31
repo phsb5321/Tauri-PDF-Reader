@@ -44,8 +44,8 @@
 .narration-cockpit-close {
   width: var(--button-height-sm);
   height: var(--button-height-sm);
-  min-width: 44px;
-  min-height: 44px;
+  min-width: 45px;
+  min-height: 45px;
   display: grid;
   place-items: center;
   flex: 0 0 auto;
@@ -79,7 +79,7 @@
 .narration-cockpit-tabs [role="tab"] {
   position: relative;
   flex: 0 0 auto;
-  min-height: 44px;
+  min-height: 45px;
   padding: var(--space-3) var(--space-3);
   border: 0;
   background: transparent;

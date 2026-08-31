@@ -1523,13 +1523,13 @@ describe("design tokens: WCAG AA contrast floor", () => {
     expect(cockpit).toMatch(/\.narration-cockpit\s*\{[^}]*28vh/s);
     expect(cockpit).not.toMatch(/backdrop-filter\s*:/);
     expect(cockpit).toMatch(
-      /\.narration-cockpit-close\s*\{[^}]*min-width:\s*44px;[^}]*min-height:\s*44px;/s,
+      /\.narration-cockpit-close\s*\{[^}]*min-width:\s*45px;[^}]*min-height:\s*45px;/s,
     );
     expect(cockpit).toMatch(
-      /\.narration-cockpit-tabs \[role="tab"\]\s*\{[^}]*min-height:\s*44px;/s,
+      /\.narration-cockpit-tabs \[role="tab"\]\s*\{[^}]*min-height:\s*45px;/s,
     );
     expect(playback).toMatch(
-      /\.ai-playback-button\s*\{[^}]*min-width:\s*44px;[^}]*min-height:\s*44px;/s,
+      /\.ai-playback-button\s*\{[^}]*min-width:\s*45px;[^}]*min-height:\s*45px;/s,
     );
     expect(playback.match(/\.ai-playback-progress\s*\{/g)).toHaveLength(1);
   });
