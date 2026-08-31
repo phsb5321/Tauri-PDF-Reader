@@ -353,6 +353,15 @@ describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
         (await browser.execute(() => window.__E2E_READ__.playbackState())) !==
         "idle",
     );
+    await browser.waitUntil(
+      async () =>
+        (await browser.execute(() => window.__E2E_READ__.playbackState())) ===
+        "playing",
+      {
+        timeout: 10000,
+        timeoutMsg: "public Play never reached active audio before settings",
+      },
+    );
     await openNarrationTab("voice");
     await browser.waitUntil(
       async () =>
