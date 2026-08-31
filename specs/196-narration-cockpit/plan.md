@@ -86,7 +86,7 @@ Add `NarrationCockpit.tsx/.css` and `NarrationDeliverySettings.tsx`:
 - Performance reuses telemetry after profile controls move to Delivery;
 - Selection reuses `HighlightSettings` plus excerpt-limit explanation.
 
-Refactor the compact footer to `auto minmax(16rem,1fr) auto`, a full status/progress lane, quick voice/speed, export, and labeled Tune. Remove the ambiguous auto-page icon, special modal overlay, nonexistent scroll callback, and duplicate CSS declarations. Narrow layout becomes two compact rows; the drawer becomes one column with horizontal-scroll-safe tabs.
+Refactor the compact footer to `auto minmax(16rem,1fr) auto`, a full status/progress lane, quick voice/speed, export, and an accessible Narration settings action. Remove the ambiguous auto-page icon, special modal overlay, nonexistent scroll callback, and duplicate CSS declarations. Narrow layout becomes two compact rows; the drawer becomes one column with horizontal-scroll-safe tabs.
 
 ### 7. Real PDF zoom
 
@@ -117,7 +117,7 @@ Red-first targeted tests:
 Packaged journey `e2e/narration-cockpit.e2e.mjs` via `scripts/e2e-narration-cockpit.sh`:
 
 1. open a two-page fixture containing `2022`, `91,000`, long content, and a selectable full page;
-2. open Tune and drive all four tabs by keyboard;
+2. open Narration settings and drive all four tabs by keyboard;
 3. enable normalization/follow/auto-page and Continuous policy;
 4. Play; observer asserts original digit source ranges while fixture captures expanded outbound text;
 5. assert exactly one current range and a changed scrollTop after the cursor leaves the band;

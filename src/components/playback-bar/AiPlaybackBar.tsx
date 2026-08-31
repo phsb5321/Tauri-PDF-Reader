@@ -184,11 +184,13 @@ export function AiPlaybackBar({
   const sentenceQueueRef = useRef<SentencePlaybackQueue | null>(null);
   const pageContinuationAbortRef = useRef<AbortController | null>(null);
   const pendingContinuationPageRef = useRef<number | null>(null);
+  const [continuationPending, setContinuationPending] = useState(false);
   const readerPageRef = useRef(currentPage);
   const cancelPageContinuation = useCallback(() => {
     pageContinuationAbortRef.current?.abort();
     pageContinuationAbortRef.current = null;
     pendingContinuationPageRef.current = null;
+    setContinuationPending(false);
   }, []);
   useEffect(
     () => () => {
@@ -464,6 +466,7 @@ export function AiPlaybackBar({
       const controller = new AbortController();
       pageContinuationAbortRef.current = controller;
       pendingContinuationPageRef.current = nextPage;
+      setContinuationPending(true);
 
       // Navigate, then wait for this exact render's canvas, text layer, and
       // source annotations. An older ready marker for the same page is stale.
@@ -475,6 +478,7 @@ export function AiPlaybackBar({
       if (pageContinuationAbortRef.current === controller) {
         pageContinuationAbortRef.current = null;
         pendingContinuationPageRef.current = null;
+        setContinuationPending(false);
       }
       if (
         ready.status === "aborted" ||
@@ -771,7 +775,10 @@ export function AiPlaybackBar({
         } else {
           handlePlay();
         }
-      } else if (e.key === "Escape" && (isPlaying || isPaused)) {
+      } else if (
+        e.key === "Escape" &&
+        (isPlaying || isPaused || continuationPending)
+      ) {
         e.preventDefault();
         handleStop();
       }
@@ -779,12 +786,22 @@ export function AiPlaybackBar({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isPlaying, isPaused, handlePlay, handlePause, handleStop]);
+  }, [
+    isPlaying,
+    isPaused,
+    continuationPending,
+    handlePlay,
+    handlePause,
+    handleStop,
+  ]);
 
   // Show settings if API key is needed
   if (needsApiKey) {
     return (
       <div className="ai-playback-bar ai-playback-bar-setup">
+        {showSettings && (
+          <NarrationCockpit onClose={closeNarrationCockpit} controlsDisabled />
+        )}
         <div className="ai-playback-setup-message">
           <svg
             viewBox="0 0 24 24"
@@ -822,15 +839,21 @@ export function AiPlaybackBar({
             Configure
           </button>
         </div>
-        {showSettings && (
-          <NarrationCockpit onClose={closeNarrationCockpit} controlsDisabled />
-        )}
       </div>
     );
   }
 
   return (
     <div className="ai-playback-bar">
+      {showSettings && (
+        <NarrationCockpit
+          onClose={closeNarrationCockpit}
+          controlsDisabled={
+            isPlaying || isPaused || isLoading || Boolean(switchingProvider)
+          }
+        />
+      )}
+
       <div className="ai-playback-controls">
         {isPlaying ? (
           <button
@@ -877,7 +900,11 @@ export function AiPlaybackBar({
         <button
           className="ai-playback-button"
           onClick={handleStop}
-          disabled={!isHighlightActive && playbackState === "idle"}
+          disabled={
+            !isHighlightActive &&
+            playbackState === "idle" &&
+            !continuationPending
+          }
           title="Stop (Esc)"
         >
           <svg viewBox="0 0 24 24" className="ai-playback-icon">
@@ -990,15 +1017,6 @@ export function AiPlaybackBar({
           </svg>
         </button>
       </div>
-
-      {showSettings && (
-        <NarrationCockpit
-          onClose={closeNarrationCockpit}
-          controlsDisabled={
-            isPlaying || isPaused || isLoading || Boolean(switchingProvider)
-          }
-        />
-      )}
 
       {error && (
         <div className="ai-playback-error">

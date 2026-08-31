@@ -10,8 +10,13 @@
 }
 
 .ai-playback-bar-setup {
-  display: flex;
-  justify-content: center;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+}
+
+.ai-playback-bar > .narration-cockpit {
+  grid-column: 1 / -1;
+  width: 100%;
 }
 
 .ai-playback-setup-message {
@@ -23,6 +28,7 @@
 }
 
 .ai-playback-setup-btn {
+  min-height: 44px;
   padding: 6px 14px;
   border-radius: 6px;
   background: var(--accent-color, #7c3aed);
@@ -51,6 +57,8 @@
 .ai-playback-button {
   width: var(--button-height);
   height: var(--button-height);
+  min-width: 44px;
+  min-height: 44px;
   padding: 0;
   border: none;
   border-radius: 8px;
@@ -122,33 +130,6 @@
   }
 }
 
-/* Word progress indicator */
-.ai-playback-progress {
-  flex: 1;
-  max-width: 200px;
-  height: 4px;
-  background: var(--background-tertiary, #2a2a2a);
-  border-radius: 2px;
-  position: relative;
-  overflow: hidden;
-}
-
-.ai-playback-progress-bar {
-  height: 100%;
-  background: var(--accent-color, #7c3aed);
-  border-radius: 2px;
-  transition: width 0.1s ease-out;
-}
-
-.ai-playback-progress-text {
-  position: absolute;
-  right: 0;
-  top: -18px;
-  font-size: var(--text-xs);
-  color: var(--text-secondary, #888);
-  font-variant-numeric: tabular-nums;
-}
-
 .ai-playback-bar > .cache-progress-bar {
   justify-self: center;
   width: 100%;
@@ -164,6 +145,7 @@
 
 .ai-playback-provider-select {
   min-width: 7.5rem;
+  min-height: 44px;
   max-width: 10rem;
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-border);

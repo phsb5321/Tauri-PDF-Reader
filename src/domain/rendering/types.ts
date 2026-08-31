@@ -81,8 +81,8 @@ export const PLATFORM_DEFAULTS: Record<string, Partial<RenderSettings>> = {
 export const RenderPlanSchema = z.object({
   /** User zoom level (1.0 = 100%) */
   zoomLevel: z.number().min(0.25).max(4.0),
-  /** HiDPI multiplier (1.0-4.0) */
-  outputScale: z.number().min(1.0).max(4.0),
+  /** Backing-raster multiplier; may fall below 1 to honour hard canvas limits. */
+  outputScale: z.number().positive().max(4.0),
   /** Logical width (CSS pixels) */
   viewportWidth: z.number().positive(),
   /** Logical height (CSS pixels) */

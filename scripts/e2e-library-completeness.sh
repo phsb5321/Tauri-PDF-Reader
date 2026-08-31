@@ -3,6 +3,21 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+BUILD_REVISION=$(git rev-parse HEAD)
+[[ "$BUILD_REVISION" =~ ^[0-9a-f]{40}$ ]]
+git diff --quiet HEAD -- || {
+  echo "library-completeness: tracked worktree changes make buildRevision dishonest" >&2
+  exit 2
+}
+git diff --cached --quiet -- || {
+  echo "library-completeness: staged changes make buildRevision dishonest" >&2
+  exit 2
+}
+[ -z "$(git status --porcelain --untracked-files=all)" ] || {
+  echo "library-completeness: untracked source makes buildRevision dishonest" >&2
+  exit 2
+}
+
 source ./scripts/e2e-profile.sh
 RUN_ROOT="$(mktemp -d "${PI_SCRATCH_DIR:-${TMPDIR:-/tmp}}/lectrice-library-completeness.XXXXXX")"
 export RUN_ROOT
@@ -133,3 +148,15 @@ SQL
 
   echo "PASS receipt=$LIBRARY_COMPLETENESS_OUT scope=$SCOPE"
 '
+
+receipt_tmp=$(mktemp)
+jq \
+  --arg buildRevision "$BUILD_REVISION" \
+  --arg observedAt "$(date -Iseconds)" \
+  '. + {status: "PASS", buildRevision: $buildRevision, observedAt: $observedAt}' \
+  "$LIBRARY_COMPLETENESS_OUT" >"$receipt_tmp"
+mv "$receipt_tmp" "$LIBRARY_COMPLETENESS_OUT"
+if [ -n "${LIBRARY_COMPLETENESS_EVIDENCE_DIR:-}" ]; then
+  cp "$LIBRARY_COMPLETENESS_OUT" \
+    "$LIBRARY_COMPLETENESS_EVIDENCE_DIR/177-library-completeness.json"
+fi

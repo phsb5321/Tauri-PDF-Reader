@@ -26,6 +26,16 @@ describe("real PDF zoom controls", () => {
     expect(selectedZoomLabel()).toBe("Fit Page · 280%");
   });
 
+  it("keeps a rounded-boundary continuous value selected", () => {
+    useDocumentStore.setState({ zoomLevel: 3.00006, fitMode: "none" });
+    render(<ZoomControls />);
+
+    expect(screen.getByRole("combobox", { name: "Zoom level" })).toHaveValue(
+      "3.0001",
+    );
+    expect(selectedZoomLabel()).toBe("300%");
+  });
+
   it("reports the exact high-zoom step selected by the public control", () => {
     useDocumentStore.setState({ zoomLevel: 2.8, fitMode: "none" });
     render(<ZoomControls />);

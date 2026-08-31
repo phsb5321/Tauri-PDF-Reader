@@ -55,6 +55,29 @@ class ChunkingTests(unittest.TestCase):
 
 
 class ResponseBoundaryTests(unittest.TestCase):
+    def test_cli_failure_never_echoes_source_text(self) -> None:
+        source = "private reader sentence"
+        result = Mock(
+            stderr=f"failed while synthesizing {source}",
+            stdout=f"input={source}",
+            returncode=2,
+        )
+        with (
+            patch.object(bridge.subprocess, "run", return_value=result),
+            patch("builtins.print") as output,
+            tempfile.TemporaryDirectory() as temp,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "exited 2") as failure:
+                bridge._run_chunk(source, "Aria-en", Path(temp) / "out.wav")
+
+        rendered = " ".join(
+            str(argument)
+            for call in output.call_args_list
+            for argument in call.args
+        )
+        self.assertNotIn(source, rendered)
+        self.assertNotIn(source, str(failure.exception))
+
     def test_client_disconnect_is_not_an_engine_failure(self) -> None:
         handler = bridge.Handler.__new__(bridge.Handler)
         handler.send_response = Mock()

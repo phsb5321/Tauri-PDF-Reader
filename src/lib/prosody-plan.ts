@@ -2,7 +2,7 @@ import type { PdfTextBoundary, PdfTextSegment } from "./pdf-text";
 import { findSpeechNumberReplacements } from "./speech-normalization";
 import { segmentSpeechWithOffsets } from "./tts-tracking";
 
-export const PROSODY_PLAN_REVISION = "source-aligned-v3";
+export const PROSODY_PLAN_REVISION = "source-aligned-v4";
 export const PROSODY_CONTEXT_MAX_UTF8_BYTES = 300;
 
 export type ProsodyLanguage = "auto" | "en" | "pt-BR";
@@ -163,23 +163,75 @@ function median(values: readonly number[]): number | null {
   return sorted[Math.floor(sorted.length / 2)];
 }
 
-/** Geometry, not token text alone, distinguishes PDF superscript references. */
+function hasAttachedRaisedBodyNeighbor(
+  marker: PdfTextSegment,
+  segments: readonly PdfTextSegment[],
+  bodyHeight: number,
+): boolean {
+  if (
+    marker.x === null ||
+    marker.y === null ||
+    marker.width === null ||
+    marker.height === null ||
+    marker.width <= 0 ||
+    marker.height <= 0
+  ) {
+    return false;
+  }
+
+  const markerX = marker.x;
+  const markerY = marker.y;
+  const markerWidth = marker.width;
+  return segments.some((neighbor) => {
+    if (
+      neighbor === marker ||
+      !/[\p{L}]/u.test(neighbor.text) ||
+      neighbor.x === null ||
+      neighbor.y === null ||
+      neighbor.width === null ||
+      neighbor.height === null ||
+      neighbor.height <= bodyHeight * 0.8
+    ) {
+      return false;
+    }
+
+    const baselineRaise = markerY - neighbor.y;
+    if (
+      baselineRaise <= neighbor.height * 0.15 ||
+      baselineRaise > neighbor.height * 0.5
+    ) {
+      return false;
+    }
+
+    const attachmentTolerance = neighbor.height * 0.35;
+    const neighborEnd = neighbor.x + neighbor.width;
+    const markerEnd = markerX + markerWidth;
+    return (
+      Math.abs(markerX - neighborEnd) <= attachmentTolerance ||
+      Math.abs(neighbor.x - markerEnd) <= attachmentTolerance
+    );
+  });
+}
+
+/** Geometry, attachment, and a raised baseline identify reference markers. */
 function superscriptDeletions(source: ProsodySource): SourceEdit[] {
+  const segments = source.segments ?? [];
   const bodyHeight = median(
-    (source.segments ?? [])
+    segments
       .map((segment) => segment.height)
       .filter((height): height is number => height !== null && height > 0),
   );
   if (bodyHeight === null) return [];
 
-  return (source.segments ?? [])
+  return segments
     .filter(
       (segment) =>
         /^\d{1,2}$/u.test(segment.text) &&
         segment.height !== null &&
         segment.width !== null &&
         segment.height <= bodyHeight * 0.8 &&
-        segment.width <= segment.height,
+        segment.width <= segment.height &&
+        hasAttachedRaisedBodyNeighbor(segment, segments, bodyHeight),
     )
     .map((segment) => ({
       sourceStart: segment.start,
@@ -338,24 +390,47 @@ function sourceBoundaryAfter(
   return TERMINAL_MARK.test(spokenText) ? "sentence" : "clause";
 }
 
+interface PlanningContext {
+  source: ProsodySource;
+  aligned: AlignedText;
+  absoluteSpokenRanges: Map<SpokenRun, SourceRange>;
+}
+
 function mergeRuns(
-  source: ProsodySource,
+  context: PlanningContext,
   left: SpokenRun,
   right: SpokenRun,
 ): SpokenRun {
-  const sourceGap = source.text.slice(left.sourceEnd, right.sourceStart);
-  const rightSpokenOffset = left.spokenText.length + sourceGap.length;
+  const { source, aligned, absoluteSpokenRanges } = context;
+  const leftRange = absoluteSpokenRanges.get(left);
+  const rightRange = absoluteSpokenRanges.get(right);
+  if (!leftRange || !rightRange) {
+    throw new Error("Missing absolute spoken range for prosody merge");
+  }
+  const gapStart = leftRange.end;
+  const gapEnd = rightRange.start;
+  const spokenGap = aligned.spokenText.slice(gapStart, gapEnd);
+  const rightSpokenOffset = left.spokenText.length + spokenGap.length;
   const rightSourceOffset = right.sourceStart - left.sourceStart;
   const alignment: AlignmentSegment[] = [...left.alignment];
-  if (sourceGap.length > 0) {
-    alignment.push({
-      spokenStart: left.spokenText.length,
-      spokenEnd: rightSpokenOffset,
-      sourceStart: left.sourceEnd - left.sourceStart,
-      sourceEnd: rightSourceOffset,
-      kind: "copy",
-    });
-  }
+  alignment.push(
+    ...aligned.alignment
+      .map((segment) => projectSegment(segment, gapStart, gapEnd))
+      .filter((segment): segment is AlignmentSegment => segment !== null)
+      .map((segment) => ({
+        ...segment,
+        spokenStart: left.spokenText.length + segment.spokenStart - gapStart,
+        spokenEnd: left.spokenText.length + segment.spokenEnd - gapStart,
+        sourceStart:
+          segment.sourceStart === null
+            ? null
+            : segment.sourceStart - left.sourceStart,
+        sourceEnd:
+          segment.sourceEnd === null
+            ? null
+            : segment.sourceEnd - left.sourceStart,
+      })),
+  );
   alignment.push(
     ...right.alignment.map((segment) => ({
       ...segment,
@@ -371,16 +446,21 @@ function mergeRuns(
           : segment.sourceEnd + rightSourceOffset,
     })),
   );
-  return {
+  const merged: SpokenRun = {
     sourceStart: left.sourceStart,
     sourceEnd: right.sourceEnd,
     displayText: source.text.slice(left.sourceStart, right.sourceEnd),
-    spokenText: left.spokenText + sourceGap + right.spokenText,
+    spokenText: left.spokenText + spokenGap + right.spokenText,
     alignment,
     language: left.language,
     boundaryAfter: right.boundaryAfter,
     revision: PROSODY_PLAN_REVISION,
   };
+  absoluteSpokenRanges.set(merged, {
+    start: leftRange.start,
+    end: rightRange.end,
+  });
+  return merged;
 }
 
 /**
@@ -392,7 +472,7 @@ function mergeRuns(
 const MIN_SPOKEN_RUN_UTF8_BYTES = 12;
 
 function coalesceMicroRuns(
-  source: ProsodySource,
+  context: PlanningContext,
   runs: SpokenRun[],
   contextLimit: number,
 ): SpokenRun[] {
@@ -407,7 +487,7 @@ function coalesceMicroRuns(
         run.boundaryAfter !== "paragraph" &&
         run.boundaryAfter !== "section"
       ) {
-        const candidate = mergeRuns(source, run, next);
+        const candidate = mergeRuns(context, run, next);
         if (encoder.encode(candidate.spokenText).length <= contextLimit) {
           coalesced.push(candidate);
           index += 1;
@@ -421,7 +501,7 @@ function coalesceMicroRuns(
         previous.boundaryAfter !== "paragraph" &&
         previous.boundaryAfter !== "section"
       ) {
-        const candidate = mergeRuns(source, previous, run);
+        const candidate = mergeRuns(context, previous, run);
         if (encoder.encode(candidate.spokenText).length <= contextLimit) {
           coalesced[coalesced.length - 1] = candidate;
           continue;
@@ -434,7 +514,7 @@ function coalesceMicroRuns(
 }
 
 function mergeContextRuns(
-  source: ProsodySource,
+  context: PlanningContext,
   runs: SpokenRun[],
   contextLimit: number,
 ): SpokenRun[] {
@@ -444,7 +524,7 @@ function mergeContextRuns(
   let current = runs[1];
 
   for (const next of runs.slice(2)) {
-    const candidate = mergeRuns(source, current, next);
+    const candidate = mergeRuns(context, current, next);
     const crossesBlock =
       current.boundaryAfter === "paragraph" ||
       current.boundaryAfter === "section";
@@ -481,6 +561,7 @@ export function planProsodyRuns(
   if (spans.length === 0) return [];
 
   const runs: SpokenRun[] = [];
+  const absoluteSpokenRanges = new Map<SpokenRun, SourceRange>();
   for (const span of spans) {
     const projected = aligned.alignment
       .map((segment) => projectSegment(segment, span.charStart, span.charEnd))
@@ -504,7 +585,7 @@ export function planProsodyRuns(
       sourceEnd:
         segment.sourceEnd === null ? null : segment.sourceEnd - sourceStart,
     }));
-    runs.push({
+    const run: SpokenRun = {
       sourceStart,
       sourceEnd,
       displayText: source.text.slice(sourceStart, sourceEnd),
@@ -513,11 +594,21 @@ export function planProsodyRuns(
       language: source.language ?? "auto",
       boundaryAfter: sourceBoundaryAfter(source, sourceEnd, span.text),
       revision: PROSODY_PLAN_REVISION,
+    };
+    runs.push(run);
+    absoluteSpokenRanges.set(run, {
+      start: span.charStart,
+      end: span.charEnd,
     });
   }
-  return mergeContextRuns(
+  const context: PlanningContext = {
     source,
-    coalesceMicroRuns(source, runs, contextLimit),
+    aligned,
+    absoluteSpokenRanges,
+  };
+  return mergeContextRuns(
+    context,
+    coalesceMicroRuns(context, runs, contextLimit),
     contextLimit,
   );
 }

@@ -1,6 +1,8 @@
 /* global browser, $, expect */
 
 import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 
 // Runs in the WebdriverIO Node process, NOT inside browser.execute/WebKit. The
 // production CSP therefore stays closed; this observer reads only the hermetic
@@ -126,6 +128,85 @@ async function closeNarrationSettings() {
   });
 }
 
+async function measureCockpitGeometry(width) {
+  await browser.setWindowSize(width, 800);
+  await browser.pause(100);
+  const beforeHeight = await browser.execute(
+    () => document.querySelector(".pdf-viewer")?.getBoundingClientRect().height,
+  );
+  await openNarrationTab("voice");
+  await browser.pause(100);
+  const geometry = await browser.execute(() => {
+    const viewer = document.querySelector(".pdf-viewer");
+    const bar = document.querySelector(".ai-playback-bar");
+    const cockpit = document.querySelector(".narration-cockpit");
+    const selectors = [
+      ".ai-playback-controls button",
+      ".ai-playback-settings-section button",
+      ".ai-playback-settings-section select",
+      ".ai-playback-settings-section input",
+      ".narration-cockpit-close",
+      '.narration-cockpit-tabs [role="tab"]',
+    ].join(",");
+    const controls = Array.from(document.querySelectorAll(selectors))
+      .filter((element) => element.getClientRects().length > 0)
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          name:
+            element.getAttribute("aria-label") ??
+            element.getAttribute("title") ??
+            element.textContent?.trim() ??
+            element.tagName,
+          width: rect.width,
+          height: rect.height,
+        };
+      });
+    if (!viewer || !bar || !cockpit) return null;
+    const barRect = bar.getBoundingClientRect();
+    const cockpitRect = cockpit.getBoundingClientRect();
+    return {
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      viewerHeight: viewer.getBoundingClientRect().height,
+      bar: { left: barRect.left, right: barRect.right },
+      cockpit: {
+        left: cockpitRect.left,
+        right: cockpitRect.right,
+        height: cockpitRect.height,
+        position: getComputedStyle(cockpit).position,
+        backdropFilter: getComputedStyle(cockpit).backdropFilter,
+      },
+      documentScrollWidth: document.documentElement.scrollWidth,
+      controls,
+    };
+  });
+  expect(geometry).not.toBeNull();
+  expect(beforeHeight).toBeGreaterThan(0);
+  expect(geometry.viewerHeight / beforeHeight).toBeGreaterThanOrEqual(0.6);
+  expect(geometry.cockpit.position).toBe("static");
+  expect(geometry.cockpit.backdropFilter).toBe("none");
+  expect(geometry.bar.left).toBeGreaterThanOrEqual(-1);
+  expect(geometry.bar.right).toBeLessThanOrEqual(geometry.viewport.width + 1);
+  expect(geometry.cockpit.left).toBeGreaterThanOrEqual(-1);
+  expect(geometry.cockpit.right).toBeLessThanOrEqual(
+    geometry.viewport.width + 1,
+  );
+  expect(geometry.documentScrollWidth).toBeLessThanOrEqual(
+    geometry.viewport.width + 1,
+  );
+  expect(geometry.controls.length).toBeGreaterThanOrEqual(8);
+  expect(
+    geometry.controls.every(
+      (control) => control.width >= 44 && control.height >= 44,
+    ),
+  ).toBe(true);
+  await closeNarrationSettings();
+  return {
+    ...geometry,
+    retainedPageRatio: geometry.viewerHeight / beforeHeight,
+  };
+}
+
 describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
   it("plays, replaces a paused queue from selection, and stops", async () => {
     await browser.waitUntil(
@@ -161,18 +242,64 @@ describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
       },
     );
 
+    const cockpitGeometry = [];
+    for (const width of [1920, 1440, 767, 640]) {
+      cockpitGeometry.push(await measureCockpitGeometry(width));
+    }
+    await browser.setWindowSize(1200, 800);
+
     await openNarrationTab("voice");
+    const voiceTab = await $("#narration-tab-voice");
+    await focusPublicControl(voiceTab);
+    await browser.keys(["ArrowRight"]);
+    expect(await $("#narration-tab-delivery").isFocused()).toBe(true);
+    expect(
+      await $("#narration-tab-delivery").getAttribute("aria-selected"),
+    ).toBe("true");
+    await browser.keys(["ArrowLeft"]);
+    expect(await voiceTab.isFocused()).toBe(true);
     expect(await $("#narration-panel-voice").getText()).toContain("Local TTS");
+    const reducedMotionEvidence = await browser.execute(() => {
+      const seconds = (value) =>
+        value
+          .split(",")
+          .map((duration) =>
+            duration.trim().endsWith("ms")
+              ? Number.parseFloat(duration) / 1000
+              : Number.parseFloat(duration),
+          )
+          .filter(Number.isFinite);
+      const candidates = [
+        document.querySelector(".pdf-page-container"),
+        ...document.querySelectorAll(".narration-cockpit *"),
+      ].filter(Boolean);
+      const durations = candidates.flatMap((element) => {
+        const style = getComputedStyle(element);
+        return [
+          ...seconds(style.animationDuration),
+          ...seconds(style.transitionDuration),
+        ];
+      });
+      return {
+        mediaMatches: matchMedia("(prefers-reduced-motion: reduce)").matches,
+        maxDurationSeconds: Math.max(0, ...durations),
+        pageTransition: getComputedStyle(
+          document.querySelector(".pdf-page-container"),
+        ).transitionDuration,
+      };
+    });
+    expect(reducedMotionEvidence.mediaMatches).toBe(true);
+    expect(reducedMotionEvidence.maxDurationSeconds).toBeLessThanOrEqual(
+      0.00001,
+    );
+    expect(reducedMotionEvidence.pageTransition).toBe("0s");
     await closeNarrationSettings();
 
     await openNarrationTab("performance");
-    expect(await $(".performance-facts").getText()).toContain(
-      "Magpie TTS Multilingual 357M",
-    );
-    expect(await $(".performance-facts").getText()).toContain(
-      "Vulkan/RADV fixture",
-    );
-    expect(await $(".performance-facts").getText()).toContain("Fixture GPU");
+    const performanceFactsText = await $(".performance-facts").getText();
+    expect(performanceFactsText).toContain("Magpie TTS Multilingual 357M");
+    expect(performanceFactsText).toContain("Vulkan/RADV fixture");
+    expect(performanceFactsText).toContain("Fixture GPU");
     await closeNarrationSettings();
 
     await openNarrationTab("delivery");
@@ -273,6 +400,12 @@ describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
       sources: ["What"],
       active: true,
     });
+    const initialSourceText = await browser.execute(() =>
+      Array.from(document.querySelectorAll(".textLayer span"))
+        .map((span) => span.textContent?.trim() ?? "")
+        .filter(Boolean)
+        .join(" / "),
+    );
     expect(
       await browser.execute(
         () =>
@@ -280,6 +413,12 @@ describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
           document.querySelector(".tts-word-debug") === null,
       ),
     ).toBe(true);
+
+    await openNarrationTab("voice");
+    await closeNarrationSettings();
+    expect(
+      await browser.execute(() => window.__E2E_READ__.playbackState()),
+    ).toBe("playing");
 
     const receipt = await readFixtureRequests();
     expect(receipt.requests.length).toBeGreaterThanOrEqual(1);
@@ -461,6 +600,24 @@ describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
     expect(paragraphGeometry.title).toBeNull();
     expect(paragraphGeometry.tickBackground).not.toBe("rgba(0, 0, 0, 0)");
     expect(paragraphGeometry.iconVisibility).toBe("hidden");
+    const paragraphActionsNonOverlapping = await browser.execute(() => {
+      const rectangles = Array.from(
+        document.querySelectorAll("button.paragraph-action-button"),
+        (button) => button.getBoundingClientRect(),
+      );
+      return rectangles.every((left, index) =>
+        rectangles
+          .slice(index + 1)
+          .every(
+            (right) =>
+              left.right <= right.left ||
+              right.right <= left.left ||
+              left.bottom <= right.top ||
+              right.bottom <= left.top,
+          ),
+      );
+    });
+    expect(paragraphActionsNonOverlapping).toBe(true);
 
     await focusPublicControl(paragraphAction);
     const focusedAction = await browser.execute(() => {
@@ -581,9 +738,11 @@ describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
     expect(Date.now() - playbackStartedAt).toBeLessThan(20000);
 
     await openNarrationTab("performance");
-    await $(".performance-measurement").waitForDisplayed({ timeout: 10000 });
-    expect(await $(".performance-measurement").getText()).toContain("RTF");
-    expect(await $(".performance-measurement").getText()).toContain(
+    const performanceMeasurement = await $(".performance-measurement");
+    await performanceMeasurement.waitForDisplayed({ timeout: 10000 });
+    const performanceMeasurementText = await performanceMeasurement.getText();
+    expect(performanceMeasurementText).toContain("RTF");
+    expect(performanceMeasurementText).toContain(
       "Sustains continuous playback",
     );
     await closeNarrationSettings();
@@ -597,10 +756,60 @@ describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
     ]);
     expect(completed.requests.length).toBeGreaterThan(2);
     expect(completed.requests[2].body.input).toBe(selectedRequest);
-    expect(
-      completed.requests.some((request) =>
-        request.body.input.startsWith("Second page ready."),
+    const pageTwoRequest = completed.requests.find((request) =>
+      request.body.input.startsWith("Second page ready."),
+    );
+    expect(pageTwoRequest).toBeDefined();
+
+    const observed = {
+      performanceModel: performanceFactsText.match(
+        /Magpie TTS Multilingual 357M/u,
+      )?.[0],
+      performanceBackend:
+        performanceFactsText.match(/Vulkan\/RADV fixture/u)?.[0],
+      performanceDevice: performanceFactsText.match(/Fixture GPU/u)?.[0],
+      performanceProfile: (await continuous.isSelected())
+        ? await continuous.getAttribute("value")
+        : null,
+      uncachedRtfVisible: performanceMeasurementText.includes("RTF"),
+      sourceText: initialSourceText,
+      spokenFirstRun: receipt.requests[0]?.body.input ?? null,
+      highlightedSourceRange: alignedHighlight.sources.join(" "),
+      secondRun: receipt.requests[1]?.body.input ?? null,
+      readFromHereReplacedPausedQueue:
+        selectedRequest.startsWith("This book aims") &&
+        selectionRequests.length > 0,
+      paragraphActionStartedAtChosenParagraph:
+        completed.requests.some(
+          (request) => request.body.input === "This book aims to fill a gap.",
+        ) && paragraphGeometry.line.left > paragraphGeometry.action.right,
+      paragraphActionNonOverlapping: paragraphActionsNonOverlapping,
+      paragraphActionFocusVisible:
+        focusedAction.outlineStyle !== "none" &&
+        Number.parseFloat(focusedAction.outlineWidth) >= 2 &&
+        focusedAction.iconVisibility === "visible",
+      paragraphActionPaperMarker:
+        paragraphGeometry.title === null &&
+        paragraphGeometry.tickBackground !== "rgba(0, 0, 0, 0)" &&
+        paragraphGeometry.iconVisibility === "hidden",
+      manualPageFreshPlay: pageTwoRequest?.body.input ?? null,
+      provider: await browser.execute(() => window.__E2E_READ__.provider()),
+      credentialPresent: await browser.execute(() =>
+        window.__E2E_READ__.hasKey(),
       ),
-    ).toBe(true);
+      finalPlaybackState: await browser.execute(() =>
+        window.__E2E_READ__.playbackState(),
+      ),
+      cockpitGeometry,
+      reducedMotion: reducedMotionEvidence,
+    };
+    const evidenceDirectory = process.env.LECTRICE_LOCAL_TTS_EVIDENCE_DIR;
+    if (!evidenceDirectory) {
+      throw new Error("LECTRICE_LOCAL_TTS_EVIDENCE_DIR is required");
+    }
+    fs.writeFileSync(
+      path.join(evidenceDirectory, "observed.json"),
+      `${JSON.stringify(observed, null, 2)}\n`,
+    );
   });
 });

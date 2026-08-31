@@ -76,9 +76,27 @@ export function calculateOptimalOutputScale(
     }
   }
 
-  // A pathological PDF can exceed WebKit even at 1x. Keep the established
-  // minimum here; the renderer's visible error path remains the final guard.
-  return { outputScale: 1, wasCapped: true };
+  // CSS zoom stays truthful even when the logical page itself is wider than
+  // WebKit's backing-store limit. A fractional raster scale preserves that
+  // geometry while bounding both the hard side and optional memory budget.
+  const sideScale = Math.min(
+    RENDER_CONSTANTS.MAX_CANVAS_DIMENSION / viewportWidth,
+    RENDER_CONSTANTS.MAX_CANVAS_DIMENSION / viewportHeight,
+  );
+  const megapixelScale =
+    maxMegapixels === 0
+      ? Number.POSITIVE_INFINITY
+      : Math.sqrt(
+          (maxMegapixels * RENDER_CONSTANTS.MEGAPIXEL_DIVISOR) /
+            (viewportWidth * viewportHeight),
+        );
+  return {
+    outputScale: Math.max(
+      Number.EPSILON,
+      Math.min(targetScale, sideScale, megapixelScale),
+    ),
+    wasCapped: true,
+  };
 }
 
 /**
@@ -131,8 +149,8 @@ export function calculateRenderPlan(input: RenderPlanInput): RenderPlan {
   );
 
   // Calculate physical canvas dimensions
-  const canvasWidth = Math.floor(viewportWidth * outputScale);
-  const canvasHeight = Math.floor(viewportHeight * outputScale);
+  const canvasWidth = Math.max(1, Math.floor(viewportWidth * outputScale));
+  const canvasHeight = Math.max(1, Math.floor(viewportHeight * outputScale));
 
   // Calculate metrics
   const megapixels = calculateMegapixels(canvasWidth, canvasHeight);

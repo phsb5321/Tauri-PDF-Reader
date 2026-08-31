@@ -351,6 +351,27 @@ describe("local sentence playback", () => {
     }
   });
 
+  it("keeps Stop operable while the next page render is pending", async () => {
+    useAiTtsStore.setState({ autoPageEnabled: true });
+    render(<AiPlaybackBar getText={() => Promise.resolve("Page one.")} />);
+
+    fireEvent.click(screen.getByTitle("Play (Ctrl+Space)"));
+    await waitFor(() => expect(h.speakWithHighlight).toHaveBeenCalledTimes(1));
+    await act(async () => h.complete?.());
+    await waitFor(() =>
+      expect(useDocumentStore.getState().currentPage).toBe(2),
+    );
+
+    const stop = screen.getByTitle("Stop (Esc)");
+    expect(stop).toBeEnabled();
+    fireEvent.click(stop);
+    act(() => markPdfPageReady(2));
+    await act(async () => Promise.resolve());
+
+    expect(h.speakWithHighlight).toHaveBeenCalledTimes(1);
+    expect(useAiTtsStore.getState().error).toBeNull();
+  });
+
   it("cancels a pending page handoff when navigation moves elsewhere", async () => {
     h.playbackState = "playing";
     useAiTtsStore.setState({ autoPageEnabled: true });

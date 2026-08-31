@@ -6,21 +6,12 @@
  */
 
 import { useCallback, useEffect } from "react";
-// TODO: Migrate to type-safe bindings when render_settings commands are added to tauri-specta
-// eslint-disable-next-line no-restricted-imports
-import { invoke } from "@tauri-apps/api/core";
 import { useRenderStore, selectRenderSettings } from "../stores/render-store";
 import type { RenderSettings } from "../domain/rendering";
-import { RenderSettingsSchema } from "../domain/rendering";
-
-/**
- * Backend response for update render settings
- */
-interface UpdateRenderSettingsResponse {
-  success: boolean;
-  restartRequired: boolean;
-  settings: RenderSettings;
-}
+import {
+  getRenderSettings,
+  updateRenderSettings,
+} from "../lib/api/render-settings";
 
 /**
  * Hook for managing render settings with persistence
@@ -62,8 +53,7 @@ export function useRenderSettings() {
       setError(null);
 
       try {
-        const response = await invoke<RenderSettings>("get_render_settings");
-        setSettings(RenderSettingsSchema.parse(response));
+        setSettings(await getRenderSettings());
       } catch (err) {
         console.error("Failed to load render settings:", err);
         setError(
@@ -96,15 +86,12 @@ export function useRenderSettings() {
     setError(null);
 
     try {
-      const response = await invoke<UpdateRenderSettingsResponse>(
-        "update_render_settings",
-        {
-          qualityMode: settings.qualityMode,
-          maxMegapixels: settings.maxMegapixels,
-          hwAccelerationEnabled: settings.hwAccelerationEnabled,
-          debugOverlayEnabled: settings.debugOverlayEnabled,
-        },
-      );
+      const response = await updateRenderSettings({
+        qualityMode: settings.qualityMode,
+        maxMegapixels: settings.maxMegapixels,
+        hwAccelerationEnabled: settings.hwAccelerationEnabled,
+        debugOverlayEnabled: settings.debugOverlayEnabled,
+      });
 
       if (response.success) {
         setSettings(response.settings);
@@ -158,12 +145,7 @@ export function useRenderSettings() {
       setError(null);
 
       try {
-        const response = await invoke<UpdateRenderSettingsResponse>(
-          "update_render_settings",
-          {
-            [key]: value,
-          },
-        );
+        const response = await updateRenderSettings({ [key]: value });
 
         if (response.success) {
           setSettings(response.settings);

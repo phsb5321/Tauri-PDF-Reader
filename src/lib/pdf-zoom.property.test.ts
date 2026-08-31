@@ -27,8 +27,10 @@ describe("real PDF zoom model", () => {
     fc.assert(
       fc.property(
         fc.double({ min: 0.25, max: 4, noNaN: true }),
+        fc.double({ min: 10, max: 5_000, noNaN: true }),
+        fc.double({ min: 10, max: 5_000, noNaN: true }),
         fc.array(action, { minLength: 1, maxLength: 100 }),
-        (initialZoom, actions) => {
+        (initialZoom, pageWidth, pageHeight, actions) => {
           useDocumentStore.getState().reset();
           useDocumentStore.setState({ zoomLevel: initialZoom });
 
@@ -45,8 +47,8 @@ describe("real PDF zoom model", () => {
             expect(state.fitMode).toBe("none");
 
             const plan = calculateRenderPlan({
-              pageWidth: 612,
-              pageHeight: 792,
+              pageWidth,
+              pageHeight,
               zoomLevel: state.zoomLevel,
               settings: {
                 qualityMode: "ultra",
@@ -63,8 +65,12 @@ describe("real PDF zoom model", () => {
             expect(
               Math.max(plan.canvasWidth, plan.canvasHeight),
             ).toBeLessThanOrEqual(8192);
-            expect(plan.viewportWidth).toBeCloseTo(612 * state.zoomLevel);
-            expect(plan.viewportHeight).toBeCloseTo(792 * state.zoomLevel);
+            expect(plan.canvasWidth).toBeGreaterThanOrEqual(1);
+            expect(plan.canvasHeight).toBeGreaterThanOrEqual(1);
+            expect(plan.viewportWidth).toBeCloseTo(pageWidth * state.zoomLevel);
+            expect(plan.viewportHeight).toBeCloseTo(
+              pageHeight * state.zoomLevel,
+            );
           }
         },
       ),

@@ -46,7 +46,7 @@ As a reader, I can tune only real narration behavior from a docked footer drawer
 
 Acceptance scenarios:
 
-1. The compact footer has transport, a growing truthful progress/status lane, quick voice/speed, export, and a named Tune action.
+1. The compact footer has transport, a growing truthful progress/status lane, quick voice/speed, export, and an accessible Narration settings action.
 2. The drawer provides `Voice & route`, `Delivery`, `Performance`, and `Selection` tabs.
 3. Delivery controls speed, follow read-along, automatic page turn, number normalization/language, and Responsive/Balanced/Continuous policy.
 4. Performance reports factual engine/model/backend/device/RTF data; it does not imply unsupported controls.

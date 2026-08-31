@@ -1503,6 +1503,37 @@ describe("design tokens: WCAG AA contrast floor", () => {
     expect(rootBlock).not.toMatch(/font-size:\s*\d+px/);
   });
 
+  it("keeps the narration cockpit in flow with 44px primary targets", () => {
+    const cockpit = stripCssComments(
+      readFileSync(
+        join(SRC, "components/playback-bar/NarrationCockpit.css"),
+        "utf8",
+      ),
+    );
+    const playback = stripCssComments(
+      readFileSync(
+        join(SRC, "components/playback-bar/AiPlaybackBar.css"),
+        "utf8",
+      ),
+    );
+
+    expect(cockpit).toMatch(
+      /\.narration-cockpit\s*\{[^}]*position:\s*static;/s,
+    );
+    expect(cockpit).toMatch(/\.narration-cockpit\s*\{[^}]*32vh/s);
+    expect(cockpit).not.toMatch(/backdrop-filter\s*:/);
+    expect(cockpit).toMatch(
+      /\.narration-cockpit-close\s*\{[^}]*min-width:\s*44px;[^}]*min-height:\s*44px;/s,
+    );
+    expect(cockpit).toMatch(
+      /\.narration-cockpit-tabs \[role="tab"\]\s*\{[^}]*min-height:\s*44px;/s,
+    );
+    expect(playback).toMatch(
+      /\.ai-playback-button\s*\{[^}]*min-width:\s*44px;[^}]*min-height:\s*44px;/s,
+    );
+    expect(playback.match(/\.ai-playback-progress\s*\{/g)).toHaveLength(1);
+  });
+
   it("focus rings are keyboard-only — no bare :focus on interactive controls", () => {
     // The convention is the global :focus-visible ring; a bare :focus on a
     // button/menu/nav paints it for mouse clicks too. Only text-entry

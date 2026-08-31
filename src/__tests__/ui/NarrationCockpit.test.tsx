@@ -117,7 +117,7 @@ describe("NarrationCockpit", () => {
       screen.getByRole("combobox", { name: /^Narration language/ }),
     ).toBeDisabled();
     expect(
-      screen.getByText("Stop narration before changing speed or queue policy."),
+      screen.getByText("Stop narration before changing delivery settings."),
     ).toBeVisible();
   });
 

@@ -45,7 +45,7 @@ export function ZoomControls() {
   const zoomPercentage = Math.round(zoomLevel * 100);
   const exactZoomValue = String(Number(zoomLevel.toFixed(4)));
   const isPresetZoom = ZOOM_LEVELS.some(
-    (level) => Math.abs(level.value - zoomLevel) < 0.0001,
+    (level) => String(Number(level.value.toFixed(4))) === exactZoomValue,
   );
   const selectedValue = fitMode === "none" ? exactZoomValue : fitMode;
 

@@ -20,7 +20,10 @@ import type {
   RenderSettings,
   DisplayInfo,
 } from "../../../domain/rendering/types";
-import { DEFAULT_RENDER_SETTINGS } from "../../../domain/rendering/types";
+import {
+  DEFAULT_RENDER_SETTINGS,
+  RenderPlanSchema,
+} from "../../../domain/rendering/types";
 
 // Test fixtures
 const createDisplayInfo = (
@@ -127,6 +130,26 @@ describe("RenderPolicy", () => {
       },
     );
 
+    it("keeps an A1 page at 400% truthful while capping its backing canvas", () => {
+      const plan = calculateRenderPlan({
+        pageWidth: 1684,
+        pageHeight: 2384,
+        zoomLevel: 4,
+        settings: createSettings({ qualityMode: "ultra", maxMegapixels: 0 }),
+        displayInfo: createDisplayInfo({ devicePixelRatio: 2 }),
+      });
+
+      expect(plan.zoomLevel).toBe(4);
+      expect(plan.viewportWidth).toBe(6736);
+      expect(plan.viewportHeight).toBe(9536);
+      expect(plan.outputScale).toBeLessThan(1);
+      expect(Math.max(plan.canvasWidth, plan.canvasHeight)).toBeLessThanOrEqual(
+        8192,
+      );
+      expect(plan.wasCapped).toBe(true);
+      expect(RenderPlanSchema.parse(plan)).toEqual(plan);
+    });
+
     it("keeps 280% PDF zoom inside WebKit canvas dimensions even when the configurable megapixel cap is disabled", () => {
       const plan = calculateRenderPlan({
         pageWidth: 612,
@@ -201,17 +224,15 @@ describe("RenderPolicy", () => {
       expect(result.wasCapped).toBe(true);
     });
 
-    it("never drops below scale of 1", () => {
-      const result = calculateOptimalOutputScale(
-        10000, // very wide viewport
-        10000, // very tall viewport
-        4.0, // target scale
-        1, // very restrictive limit
-      );
+    it("uses a fractional backing scale when 1x would violate hard limits", () => {
+      const result = calculateOptimalOutputScale(10000, 10000, 4.0, 1);
 
-      // Even at 1x: 10000 * 10000 = 100 MP (over 1 MP limit)
-      // But we should still get at least 1x
-      expect(result.outputScale).toBeGreaterThanOrEqual(1);
+      expect(result.outputScale).toBeCloseTo(0.1);
+      expect(10000 * result.outputScale).toBeLessThanOrEqual(8192);
+      expect(
+        (10000 * result.outputScale * 10000 * result.outputScale) / 1_000_000,
+      ).toBeLessThanOrEqual(1);
+      expect(result.wasCapped).toBe(true);
     });
   });
 

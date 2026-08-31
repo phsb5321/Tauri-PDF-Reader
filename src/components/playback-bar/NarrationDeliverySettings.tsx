@@ -159,7 +159,7 @@ export function NarrationDeliverySettings({
       </fieldset>
       {disabled && (
         <p className="narration-control-note" role="status">
-          Stop narration before changing speed or queue policy.
+          Stop narration before changing delivery settings.
         </p>
       )}
     </div>
