@@ -190,6 +190,23 @@ describe("source-aligned prosody plan", () => {
     expect(projected).toEqual(text.match(/\S+/gu));
   });
 
+  it("applies a performance-profile ceiling below the provider maximum", () => {
+    const text = `${"semantic context stays source aligned ".repeat(20)}Done.`;
+    const responsive = planProsodyRuns({ text }, 8_192, 180);
+    const balanced = planProsodyRuns({ text }, 8_192, 300);
+
+    expect(responsive.length).toBeGreaterThan(balanced.length);
+    expect(responsive.every((run) => bytes(run.spokenText) <= 180)).toBe(true);
+    expect(balanced.every((run) => bytes(run.spokenText) <= 300)).toBe(true);
+    expect(
+      responsive
+        .map((run) => run.displayText)
+        .join(" ")
+        .replace(/\s+/gu, " ")
+        .trim(),
+    ).toBe(text.replace(/\s+/gu, " ").trim());
+  });
+
   it("retains the provider UTF-8 bound and fails closed on an oversized grapheme", () => {
     const text = `${"alpha ".repeat(40)}Since the end`;
     const runs = planProsodyRuns({ text }, 64);

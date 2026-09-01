@@ -61,13 +61,31 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if self.path == "/health":
-            self.json_response({"status": "ok", "ready": True, "version": "fixture-1"})
+            self.json_response(
+                {
+                    "status": "ok",
+                    "ready": True,
+                    "version": "magpie-fixture-chunk-v1",
+                }
+            )
         elif self.path == "/v1/capabilities":
             self.json_response(
                 {
                     "status": "ok",
                     "ready": True,
-                    "limits": {"maxTextUtf8Bytes": 8192},
+                    "limits": {
+                        "maxTextUtf8Bytes": 300,
+                        "queueCapacity": 1,
+                    },
+                    "runtime": {
+                        "model": "Magpie TTS Multilingual 357M",
+                        "modelRevision": "fixture-model",
+                        "quantization": "Q6_K",
+                        "backend": "Vulkan/RADV fixture",
+                        "device": "Fixture GPU",
+                        "acceleration": "gpu",
+                        "chunkMaxUtf8Bytes": 300,
+                    },
                     "tts": {
                         "voices": [
                             {

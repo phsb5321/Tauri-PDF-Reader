@@ -8,6 +8,21 @@ const readFixtureRequests = () =>
     .fetch("http://127.0.0.1:5301/requests")
     .then((response) => response.json());
 
+async function openPerformance() {
+  const settings = await $('button[aria-label="Settings"]');
+  await settings.waitForClickable({ timeout: 10000 });
+  await settings.click();
+  const performance = await $("button*=Performance");
+  await performance.waitForClickable({ timeout: 10000 });
+  await performance.click();
+  await $(".performance-settings").waitForDisplayed({ timeout: 10000 });
+}
+
+async function closeSettings() {
+  await browser.keys(["Escape"]);
+  await $(".settings-backdrop").waitForExist({ reverse: true, timeout: 5000 });
+}
+
 describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
   it("plays through local sentence audio with an estimated read-along", async () => {
     await browser.waitUntil(
@@ -42,6 +57,30 @@ describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
         timeoutMsg: "local provider did not initialize keylessly",
       },
     );
+
+    await openPerformance();
+    expect(await $(".performance-facts").getText()).toContain(
+      "Magpie TTS Multilingual 357M",
+    );
+    expect(await $(".performance-facts").getText()).toContain(
+      "Vulkan/RADV fixture",
+    );
+    expect(await $(".performance-facts").getText()).toContain("Fixture GPU");
+    const continuous = await $('input[value="continuous"]');
+    await continuous.waitForEnabled({ timeout: 10000 });
+    await browser.execute(() =>
+      document.querySelector('input[value="continuous"]').focus(),
+    );
+    await browser.keys(["Space"]);
+    await browser.waitUntil(() => continuous.isSelected(), {
+      timeout: 5000,
+      timeoutMsg: "Continuous performance policy did not become selected",
+    });
+    await closeSettings();
+
+    await openPerformance();
+    expect(await $('input[value="continuous"]').isSelected()).toBe(true);
+    await closeSettings();
 
     const play = await $(".ai-playback-button");
     await play.waitForExist({ timeout: 15000 });
@@ -155,6 +194,15 @@ describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
     ).toBe(true);
 
     expect(Date.now() - playbackStartedAt).toBeLessThan(15000);
+
+    await openPerformance();
+    await $(".performance-measurement").waitForDisplayed({ timeout: 10000 });
+    expect(await $(".performance-measurement").getText()).toContain("RTF");
+    expect(await $(".performance-measurement").getText()).toContain(
+      "Sustains continuous playback",
+    );
+    await closeSettings();
+
     const completed = await readFixtureRequests();
     expect(completed.requests.map((request) => request.body.input)).toEqual([
       "What This Book Is About.",

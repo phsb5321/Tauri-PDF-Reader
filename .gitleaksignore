@@ -1,0 +1,7 @@
+# Proven deterministic local-TTS idempotency values retained in old commits.
+# Current evidence stores only `idempotencyKeyValid`; no credential is ignored.
+23129b8535863c4e8accc075895548c46162f09f:docs/evidence/177-local-tts-packaged-20260825.json:generic-api-key:9
+23129b8535863c4e8accc075895548c46162f09f:docs/evidence/177-local-tts-post-registry-20260825/requests.jsonl:generic-api-key:1
+23129b8535863c4e8accc075895548c46162f09f:docs/evidence/177-local-tts-post-registry-20260825/receipt.json:generic-api-key:9
+933436c936f93cce455d9d98945f18715e400ece:scripts/e2e-local-tts.sh:generic-api-key:37
+d6fd9af10295affb3f520a0712b82cb0d588c4fb:scripts/e2e-local-tts.sh:generic-api-key:37

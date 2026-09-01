@@ -7,6 +7,7 @@ import { ThemeToggle } from "./ThemeToggle";
 import { KeyboardShortcuts } from "./KeyboardShortcuts";
 import { RenderSettings } from "./RenderSettings";
 import { CacheSettings } from "./CacheSettings";
+import { PerformanceSettings } from "./PerformanceSettings";
 import "./SettingsPanel.css";
 
 interface SettingsPanelProps {
@@ -18,6 +19,7 @@ type SettingsSection =
   | "appearance"
   | "rendering"
   | "tts"
+  | "performance"
   | "cache"
   | "highlights"
   | "shortcuts";
@@ -101,6 +103,14 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
             </button>
             <button
               type="button"
+              className={`settings-nav-item ${activeSection === "performance" ? "active" : ""}`}
+              onClick={() => setActiveSection("performance")}
+            >
+              <PerformanceIcon />
+              <span>Performance</span>
+            </button>
+            <button
+              type="button"
               className={`settings-nav-item ${activeSection === "cache" ? "active" : ""}`}
               onClick={() => setActiveSection("cache")}
             >
@@ -129,6 +139,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
             {activeSection === "appearance" && <ThemeToggle />}
             {activeSection === "rendering" && <RenderSettings />}
             {activeSection === "tts" && <AiTtsSettings />}
+            {activeSection === "performance" && <PerformanceSettings />}
             {activeSection === "cache" && <CacheSettings />}
             {activeSection === "highlights" && <HighlightSettings />}
             {activeSection === "shortcuts" && <KeyboardShortcuts />}
@@ -204,6 +215,20 @@ function RenderingIcon() {
       <path
         d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14zM5 15h14v2H5zm0-4h14v2H5zm0-4h14v2H5z"
         fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+function PerformanceIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="nav-icon" aria-hidden="true">
+      <path
+        d="M4 18a8 8 0 1116 0M12 10l4-4M7 18h10"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        fill="none"
       />
     </svg>
   );

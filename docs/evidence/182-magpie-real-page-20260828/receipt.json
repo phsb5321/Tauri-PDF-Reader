@@ -1,0 +1,97 @@
+{
+  "status": "PASS",
+  "observedAtBrt": "28/08/2026 11:41 BRT",
+  "candidate": {
+    "model": "Magpie TTS Multilingual 357M",
+    "modelRevision": "8291ffde2e13e2e9221a000669b5f7814c7ecc858eb0a1a9de8ee77d8da05736",
+    "quantization": "Q6_K",
+    "backend": "Vulkan/RADV",
+    "device": "AMD Radeon RX 5700 XT",
+    "acceleration": "gpu",
+    "chunkMaxUtf8Bytes": 300
+  },
+  "serviceRevision": "magpie-q6-vulkan-8291ffde2e13e2e9-chunk-v1",
+  "bridgeSha256": "ddda4e6d4aef2c2a4c1a9ecabc55e40708e64924219229321b9c89114843cb1b",
+  "modelSha256": "8291ffde2e13e2e9221a000669b5f7814c7ecc858eb0a1a9de8ee77d8da05736",
+  "heldOutPage": {
+    "normalizedCharacters": 2202,
+    "utf8Bytes": 2232,
+    "textSha256": "bbb2dad4b724e4eda74afd7192ba6b893e57bf3e9b4b71e06f0a1c2202e416e9",
+    "status": "PASS",
+    "httpStatus": 200,
+    "wallSeconds": 68.840475,
+    "downloadBytes": 5896236,
+    "audio": {
+      "channels": 1,
+      "sampleWidth": 2,
+      "sampleRate": 22050,
+      "frames": 2948096,
+      "seconds": 133.70049886621314
+    },
+    "standardRtf": 0.514885700380856,
+    "vramBaselineBytes": 1833046016,
+    "vramPeakBytes": 3189194752,
+    "vramDeltaBytes": 1356148736,
+    "gpuHandleSamples": 166,
+    "samples": 171
+  },
+  "firstUnit": {
+    "status": "PASS",
+    "acceptance": "first-unit-latency",
+    "text": "What This Book Is About.",
+    "utf8Bytes": 24,
+    "wallSeconds": 2.069812,
+    "audioSeconds": 1.3931972789115645,
+    "standardRtfDiagnostic": 1.4856560742187503,
+    "firstUnitLatencyLimitSeconds": 15,
+    "firstUnitLatencyPass": true,
+    "note": "Per-unit RTF is not the sustained criterion for a deliberately short first unit; aggregate held-out-page RTF is authoritative."
+  },
+  "idempotencyReplay": {
+    "cacheHit": true,
+    "wallSeconds": 0.005586,
+    "byteIdentical": true,
+    "changedBodyRejected": true
+  },
+  "capabilities": {
+    "limits": {
+      "maxTextUtf8Bytes": 300,
+      "idempotencyRetentionSeconds": 900,
+      "queueCapacity": 1
+    },
+    "voices": 10
+  },
+  "assertions": {
+    "http200": true,
+    "pcm16": true,
+    "audioOver30Seconds": true,
+    "aggregateRtfBelowPoint8": true,
+    "firstUnitBelow15Seconds": true,
+    "gpuDeviceOpened": true,
+    "vramIncreased": true,
+    "noGgmlAssertion": true,
+    "repeatPass": true
+  },
+  "retainedFiles": [
+    "gpu-samples.csv",
+    "gpu-handles.txt",
+    "bridge-synthesis.log",
+    "repeat.json"
+  ],
+  "omitted": ["PDF text", "generated WAV", "idempotency key"],
+  "repeat": {
+    "status": "PASS",
+    "httpStatus": 200,
+    "serviceRevision": "8291ffde2e13e2e9221a000669b5f7814c7ecc858eb0a1a9de8ee77d8da05736",
+    "pageUtf8Bytes": 2232,
+    "pageTextSha256": "bbb2dad4b724e4eda74afd7192ba6b893e57bf3e9b4b71e06f0a1c2202e416e9",
+    "wallSeconds": 64.939243,
+    "audioSeconds": 133.70049886621314,
+    "standardRtf": 0.48570681149799744,
+    "vramBaselineBytes": 1795358720,
+    "vramPeakBytes": 3116269568,
+    "vramDeltaBytes": 1320910848,
+    "gpuHandleSamples": 162,
+    "downloadBytes": 5896236
+  }
+}

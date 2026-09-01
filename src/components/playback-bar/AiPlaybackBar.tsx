@@ -16,6 +16,7 @@ import {
   type SpokenRun,
 } from "../../lib/prosody-plan";
 import { AI_TTS_SETUP_MESSAGE } from "../../lib/constants";
+import { narrationPerformancePolicy } from "../../lib/narration-performance";
 import { buildPdfText, type BuiltPdfText } from "../../lib/pdf-text";
 import { AiVoiceSelector } from "./AiVoiceSelector";
 import { AiSpeedSlider } from "./AiSpeedSlider";
@@ -58,8 +59,9 @@ interface SentencePlaybackQueue {
   index: number;
   generation: number;
   baseOffset: number;
-  prefetchIndex: number | null;
-  prefetch: Promise<void> | null;
+  lookaheadUnits: number;
+  prefetches: Map<number, Promise<void>>;
+  prefetchTail: Promise<void>;
 }
 
 interface AiPlaybackBarProps {
@@ -113,6 +115,7 @@ export function AiPlaybackBar({
   const naturalCompletionCount = useAiTtsStore((s) => s.naturalCompletionCount);
   const provider = useAiTtsStore((s) => s.provider);
   const selectedVoiceId = useAiTtsStore((s) => s.selectedVoiceId);
+  const performanceProfile = useAiTtsStore((s) => s.performanceProfile);
   const playingRef = useRef(false);
   // Providers without marks use measured-duration word estimates. The UI must
   // remain on the same real audio clock instead of hiding karaoke and leaving
@@ -131,6 +134,24 @@ export function AiPlaybackBar({
   >(null);
   const playbackGenerationRef = useRef(0);
   const sentenceQueueRef = useRef<SentencePlaybackQueue | null>(null);
+  const continuationTimerRef = useRef<number | null>(null);
+  const [continuationPending, setContinuationPending] = useState(false);
+  const pendingContinuationRef = useRef<{
+    pageNumber: number;
+    generation: number;
+  } | null>(null);
+  const cancelPendingPageContinuation = useCallback(() => {
+    if (continuationTimerRef.current !== null) {
+      window.clearTimeout(continuationTimerRef.current);
+      continuationTimerRef.current = null;
+    }
+    pendingContinuationRef.current = null;
+    setContinuationPending(false);
+  }, []);
+  useEffect(
+    () => () => cancelPendingPageContinuation(),
+    [cancelPendingPageContinuation],
+  );
   const [sentenceProgress, setSentenceProgress] = useState<{
     completedWords: number;
     totalWords: number;
@@ -144,8 +165,29 @@ export function AiPlaybackBar({
     playingRef.current = false;
     playbackGenerationRef.current += 1;
     sentenceQueueRef.current = null;
+    cancelPendingPageContinuation();
     setSentenceProgress(null);
-  }, [switchingProvider]);
+  }, [switchingProvider, cancelPendingPageContinuation]);
+
+  // A reader-driven page turn can arrive through several public surfaces, not
+  // all of which call this component's handleStop. Invalidate the private
+  // no-mark queue at the shared page authority. Natural auto-page clears the
+  // completed queue before changing currentPage, so it is not cancelled here.
+  useEffect(() => {
+    const pending = pendingContinuationRef.current;
+    const queue = sentenceQueueRef.current;
+    const pendingIsStale =
+      pending !== null && pending.pageNumber !== currentPage;
+    const queueIsStale = queue !== null && queue.pageNumber !== currentPage;
+    if (!pendingIsStale && !queueIsStale) return;
+
+    playingRef.current = false;
+    playbackGenerationRef.current += 1;
+    sentenceQueueRef.current = null;
+    cancelPendingPageContinuation();
+    setSentenceProgress(null);
+    if (playbackState !== "idle") void stop();
+  }, [currentPage, playbackState, stop, cancelPendingPageContinuation]);
 
   // T050: Audio cache coverage for current document
   const documentId = currentDocument?.id ?? null;
@@ -209,20 +251,36 @@ export function AiPlaybackBar({
     }
   }, []);
 
-  const prefetchSentence = useCallback(
-    (queue: SentencePlaybackQueue, index: number) => {
-      if (supportsWordTimings || index >= queue.sentences.length) return;
-      const sentence = queue.sentences[index];
-      queue.prefetchIndex = index;
-      queue.prefetch = aiTtsPrebuffer(
-        sentence.spokenText,
-        selectedVoiceId ?? undefined,
-        sentence.boundaryAfter,
-      )
-        .then(() => undefined)
-        .catch((error) => {
-          console.warn("[AiPlaybackBar] Sentence prebuffer failed:", error);
-        });
+  const prefetchSentences = useCallback(
+    (queue: SentencePlaybackQueue, startIndex: number) => {
+      if (supportsWordTimings) return;
+      const endIndex = Math.min(
+        queue.sentences.length,
+        startIndex + queue.lookaheadUnits,
+      );
+      for (let index = startIndex; index < endIndex; index += 1) {
+        if (queue.prefetches.has(index)) continue;
+        const sentence = queue.sentences[index];
+        const task = queue.prefetchTail
+          .then(async () => {
+            if (
+              queue.generation !== playbackGenerationRef.current ||
+              sentenceQueueRef.current !== queue
+            ) {
+              return;
+            }
+            await aiTtsPrebuffer(
+              sentence.spokenText,
+              selectedVoiceId ?? undefined,
+              sentence.boundaryAfter,
+            );
+          })
+          .catch((error) => {
+            console.warn("[AiPlaybackBar] Sentence prebuffer failed:", error);
+          });
+        queue.prefetchTail = task;
+        queue.prefetches.set(index, task);
+      }
     },
     [supportsWordTimings, selectedVoiceId],
   );
@@ -234,9 +292,14 @@ export function AiPlaybackBar({
       baseOffset = 0,
     ): Promise<boolean> => {
       const text = sourceText(source);
+      const policy = narrationPerformancePolicy(
+        performanceProfile,
+        maxTextUtf8Bytes,
+      );
       const sentences = planProsodyRuns(
         prosodySource(source),
         maxTextUtf8Bytes,
+        policy.contextMaxUtf8Bytes,
       );
       if (sentences.length === 0) {
         if (text.trim()) {
@@ -256,8 +319,9 @@ export function AiPlaybackBar({
         index: 0,
         generation,
         baseOffset,
-        prefetchIndex: null,
-        prefetch: null,
+        lookaheadUnits: policy.lookaheadUnits,
+        prefetches: new Map(),
+        prefetchTail: Promise.resolve(),
       };
       sentenceQueueRef.current = queue;
       setSentenceProgress({
@@ -280,10 +344,16 @@ export function AiPlaybackBar({
           first.boundaryAfter,
         )) ?? false;
       if (generation !== playbackGenerationRef.current) return false;
-      if (started) prefetchSentence(queue, 1);
+      if (started) prefetchSentences(queue, 1);
       return started;
     },
-    [maxTextUtf8Bytes, prefetchSentence, provider, selectedVoiceId],
+    [
+      maxTextUtf8Bytes,
+      performanceProfile,
+      prefetchSentences,
+      provider,
+      selectedVoiceId,
+    ],
   );
 
   // Handle multi-page continuation
@@ -299,11 +369,13 @@ export function AiPlaybackBar({
     ) {
       const completed = queue.sentences[queue.index];
       const nextIndex = queue.index + 1;
-      if (queue.prefetchIndex === nextIndex && queue.prefetch) {
+      const prefetched = queue.prefetches.get(nextIndex);
+      if (prefetched) {
         await Promise.race([
-          queue.prefetch,
+          prefetched,
           new Promise<void>((resolve) => setTimeout(resolve, 2_500)),
         ]);
+        queue.prefetches.delete(nextIndex);
       }
       if (queue.generation !== playbackGenerationRef.current) return;
 
@@ -340,7 +412,7 @@ export function AiPlaybackBar({
         setSentenceProgress(null);
         return;
       }
-      prefetchSentence(queue, nextIndex + 1);
+      prefetchSentences(queue, nextIndex + 1);
       return;
     }
 
@@ -363,31 +435,58 @@ export function AiPlaybackBar({
       const nextPage = page + 1;
       console.debug("[AiPlaybackBar] Moving to next page:", nextPage);
 
-      // Navigate to next page
-      setCurrentPage(nextPage);
+      cancelPendingPageContinuation();
+      const pending = {
+        pageNumber: nextPage,
+        generation: ++playbackGenerationRef.current,
+      };
+      pendingContinuationRef.current = pending;
+      setContinuationPending(true);
 
-      // Small delay to let page render, then continue TTS. A Stop or newer
-      // Play invalidates this delayed continuation.
-      const generation = playbackGenerationRef.current;
-      setTimeout(async () => {
-        if (
-          playingRef.current &&
-          generation === playbackGenerationRef.current
-        ) {
+      // Navigate to the expected next page. The shared page-authority effect
+      // cancels this ticket if any public control moves elsewhere before the
+      // delayed extraction or while it is in flight.
+      setCurrentPage(nextPage);
+      continuationTimerRef.current = window.setTimeout(async () => {
+        continuationTimerRef.current = null;
+        try {
+          if (
+            pendingContinuationRef.current !== pending ||
+            !playingRef.current ||
+            pending.generation !== playbackGenerationRef.current ||
+            currentPageRef.current !== nextPage
+          ) {
+            return;
+          }
+
           const nextText = await getPageText(nextPage);
-          if (nextText && playingRef.current) {
-            if (!supportsWordTimings) {
-              await startNoMarkSentenceSequence(nextText, nextPage, 0);
-            } else if (usesWordHighlighting) {
-              await speakWithHighlightRef.current?.(
-                sourceText(nextText),
-                nextPage,
-              );
-            } else {
-              await speak(sourceText(nextText));
-            }
+          if (
+            pendingContinuationRef.current !== pending ||
+            !nextText ||
+            !playingRef.current ||
+            pending.generation !== playbackGenerationRef.current ||
+            currentPageRef.current !== nextPage
+          ) {
+            if (!nextText) playingRef.current = false;
+            return;
+          }
+
+          pendingContinuationRef.current = null;
+          setContinuationPending(false);
+          if (!supportsWordTimings) {
+            await startNoMarkSentenceSequence(nextText, nextPage, 0);
+          } else if (usesWordHighlighting) {
+            await speakWithHighlightRef.current?.(
+              sourceText(nextText),
+              nextPage,
+            );
           } else {
-            playingRef.current = false;
+            await speak(sourceText(nextText));
+          }
+        } finally {
+          if (pendingContinuationRef.current === pending) {
+            pendingContinuationRef.current = null;
+            setContinuationPending(false);
           }
         }
       }, 500);
@@ -402,9 +501,10 @@ export function AiPlaybackBar({
     usesWordHighlighting,
     startNoMarkSentenceSequence,
     selectedVoiceId,
-    prefetchSentence,
+    prefetchSentences,
     speak,
     supportsWordTimings,
+    cancelPendingPageContinuation,
   ]);
 
   // Plain/no-mark providers complete from the real sink-drained event recorded
@@ -497,7 +597,8 @@ export function AiPlaybackBar({
         await resume();
       }
     } else {
-      if (supportsWordTimings) playbackGenerationRef.current += 1;
+      cancelPendingPageContinuation();
+      playbackGenerationRef.current += 1;
       playingRef.current = true;
       const source = await getText();
       const baseOffset = getTextBaseOffset?.() ?? 0;
@@ -527,6 +628,7 @@ export function AiPlaybackBar({
     supportsWordTimings,
     startNoMarkSentenceSequence,
     currentPage,
+    cancelPendingPageContinuation,
   ]);
 
   const handlePause = useCallback(async () => {
@@ -561,13 +663,19 @@ export function AiPlaybackBar({
     playingRef.current = false;
     playbackGenerationRef.current += 1;
     sentenceQueueRef.current = null;
+    cancelPendingPageContinuation();
     setSentenceProgress(null);
     if (usesWordHighlighting) {
       await stopHighlight();
     } else {
       await stop();
     }
-  }, [stop, stopHighlight, usesWordHighlighting]);
+  }, [
+    stop,
+    stopHighlight,
+    usesWordHighlighting,
+    cancelPendingPageContinuation,
+  ]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -586,7 +694,10 @@ export function AiPlaybackBar({
         } else {
           handlePlay();
         }
-      } else if (e.key === "Escape" && (isPlaying || isPaused)) {
+      } else if (
+        e.key === "Escape" &&
+        (isPlaying || isPaused || continuationPending)
+      ) {
         e.preventDefault();
         handleStop();
       }
@@ -594,7 +705,14 @@ export function AiPlaybackBar({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isPlaying, isPaused, handlePlay, handlePause, handleStop]);
+  }, [
+    isPlaying,
+    isPaused,
+    continuationPending,
+    handlePlay,
+    handlePause,
+    handleStop,
+  ]);
 
   // Show settings if API key is needed
   if (needsApiKey) {
@@ -693,7 +811,11 @@ export function AiPlaybackBar({
         <button
           className="ai-playback-button"
           onClick={handleStop}
-          disabled={!isHighlightActive && playbackState === "idle"}
+          disabled={
+            !isHighlightActive &&
+            playbackState === "idle" &&
+            !continuationPending
+          }
           title="Stop (Esc)"
         >
           <svg viewBox="0 0 24 24" className="ai-playback-icon">

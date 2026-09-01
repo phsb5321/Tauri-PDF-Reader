@@ -6,18 +6,25 @@ import {
   useAiTtsStore,
   type AiTtsProvider,
 } from "../stores/ai-tts-store";
+import type { NarrationPerformanceProfile } from "../lib/narration-performance";
 
 type Operation =
   | { kind: "connect"; provider: AiTtsProvider }
   | { kind: "switch"; provider: AiTtsProvider }
   | { kind: "voice"; provider: AiTtsProvider; voice: string }
   | { kind: "key"; value: string }
-  | { kind: "begin"; provider: AiTtsProvider };
+  | { kind: "begin"; provider: AiTtsProvider }
+  | { kind: "profile"; profile: NarrationPerformanceProfile };
 
 const providerArbitrary = fc.constantFrom<AiTtsProvider>(
   "local",
   "elevenlabs",
   "groq",
+);
+const profileArbitrary = fc.constantFrom<NarrationPerformanceProfile>(
+  "responsive",
+  "balanced",
+  "continuous",
 );
 const operationArbitrary: fc.Arbitrary<Operation> = fc.oneof(
   providerArbitrary.map((provider) => ({ kind: "connect", provider })),
@@ -30,6 +37,7 @@ const operationArbitrary: fc.Arbitrary<Operation> = fc.oneof(
     value: `sk_${value}`,
   })),
   providerArbitrary.map((provider) => ({ kind: "begin", provider })),
+  profileArbitrary.map((profile) => ({ kind: "profile", profile })),
 );
 
 beforeEach(() => {
@@ -41,6 +49,7 @@ beforeEach(() => {
     initialized: false,
     apiKey: null,
     providerOperationGeneration: 0,
+    performanceProfile: "balanced",
     providerVoiceIds: { elevenlabs: null, local: null, groq: null },
     connections: {
       elevenlabs: {
@@ -71,6 +80,7 @@ describe("TTS provider routing model", () => {
             initialized: false,
             apiKey: null,
             providerOperationGeneration: 0,
+            performanceProfile: "balanced",
             providerVoiceIds: { elevenlabs: null, local: null, groq: null },
             connections: {
               elevenlabs: {
@@ -91,10 +101,12 @@ describe("TTS provider routing model", () => {
             },
           });
           localStorage.clear();
+          useAiTtsStore.getState().setPerformanceProfile("balanced");
           const connected = new Set<AiTtsProvider>();
           const voices: Partial<Record<AiTtsProvider, string>> = {};
           let active: AiTtsProvider | null = null;
           let latestSecret: string | null = null;
+          let latestProfile: NarrationPerformanceProfile = "balanced";
 
           for (const operation of operations) {
             const store = useAiTtsStore.getState();
@@ -126,6 +138,9 @@ describe("TTS provider routing model", () => {
               store.setApiKey(operation.value);
             } else if (operation.kind === "begin") {
               store.beginProviderOperation(operation.provider);
+            } else if (operation.kind === "profile") {
+              latestProfile = operation.profile;
+              store.setPerformanceProfile(operation.profile);
             }
 
             const state = useAiTtsStore.getState();
@@ -141,7 +156,11 @@ describe("TTS provider routing model", () => {
                 voice,
               );
             }
+            expect(state.performanceProfile).toBe(latestProfile);
             const persisted = localStorage.getItem("ai-tts-storage") ?? "";
+            expect(persisted).toContain(
+              `"performanceProfile":"${latestProfile}"`,
+            );
             expect(persisted).not.toContain("apiKey");
             if (latestSecret) expect(persisted).not.toContain(latestSecret);
           }

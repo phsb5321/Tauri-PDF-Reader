@@ -277,14 +277,10 @@ function mergeRuns(
 function mergeContextRuns(
   source: ProsodySource,
   runs: SpokenRun[],
-  providerMaxUtf8Bytes: number,
+  contextLimit: number,
 ): SpokenRun[] {
   if (runs.length < 3) return runs;
   const encoder = new TextEncoder();
-  const contextLimit = Math.min(
-    providerMaxUtf8Bytes,
-    PROSODY_CONTEXT_MAX_UTF8_BYTES,
-  );
   const merged: SpokenRun[] = [runs[0]];
   let current = runs[1];
 
@@ -316,10 +312,13 @@ function mergeContextRuns(
 export function planProsodyRuns(
   source: ProsodySource,
   maxTextUtf8Bytes: number,
+  contextMaxUtf8Bytes = PROSODY_CONTEXT_MAX_UTF8_BYTES,
 ): SpokenRun[] {
   if (!source.text.trim()) return [];
+  const contextLimit = Math.min(maxTextUtf8Bytes, contextMaxUtf8Bytes);
+  if (contextLimit <= 0) return [];
   const aligned = buildAlignedText(source);
-  const spans = segmentSpeechWithOffsets(aligned.spokenText, maxTextUtf8Bytes);
+  const spans = segmentSpeechWithOffsets(aligned.spokenText, contextLimit);
   if (spans.length === 0) return [];
 
   const runs: SpokenRun[] = [];
@@ -357,7 +356,7 @@ export function planProsodyRuns(
       revision: PROSODY_PLAN_REVISION,
     });
   }
-  return mergeContextRuns(source, runs, maxTextUtf8Bytes);
+  return mergeContextRuns(source, runs, contextLimit);
 }
 
 /** Map a spoken timing range to the run-local unchanged source range. */

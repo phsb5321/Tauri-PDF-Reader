@@ -1,0 +1,36 @@
+   Compiling tauri-pdf-reader v0.2.0 (/home/notroot/Documents/Code/personal/tauri-pdf-reader-182-gpu-performance/src-tauri)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 34.55s
+
+> lectrice@0.2.0 test:e2e /home/notroot/Documents/Code/personal/tauri-pdf-reader-182-gpu-performance
+> wdio run wdio.conf.mjs
+
+
+Execution of 1 workers started at 2026-08-28T15:26:00.430Z
+
+[0-0] RUNNING in undefined - file:///e2e/local-tts.e2e.mjs
+GStreamer element appsink not found. Please install it.
+[0-0] Error in "Local TTS (native config → Rust HTTP → WAV playback).plays through local sentence audio with an estimated read-along"
+Error: Continuous performance policy did not become selected
+    at async Context.<anonymous> (file:///home/notroot/Documents/Code/personal/tauri-pdf-reader-182-gpu-performance/e2e/local-tts.e2e.mjs:67:5)
+[0-0] FAILED in undefined - file:///e2e/local-tts.e2e.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[wry 0.53.5 linux #0-0] Running: wry (v0.53.5) on linux
+[wry 0.53.5 linux #0-0] Session ID: cfdf5cbf-17f4-41c6-a16f-a0e64e90a82c
+[wry 0.53.5 linux #0-0]
+[wry 0.53.5 linux #0-0] » e2e/local-tts.e2e.mjs
+[wry 0.53.5 linux #0-0] Local TTS (native config → Rust HTTP → WAV playback)
+[wry 0.53.5 linux #0-0]    ✖ plays through local sentence audio with an estimated read-along
+[wry 0.53.5 linux #0-0]
+[wry 0.53.5 linux #0-0] 1 failing (6.5s)
+[wry 0.53.5 linux #0-0]
+[wry 0.53.5 linux #0-0] 1) Local TTS (native config → Rust HTTP → WAV playback) plays through local sentence audio with an estimated read-along
+[wry 0.53.5 linux #0-0] Continuous performance policy did not become selected
+[wry 0.53.5 linux #0-0] Error: Continuous performance policy did not become selected
+[wry 0.53.5 linux #0-0]     at async Context.<anonymous> (file:///home/notroot/Documents/Code/personal/tauri-pdf-reader-182-gpu-performance/e2e/local-tts.e2e.mjs:67:5)
+
+
+Spec Files:	 0 passed, 1 failed, 1 total (100% completed) in 00:00:08
+
+ ELIFECYCLE  Command failed with exit code 1.
