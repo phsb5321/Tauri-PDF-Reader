@@ -28,7 +28,7 @@
 - [x] T012 Add executable `scripts/e2e-prosody.sh` covering planner, current model, WAV equalizer, architecture, and secret canaries.
 - [x] T013 Run targeted lint/typecheck/tests, seeded fuzz, and harness checks.
 - [x] T014 Run the packaged agent-operated TTS journey through public controls and retain its exact-head receipt under `docs/evidence/`.
-- [ ] T015 Obtain a different-family exact-diff adversarial ALLOW and resolve every BLOCKER/MAJOR.
+- [x] T015 Obtain a different-family exact-diff adversarial ALLOW and resolve every BLOCKER/MAJOR — Anthropic Opus ALLOW at exact head `314f8e28ffda16f139e0652c12dd17ae6b348938`.
 - [ ] T016 Score the retained blind EN/PT-BR pack before claiming naturalness or promoting an unmeasured target/step/context change.
 
 ## Phase 6 — Reported heading and continuity defect

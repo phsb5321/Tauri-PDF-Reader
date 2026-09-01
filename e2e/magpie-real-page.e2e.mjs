@@ -129,8 +129,10 @@ describe("Magpie real-model page queue", () => {
       },
     );
 
-    // Public Escape maps to Stop. It must invalidate the delayed page-two
-    // continuation that is scheduled by the natural page advance.
+    // Public Escape maps to Stop. It must stay operable during the handoff and
+    // invalidate the delayed page-two continuation scheduled by the advance.
+    const stop = await $('.ai-playback-button[title="Stop (Esc)"]');
+    await stop.waitForEnabled({ timeout: 5000 });
     await browser.keys(["Escape"]);
     await browser.waitUntil(
       async () =>
@@ -138,6 +140,9 @@ describe("Magpie real-model page queue", () => {
       { timeout: 10000, timeoutMsg: "public Stop did not return idle" },
     );
     await browser.pause(1500);
+    expect(
+      await browser.execute(() => window.__E2E_READ__.playbackState()),
+    ).toBe("idle");
     expect(await browser.execute(() => window.__E2E_READ__.currentPage())).toBe(
       2,
     );
