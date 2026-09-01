@@ -5,6 +5,10 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$ROOT"
 
+command -v rg >/dev/null || {
+  echo 'e2e-prosody: rg is required' >&2
+  exit 1
+}
 if rg -n 'eleven_monolingual_v1' src-tauri/src; then
   echo 'e2e-prosody: removed ElevenLabs model remains in runtime source' >&2
   exit 1
@@ -25,12 +29,12 @@ export CARGO_TARGET_DIR=${CARGO_TARGET_DIR:-$HOME/.cache/lectrice/prosody-gate-t
 source "$ROOT/scripts/e2e-toolchain.sh"
 toolchain_run 'set -euo pipefail
   cd src-tauri
-  cargo fmt --check
+  cargo-fmt --check
   cargo test current_eleven_model --features test-mocks -j 1
   cargo test prosody_revision_contract --features test-mocks -j 1
   cargo test prosody_boundary_targets --features test-mocks -j 1
   cargo test equalizer_ --features test-mocks -j 1
-  cargo clippy --features test-mocks -- -D warnings'
+  CARGO_BUILD_JOBS=1 cargo-clippy clippy --features test-mocks -- -D warnings'
 
 make harness-check
 printf 'e2e-prosody: PASS\n'

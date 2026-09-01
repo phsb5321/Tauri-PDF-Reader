@@ -12,13 +12,14 @@ fn prosody_revision_contract() {
         TTS_ENGINE.contains(&format!("SOURCE_PROSODY_REVISION: &str = \"{REVISION}\"")),
         "backend cache revision must move with the frontend planner"
     );
+    let compact_engine = TTS_ENGINE.split_whitespace().collect::<Vec<_>>().join(" ");
     for provider_coordinate in [
         "ELEVEN_PROSODY_COMPILER_REVISION}_{SOURCE_PROSODY_REVISION}",
-        "PCM_PROSODY_REVISION,\n                    SOURCE_PROSODY_REVISION",
+        "PCM_PROSODY_REVISION, SOURCE_PROSODY_REVISION",
         "PCM_PROSODY_REVISION}_{SOURCE_PROSODY_REVISION}",
     ] {
         assert!(
-            TTS_ENGINE.contains(provider_coordinate),
+            compact_engine.contains(provider_coordinate),
             "provider cache coordinate omitted the source planner revision: {provider_coordinate}"
         );
     }
