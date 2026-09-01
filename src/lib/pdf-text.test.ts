@@ -13,10 +13,101 @@ describe("shared PDF text model", () => {
     ).toEqual({
       text: "Alpha Beta gamma",
       segments: [
-        { text: "Alpha", start: 0 },
-        { text: "Beta gamma", start: 6 },
+        {
+          text: "Alpha",
+          start: 0,
+          end: 5,
+          hasEol: false,
+          x: null,
+          y: null,
+          width: null,
+          height: null,
+          fontName: null,
+        },
+        {
+          text: "Beta gamma",
+          start: 6,
+          end: 16,
+          hasEol: false,
+          x: null,
+          y: null,
+          width: null,
+          height: null,
+          fontName: null,
+        },
       ],
+      boundaries: [],
     });
+  });
+
+  it("retains line evidence without changing source offsets", () => {
+    const built = buildPdfText([
+      {
+        str: "first block",
+        hasEOL: true,
+        transform: [1, 0, 0, 1, 72, 700],
+        width: 80,
+        height: 10,
+        fontName: "Body",
+      },
+      {
+        str: "Next block",
+        transform: [1, 0, 0, 1, 72, 680],
+        width: 70,
+        height: 10,
+        fontName: "Body",
+      },
+    ]);
+
+    expect(built.text).toBe("first block Next block");
+    expect(built.segments.map(({ start, end }) => ({ start, end }))).toEqual([
+      { start: 0, end: 11 },
+      { start: 12, end: 22 },
+    ]);
+    expect(built.boundaries).toEqual([{ offset: 11, kind: "paragraph" }]);
+  });
+
+  it("recognizes the real heading geometry even when PDF.js omits hasEOL", () => {
+    const built = buildPdfText([
+      {
+        str: "What This Book Is About",
+        hasEOL: false,
+        transform: [21.2475, 0, 0, 21.2475, 76.99, 700.5],
+        width: 251.41,
+        height: 21.2475,
+        fontName: "Heading",
+      },
+      {
+        str: "This book aims to fill a gap.",
+        hasEOL: true,
+        transform: [15, 0, 0, 15, 76.99, 673.5],
+        width: 180,
+        height: 15,
+        fontName: "Body",
+      },
+    ]);
+
+    expect(built.text).toBe(
+      "What This Book Is About This book aims to fill a gap.",
+    );
+    expect(built.boundaries).toEqual([{ offset: 23, kind: "section" }]);
+  });
+
+  it("does not promote an ordinary PDF line ending to a paragraph", () => {
+    const built = buildPdfText([
+      {
+        str: "wrapped line",
+        hasEOL: true,
+        transform: [1, 0, 0, 1, 72, 700],
+        height: 10,
+      },
+      {
+        str: "continues here",
+        transform: [1, 0, 0, 1, 72, 690],
+        height: 10,
+      },
+    ]);
+    expect(built.boundaries).toEqual([{ offset: 12, kind: "line" }]);
   });
 
   it("maps normalized boundaries back through raw whitespace runs", () => {

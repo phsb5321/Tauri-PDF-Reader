@@ -27,6 +27,7 @@
 import { renderHook, act } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WordTiming } from "../../lib/api/ai-tts";
+import type { AlignmentSegment } from "../../lib/prosody-plan";
 import { useTtsWordHighlight } from "../../hooks/useTtsWordHighlight";
 import { useTtsHighlightStore } from "../../stores/tts-highlight-store";
 import { useAiTtsStore } from "../../stores/ai-tts-store";
@@ -106,6 +107,7 @@ async function startViaProductionPath(
     page: number,
     voice?: string,
     baseOffset?: number,
+    alignment?: readonly AlignmentSegment[],
   ) => Promise<boolean>,
   text: string,
   wordTimings: WordTiming[],
@@ -113,6 +115,7 @@ async function startViaProductionPath(
   eventClockMs: number,
   responseClockMs: number,
   baseOffset = 0,
+  alignment?: readonly AlignmentSegment[],
 ): Promise<void> {
   h.speakResult = { success: true, wordTimings, totalDuration };
   // The backend emits playback-starting right before audio begins.
@@ -121,7 +124,7 @@ async function startViaProductionPath(
   // The timestamps response arrives slightly later.
   nowMs = responseClockMs;
   await act(async () => {
-    await speak(text, 1, undefined, baseOffset);
+    await speak(text, 1, undefined, baseOffset, alignment);
   });
 }
 
@@ -243,6 +246,44 @@ describe("karaoke sync — highlight index advances with the timing marks", () =
     act(() => h.finishedCb?.({ generation: 7 }));
     expect(onComplete).toHaveBeenCalledOnce();
     expect(store().isActive).toBe(false);
+  });
+
+  it("projects spoken-only punctuation back to the exact PDF source range", async () => {
+    const { result } = renderHook(() => useTtsWordHighlight());
+    const alignment: AlignmentSegment[] = [
+      {
+        spokenStart: 0,
+        spokenEnd: 7,
+        sourceStart: 0,
+        sourceEnd: 7,
+        kind: "copy",
+      },
+      {
+        spokenStart: 7,
+        spokenEnd: 8,
+        sourceStart: null,
+        sourceEnd: null,
+        kind: "insert",
+      },
+    ];
+
+    await startViaProductionPath(
+      result.current.speakWithHighlight,
+      "serving.",
+      [],
+      1,
+      0,
+      50,
+      40,
+      alignment,
+    );
+
+    expect(store().wordTimings).toHaveLength(1);
+    expect(store().wordTimings[0]).toMatchObject({
+      word: "serving.",
+      charStart: 40,
+      charEnd: 47,
+    });
   });
 
   it("ignores a finished event from the provider generation replaced by a switch", async () => {

@@ -132,6 +132,7 @@ describe("resume and play", () => {
       expect(mockInvoke).toHaveBeenCalledWith("ai_tts_speak_with_timestamps", {
         text: "It was the best of times.",
         voiceId: "F1-pt",
+        boundaryAfter: "sentence",
       }),
     );
     expect(mockInvoke).not.toHaveBeenCalledWith(

@@ -1,0 +1,57 @@
+{
+  "status": "PASS",
+  "buildRevision": "c7d0449ffede9daa4ce7c637935f5dee1ebac3e2",
+  "observedAt": "2026-08-28T00:23:18-03:00",
+  "plannerRevision": "source-aligned-v2",
+  "boundaryTargetsMs": {
+    "clause": 200,
+    "sentence": 350,
+    "paragraph": 650,
+    "section": 800
+  },
+  "contextMaxUtf8Bytes": 300,
+  "checks": [
+    {
+      "name": "source-aligned frontend",
+      "status": "PASS",
+      "tests": 31
+    },
+    {
+      "name": "typecheck",
+      "status": "PASS"
+    },
+    {
+      "name": "current Eleven model",
+      "status": "PASS"
+    },
+    {
+      "name": "prosody revision contract",
+      "status": "PASS"
+    },
+    {
+      "name": "document boundary targets",
+      "status": "PASS"
+    },
+    {
+      "name": "PCM equalizer",
+      "status": "PASS",
+      "tests": 4
+    },
+    {
+      "name": "clippy -D warnings",
+      "status": "PASS"
+    },
+    {
+      "name": "harness",
+      "status": "PASS"
+    },
+    {
+      "name": "seeded routing/navigation fuzz",
+      "status": "PASS",
+      "seed": "20260827",
+      "runs": 2000
+    }
+  ],
+  "packagedReceipt": "docs/evidence/188-prosody-packaged-20260827/receipt.json",
+  "naturalnessVerdict": "NOT_CLAIMED; blind scorecard remains authoritative"
+}

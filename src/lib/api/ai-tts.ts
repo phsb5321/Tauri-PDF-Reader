@@ -6,6 +6,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { ProsodyBoundary } from "../prosody-plan";
 
 // Types
 
@@ -84,8 +85,13 @@ export async function aiTtsSpeak(
 export async function aiTtsSpeakWithTimestamps(
   text: string,
   voiceId?: string,
+  boundaryAfter?: ProsodyBoundary,
 ): Promise<SpeakWithTimestampsResponse> {
-  return invoke("ai_tts_speak_with_timestamps", { text, voiceId });
+  return invoke("ai_tts_speak_with_timestamps", {
+    text,
+    voiceId,
+    boundaryAfter,
+  });
 }
 
 export async function aiTtsStop(): Promise<{ success: boolean }> {
@@ -181,8 +187,9 @@ export async function aiTtsCacheInvalidateVoice(
 export async function aiTtsPrebuffer(
   text: string,
   voiceId?: string,
+  boundaryAfter?: ProsodyBoundary,
 ): Promise<AiTtsPrebufferResponse> {
-  return invoke("ai_tts_prebuffer", { text, voiceId });
+  return invoke("ai_tts_prebuffer", { text, voiceId, boundaryAfter });
 }
 
 // Event Types

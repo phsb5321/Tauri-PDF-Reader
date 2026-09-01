@@ -19,6 +19,8 @@ use serde::{Deserialize, Serialize};
 use std::error::Error as StdError;
 
 const BASE_URL: &str = "https://api.elevenlabs.io/v1";
+pub const ELEVEN_DEFAULT_MODEL_ID: &str = "eleven_multilingual_v2";
+pub const ELEVEN_PROSODY_COMPILER_REVISION: &str = "eleven-prosody-v1";
 
 /// ElevenLabs API client
 pub struct ElevenLabsClient {
@@ -204,7 +206,7 @@ impl ElevenLabsClient {
 
         let request = TtsRequest {
             text: text.to_string(),
-            model_id: model_id.unwrap_or("eleven_monolingual_v1").to_string(),
+            model_id: model_id.unwrap_or(ELEVEN_DEFAULT_MODEL_ID).to_string(),
             voice_settings: VoiceSettings::default(),
         };
 
@@ -267,7 +269,7 @@ impl ElevenLabsClient {
 
         let request = TtsRequest {
             text: text.to_string(),
-            model_id: model_id.unwrap_or("eleven_monolingual_v1").to_string(),
+            model_id: model_id.unwrap_or(ELEVEN_DEFAULT_MODEL_ID).to_string(),
             voice_settings: VoiceSettings::default(),
         };
 
@@ -341,7 +343,7 @@ impl ElevenLabsClient {
 
         let request = TtsWithTimestampsRequest {
             text: text.to_string(),
-            model_id: model_id.unwrap_or("eleven_monolingual_v1").to_string(),
+            model_id: model_id.unwrap_or(ELEVEN_DEFAULT_MODEL_ID).to_string(),
             voice_settings: VoiceSettings::default(),
         };
 
@@ -558,7 +560,7 @@ impl SynthesizerPort for ElevenLabsClient {
     }
 
     fn provider_revision(&self) -> &str {
-        "eleven_monolingual_v1"
+        ELEVEN_DEFAULT_MODEL_ID
     }
 
     fn max_text_utf8_bytes(&self) -> usize {
@@ -624,6 +626,29 @@ mod tests {
         let settings = VoiceSettings::default();
         assert_eq!(settings.stability, 0.5);
         assert_eq!(settings.similarity_boost, 0.75);
+    }
+
+    #[test]
+    fn current_model_is_the_outbound_default() {
+        let plain = TtsRequest {
+            text: "Reading".to_string(),
+            model_id: ELEVEN_DEFAULT_MODEL_ID.to_string(),
+            voice_settings: VoiceSettings::default(),
+        };
+        let timestamped = TtsWithTimestampsRequest {
+            text: "Reading".to_string(),
+            model_id: ELEVEN_DEFAULT_MODEL_ID.to_string(),
+            voice_settings: VoiceSettings::default(),
+        };
+        assert_eq!(
+            serde_json::to_value(plain).unwrap()["model_id"],
+            ELEVEN_DEFAULT_MODEL_ID
+        );
+        assert_eq!(
+            serde_json::to_value(timestamped).unwrap()["model_id"],
+            ELEVEN_DEFAULT_MODEL_ID
+        );
+        assert_eq!(ELEVEN_DEFAULT_MODEL_ID, "eleven_multilingual_v2");
     }
 
     // ---- chars_to_words: word-level timing (karaoke highlight core) ----

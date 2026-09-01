@@ -1,0 +1,35 @@
+{
+  "status": "PASS",
+  "buildRevision": "c7d0449ffede9daa4ce7c637935f5dee1ebac3e2",
+  "binarySha256": "74e7bdc5bb3eee352267be0285308f1c2aec0d68f692a15e90750175f4970945",
+  "fixtureSha256": "dfd48160ee42119e5a2a1b8d483f1e41f7e10f05cc817631e82cd8080a48cbb1",
+  "observedAt": "2026-08-28T00:16:57-03:00",
+  "journey": "public Play -> standalone spoken heading -> connected body context -> exact source highlight -> public Stop",
+  "assertions": {
+    "sourceText": "What This Book Is About / This book aims to fill a gap. It connects the dots. Readers benefit.",
+    "spokenFirstRun": "What This Book Is About.",
+    "highlightedSourceRange": "What",
+    "secondRun": "This book aims to fill a gap. It connects the dots. Readers benefit.",
+    "provider": "local",
+    "credentialPresent": false,
+    "finalPlaybackState": "idle"
+  },
+  "requests": [
+    {
+      "body": {
+        "input": "What This Book Is About.",
+        "speed": 1.0,
+        "voice": "F1-pt"
+      },
+      "idempotencyKeyValid": true
+    },
+    {
+      "body": {
+        "input": "This book aims to fill a gap. It connects the dots. Readers benefit.",
+        "speed": 1.0,
+        "voice": "F1-pt"
+      },
+      "idempotencyKeyValid": true
+    }
+  ]
+}
