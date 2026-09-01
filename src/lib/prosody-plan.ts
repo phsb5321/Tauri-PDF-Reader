@@ -223,6 +223,8 @@ function superscriptDeletions(source: ProsodySource): SourceEdit[] {
   );
   if (bodyHeight === null) return [];
 
+  // ponytail: this is an O(n²) page-local scan; bucket letter neighbours by
+  // baseline only if measured PDF segment counts make Play latency regress.
   return segments
     .filter(
       (segment) =>
