@@ -20,5 +20,5 @@
 - [x] T018 Run the pinned Magpie Q6 held-out-page oracle; record chunk trace, valid >30s PCM16 WAV, first-unit latency, aggregate standard RTF, GPU device handles, and VRAM delta.
 - [x] T019 Run the packaged real-model journey and prove one natural page advance with no stale continuation after Stop.
 - [x] T020 Update issue #182, fleet ledger, project handoff, and exact-head evidence.
-- [ ] T021 Obtain a capable different-family exact-head ALLOW and repair every BLOCKER/MAJOR.
+- [x] T021 Obtain a capable different-family exact-head ALLOW and repair every BLOCKER/MAJOR — Anthropic Opus ALLOW at exact head `6bd31866abf853da5a5f3df2727cfa51e83725ce`.
 - [ ] T022 Push a stacked PR, poll applicable checks, and merge only after parent/gate constraints clear.
