@@ -6,6 +6,7 @@ import tempfile
 import unittest
 import wave
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 MODULE_PATH = Path(__file__).with_name("lectrice_magpie_bridge.py")
 SPEC = importlib.util.spec_from_file_location("lectrice_magpie_bridge", MODULE_PATH)
@@ -51,6 +52,47 @@ class ChunkingTests(unittest.TestCase):
     def test_ceiling_smaller_than_one_scalar_fails_closed(self) -> None:
         with self.assertRaises(ValueError):
             bridge.split_text_utf8("😀", 3)
+
+
+class ResponseBoundaryTests(unittest.TestCase):
+    def test_cli_failure_never_echoes_source_text(self) -> None:
+        source = "private reader sentence"
+        result = Mock(
+            stderr=f"failed while synthesizing {source}",
+            stdout=f"input={source}",
+            returncode=2,
+        )
+        with (
+            patch.object(bridge.subprocess, "run", return_value=result),
+            patch("builtins.print") as output,
+            tempfile.TemporaryDirectory() as temp,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "exited 2") as failure:
+                bridge._run_chunk(source, "Aria-en", Path(temp) / "out.wav")
+
+        rendered = " ".join(
+            str(argument)
+            for call in output.call_args_list
+            for argument in call.args
+        )
+        self.assertNotIn(source, rendered)
+        self.assertNotIn(source, str(failure.exception))
+
+    def test_client_disconnect_is_not_an_engine_failure(self) -> None:
+        handler = bridge.Handler.__new__(bridge.Handler)
+        handler.send_response = Mock()
+        handler.send_header = Mock()
+        handler.end_headers = Mock()
+        handler.wfile = Mock()
+        handler.wfile.write.side_effect = BrokenPipeError("client cancelled")
+
+        with patch("builtins.print") as output:
+            delivered = handler.send_payload(200, "audio/wav", b"audio")
+
+        self.assertFalse(delivered)
+        output.assert_called_once()
+        self.assertIn("client disconnected", output.call_args.args[0])
+        self.assertNotIn("engine", output.call_args.args[0])
 
 
 class WavTests(unittest.TestCase):

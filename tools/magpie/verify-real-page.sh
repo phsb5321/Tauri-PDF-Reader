@@ -65,7 +65,14 @@ python - "$work" "$baseline" <<'PY'
 import csv, hashlib, json, pathlib, sys, wave
 root = pathlib.Path(sys.argv[1]); baseline = int(sys.argv[2])
 status, wall, size = root.joinpath("curl.stats").read_text().split()
-assert status == "200", (status, root.joinpath("headers.txt").read_text())
+headers = root.joinpath("headers.txt").read_text()
+assert status == "200", (status, headers)
+cache_headers = [
+    line.split(":", 1)[1].strip().lower()
+    for line in headers.splitlines()
+    if line.lower().startswith("x-cache-hit:")
+]
+assert cache_headers == ["false"], cache_headers
 rows = list(csv.DictReader(root.joinpath("gpu.csv").open()))
 peak = max(int(row["vramUsedBytes"]) for row in rows)
 handles = sum(row["gpuHandle"] == "1" for row in rows)
@@ -76,6 +83,7 @@ wall = float(wall)
 result = {
     "status": "PASS",
     "httpStatus": int(status),
+    "cacheHit": False,
     "serviceRevision": json.loads(root.joinpath("capabilities.json").read_text())["runtime"]["modelRevision"],
     "pageUtf8Bytes": len(json.loads(root.joinpath("request.json").read_text())["input"].encode()),
     "pageTextSha256": hashlib.sha256(json.loads(root.joinpath("request.json").read_text())["input"].encode()).hexdigest(),

@@ -238,10 +238,9 @@ def _run_chunk(text: str, voice: str, destination: Path) -> float:
     )
     elapsed = time.monotonic() - started
     if result.stderr:
-        print(result.stderr.rstrip(), flush=True)
+        print(f"magpie-cli diagnostic bytes={len(result.stderr)}", flush=True)
     if result.returncode != 0:
-        detail = (result.stderr or result.stdout)[-500:]
-        raise RuntimeError(f"magpie-cli exited {result.returncode}: {detail}")
+        raise RuntimeError(f"magpie-cli exited {result.returncode}")
     return elapsed
 
 
@@ -315,14 +314,23 @@ class Handler(BaseHTTPRequestHandler):
 
     def send_payload(
         self, status: int, media_type: str, body: bytes, **headers: str
-    ) -> None:
-        self.send_response(status)
-        self.send_header("Content-Type", media_type)
-        self.send_header("Content-Length", str(len(body)))
-        for key, value in headers.items():
-            self.send_header(key, value)
-        self.end_headers()
-        self.wfile.write(body)
+    ) -> bool:
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", media_type)
+            self.send_header("Content-Length", str(len(body)))
+            for key, value in headers.items():
+                self.send_header(key, value)
+            self.end_headers()
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError) as error:
+            print(
+                "client disconnected before response delivery: "
+                f"{type(error).__name__}",
+                flush=True,
+            )
+            return False
+        return True
 
     def do_GET(self) -> None:
         if self.path == "/health":
@@ -462,9 +470,9 @@ class Handler(BaseHTTPRequestHandler):
                 *problem(504, "synthesis_timeout", "Magpie chunk exceeded its deadline")
             )
         except Exception as error:  # request boundary: structured local failure
-            print(f"synthesis failed: {type(error).__name__}: {error}", flush=True)
+            print(f"synthesis failed: {type(error).__name__}", flush=True)
             self.send_payload(
-                *problem(500, "engine_failed", f"{type(error).__name__}: {error}")
+                *problem(500, "engine_failed", "Local synthesis failed")
             )
 
 

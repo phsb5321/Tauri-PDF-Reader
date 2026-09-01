@@ -46,14 +46,19 @@ export function PerformanceSettings() {
   );
 
   const refresh = useCallback(async () => {
-    const result = await commands.aiTtsGetPerformance();
-    if (result.status === "ok") {
-      setSnapshot(result.data);
-      setStatus("ready");
-    } else {
-      setSnapshot(null);
-      setStatus("unavailable");
+    try {
+      const result = await commands.aiTtsGetPerformance();
+      if (result.status === "ok") {
+        setSnapshot(result.data);
+        setStatus("ready");
+        return;
+      }
+    } catch {
+      // IPC transport failures use the same honest unavailable state as a
+      // typed command error; polling must never leak unhandled rejections.
     }
+    setSnapshot(null);
+    setStatus("unavailable");
   }, []);
 
   useEffect(() => {

@@ -95,6 +95,18 @@ describe("narration Performance settings", () => {
     ).toBeVisible();
   });
 
+  it("renders IPC transport failures as unavailable without rejecting", async () => {
+    h.performance.mockRejectedValueOnce(new Error("transport unavailable"));
+    render(<PerformanceSettings />);
+
+    expect(
+      await screen.findByText(
+        "Connect a narration provider to inspect its runtime.",
+      ),
+    ).toBeVisible();
+    expect(screen.queryByText("transport unavailable")).not.toBeInTheDocument();
+  });
+
   it("renders unknown runtime data as unavailable rather than claiming GPU", async () => {
     h.performance.mockResolvedValue({
       status: "ok",

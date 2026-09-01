@@ -17,6 +17,23 @@ const h = vi.hoisted(() => ({
   announce: vi.fn(),
   speakWithHighlight: vi.fn(() => Promise.resolve(true)),
   stop: vi.fn(() => Promise.resolve()),
+  getPage: vi.fn(() =>
+    Promise.resolve({
+      getTextContent: () =>
+        Promise.resolve({
+          items: [
+            {
+              str: "Auto page sentence.",
+              transform: [1, 0, 0, 1, 0, 10],
+              width: 100,
+              height: 12,
+              fontName: "Body",
+              hasEOL: true,
+            },
+          ],
+        }),
+    }),
+  ),
   prebuffer: vi.fn(() =>
     Promise.resolve({
       success: true,
@@ -60,6 +77,9 @@ vi.mock("../../hooks/useTtsWordHighlight", () => ({
   },
 }));
 vi.mock("../../hooks/useAudioCache", () => ({ useAudioCache: vi.fn() }));
+vi.mock("../../services/pdf-service", () => ({
+  pdfService: { getPage: h.getPage },
+}));
 vi.mock("../../hooks/useAnnounce", () => ({
   useAnnounce: () => ({ announce: h.announce }),
   ANNOUNCEMENTS: {
@@ -90,6 +110,7 @@ beforeEach(() => {
   h.complete = null;
   h.maxTextUtf8Bytes = 8192;
   h.playbackState = "idle";
+  h.getPage.mockClear();
   useAiTtsStore.setState({
     provider: "local",
     supportsWordTimings: false,
@@ -276,6 +297,106 @@ describe("local sentence playback", () => {
 
     expect(h.prebuffer).toHaveBeenCalledTimes(1);
     expect(h.speakWithHighlight).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps public Stop available while auto-page continuation is pending", async () => {
+    vi.useFakeTimers();
+    try {
+      useAiTtsStore.setState({ autoPageEnabled: true });
+      useDocumentStore.setState({ totalPages: 2 });
+      render(
+        <AiPlaybackBar getText={() => Promise.resolve("Last sentence.")} />,
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByTitle("Play (Ctrl+Space)"));
+      });
+      await act(async () => h.complete?.());
+
+      const stopButton = screen.getByTitle("Stop (Esc)");
+      expect(stopButton).toBeEnabled();
+      await act(async () => fireEvent.click(stopButton));
+      await act(async () => vi.advanceTimersByTimeAsync(500));
+
+      expect(h.getPage).not.toHaveBeenCalled();
+      expect(h.speakWithHighlight).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("cancels a pending auto-page continuation after a manual page turn", async () => {
+    vi.useFakeTimers();
+    try {
+      useAiTtsStore.setState({ autoPageEnabled: true });
+      useDocumentStore.setState({ totalPages: 3 });
+      render(
+        <AiPlaybackBar getText={() => Promise.resolve("Last sentence.")} />,
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByTitle("Play (Ctrl+Space)"));
+      });
+      expect(h.speakWithHighlight).toHaveBeenCalledTimes(1);
+
+      await act(async () => h.complete?.());
+      expect(useDocumentStore.getState().currentPage).toBe(2);
+
+      act(() => useDocumentStore.getState().setCurrentPage(3));
+      await act(async () => vi.advanceTimersByTimeAsync(500));
+
+      expect(h.getPage).not.toHaveBeenCalled();
+      expect(h.speakWithHighlight).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("cancels an in-flight auto-page extraction after a manual page turn", async () => {
+    vi.useFakeTimers();
+    try {
+      let releasePage: (() => void) | undefined;
+      h.getPage.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            releasePage = () =>
+              resolve({
+                getTextContent: () =>
+                  Promise.resolve({
+                    items: [
+                      {
+                        str: "Delayed auto page sentence.",
+                        transform: [1, 0, 0, 1, 0, 10],
+                        width: 100,
+                        height: 12,
+                        fontName: "Body",
+                        hasEOL: true,
+                      },
+                    ],
+                  }),
+              });
+          }),
+      );
+      useAiTtsStore.setState({ autoPageEnabled: true });
+      useDocumentStore.setState({ totalPages: 3 });
+      render(
+        <AiPlaybackBar getText={() => Promise.resolve("Last sentence.")} />,
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByTitle("Play (Ctrl+Space)"));
+      });
+      await act(async () => h.complete?.());
+      await act(async () => vi.advanceTimersByTimeAsync(500));
+      expect(h.getPage).toHaveBeenCalledWith(expect.anything(), 2);
+
+      act(() => useDocumentStore.getState().setCurrentPage(3));
+      await act(async () => releasePage?.());
+
+      expect(h.speakWithHighlight).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("synthesizes a spoken-only period while retaining source queue offsets", async () => {
