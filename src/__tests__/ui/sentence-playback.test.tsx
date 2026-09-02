@@ -421,6 +421,40 @@ describe("local sentence playback", () => {
     expect(h.getPage).not.toHaveBeenCalled();
   });
 
+  it("cancels an in-flight page extraction when navigation moves elsewhere", async () => {
+    let releasePage: (() => void) | undefined;
+    h.getPage.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releasePage = () =>
+            resolve({
+              getTextContent: () =>
+                Promise.resolve({ items: [{ str: "Delayed page two." }] }),
+            });
+        }),
+    );
+    useAiTtsStore.setState({ autoPageEnabled: true });
+    useDocumentStore.setState({ totalPages: 3 });
+    render(<AiPlaybackBar getText={() => Promise.resolve("Page one.")} />);
+
+    fireEvent.click(screen.getByTitle("Play (Ctrl+Space)"));
+    await waitFor(() => expect(h.speakWithHighlight).toHaveBeenCalledTimes(1));
+    await act(async () => h.complete?.());
+    await waitFor(() =>
+      expect(useDocumentStore.getState().currentPage).toBe(2),
+    );
+
+    act(() => markPdfPageReady(2));
+    await waitFor(() =>
+      expect(h.getPage).toHaveBeenCalledWith(expect.anything(), 2),
+    );
+    act(() => useDocumentStore.getState().setCurrentPage(3));
+    await act(async () => releasePage?.());
+
+    expect(h.speakWithHighlight).toHaveBeenCalledTimes(1);
+    expect(useAiTtsStore.getState().error).toBeNull();
+  });
+
   it("synthesizes a spoken-only period while retaining source queue offsets", async () => {
     const text =
       "storage, ingestion, transformation, and serving Since the dawn";

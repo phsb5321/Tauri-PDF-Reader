@@ -471,23 +471,28 @@ export function AiPlaybackBar({
       // Navigate, then wait for this exact render's canvas, text layer, and
       // source annotations. An older ready marker for the same page is stale.
       setCurrentPage(nextPage);
+      const releaseContinuation = () => {
+        if (pageContinuationAbortRef.current === controller) {
+          pageContinuationAbortRef.current = null;
+          pendingContinuationPageRef.current = null;
+          setContinuationPending(false);
+        }
+      };
       const ready = await waitForPdfPageReady(nextPage, previousReadyEpoch, {
         signal: controller.signal,
         timeoutMs: PAGE_READY_TIMEOUT_MS,
       });
-      if (pageContinuationAbortRef.current === controller) {
-        pageContinuationAbortRef.current = null;
-        pendingContinuationPageRef.current = null;
-        setContinuationPending(false);
-      }
       if (
         ready.status === "aborted" ||
+        controller.signal.aborted ||
         !playingRef.current ||
         generation !== playbackGenerationRef.current
       ) {
+        releaseContinuation();
         return;
       }
       if (ready.status === "timeout") {
+        releaseContinuation();
         playingRef.current = false;
         playbackGenerationRef.current += 1;
         useAiTtsStore
@@ -498,13 +503,18 @@ export function AiPlaybackBar({
         return;
       }
 
+      // Keep the same ticket alive through text extraction. A public page
+      // change or Stop after render-readiness aborts this controller, so the
+      // old page can never start after its asynchronous extraction resolves.
       const nextText = await getPageText(nextPage);
+      releaseContinuation();
       if (
+        controller.signal.aborted ||
         !nextText ||
         !playingRef.current ||
         generation !== playbackGenerationRef.current
       ) {
-        if (!nextText) {
+        if (!nextText && !controller.signal.aborted) {
           playingRef.current = false;
           useAiTtsStore
             .getState()
