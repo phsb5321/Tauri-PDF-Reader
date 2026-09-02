@@ -46,8 +46,7 @@ const SAVED_PAGE = "4";
  * resume-target page (2) as "…page two…" (the long narration paragraph);
  * every other page is "…page N…".
  */
-const pageMarker = (n) =>
-  n === 2 ? "fixture page two" : `fixture page ${n}`;
+const pageMarker = (n) => (n === 2 ? "fixture page two" : `fixture page ${n}`);
 
 async function renderedPageShows(n) {
   return browser.execute(
@@ -79,7 +78,9 @@ describe("Packaged reader journey (position survives restart; nav + zoom render)
       await resume.waitForClickable({ timeout: 15000 });
       await browser.execute(() =>
         document
-          .querySelector('button[aria-label^="Resume E2E Resume Fixture A, page"]')
+          .querySelector(
+            'button[aria-label^="Resume E2E Resume Fixture A, page"]',
+          )
           ?.click(),
       );
 
@@ -89,25 +90,27 @@ describe("Packaged reader journey (position survives restart; nav + zoom render)
           (await $('input[aria-label="Current page"]').getValue()) === "2",
         { timeout: 15000, timeoutMsg: "resume did not land on page 2" },
       );
-      await browser.waitUntil(
-        async () => renderedPageShows(2),
-        { timeout: 30000, timeoutMsg: "page 2 never rendered in the text layer" },
-      );
+      await browser.waitUntil(async () => renderedPageShows(2), {
+        timeout: 30000,
+        timeoutMsg: "page 2 never rendered in the text layer",
+      });
       // ── 1. Public Next button: 2 → 3, rendered, not just store. ──────────
       const next = await $('button[title="Next page (Right Arrow)"]');
       await next.waitForClickable({ timeout: 10000 });
       await browser.execute(() =>
-        document.querySelector('button[title="Next page (Right Arrow)"]')?.click(),
+        document
+          .querySelector('button[title="Next page (Right Arrow)"]')
+          ?.click(),
       );
       await browser.waitUntil(
         async () =>
           (await $('input[aria-label="Current page"]').getValue()) === "3",
         { timeout: 10000, timeoutMsg: "Next did not move to page 3" },
       );
-      await browser.waitUntil(
-        async () => renderedPageShows(3),
-        { timeout: 15000, timeoutMsg: "page 3 never rendered after Next" },
-      );
+      await browser.waitUntil(async () => renderedPageShows(3), {
+        timeout: 15000,
+        timeoutMsg: "page 3 never rendered after Next",
+      });
 
       // ── 2. Public page input: 3 → 4, via the keyboard (focus, select-all,
       //    type, Enter). NOT setValue: on WebKitGTK the driver's clear can
@@ -121,24 +124,43 @@ describe("Packaged reader journey (position survives restart; nav + zoom render)
       await browser.keys(["Enter"]);
       await browser.waitUntil(
         async () =>
-          (await $('input[aria-label="Current page"]').getValue()) === SAVED_PAGE,
+          (await $('input[aria-label="Current page"]').getValue()) ===
+          SAVED_PAGE,
         { timeout: 10000, timeoutMsg: "page input did not jump to page 4" },
       );
-      await browser.waitUntil(
-        async () => renderedPageShows(4),
-        { timeout: 15000, timeoutMsg: "page 4 never rendered after input jump" },
-      );
+      await browser.waitUntil(async () => renderedPageShows(4), {
+        timeout: 15000,
+        timeoutMsg: "page 4 never rendered after input jump",
+      });
 
-      // ── 3. Zoom through the public control: percentage display moves. ────
-      const zoomBefore = await $("span.zoom-percentage").getText();
+      // ── 3. Zoom through the public control: one exact selected label and
+      //    the same committed render ticket move together. ────────────────
+      const selectedZoom = () =>
+        browser.execute(
+          () =>
+            document
+              .querySelector(".zoom-select option:checked")
+              ?.textContent?.trim() ?? null,
+        );
+      const zoomBefore = await selectedZoom();
       const zoomIn = await $('button[aria-label="Zoom in"]');
       await zoomIn.waitForClickable({ timeout: 10000 });
       await browser.execute(() =>
         document.querySelector('button[aria-label="Zoom in"]')?.click(),
       );
       await browser.waitUntil(
-        async () => (await $("span.zoom-percentage").getText()) !== zoomBefore,
-        { timeout: 10000, timeoutMsg: "zoom percentage never changed after Zoom in" },
+        async () => {
+          const page = await $(".pdf-page-container");
+          return (
+            (await selectedZoom()) !== zoomBefore &&
+            (await page.getAttribute("data-render-ready")) === "true" &&
+            Number(await page.getAttribute("data-render-zoom")) > 0
+          );
+        },
+        {
+          timeout: 30000,
+          timeoutMsg: "zoom control changed without an exact PDF render commit",
+        },
       );
 
       // Let useAutoSave's debounce land (the runner then verifies the row).
@@ -155,8 +177,14 @@ describe("Packaged reader journey (position survives restart; nav + zoom render)
           "DIAG reader-verify-home:",
           JSON.stringify(
             await browser.execute(() => ({
-              homeText: document.querySelector(".resume-section")?.textContent ?? null,
-              gridText: document.querySelector(".library-body, .library-grid, [class*='library']")?.textContent?.slice(0, 200) ?? null,
+              homeText:
+                document.querySelector(".resume-section")?.textContent ?? null,
+              gridText:
+                document
+                  .querySelector(
+                    ".library-body, .library-grid, [class*='library']",
+                  )
+                  ?.textContent?.slice(0, 200) ?? null,
               logs: window.__E2E_READ__.logs().slice(-40),
             })),
           ),
@@ -170,18 +198,24 @@ describe("Packaged reader journey (position survives restart; nav + zoom render)
       // Resume lands on the saved page AND renders it.
       await browser.execute(() =>
         document
-          .querySelector('button[aria-label^="Resume E2E Resume Fixture A, page"]')
+          .querySelector(
+            'button[aria-label^="Resume E2E Resume Fixture A, page"]',
+          )
           ?.click(),
       );
       await browser.waitUntil(
         async () =>
-          (await $('input[aria-label="Current page"]').getValue()) === SAVED_PAGE,
-        { timeout: 15000, timeoutMsg: "resume did not land on the saved page 4" },
+          (await $('input[aria-label="Current page"]').getValue()) ===
+          SAVED_PAGE,
+        {
+          timeout: 15000,
+          timeoutMsg: "resume did not land on the saved page 4",
+        },
       );
-      await browser.waitUntil(
-        async () => renderedPageShows(4),
-        { timeout: 30000, timeoutMsg: "saved page 4 never rendered after restart" },
-      );
+      await browser.waitUntil(async () => renderedPageShows(4), {
+        timeout: 30000,
+        timeoutMsg: "saved page 4 never rendered after restart",
+      });
 
       console.log(
         "DIAG reader-verify:",

@@ -1,8 +1,21 @@
 /**
- * Read-along focus — the current word is painted in the PDF text layer itself.
- * Mauve is the design-system voice colour; a solid chip remains visible over
- * both dark and light PDF artwork without adding a floating debug overlay.
+ * Read-along focus, painted in the PDF text layer itself.
+ *
+ * Two tiers, because a lone word chip makes the eye chase a jumping block with
+ * no sense of where the sentence is going:
+ *   1. a calm band over the run being spoken — a landing zone, no colour flip;
+ *   2. a strong mark on the current word, sitting on top of the band.
+ *
+ * `::highlight()` only accepts colour, background-color, text-decoration,
+ * text-shadow and -webkit-text-stroke-*; padding, radii, transforms and
+ * transitions are not available here, so contrast and weight do all the work.
+ * Stacking order comes from Highlight.priority, not from rule order.
  */
+
+::highlight(tts-active-sentence) {
+  background-color: var(--color-speak-alpha);
+}
+
 ::highlight(tts-current-word) {
   background-color: var(--color-speak);
   color: var(--color-on-accent);

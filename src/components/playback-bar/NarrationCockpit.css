@@ -1,0 +1,305 @@
+.narration-cockpit {
+  position: static;
+  align-self: stretch;
+  width: 100%;
+  height: min(30rem, 25vh);
+  min-height: min(10rem, 24vh);
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  color: var(--color-text-primary);
+}
+
+.narration-cockpit-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5) var(--space-3);
+}
+
+.narration-cockpit-header h2,
+.narration-cockpit-header p,
+.narration-cockpit h3,
+.narration-cockpit p {
+  margin: 0;
+}
+
+.narration-cockpit-header h2 {
+  font-size: var(--text-lg);
+  line-height: 1.3;
+}
+
+.narration-cockpit-header p,
+.narration-cockpit p,
+.narration-cockpit small {
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+
+.narration-cockpit-close {
+  width: var(--button-height-sm);
+  height: var(--button-height-sm);
+  min-width: 45px;
+  min-height: 45px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.narration-cockpit-close:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.narration-cockpit-close svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.narration-cockpit-tabs {
+  display: flex;
+  gap: var(--space-1);
+  overflow-x: auto;
+  padding: 0 var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+  scrollbar-width: thin;
+}
+
+.narration-cockpit-tabs [role="tab"] {
+  position: relative;
+  flex: 0 0 auto;
+  min-height: 45px;
+  padding: var(--space-3) var(--space-3);
+  border: 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.narration-cockpit-tabs [role="tab"]::after {
+  content: "";
+  position: absolute;
+  right: var(--space-2);
+  bottom: -1px;
+  left: var(--space-2);
+  height: 2px;
+  background: transparent;
+}
+
+.narration-cockpit-tabs [role="tab"][aria-selected="true"] {
+  color: var(--color-text-primary);
+}
+
+.narration-cockpit-tabs [role="tab"][aria-selected="true"]::after {
+  background: var(--color-accent);
+}
+
+.narration-cockpit :is(button, input, select):focus-visible,
+.narration-cockpit-panel:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.narration-cockpit-panel {
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-5);
+}
+
+.narration-quick-voice,
+.narration-setting-row,
+.narration-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5);
+}
+
+.narration-quick-voice,
+.narration-setting-row {
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.narration-quick-voice > div:first-child,
+.narration-setting-row > div:first-child,
+.narration-setting-row > label,
+.narration-toggle-row > span {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.narration-quick-voice h3,
+.narration-setting-row h3,
+.narration-selection-intro h3 {
+  font-size: var(--text-sm);
+}
+
+.narration-voice-route > .ai-tts-settings {
+  min-width: 0;
+  max-width: none;
+  margin-top: var(--space-4);
+  padding: 0;
+  background: transparent;
+}
+
+.narration-voice-route .ai-tts-settings-header {
+  display: none;
+}
+
+.narration-voice-route .ai-tts-connections {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.narration-voice-route .ai-tts-connection {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.narration-voice-route .ai-tts-connection-select {
+  align-items: start;
+  flex-direction: column;
+}
+
+.narration-delivery-settings,
+.narration-selection-settings {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.narration-toggle-row {
+  padding: var(--space-3) 0;
+  cursor: pointer;
+}
+
+.narration-toggle-row input[type="checkbox"] {
+  width: 2.5rem;
+  height: 1.25rem;
+  accent-color: var(--color-accent);
+}
+
+.narration-setting-row select {
+  min-width: 11rem;
+  min-height: 2.75rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-subtle);
+  color: var(--color-text-primary);
+}
+
+.narration-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-4) 0 0;
+  border: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.narration-profile-grid legend {
+  padding: 0;
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.narration-profile-option {
+  display: flex;
+  align-items: start;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-subtle);
+  cursor: pointer;
+}
+
+.narration-profile-option:has(input:checked) {
+  border-color: var(--color-accent);
+  background: var(--color-accent-alpha);
+}
+
+.narration-profile-option input {
+  margin-top: 0.15rem;
+  accent-color: var(--color-accent);
+}
+
+.narration-profile-option span {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.narration-profile-option small {
+  line-height: 1.35;
+}
+
+.narration-control-note {
+  color: var(--color-warning-text) !important;
+}
+
+.narration-selection-intro {
+  display: grid;
+  gap: var(--space-1);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.narration-selection-settings > .settings-section {
+  margin: 0;
+  padding: 0;
+}
+
+@media (max-width: 767px) {
+  .narration-cockpit {
+    height: min(26rem, 25vh);
+  }
+
+  .narration-cockpit-header,
+  .narration-cockpit-panel {
+    padding: var(--space-3);
+  }
+
+  .narration-cockpit-tabs {
+    padding: 0 var(--space-2);
+  }
+
+  .narration-voice-route .ai-tts-connections,
+  .narration-profile-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .narration-quick-voice,
+  .narration-setting-row {
+    align-items: stretch;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .narration-cockpit,
+  .narration-cockpit * {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

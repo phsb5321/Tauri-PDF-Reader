@@ -1,0 +1,62 @@
+.paragraph-action-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-floating);
+  pointer-events: none;
+}
+
+.paragraph-action-button {
+  position: absolute;
+  display: block;
+  width: max(2.2rem, 45px);
+  height: max(2.2rem, 45px);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-paper-on-speak);
+  box-shadow: var(--shadow-none);
+  cursor: pointer;
+  pointer-events: auto;
+  transform: translateY(-50%);
+}
+
+.paragraph-action-tick {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: 3px;
+  height: 1rem;
+  border-radius: var(--radius-full);
+  background: var(--color-paper-tick);
+  transform: translateY(-50%);
+}
+
+.paragraph-action-button svg {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  box-sizing: border-box;
+  width: 1.4rem;
+  height: 1.4rem;
+  padding: var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--color-paper-speak);
+  margin-block: auto;
+  box-shadow: var(--shadow-sm);
+  visibility: hidden;
+}
+
+.paragraph-action-button:is(:hover, :focus-visible) .paragraph-action-tick {
+  visibility: hidden;
+}
+
+.paragraph-action-button:is(:hover, :focus-visible) svg {
+  visibility: visible;
+}
+
+.paragraph-action-button:focus-visible {
+  outline: 3px solid var(--color-paper-focus);
+  outline-offset: 2px;
+}

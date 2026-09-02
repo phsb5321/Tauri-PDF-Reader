@@ -1,0 +1,75 @@
+{
+  "titles": [
+    {
+      "text": "Legacy readable book",
+      "displayed": true,
+      "rect": {
+        "x": 265,
+        "y": 608,
+        "width": 228,
+        "height": 25
+      }
+    },
+    {
+      "text": "Missing book control",
+      "displayed": true,
+      "rect": {
+        "x": 545,
+        "y": 608,
+        "width": 228,
+        "height": 25
+      }
+    }
+  ],
+  "realCover": {
+    "state": "ready",
+    "cardAccessibleName": "Select Legacy readable book; press Enter or double-click to open"
+  },
+  "missingCover": {
+    "state": "fallback",
+    "cardAccessibleName": "Select Missing book control; press Enter or double-click to open"
+  },
+  "readerSettings": {
+    "viewerDisplayed": true,
+    "dialogDisplayed": true
+  },
+  "dropSession": {
+    "target": "Drop one PDF to create a reading session",
+    "status": "Session “Legacy readable book” created",
+    "invalidError": "DROP_INVALID",
+    "viewerDisplayed": true,
+    "chaptersSurface": true,
+    "ctrlWheel": {
+      "before": 0.6186868686868687,
+      "after": 0.6889021739467206,
+      "exactLabel": "69%",
+      "anchorDelta": {
+        "x": 0.0000019970847789929635,
+        "y": 0.004460046371749404
+      },
+      "ordinaryWheelPreservedZoom": true
+    },
+    "highZoom": {
+      "committed": 3,
+      "label": "300%",
+      "maxBackingSide": 4752
+    },
+    "returnedToLibrary": true,
+    "activeSession": "Legacy readable book",
+    "readerNarrow": {
+      "toolbar": {
+        "x": 0,
+        "width": 614.172119140625,
+        "right": 614.172119140625
+      },
+      "viewport": 614,
+      "shellNames": [
+        "Back to library",
+        "Chapters",
+        "Sessions",
+        "Open PDF",
+        "Settings"
+      ]
+    }
+  }
+}

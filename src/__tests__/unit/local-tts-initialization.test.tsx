@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   listVoices: vi.fn(),
   setVoice: vi.fn(),
   setSpeed: vi.fn(),
-  stopped: null as (() => void) | null,
+  stopped: null as ((event: { generation: number }) => void) | null,
   listen: vi.fn(async () => () => {}),
 }));
 
@@ -31,10 +31,12 @@ vi.mock("../../lib/tauri-invoke", () => ({
   onAiTtsStarted: mocks.listen,
   onAiTtsFinished: mocks.listen,
   onAiTtsPlaybackStarting: mocks.listen,
-  onAiTtsStopped: vi.fn(async (callback: () => void) => {
-    mocks.stopped = callback;
-    return () => {};
-  }),
+  onAiTtsStopped: vi.fn(
+    async (callback: (event: { generation: number }) => void) => {
+      mocks.stopped = callback;
+      return () => {};
+    },
+  ),
   onAiTtsPaused: mocks.listen,
   onAiTtsResumed: mocks.listen,
   onAiTtsError: mocks.listen,
@@ -134,7 +136,7 @@ describe("local TTS initialization", () => {
         currentText: "old page",
         pageNumber: 1,
       });
-      mocks.stopped?.();
+      mocks.stopped?.({ generation: 1 });
     });
 
     expect(useTtsHighlightStore.getState()).toMatchObject({
@@ -143,6 +145,34 @@ describe("local TTS initialization", () => {
       currentText: null,
       pageNumber: null,
     });
+  });
+
+  it("ignores a delayed stopped event from the generation already replaced", async () => {
+    renderHook(() => useAiTts());
+    await waitFor(() => expect(mocks.stopped).not.toBeNull());
+    act(() => {
+      useAiTtsStore.setState({
+        playbackState: "playing",
+        currentText: "new run",
+        backendPlaybackGeneration: 8,
+      });
+      useTtsHighlightStore.setState({ isActive: true, currentWordIndex: 0 });
+      mocks.stopped?.({ generation: 8 });
+    });
+    expect(useAiTtsStore.getState()).toMatchObject({
+      playbackState: "playing",
+      currentText: "new run",
+      backendPlaybackGeneration: 8,
+    });
+    expect(useTtsHighlightStore.getState().isActive).toBe(true);
+
+    act(() => mocks.stopped?.({ generation: 9 }));
+    expect(useAiTtsStore.getState()).toMatchObject({
+      playbackState: "idle",
+      currentText: null,
+      backendPlaybackGeneration: null,
+    });
+    expect(useTtsHighlightStore.getState().isActive).toBe(false);
   });
 
   it("keeps the provider blocked when native initialization fails", async () => {

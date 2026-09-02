@@ -493,6 +493,13 @@ const TEXT_TOKENS = [
 ] as const;
 
 /** Surfaces that text sits on. */
+const PAPER_TOKENS = [
+  "--color-paper-tick",
+  "--color-paper-speak",
+  "--color-paper-on-speak",
+  "--color-paper-focus",
+] as const;
+
 const SURFACE_TOKENS = [
   "--color-bg",
   "--color-bg-surface",
@@ -1241,7 +1248,7 @@ describe("design tokens: WCAG AA contrast floor", () => {
   });
 
   it.each(THEMES)("%s theme resolves every colour token", (_name, tokens) => {
-    for (const token of [...TEXT_TOKENS, ...SURFACE_TOKENS]) {
+    for (const token of [...TEXT_TOKENS, ...SURFACE_TOKENS, ...PAPER_TOKENS]) {
       const value = tokens.get(token);
       expect(value, `${token} is not defined`).toBeDefined();
       expect(resolve(value as string, tokens)).not.toBe(NOT_OPAQUE);
@@ -1262,6 +1269,34 @@ describe("design tokens: WCAG AA contrast floor", () => {
         }
       }
       expect(failures).toEqual([]);
+    },
+  );
+
+  it.each(THEMES)(
+    "%s theme: paragraph controls remain legible on white PDF paper",
+    (_name, tokens) => {
+      const paper: Rgb = [255, 255, 255];
+      const tick = resolve(
+        tokens.get("--color-paper-tick") as string,
+        tokens,
+      ) as Rgb;
+      const chip = resolve(
+        tokens.get("--color-paper-speak") as string,
+        tokens,
+      ) as Rgb;
+      const glyph = resolve(
+        tokens.get("--color-paper-on-speak") as string,
+        tokens,
+      ) as Rgb;
+      const focus = resolve(
+        tokens.get("--color-paper-focus") as string,
+        tokens,
+      ) as Rgb;
+
+      expect(contrastRatio(tick, paper)).toBeGreaterThanOrEqual(3);
+      expect(contrastRatio(chip, paper)).toBeGreaterThanOrEqual(AA_TEXT);
+      expect(contrastRatio(glyph, chip)).toBeGreaterThanOrEqual(AA_TEXT);
+      expect(contrastRatio(focus, paper)).toBeGreaterThanOrEqual(3);
     },
   );
 
@@ -1466,6 +1501,37 @@ describe("design tokens: WCAG AA contrast floor", () => {
     const rootStart = css.indexOf(":root");
     const rootBlock = css.slice(rootStart, css.indexOf("}", rootStart) + 1);
     expect(rootBlock).not.toMatch(/font-size:\s*\d+px/);
+  });
+
+  it("keeps the narration cockpit in flow with 44px primary targets", () => {
+    const cockpit = stripCssComments(
+      readFileSync(
+        join(SRC, "components/playback-bar/NarrationCockpit.css"),
+        "utf8",
+      ),
+    );
+    const playback = stripCssComments(
+      readFileSync(
+        join(SRC, "components/playback-bar/AiPlaybackBar.css"),
+        "utf8",
+      ),
+    );
+
+    expect(cockpit).toMatch(
+      /\.narration-cockpit\s*\{[^}]*position:\s*static;/s,
+    );
+    expect(cockpit).toMatch(/\.narration-cockpit\s*\{[^}]*25vh/s);
+    expect(cockpit).not.toMatch(/backdrop-filter\s*:/);
+    expect(cockpit).toMatch(
+      /\.narration-cockpit-close\s*\{[^}]*min-width:\s*45px;[^}]*min-height:\s*45px;/s,
+    );
+    expect(cockpit).toMatch(
+      /\.narration-cockpit-tabs \[role="tab"\]\s*\{[^}]*min-height:\s*45px;/s,
+    );
+    expect(playback).toMatch(
+      /\.ai-playback-button\s*\{[^}]*min-width:\s*45px;[^}]*min-height:\s*45px;/s,
+    );
+    expect(playback.match(/\.ai-playback-progress\s*\{/g)).toHaveLength(1);
   });
 
   it("focus rings are keyboard-only — no bare :focus on interactive controls", () => {

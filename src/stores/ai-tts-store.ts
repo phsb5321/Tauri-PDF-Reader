@@ -10,6 +10,7 @@ import {
   isNarrationPerformanceProfile,
   type NarrationPerformanceProfile,
 } from "../lib/narration-performance";
+import type { ProsodyLanguage } from "../lib/prosody-plan";
 
 export type AiTtsProvider = "elevenlabs" | "local" | "groq";
 export const AI_TTS_PROVIDERS: readonly AiTtsProvider[] = [
@@ -48,6 +49,7 @@ const VALID_TRANSITIONS: Record<AiTtsPlaybackState, AiTtsPlaybackState[]> = {
 };
 
 export type ProviderVoiceIds = Record<AiTtsProvider, string | null>;
+export type NarrationLanguage = ProsodyLanguage;
 
 interface AiTtsState {
   initialized: boolean;
@@ -73,6 +75,8 @@ interface AiTtsState {
   speed: number;
   autoPageEnabled: boolean;
   performanceProfile: NarrationPerformanceProfile;
+  numberNormalizationEnabled: boolean;
+  narrationLanguage: NarrationLanguage;
   cacheCoverage: CoverageResponse | null;
 
   setApiKey: (key: string | null) => void;
@@ -96,6 +100,8 @@ interface AiTtsState {
   setSpeed: (speed: number) => void;
   setAutoPageEnabled: (enabled: boolean) => void;
   setPerformanceProfile: (profile: NarrationPerformanceProfile) => void;
+  setNumberNormalizationEnabled: (enabled: boolean) => void;
+  setNarrationLanguage: (language: NarrationLanguage) => void;
   setCacheCoverage: (coverage: CoverageResponse | null) => void;
   setPlaybackState: (state: AiTtsPlaybackState) => void;
   transitionTo: (nextState: AiTtsPlaybackState, force?: boolean) => boolean;
@@ -166,6 +172,8 @@ const initialState = {
   speed: DEFAULT_SPEED,
   autoPageEnabled: true,
   performanceProfile: DEFAULT_NARRATION_PERFORMANCE_PROFILE,
+  numberNormalizationEnabled: true,
+  narrationLanguage: "auto" as NarrationLanguage,
   cacheCoverage: null as CoverageResponse | null,
 };
 
@@ -175,13 +183,19 @@ interface PersistedAiTtsPreferences {
   speed: number;
   autoPageEnabled: boolean;
   performanceProfile: NarrationPerformanceProfile;
+  numberNormalizationEnabled: boolean;
+  narrationLanguage: NarrationLanguage;
 }
 
-const PERSISTENCE_VERSION = 3;
+const PERSISTENCE_VERSION = 4;
 const PERSISTENCE_KEY = "ai-tts-storage";
 
 function safeVoice(value: unknown, fallback: string | null): string | null {
   return typeof value === "string" || value === null ? value : fallback;
+}
+
+function isNarrationLanguage(value: unknown): value is NarrationLanguage {
+  return value === "auto" || value === "en" || value === "pt-BR";
 }
 
 function sanitizePersistedPreferences(
@@ -225,6 +239,13 @@ function sanitizePersistedPreferences(
     )
       ? candidate.performanceProfile
       : initialState.performanceProfile,
+    numberNormalizationEnabled:
+      typeof candidate.numberNormalizationEnabled === "boolean"
+        ? candidate.numberNormalizationEnabled
+        : initialState.numberNormalizationEnabled,
+    narrationLanguage: isNarrationLanguage(candidate.narrationLanguage)
+      ? candidate.narrationLanguage
+      : initialState.narrationLanguage,
   };
 }
 
@@ -346,6 +367,9 @@ export const useAiTtsStore = create<AiTtsState>()(
 
       setAutoPageEnabled: (enabled) => set({ autoPageEnabled: enabled }),
       setPerformanceProfile: (profile) => set({ performanceProfile: profile }),
+      setNumberNormalizationEnabled: (enabled) =>
+        set({ numberNormalizationEnabled: enabled }),
+      setNarrationLanguage: (language) => set({ narrationLanguage: language }),
       setCacheCoverage: (coverage) => set({ cacheCoverage: coverage }),
 
       setPlaybackState: (state) => {
@@ -440,6 +464,8 @@ export const useAiTtsStore = create<AiTtsState>()(
         speed: state.speed,
         autoPageEnabled: state.autoPageEnabled,
         performanceProfile: state.performanceProfile,
+        numberNormalizationEnabled: state.numberNormalizationEnabled,
+        narrationLanguage: state.narrationLanguage,
       }),
       migrate: (persistedState) => sanitizePersistedPreferences(persistedState),
       merge: (persistedState, currentState) => ({

@@ -116,6 +116,14 @@ describe("ai-tts event subscriptions", () => {
     }
   });
 
+  it("onAiTtsStopped preserves the native cancellation generation", async () => {
+    const callback = vi.fn();
+    await api.onAiTtsStopped(callback);
+    const listener = vi.mocked(listen).mock.calls.at(-1)?.[1];
+    listener?.({ payload: 43 } as never);
+    expect(callback).toHaveBeenCalledWith({ generation: 43 });
+  });
+
   it("onAiTtsFinished preserves the native playback generation", async () => {
     const callback = vi.fn();
     await api.onAiTtsFinished(callback);

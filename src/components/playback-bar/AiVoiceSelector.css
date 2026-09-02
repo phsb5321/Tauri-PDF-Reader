@@ -12,6 +12,7 @@
 }
 
 .ai-voice-selector-select {
+  min-height: 45px;
   padding: 6px 28px 6px 10px;
   border: 1px solid var(--border-color, #333);
   border-radius: 6px;

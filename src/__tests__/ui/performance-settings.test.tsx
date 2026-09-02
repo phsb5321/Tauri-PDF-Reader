@@ -1,10 +1,4 @@
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => ({
@@ -73,25 +67,18 @@ describe("narration Performance settings", () => {
     expect(
       screen.getByText(/292 bytes · 4.20 s for 12.00 s audio/u),
     ).toBeVisible();
-    expect(screen.getByRole("radio", { name: /Balanced/u })).toBeChecked();
+    expect(
+      screen.getByText(/Delivery profiles live in the Delivery tab/u),
+    ).toBeVisible();
   });
 
-  it("persists one coherent policy and locks changes during playback", async () => {
-    const view = render(<PerformanceSettings />);
-    await screen.findByText("Magpie TTS Multilingual 357M");
-
-    fireEvent.click(screen.getByRole("radio", { name: /Continuous/u }));
-    expect(useAiTtsStore.getState().performanceProfile).toBe("continuous");
-
-    view.unmount();
+  it("keeps policy controls out of the factual telemetry panel", async () => {
     render(<PerformanceSettings />);
     await screen.findByText("Magpie TTS Multilingual 357M");
-    expect(screen.getByRole("radio", { name: /Continuous/u })).toBeChecked();
 
-    act(() => useAiTtsStore.setState({ playbackState: "playing" }));
-    expect(screen.getByRole("radio", { name: /Responsive/u })).toBeDisabled();
+    expect(screen.queryAllByRole("radio")).toHaveLength(0);
     expect(
-      screen.getByText("Stop narration before changing its queue policy."),
+      screen.getByText(/this view reports only measured engine facts/u),
     ).toBeVisible();
   });
 
