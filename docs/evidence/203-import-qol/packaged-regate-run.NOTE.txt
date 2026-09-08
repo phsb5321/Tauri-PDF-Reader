@@ -12,3 +12,21 @@ helper heredoc — zero literal single quotes remain in the toolchain_exec
 body (verified by delimiter scan); mechanism validated against a scratch
 DB reproducing the seeded identity set (documents=2, seeded=2, unexpected=0,
 member=real, non_pdf_rows=0) BEFORE any further native slot is spent.
+
+15:1x PROOF (coordinator-required, beyond bash -n):
+- Captured the ACTUAL post-quoting toolchain_exec argument via a bash-parsed
+  harness (packaged-regate-captured-toolchain-body.txt): 0 single quotes
+  survive; @real_id/@missing_id/@non_pdf parameter tokens intact (6 refs).
+- Positive control on the RETAINED run DB
+  (/tmp/lectrice-e2e-profile.dVRmUt/.../pdf-reader.db): documents=2,
+  seeded=2, unexpected=0, member=0f3af5b3... (source hash), non_pdf_rows=0.
+- Negative controls on a COPY (original untouched, re-verified documents=2):
+  extra document row -> unexpected=1 (gate fails); member re-pointed ->
+  member gate fails; non-PDF path row -> non_pdf_rows=1 (gate fails).
+STOP ORDER COMPLIANCE: native descendant was already terminated 15:00:02
+(exit 143, SIGTERM, cold-build phase, pre-assertion); no descendant PIDs
+remain; log/persistent target/identity preserved; NO native restart until
+explicit coordinator reauthorization. Head disclosure: SQL-bind fix commit
+a5ba847 was pushed as the 15:0x response to the earlier urgent-defect
+message, before this stop order arrived; original broken runner retained in
+git history at 98eabdf.
