@@ -72,8 +72,18 @@ describe("ResumeSection", () => {
     render(
       <ResumeSection
         documents={[
-          doc({ id: "primary", title: "Primary", currentPage: 2, lastOpenedAt: "2026-08-10T10:00:00Z" }),
-          doc({ id: "row", title: "Row Book", currentPage: 3, lastOpenedAt: "2026-08-09T10:00:00Z" }),
+          doc({
+            id: "primary",
+            title: "Primary",
+            currentPage: 2,
+            lastOpenedAt: "2026-08-10T10:00:00Z",
+          }),
+          doc({
+            id: "row",
+            title: "Row Book",
+            currentPage: 3,
+            lastOpenedAt: "2026-08-09T10:00:00Z",
+          }),
         ]}
         onResume={noop}
         onResumeAndPlay={noop}
@@ -214,10 +224,10 @@ describe("ResumeSection", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: /Primary and start reading aloud/ }),
+      screen.getByRole("button", { name: /Primary and read aloud/ }),
     );
     fireEvent.click(
-      screen.getByRole("button", { name: /Secondary and start reading aloud/ }),
+      screen.getByRole("button", { name: /Secondary and read aloud/ }),
     );
 
     expect(onResumeAndPlay).toHaveBeenCalledWith(primary);
@@ -286,7 +296,7 @@ describe("ResumeSection", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", {
-        name: /Resume One and start reading aloud/,
+        name: /Resume One and read aloud/,
       }),
     ).toBeInTheDocument();
   });
