@@ -47,15 +47,22 @@ function domClick(selector) {
   );
 }
 
-/** Type into a public field at DOM level (see actor-contract note above). */
+/** Type into a public field at DOM level. React's ValueTracker dedupes a
+ * plain `.value` set, so the NATIVE setter must place the value before the
+ * input event (the same sanction as domClick: DOM-level actor action on a
+ * public control, forced by the WebKitGTK driver's event drops). */
 function domType(selector, value) {
   return browser.execute(
     (sel, val) => {
       const el = document.querySelector(sel);
       if (!el) return false;
-      el.value = val;
+      const setter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        "value",
+      ).set;
+      setter.call(el, val);
       el.dispatchEvent(new Event("input", { bubbles: true }));
-      return true;
+      return el.value === val;
     },
     selector,
     value,
@@ -140,8 +147,16 @@ async function widthMatrix() {
 }
 
 describe("Packaged library-202 journey (#183 tail: labels, 0% vs divider, scale)", () => {
+  // ONE spec, TWO lanes — the lane decides which `it` runs, exactly like
+  // e2e/home-journey.e2e.mjs: wdio executes the whole file per lane, so each
+  // it bails (silently passes) outside its lane's key state.
   it("no-key lane: visible labels, width matrix, keyboard-only path, 150% scale, pinned shelf form", async () => {
     await waitReady();
+    if (
+      await browser.execute(() => window.__E2E_READ__.hasKey())
+    ) {
+      return; // key lane run — the no-key journey does not apply
+    }
     await browser.setWindowSize(1200, 800);
 
     // Nothing auto-plays on launch (pre-action observer check).
@@ -300,6 +315,11 @@ describe("Packaged library-202 journey (#183 tail: labels, 0% vs divider, scale)
 
   it("key lane: the row's labeled control drives narration from the home", async () => {
     await waitReady();
+    if (
+      !(await browser.execute(() => window.__E2E_READ__.hasKey()))
+    ) {
+      return; // no-key lane run — the narration journey does not apply
+    }
     await browser.setWindowSize(1200, 800);
 
     // Two books in flight: the ALSO-IN-PROGRESS row carries the labeled
