@@ -21,6 +21,7 @@ vi.mock("../services/pdf-service", () => ({
 
 const { pdfService } = await import("../services/pdf-service");
 const loadDocument = vi.mocked(pdfService.loadDocument);
+const loadDocumentBound = vi.mocked(pdfService.loadDocumentBound);
 
 const { onNativeFileDrop } = await import("../lib/api/file-drop");
 const subscribe = vi.mocked(onNativeFileDrop);
@@ -104,9 +105,9 @@ describe("usePdfDropSession", () => {
 
     expect(deps.openDroppedPdf).toHaveBeenCalledWith(
       "/books/Data Engineering.pdf",
-      // The drop transaction holds the open lease itself (issue #185); the
-      // import runs inside it instead of acquiring its own.
-      { leaseHeldByCaller: true },
+      // The drop transaction holds the open lease itself and defers the
+      // visible-reader commit until activation (issue #185 B1 repair).
+      { leaseHeldByCaller: true, deferCommit: true },
     );
     expect(deps.createSession).toHaveBeenCalledWith("Data Engineering", [
       document.id,
@@ -269,5 +270,282 @@ describe("usePdfDropSession", () => {
     unmount();
     await act(async () => resolveSubscription(unlisten));
     expect(unlisten).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("failed drop preserves the prior document (issue #185 B1 repair)", () => {
+  const rowA = document; // already reading this book (module fixture, id a-repeated-64)
+  const rowB = {
+    ...document,
+    id: "hash-of-b",
+    title: "Dropped Book",
+    currentPage: 1,
+  };
+  function preparePriorDocument() {
+    // Document A is open in the reader at a nondefault page with progress.
+    const proxyA = { numPages: 120 };
+    act(() => {
+      useDocumentStore.setState({
+        pdfDocument: proxyA,
+        currentDocument: rowA,
+        currentPage: 42,
+        scrollPosition: 0.5,
+        totalPages: 120,
+      });
+    });
+    return proxyA;
+  }
+
+  function importMocks() {
+    // B is a brand-new import: unknown path, fresh row, hash-bound twice.
+    // The library mock is stateful so a re-drop resolves the persisted row
+    // (retry availability through the public path).
+    let persistedRow: Document | null = null;
+    loadDocumentBound.mockImplementation((path: string, options?) =>
+      Promise.resolve({
+        pdf: { numPages: 30 },
+        sha256: "hash-of-b",
+        // Second (retry) drop binds to the now-known row id.
+        ...(options && "expectedSha256" in options ? {} : {}),
+      } as never),
+    );
+    loadDocument.mockResolvedValue({ numPages: 30 } as never);
+    mockInvoke.mockImplementation((command: string) => {
+      if (command === "library_get_document_by_path") {
+        return Promise.resolve(persistedRow);
+      }
+      if (command === "library_add_document") {
+        persistedRow = rowB;
+        return Promise.resolve(rowB);
+      }
+      if (command === "library_open_document") {
+        return Promise.resolve(persistedRow ?? rowB);
+      }
+      return Promise.resolve(null);
+    });
+  }
+
+  it("restore failure keeps exact A pdf/document/page/progress; session deleted, row kept", async () => {
+    const proxyA = preparePriorDocument();
+    importMocks();
+
+    let restoreReject: (error: Error) => void = () => {};
+    const deps = {
+      // The REAL open path must run — a pure-return mock is what hid B1.
+      openDroppedPdf: undefined as unknown as ReturnType<typeof vi.fn>,
+      createSession: vi.fn().mockResolvedValue(session),
+      restoreSession: vi.fn(
+        () =>
+          new Promise((_resolve, reject) => {
+            restoreReject = reject;
+          }),
+      ),
+      deleteSession: vi.fn().mockResolvedValue(undefined),
+      onSessionCreated: vi.fn(),
+      onError: vi.fn(),
+    };
+
+    const openRef: { current: ReturnType<typeof useOpenPdf> | null } = {
+      current: null,
+    };
+    renderHook(() => {
+      const open = useOpenPdf();
+      openRef.current = open;
+      return usePdfDropSession({
+        ...(deps as unknown as Parameters<typeof usePdfDropSession>[0]),
+        openDroppedPdf: (filePath: string, options?) =>
+          openRef.current!.openDroppedPdf(filePath, options),
+      });
+    });
+    await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      emit({ type: "drop", paths: ["/books/Dropped Book.pdf"] });
+    });
+    await waitFor(() =>
+      expect(deps.createSession).toHaveBeenCalledWith("Dropped Book", [
+        "hash-of-b",
+      ]),
+    );
+    await act(async () => {
+      restoreReject(
+        new Error(
+          "SESSION_RESTORE_FAILED: The reading session could not be restored — the reader stayed on the current document. Try again.",
+        ),
+      );
+    });
+    await waitFor(() =>
+      expect(deps.deleteSession).toHaveBeenCalledWith("session-1"),
+    );
+
+    // The exact prior reader authorities survive the failed transaction —
+    // same proxy instance, same row object, same page and progress.
+    const state = useDocumentStore.getState();
+    expect(state.pdfDocument).toBe(proxyA);
+    expect(state.currentDocument).toBe(rowA);
+    expect(state.currentPage).toBe(42);
+    expect(state.scrollPosition).toBe(0.5);
+
+    // Rollback contract: session deleted, callback absent, error visible.
+    expect(deps.onSessionCreated).not.toHaveBeenCalled();
+    expect(deps.onError).toHaveBeenCalledWith(
+      expect.stringContaining("DROP_FAILED: SESSION_RESTORE_FAILED"),
+    );
+
+    // The import itself succeeded independently: B stays in the library
+    // (intentional — row cleanup is out of scope for this repair; a re-drop
+    // reuses the row to retry activation).
+    expect(mockInvoke).toHaveBeenCalledWith(
+      "library_add_document",
+      expect.objectContaining({
+        filePath: "/books/Dropped Book.pdf",
+        expectedSha256: "hash-of-b",
+      }),
+    );
+    expect(
+      mockInvoke.mock.calls.some(([command]) =>
+        String(command).includes("library_remove"),
+      ),
+    ).toBe(false);
+
+    // Retry availability through the public path: a re-drop now resolves the
+    // persisted known row (hash-bound) WITHOUT re-adding it, still without
+    // disturbing A.
+    const addCallsBeforeRetry = mockInvoke.mock.calls.filter(
+      ([command]) => command === "library_add_document",
+    ).length;
+    let retried: Awaited<
+      ReturnType<
+        NonNullable<Parameters<typeof usePdfDropSession>[0]["openDroppedPdf"]>
+      >
+    > = null;
+    await act(async () => {
+      retried = await openRef.current!.openDroppedPdf(
+        "/books/Dropped Book.pdf",
+        { leaseHeldByCaller: true, deferCommit: true },
+      );
+    });
+    expect(retried && "document" in retried ? retried.document.id : null).toBe(
+      "hash-of-b",
+    );
+    expect(loadDocumentBound).toHaveBeenLastCalledWith(
+      "/books/Dropped Book.pdf",
+      {
+        expectedSha256: "hash-of-b",
+      },
+    );
+    const addCallsAfterRetry = mockInvoke.mock.calls.filter(
+      ([command]) => command === "library_add_document",
+    ).length;
+    expect(addCallsAfterRetry).toBe(addCallsBeforeRetry); // reuse, not re-add
+    expect(useDocumentStore.getState().currentDocument).toBe(rowA);
+  });
+
+  it("commits the dropped document only after activation succeeds", async () => {
+    const prepareSpy = preparePriorDocument();
+    importMocks();
+
+    const deps = {
+      createSession: vi.fn().mockResolvedValue(session),
+      restoreSession: vi.fn().mockResolvedValue({
+        success: true,
+        session,
+        missingDocuments: [],
+      }),
+      deleteSession: vi.fn().mockResolvedValue(undefined),
+      onSessionCreated: vi.fn(),
+      onError: vi.fn(),
+    };
+    const openRef: { current: ReturnType<typeof useOpenPdf> | null } = {
+      current: null,
+    };
+    renderHook(() => {
+      const open = useOpenPdf();
+      openRef.current = open;
+      return {
+        drop: usePdfDropSession({
+          ...(deps as unknown as Parameters<typeof usePdfDropSession>[0]),
+          openDroppedPdf: (filePath: string, options?) => {
+            expect(options).toEqual({
+              leaseHeldByCaller: true,
+              deferCommit: true,
+            });
+            return openRef.current!.openDroppedPdf(filePath, options);
+          },
+        }),
+        open,
+      };
+    });
+    await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      emit({ type: "drop", paths: ["/books/Dropped Book.pdf"] });
+    });
+    await waitFor(() => expect(deps.onSessionCreated).toHaveBeenCalled());
+
+    // Only after activation does the reader show B.
+    const state = useDocumentStore.getState();
+    expect(state.currentDocument?.id).toBe("hash-of-b");
+    expect(state.pdfDocument).not.toBe(prepareSpy);
+    expect(state.totalPages).toBe(30);
+    expect(deps.onSessionCreated).toHaveBeenCalledWith(rowB, session);
+    expect(deps.onError).not.toHaveBeenCalled();
+  });
+  it("createSession rejection also preserves A exactly (no session to delete)", async () => {
+    const proxyA = preparePriorDocument();
+    importMocks();
+
+    const deps = {
+      createSession: vi
+        .fn()
+        .mockRejectedValue(
+          new Error("SESSION_CREATE_FAILED: The session could not be created."),
+        ),
+      restoreSession: vi.fn(),
+      deleteSession: vi.fn().mockResolvedValue(undefined),
+      onSessionCreated: vi.fn(),
+      onError: vi.fn(),
+    };
+    const openRef: { current: ReturnType<typeof useOpenPdf> | null } = {
+      current: null,
+    };
+    renderHook(() => {
+      const open = useOpenPdf();
+      openRef.current = open;
+      return {
+        drop: usePdfDropSession({
+          ...(deps as unknown as Parameters<typeof usePdfDropSession>[0]),
+          openDroppedPdf: (filePath: string, options?) =>
+            openRef.current!.openDroppedPdf(filePath, options),
+        }),
+        open,
+      };
+    });
+    await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      emit({ type: "drop", paths: ["/books/Dropped Book.pdf"] });
+    });
+    await waitFor(() =>
+      expect(deps.onError).toHaveBeenCalledWith(
+        expect.stringContaining("DROP_FAILED: SESSION_CREATE_FAILED"),
+      ),
+    );
+
+    // No session was created, so there is nothing to roll back...
+    expect(deps.deleteSession).not.toHaveBeenCalled();
+    expect(deps.restoreSession).not.toHaveBeenCalled();
+    // ...the reader still holds A exactly...
+    const state = useDocumentStore.getState();
+    expect(state.pdfDocument).toBe(proxyA);
+    expect(state.currentDocument).toBe(rowA);
+    expect(state.currentPage).toBe(42);
+    expect(state.scrollPosition).toBe(0.5);
+    // ...no success callback fired, and the valid import row remains.
+    expect(deps.onSessionCreated).not.toHaveBeenCalled();
+    expect(mockInvoke).toHaveBeenCalledWith(
+      "library_add_document",
+      expect.objectContaining({ expectedSha256: "hash-of-b" }),
+    );
   });
 });

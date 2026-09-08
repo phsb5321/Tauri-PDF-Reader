@@ -113,23 +113,38 @@ SQL
   MEMBER_COUNT=$(sqlite3 "$DB" "SELECT COUNT(*) FROM session_documents;")
   [ "$MEMBER_COUNT" = 1 ] || { echo "ERROR: dropped session does not contain exactly one PDF row" >&2; exit 1; }
 
-  # Issue #185: the invalid drop must also be pinned at the documents table —
-  # not only sessions/members. Expected: the 2 legacy rows + the 1 dropped PDF,
-  # and NOTHING from the rejected non-PDF drag.
+  # Issue #185 / repair round 1: corrected persisted-state oracle. The journey
+  # drops the SAME fixture seeded in phase 1, so the import REUSES that known
+  # row (known-row reuse predates this slice, aa91a67). Strict identity set:
+  # EXACTLY the two seeded rows, membership bound to the source hash, no row
+  # for the rejected non-PDF path. An extra/wrong document, wrong membership,
+  # or rejected-input row fails these gates.
   DOCUMENT_COUNT=$(sqlite3 "$DB" "SELECT COUNT(*) FROM documents;")
-  [ "$DOCUMENT_COUNT" = 3 ] || { echo "ERROR: expected exactly three document rows (2 legacy + 1 dropped; invalid drop adds none), got $DOCUMENT_COUNT" >&2; exit 1; }
+  [ "$DOCUMENT_COUNT" = 2 ] || { echo "ERROR: expected exactly the two seeded document rows (valid drop reuses the seeded row; invalid drop adds none), got $DOCUMENT_COUNT" >&2; exit 1; }
+  SEEDED_IDS=$(sqlite3 "$DB" "SELECT COUNT(*) FROM documents WHERE id IN ('$REAL_ID', '$MISSING_ID');")
+  [ "$SEEDED_IDS" = 2 ] || { echo "ERROR: seeded identity set incomplete (real+missing), got $SEEDED_IDS" >&2; exit 1; }
+  UNEXPECTED_IDS=$(sqlite3 "$DB" "SELECT COUNT(*) FROM documents WHERE id NOT IN ('$REAL_ID', '$MISSING_ID');")
+  [ "$UNEXPECTED_IDS" = 0 ] || { echo "ERROR: unexpected document identities present, got $UNEXPECTED_IDS" >&2; exit 1; }
+  MEMBER_DOC=$(sqlite3 "$DB" "SELECT document_id FROM session_documents LIMIT 1;")
+  [ "$MEMBER_DOC" = "$REAL_ID" ] || { echo "ERROR: session membership must point at the dropped source hash $REAL_ID, got $MEMBER_DOC" >&2; exit 1; }
+  NON_PDF_ROWS=$(sqlite3 "$DB" "SELECT COUNT(*) FROM documents WHERE file_path = '$NON_PDF';")
+  [ "$NON_PDF_ROWS" = 0 ] || { echo "ERROR: rejected non-PDF drag must not persist a document row" >&2; exit 1; }
 
   # Pin the DB counts into the receipt so the packaged journey carries them.
   # (No single quotes here: this whole body is a toolchain_exec argument.)
-  export DOCUMENT_COUNT SESSION_COUNT MEMBER_COUNT
+  export DOCUMENT_COUNT SEEDED_IDS UNEXPECTED_IDS MEMBER_DOC NON_PDF_ROWS SESSION_COUNT MEMBER_COUNT
   node - <<EOF
 const fs = require("fs");
 const out = process.env.LIBRARY_COMPLETENESS_OUT;
 const receipt = JSON.parse(fs.readFileSync(out, "utf8"));
-receipt.dropDbCounts = {
-  documents: Number(process.env.DOCUMENT_COUNT),
+receipt.dropDb = {
+  documentCount: Number(process.env.DOCUMENT_COUNT),
+  seededIdSet: "real+missing",
+  unexpectedDocumentIdCount: Number(process.env.UNEXPECTED_IDS),
   sessions: Number(process.env.SESSION_COUNT),
   members: Number(process.env.MEMBER_COUNT),
+  memberDocument: process.env.MEMBER_DOC,
+  nonPdfDocumentRows: Number(process.env.NON_PDF_ROWS),
 };
 fs.writeFileSync(out, JSON.stringify(receipt, null, 2) + "\n");
 EOF

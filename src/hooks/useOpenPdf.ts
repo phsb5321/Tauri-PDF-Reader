@@ -32,6 +32,13 @@ import {
 import type { Document } from "../lib/schemas";
 
 /** Provides the shared open-a-document actions. */
+export interface DroppedPreparation {
+  pdf: PDFDocumentProxy;
+  document: Document;
+  /** Commits the prepared import to visible reader state. Call once. */
+  commit: () => void;
+}
+
 export function useOpenPdf() {
   const { openFile } = useFileDialog();
   const { setDocument, setPdfDocument, setError, setCurrentPage } =
@@ -134,9 +141,19 @@ export function useOpenPdf() {
    * Dialog and native-drop entry points share this exact sequence so neither
    * can weaken the known-row hash check, fresh-row backend hash comparison, or
    * final post-registration read.
+   *
+   * Issue #185 B1 (repair round 1): with `deferCommit`, the verified pair is
+   * returned WITHOUT touching visible reader state; the caller commits via
+   * the returned pair only after the rest of its transaction (session
+   * create/restore) succeeds, so a failed transaction leaves the prior
+   * document exactly as it was. The library row itself is still persisted —
+   * a valid import stands on its own, and a re-drop reuses the known row.
    */
   const openAuthorizedPath = useCallback(
-    async (filePath: string): Promise<Document> => {
+    async (
+      filePath: string,
+      options?: { deferCommit?: boolean },
+    ): Promise<Document | { pdf: PDFDocumentProxy; document: Document }> => {
       const known = await libraryGetDocumentByPath(filePath);
       // Every open of a KNOWN row binds the bytes to the row's content hash
       // (the id): a file replaced at the same path is a different book and
@@ -174,6 +191,9 @@ export function useOpenPdf() {
         : await pdfService.loadDocument(filePath, {
             expectedSha256: document.id,
           });
+      if (options?.deferCommit) {
+        return { pdf: displayPdf, document };
+      }
       showInReader(displayPdf, document);
       return document;
     },
@@ -219,11 +239,13 @@ export function useOpenPdf() {
   const openDroppedPdf = useCallback(
     async (
       filePath: string,
-      options?: { leaseHeldByCaller?: boolean },
-    ): Promise<Document | null> => {
+      options?: { leaseHeldByCaller?: boolean; deferCommit?: boolean },
+    ): Promise<Document | DroppedPreparation | null> => {
       // When the drop-to-session transaction already holds the open lease,
       // this import runs inside it (issue #185). Direct callers get the
-      // fail-fast guard instead.
+      // fail-fast guard instead. With `deferCommit` the import is prepared
+      // but visible reader state is committed only via the returned `commit`
+      // — after the caller's session create/restore succeeds (B1 repair).
       const leaseHeldByCaller = options?.leaseHeldByCaller === true;
       const releaseLease = leaseHeldByCaller ? null : beginOpenTransaction();
       if (!leaseHeldByCaller && !releaseLease) {
@@ -237,7 +259,17 @@ export function useOpenPdf() {
             "DROP_INVALID: Drop exactly one PDF to create a reading session.",
           );
         }
-        return await openAuthorizedPath(filePath);
+        const opened = await openAuthorizedPath(filePath, {
+          deferCommit: options?.deferCommit === true,
+        });
+        if (options?.deferCommit === true && "pdf" in opened) {
+          return {
+            pdf: opened.pdf,
+            document: opened.document,
+            commit: () => showInReader(opened.pdf, opened.document),
+          };
+        }
+        return opened as Document;
       } catch (error: unknown) {
         const message =
           error instanceof Error ? error.message : "Failed to open dropped PDF";

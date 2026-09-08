@@ -170,3 +170,26 @@ No JS-dispatched drop events may substitute for the OS drop seam. **If the nativ
 OS-drop actor is not available to this seat, the packaged slice is BLOCKED** —
 recorded in `reports/import.md`, journey handed to QA (`lectrice-qa-204`), never
 skipped-green.
+
+## Repair round 1 (B1, 08/09/2026)
+
+Scope decision (coordinator, durable): a valid dropped PDF's library row is
+RETAINED after a failed session transaction — rollback covers the created
+session and prior reader state only; no row/source-file deletion, no
+whole-DB-rollback claim. Re-drop reuses the retained known row to retry.
+
+- FR-6: the drop transaction MUST defer the visible-reader commit
+  (`showInReader`) until session activation succeeds
+  (`openAuthorizedPath`/`openDroppedPdf` `deferCommit` mode returning a
+  `{ pdf, document, commit }` preparation). On any post-import failure the
+  exact prior proxy/document/page/scroll remain.
+- Oracle (fail-first, real `useOpenPdf` + real store): A at page 42 / scroll
+  0.5 → real drop of B → restore rejection → exact A retention (object
+  identity), session deleted, no callback, visible error, `library_add_document`
+  observed for B, no library row removal, re-drop resolves the retained known
+  row without re-adding. Controls: createSession rejection (nothing to delete)
+  and success-path commit ordering.
+- Native runner oracle corrected to the seeded identity set:
+  documents == 2 (exactly REAL_ID + MISSING_ID), sessions == 1, members == 1,
+  member document == REAL_ID, non-PDF rows == 0; identity/negative-control
+  values recorded in the receipt (`dropDb`).
