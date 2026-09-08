@@ -153,6 +153,26 @@ describe("resumeDocument", () => {
     expect(state.pdfDocument).toBeNull();
     expect(state.error).toBe("No such file");
   });
+
+  it("refuses a resume while another open holds the shared store (issue #185)", async () => {
+    // The library/session resume is a public open like any other: while a
+    // drop import (or any open) is in flight, a resume must be refused
+    // instead of racing it onto the reader surface.
+    useDocumentStore.setState({ isLoading: true });
+    const { result } = renderHook(() => useOpenPdf());
+
+    let resumed: boolean | undefined;
+    await act(async () => {
+      resumed = await result.current.resumeDocument(doc({ currentPage: 12 }));
+    });
+
+    expect(resumed).toBe(false);
+    expect(loadDocument).not.toHaveBeenCalled();
+    const state = useDocumentStore.getState();
+    expect(state.currentDocument).toBeNull();
+    expect(state.pdfDocument).toBeNull();
+    expect(state.error).toContain("OPEN_BUSY");
+  });
 });
 
 describe("openDroppedPdf", () => {

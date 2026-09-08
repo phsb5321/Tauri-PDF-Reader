@@ -1,36 +1,4 @@
-#!/usr/bin/env bash
-# Packaged two-phase legacy-library acceptance for Spec 177.
-set -euo pipefail
-cd "$(dirname "$0")/.."
 
-source ./scripts/e2e-profile.sh
-RUN_ROOT="$(mktemp -d "${PI_SCRATCH_DIR:-${TMPDIR:-/tmp}}/lectrice-library-completeness.XXXXXX")"
-export RUN_ROOT
-export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$RUN_ROOT/target}"
-source ./scripts/e2e-toolchain.sh
-
-APP_DIR="$E2E_PROFILE_DIR/com.lectrice.reader"
-SOURCE_DIR="$RUN_ROOT/legacy-source"
-SOURCE="$SOURCE_DIR/legacy-readable.pdf"
-MISSING="$SOURCE_DIR/missing-control.pdf"
-NON_PDF="$SOURCE_DIR/not-a-pdf.txt"
-DB="$APP_DIR/pdf-reader.db"
-SCOPE="$APP_DIR/.persisted-scope"
-export LIBRARY_COMPLETENESS_OUT="${LIBRARY_COMPLETENESS_OUT:-$RUN_ROOT/receipt.json}"
-mkdir -p "$APP_DIR" "$SOURCE_DIR"
-cp public/e2e-fixture.pdf "$SOURCE"
-printf 'invalid drag control\n' > "$NON_PDF"
-REAL_ID="$(sha256sum "$SOURCE" | cut -d' ' -f1)"
-MISSING_ID="$(printf '%s' "$MISSING" | sha256sum | cut -d' ' -f1)"
-export SOURCE SOURCE_DIR MISSING NON_PDF DB SCOPE REAL_ID MISSING_ID
-
-# Normal production frontend: no E2E bootstrap, fixture key, or seeded scope.
-unset VITE_E2E VITE_E2E_NATIVE VITE_E2E_NATIVE_TTS VITE_E2E_NATIVE_SEED
-
-toolchain_run 'pnpm build'
-touch src-tauri/src/lib.rs
-
-toolchain_exec '
   set -euo pipefail
   ( cd src-tauri && cargo build -j 1 )
   export WEBKIT_WEBDRIVER="$(command -v WebKitWebDriver)"
@@ -180,4 +148,3 @@ EOF
   fi
 
   echo "PASS receipt=$LIBRARY_COMPLETENESS_OUT scope=$SCOPE"
-'
