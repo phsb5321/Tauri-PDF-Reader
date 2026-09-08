@@ -97,7 +97,7 @@ beforeEach(() => {
  * buttons (plain resume + the opt-in "resume and play"), both named after the
  * title, so this specifically targets the plain one — the accessible name
  * always ends in a percent sign ("..., page N of M, P%"); the secondary
- * control's name ends in "and start reading aloud".
+ * control's name ends in "and read aloud" (slice 202 visible label).
  */
 async function shelfEntry(title: RegExp) {
   const shelf = await screen.findByRole("region", { name: "Continue reading" });

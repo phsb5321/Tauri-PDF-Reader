@@ -1,0 +1,2024 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+✓ Lockfile passes supply-chain policies (verified 6d ago)
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +858
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Packages are hard linked from the content-addressable store to the virtual store.
+  Content-addressable store is at: /home/notroot/.nix-js-environments/pnpm/store/v11
+  Virtual store is at:             node_modules/.pnpm
+
+   ╭──────────────────────────────────────────────╮
+   │                                              │
+   │     Update available! 11.20.0 → 12.3.4.      │
+   │     Changelog: https://pnpm.io/v/12.3.4      │
+   │   To update, run: corepack use pnpm@12.3.4   │
+   │                                              │
+   ╰──────────────────────────────────────────────╯
+
+Progress: resolved 858, reused 857, downloaded 0, added 857
+Progress: resolved 858, reused 857, downloaded 0, added 858, done
+.../node_modules/edgedriver install$ test -f ./dist/install.js && node ./dist/install.js || echo "Skipping install, project not build!"
+.../esbuild@0.27.7/node_modules/esbuild postinstall$ node install.js
+.../esbuild@0.21.5/node_modules/esbuild postinstall$ node install.js
+.../node_modules/geckodriver postinstall$ test -f ./dist/install.js && node ./dist/install.js || echo "Skipping install, project not built!"
+.../esbuild@0.25.12/node_modules/esbuild postinstall$ node install.js
+.../esbuild@0.27.7/node_modules/esbuild postinstall: Done
+.../esbuild@0.21.5/node_modules/esbuild postinstall: Done
+.../esbuild@0.25.12/node_modules/esbuild postinstall: Done
+.../node_modules/geckodriver postinstall: Done
+.../node_modules/edgedriver install: Done
+
+dependencies:
++ @fontsource/ibm-plex-mono 5.2.7
++ @fontsource/ibm-plex-sans 5.2.8
++ @fontsource/space-grotesk 5.2.10
++ @tauri-apps/api 2.9.1
++ @tauri-apps/plugin-dialog 2.5.0
++ @tauri-apps/plugin-fs 2.4.5
++ @tauri-apps/plugin-sql 2.3.1
++ pdfjs-dist 4.10.38
++ react 18.3.1
++ react-dom 18.3.1
++ zod 3.25.76
++ zustand 5.0.9
+
+devDependencies:
++ @eslint/js 9.39.2
++ @tauri-apps/cli 2.9.6
++ @testing-library/jest-dom 6.9.1
++ @testing-library/react 16.3.1
++ @types/react 18.3.27
++ @types/react-dom 18.3.7
++ @vitejs/plugin-react 4.7.0
++ @vitest/coverage-v8 2.1.9
++ @wdio/cli 9.27.2
++ @wdio/local-runner 9.27.2
++ @wdio/mocha-framework 9.27.2
++ @wdio/spec-reporter 9.27.2
++ archunit 2.1.63
++ eslint 9.39.2
++ eslint-plugin-boundaries 5.3.1
++ eslint-plugin-react 7.37.5
++ eslint-plugin-react-hooks 5.2.0
++ fast-check 4.9.0
++ globals 15.15.0
++ husky 9.1.7
++ jsdom 25.0.1
++ knip 6.29.0
++ lint-staged 16.2.7
++ prettier 3.8.3
++ type-coverage 2.29.7
++ typescript 5.6.3
++ typescript-eslint 8.52.0
++ vite 6.4.1
++ vitest 2.1.9
++ webdriverio 9.27.2
++ yaml 2.9.0
+
+. prepare$ husky
+. prepare: Done
+Done in 3.1s using pnpm v11.20.0
+$ vitest run --pool=forks --poolOptions.forks.singleFork src/__tests__/ui/library-202-affordances.test.tsx
+
+ RUN  v2.1.9 /home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol
+
+stdout | src/__tests__/ui/library-202-affordances.test.tsx
+Warning: Please use the `legacy` build in Node.js environments.
+
+stderr | src/__tests__/ui/library-202-affordances.test.tsx > FR-1: resume-and-read-aloud is visibly labeled (not icon-only) > renders a visible 'Read aloud' label on the resume line control
+[cover] cache read failed, regenerating: TypeError: URL.createObjectURL is not a function
+    at /home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/hooks/useCover.ts:153:25
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+[PDF Service] Cover load failed: Error: Not running in Tauri environment. Please use the desktop app to open local files.
+    at readFileFromTauri (/home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/services/pdf-service.ts:41:11)
+    at Object.loadDocumentForCover (/home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/services/pdf-service.ts:177:27)
+    at /home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/hooks/useCover.ts:183:33
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+stderr | src/__tests__/ui/library-202-affordances.test.tsx > FR-1: resume-and-read-aloud is visibly labeled (not icon-only) > keeps the resume verb + book title in the accessible name (Label in Name)
+[cover] cache read failed, regenerating: TypeError: URL.createObjectURL is not a function
+    at /home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/hooks/useCover.ts:153:25
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+[PDF Service] Cover load failed: Error: Not running in Tauri environment. Please use the desktop app to open local files.
+    at readFileFromTauri (/home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/services/pdf-service.ts:41:11)
+    at Object.loadDocumentForCover (/home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/services/pdf-service.ts:177:27)
+    at /home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/hooks/useCover.ts:183:33
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+stderr | src/__tests__/ui/library-202-affordances.test.tsx > FR-1: resume-and-read-aloud is visibly labeled (not icon-only) > labels the row control on every 'Also in progress' book
+[cover] cache read failed, regenerating: TypeError: URL.createObjectURL is not a function
+    at /home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/hooks/useCover.ts:153:25
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+[cover] cache read failed, regenerating: TypeError: URL.createObjectURL is not a function
+    at /home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/hooks/useCover.ts:153:25
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+[PDF Service] Cover load failed: Error: Not running in Tauri environment. Please use the desktop app to open local files.
+    at readFileFromTauri (/home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/services/pdf-service.ts:41:11)
+    at Object.loadDocumentForCover (/home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/services/pdf-service.ts:177:27)
+    at /home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/hooks/useCover.ts:183:33
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+[PDF Service] Cover load failed: Error: Not running in Tauri environment. Please use the desktop app to open local files.
+    at readFileFromTauri (/home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/services/pdf-service.ts:41:11)
+    at Object.loadDocumentForCover (/home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/services/pdf-service.ts:177:27)
+    at /home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/hooks/useCover.ts:183:33
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+stderr | src/__tests__/ui/library-202-affordances.test.tsx > FR-1: resume-and-read-aloud is visibly labeled (not icon-only) > RETENTION: the plain Resume button keeps its exact name and the silent contract
+[cover] cache read failed, regenerating: TypeError: URL.createObjectURL is not a function
+    at /home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/hooks/useCover.ts:153:25
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+[PDF Service] Cover load failed: Error: Not running in Tauri environment. Please use the desktop app to open local files.
+    at readFileFromTauri (/home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/services/pdf-service.ts:41:11)
+    at Object.loadDocumentForCover (/home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/services/pdf-service.ts:177:27)
+    at /home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/hooks/useCover.ts:183:33
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+stderr | src/__tests__/ui/library-202-affordances.test.tsx > FR-1: resume-and-read-aloud is visibly labeled (not icon-only) > RETENTION: DOM tab order inside the resume line is Resume → Read aloud
+[cover] cache read failed, regenerating: TypeError: URL.createObjectURL is not a function
+    at /home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/hooks/useCover.ts:153:25
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+[PDF Service] Cover load failed: Error: Not running in Tauri environment. Please use the desktop app to open local files.
+    at readFileFromTauri (/home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/services/pdf-service.ts:41:11)
+    at Object.loadDocumentForCover (/home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/services/pdf-service.ts:177:27)
+    at /home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/hooks/useCover.ts:183:33
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+stderr | src/__tests__/ui/library-202-affordances.test.tsx > FR-2: 0% progress is distinct from a divider > renders the empty-track state for a 0% in-flight book
+[cover] cache read failed, regenerating: TypeError: URL.createObjectURL is not a function
+    at /home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/hooks/useCover.ts:153:25
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+[PDF Service] Cover load failed: Error: Not running in Tauri environment. Please use the desktop app to open local files.
+    at readFileFromTauri (/home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/services/pdf-service.ts:41:11)
+    at Object.loadDocumentForCover (/home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/services/pdf-service.ts:177:27)
+    at /home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/hooks/useCover.ts:183:33
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+stderr | src/__tests__/ui/library-202-affordances.test.tsx > FR-2: 0% progress is distinct from a divider > RETENTION: a partially read book does not get the empty modifier
+[cover] cache read failed, regenerating: TypeError: URL.createObjectURL is not a function
+    at /home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/hooks/useCover.ts:153:25
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+[PDF Service] Cover load failed: Error: Not running in Tauri environment. Please use the desktop app to open local files.
+    at readFileFromTauri (/home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/services/pdf-service.ts:41:11)
+    at Object.loadDocumentForCover (/home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/services/pdf-service.ts:177:27)
+    at /home/notroot/Documents/Code/personal/tauri-pdf-reader-202-library-qol/src/hooks/useCover.ts:183:33
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+ ❯ src/__tests__/ui/library-202-affordances.test.tsx (13 tests | 9 failed) 628ms
+   × FR-1: resume-and-read-aloud is visibly labeled (not icon-only) > renders a visible 'Read aloud' label on the resume line control 202ms
+     → Unable to find an accessible element with the role "button" and name `/Resume Moby and read aloud/`
+
+Here are the accessible roles:
+
+  region:
+
+  Name "Continue reading":
+  [36m<section[39m
+    [33maria-labelledby[39m=[32m"continue-reading-heading"[39m
+    [33mclass[39m=[32m"resume-section"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  heading:
+
+  Name "Continue reading":
+  [36m<h2[39m
+    [33mclass[39m=[32m"resume-section-heading"[39m
+    [33mid[39m=[32m"continue-reading-heading"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  img:
+
+  Name "Moby":
+  [36m<svg[39m
+    [33maria-label[39m=[32m"Moby"[39m
+    [33mclass[39m=[32m"cover-fallback-glyph"[39m
+    [33mrole[39m=[32m"img"[39m
+    [33mviewBox[39m=[32m"0 0 24 24"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"resume-line-meta"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"resume-section-tts-signal"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  progressbar:
+
+  Name "Moby progress":
+  [36m<progress[39m
+    [33maria-label[39m=[32m"Moby progress"[39m
+    [33mclass[39m=[32m"sr-only"[39m
+    [33mmax[39m=[32m"100"[39m
+    [33mvalue[39m=[32m"42"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  button:
+
+  Name "Resume Moby, page 42 of 100, 42%":
+  [36m<button[39m
+    [33maria-label[39m=[32m"Resume Moby, page 42 of 100, 42%"[39m
+    [33mclass[39m=[32m"button button--primary button--md"[39m
+  [36m/>[39m
+
+  Name "Resume Moby and start reading aloud":
+  [36m<button[39m
+    [33maria-label[39m=[32m"Resume Moby and start reading aloud"[39m
+    [33mclass[39m=[32m"icon-button icon-button--ghost icon-button--sm resume-line-play"[39m
+  [36m/>[39m
+
+  Name "Configure":
+  [36m<button[39m
+    [33mclass[39m=[32m"resume-section-tts-signal-action"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<section[39m
+      [33maria-labelledby[39m=[32m"continue-reading-heading"[39m
+      [33mclass[39m=[32m"resume-section"[39m
+    [36m>[39m
+      [36m<h2[39m
+        [33mclass[39m=[32m"resume-section-heading"[39m
+        [33mid[39m=[32m"continue-reading-heading"[39m
+      [36m>[39m
+        [0mContinue reading[0m
+      [36m</h2>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"resume-line"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"document-cover document-cover--lg"[39m
+          [33mdata-seed[39m=[32m"13"[39m
+          [33mdata-state[39m=[32m"loading"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"cover-fallback cover-fallback--1"[39m
+          [36m>[39m
+            [36m<svg[39m
+              [33maria-label[39m=[32m"Moby"[39m
+              [33mclass[39m=[32m"cover-fallback-glyph"[39m
+              [33mrole[39m=[32m"img"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"[39m
+                [33mfill[39m=[32m"currentColor"[39m
+                [33mopacity[39m=[32m"0.9"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M14 2v6h6"[39m
+                [33mfill[39m=[32m"currentColor"[39m
+                [33mopacity[39m=[32m"0.45"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"resume-line-body"[39m
+        [36m>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"resume-line-title"[39m
+          [36m>[39m
+            [0mMoby[0m
+          [36m</span>[39m
+          [36m<p[39m
+            [33mclass[39m=[32m"resume-line-meta"[39m
+          [36m>[39m
+            [36m<span>[39m
+              [0mPage 42 of 100[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33maria-hidden[39m=[32m"true"[39m
+            [36m>[39m
+              [0m · [0m
+            [36m</span>[39m
+            [36m<span>[39m
+              [0m42[0m
+              [0m%[0m
+            [36m</span>[39m
+          [36m</p>[39m
+          [36m<progress[39m
+            [33maria-label[39m=[32m"Moby progress"[39m
+            [33mclass[39m=[32m"sr-only"[39m
+            [33mmax[39m=[32m"100"[39m
+            [33mvalue[39m=[32m"42"[39m
+          [36m/>[39m
+          [36m<span[39m
+            [33maria-hidden[39m=[32m"true"[39m
+            [33mclass[39m=[32m"resume-line-bar"[39m
+          [36m>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"resume-line-bar-fill"[39m
+              [33mstyle[39m=[32m"width: 42%;"[39m
+            [36m/>[39m
+          [36m</span>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"resume-line-actions"[39m
+          [36m>[39m
+            [36m<button[39m
+              [33maria-label[39m=[32m"Resume Moby, page 42 of 100, 42%"[39m
+              [33mclass[39m=[32m"button button--primary button--md"[39m
+            [36m>[39m
+              [36m<span[39m
+                [33mclass[39m=[32m"button__content"[39m
+              [36m>[39m
+                [0mResume[0m
+              [36m</span>[39m
+            [36m</button>[39m
+            [36m<button[39m
+              [33maria-label[39m=[32m"Resume Moby and start reading aloud"[39m
+              [33mclass[39m=[32m"icon-button icon-button--ghost icon-button--sm resume-line-play"[39m
+            [36m>[39m
+              [36m<span[39m
+                [33mclass[39m=[32m"icon-button__icon"[39m
+              [36m>[39m
+                [36m<svg[39m
+                  [33maria-hidden[39m=[32m"true"[39m
+                  [33mviewBox[39m=[32m"0 0 16 16"[39m
+                [36m>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M4 2.5v11l9-5.5-9-5.5z"[39m
+                    [33mfill[39m=[32m"currentColor"[39m
+                  [36m/>[39m
+                [36m</svg>[39m
+              [36m</span>[39m
+            [36m</button>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+      [36m</div>[39m
+      [36m<p[39m
+        [33mclass[39m=[32m"resume-section-tts-signal"[39m
+      [36m>[39m
+        [36m<span>[39m
+          [0mAI TTS requires an ElevenLabs API key[0m
+        [36m</span>[39m
+        [36m<button[39m
+          [33mclass[39m=[32m"resume-section-tts-signal-action"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [0mConfigure[0m
+        [36m</button>[39m
+      [36m</p>[39m
+      [0m    [0m
+    [36m</section>[39m
+  [36m</div>[39m
+[36m</body>[39m
+   × FR-1: resume-and-read-aloud is visibly labeled (not icon-only) > keeps the resume verb + book title in the accessible name (Label in Name) 55ms
+     → Unable to find an accessible element with the role "button" and name "Resume Moby and read aloud"
+
+Here are the accessible roles:
+
+  region:
+
+  Name "Continue reading":
+  [36m<section[39m
+    [33maria-labelledby[39m=[32m"continue-reading-heading"[39m
+    [33mclass[39m=[32m"resume-section"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  heading:
+
+  Name "Continue reading":
+  [36m<h2[39m
+    [33mclass[39m=[32m"resume-section-heading"[39m
+    [33mid[39m=[32m"continue-reading-heading"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  img:
+
+  Name "Moby":
+  [36m<svg[39m
+    [33maria-label[39m=[32m"Moby"[39m
+    [33mclass[39m=[32m"cover-fallback-glyph"[39m
+    [33mrole[39m=[32m"img"[39m
+    [33mviewBox[39m=[32m"0 0 24 24"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"resume-line-meta"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"resume-section-tts-signal"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  progressbar:
+
+  Name "Moby progress":
+  [36m<progress[39m
+    [33maria-label[39m=[32m"Moby progress"[39m
+    [33mclass[39m=[32m"sr-only"[39m
+    [33mmax[39m=[32m"100"[39m
+    [33mvalue[39m=[32m"42"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  button:
+
+  Name "Resume Moby, page 42 of 100, 42%":
+  [36m<button[39m
+    [33maria-label[39m=[32m"Resume Moby, page 42 of 100, 42%"[39m
+    [33mclass[39m=[32m"button button--primary button--md"[39m
+  [36m/>[39m
+
+  Name "Resume Moby and start reading aloud":
+  [36m<button[39m
+    [33maria-label[39m=[32m"Resume Moby and start reading aloud"[39m
+    [33mclass[39m=[32m"icon-button icon-button--ghost icon-button--sm resume-line-play"[39m
+  [36m/>[39m
+
+  Name "Configure":
+  [36m<button[39m
+    [33mclass[39m=[32m"resume-section-tts-signal-action"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<section[39m
+      [33maria-labelledby[39m=[32m"continue-reading-heading"[39m
+      [33mclass[39m=[32m"resume-section"[39m
+    [36m>[39m
+      [36m<h2[39m
+        [33mclass[39m=[32m"resume-section-heading"[39m
+        [33mid[39m=[32m"continue-reading-heading"[39m
+      [36m>[39m
+        [0mContinue reading[0m
+      [36m</h2>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"resume-line"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"document-cover document-cover--lg"[39m
+          [33mdata-seed[39m=[32m"13"[39m
+          [33mdata-state[39m=[32m"loading"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"cover-fallback cover-fallback--1"[39m
+          [36m>[39m
+            [36m<svg[39m
+              [33maria-label[39m=[32m"Moby"[39m
+              [33mclass[39m=[32m"cover-fallback-glyph"[39m
+              [33mrole[39m=[32m"img"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"[39m
+                [33mfill[39m=[32m"currentColor"[39m
+                [33mopacity[39m=[32m"0.9"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M14 2v6h6"[39m
+                [33mfill[39m=[32m"currentColor"[39m
+                [33mopacity[39m=[32m"0.45"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"resume-line-body"[39m
+        [36m>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"resume-line-title"[39m
+          [36m>[39m
+            [0mMoby[0m
+          [36m</span>[39m
+          [36m<p[39m
+            [33mclass[39m=[32m"resume-line-meta"[39m
+          [36m>[39m
+            [36m<span>[39m
+              [0mPage 42 of 100[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33maria-hidden[39m=[32m"true"[39m
+            [36m>[39m
+              [0m · [0m
+            [36m</span>[39m
+            [36m<span>[39m
+              [0m42[0m
+              [0m%[0m
+            [36m</span>[39m
+          [36m</p>[39m
+          [36m<progress[39m
+            [33maria-label[39m=[32m"Moby progress"[39m
+            [33mclass[39m=[32m"sr-only"[39m
+            [33mmax[39m=[32m"100"[39m
+            [33mvalue[39m=[32m"42"[39m
+          [36m/>[39m
+          [36m<span[39m
+            [33maria-hidden[39m=[32m"true"[39m
+            [33mclass[39m=[32m"resume-line-bar"[39m
+          [36m>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"resume-line-bar-fill"[39m
+              [33mstyle[39m=[32m"width: 42%;"[39m
+            [36m/>[39m
+          [36m</span>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"resume-line-actions"[39m
+          [36m>[39m
+            [36m<button[39m
+              [33maria-label[39m=[32m"Resume Moby, page 42 of 100, 42%"[39m
+              [33mclass[39m=[32m"button button--primary button--md"[39m
+            [36m>[39m
+              [36m<span[39m
+                [33mclass[39m=[32m"button__content"[39m
+              [36m>[39m
+                [0mResume[0m
+              [36m</span>[39m
+            [36m</button>[39m
+            [36m<button[39m
+              [33maria-label[39m=[32m"Resume Moby and start reading aloud"[39m
+              [33mclass[39m=[32m"icon-button icon-button--ghost icon-button--sm resume-line-play"[39m
+            [36m>[39m
+              [36m<span[39m
+                [33mclass[39m=[32m"icon-button__icon"[39m
+              [36m>[39m
+                [36m<svg[39m
+                  [33maria-hidden[39m=[32m"true"[39m
+                  [33mviewBox[39m=[32m"0 0 16 16"[39m
+                [36m>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M4 2.5v11l9-5.5-9-5.5z"[39m
+                    [33mfill[39m=[32m"currentColor"[39m
+                  [36m/>[39m
+                [36m</svg>[39m
+              [36m</span>[39m
+            [36m</button>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+      [36m</div>[39m
+      [36m<p[39m
+        [33mclass[39m=[32m"resume-section-tts-signal"[39m
+      [36m>[39m
+        [36m<span>[39m
+          [0mAI TTS requires an ElevenLabs API key[0m
+        [36m</span>[39m
+        [36m<button[39m
+          [33mclass[39m=[32m"resume-section-tts-signal-action"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [0mConfigure[0m
+        [36m</button>[39m
+      [36m</p>[39m
+      [0m    [0m
+    [36m</section>[39m
+  [36m</div>[39m
+[36m</body>[39m
+   × FR-1: resume-and-read-aloud is visibly labeled (not icon-only) > labels the row control on every 'Also in progress' book 108ms
+     → Unable to find an accessible element with the role "button" and name "Resume Row Book and read aloud"
+
+Here are the accessible roles:
+
+  region:
+
+  Name "Continue reading":
+  [36m<section[39m
+    [33maria-labelledby[39m=[32m"continue-reading-heading"[39m
+    [33mclass[39m=[32m"resume-section"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  heading:
+
+  Name "Continue reading":
+  [36m<h2[39m
+    [33mclass[39m=[32m"resume-section-heading"[39m
+    [33mid[39m=[32m"continue-reading-heading"[39m
+  [36m/>[39m
+
+  Name "Also in progress":
+  [36m<h3[39m
+    [33mclass[39m=[32m"also-in-progress-heading"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  img:
+
+  Name "Primary":
+  [36m<svg[39m
+    [33maria-label[39m=[32m"Primary"[39m
+    [33mclass[39m=[32m"cover-fallback-glyph"[39m
+    [33mrole[39m=[32m"img"[39m
+    [33mviewBox[39m=[32m"0 0 24 24"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"resume-line-meta"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"resume-section-tts-signal"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  progressbar:
+
+  Name "Primary progress":
+  [36m<progress[39m
+    [33maria-label[39m=[32m"Primary progress"[39m
+    [33mclass[39m=[32m"sr-only"[39m
+    [33mmax[39m=[32m"100"[39m
+    [33mvalue[39m=[32m"10"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  button:
+
+  Name "Resume Primary, page 10 of 100, 10%":
+  [36m<button[39m
+    [33maria-label[39m=[32m"Resume Primary, page 10 of 100, 10%"[39m
+    [33mclass[39m=[32m"button button--primary button--md"[39m
+  [36m/>[39m
+
+  Name "Resume Primary and start reading aloud":
+  [36m<button[39m
+    [33maria-label[39m=[32m"Resume Primary and start reading aloud"[39m
+    [33mclass[39m=[32m"icon-button icon-button--ghost icon-button--sm resume-line-play"[39m
+  [36m/>[39m
+
+  Name "Configure":
+  [36m<button[39m
+    [33mclass[39m=[32m"resume-section-tts-signal-action"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  Name "Resume Row Book, page 5 of 100":
+  [36m<button[39m
+    [33maria-label[39m=[32m"Resume Row Book, page 5 of 100"[39m
+    [33maria-selected[39m=[32m"false"[39m
+    [33mclass[39m=[32m"list-row list-row--interactive also-in-progress-row-main"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  Name "Resume Row Book and start reading aloud":
+  [36m<button[39m
+    [33maria-label[39m=[32m"Resume Row Book and start reading aloud"[39m
+    [33mclass[39m=[32m"icon-button icon-button--ghost icon-button--sm also-in-progress-row-play"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  list:
+
+  Name "":
+  [36m<ul[39m
+    [33mclass[39m=[32m"also-in-progress-list"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  listitem:
+
+  Name "":
+  [36m<li[39m
+    [33mclass[39m=[32m"also-in-progress-row"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<section[39m
+      [33maria-labelledby[39m=[32m"continue-reading-heading"[39m
+      [33mclass[39m=[32m"resume-section"[39m
+    [36m>[39m
+      [36m<h2[39m
+        [33mclass[39m=[32m"resume-section-heading"[39m
+        [33mid[39m=[32m"continue-reading-heading"[39m
+      [36m>[39m
+        [0mContinue reading[0m
+      [36m</h2>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"resume-line"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"document-cover document-cover--lg"[39m
+          [33mdata-seed[39m=[32m"NaN"[39m
+          [33mdata-state[39m=[32m"loading"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"cover-fallback cover-fallback--NaN"[39m
+          [36m>[39m
+            [36m<svg[39m
+              [33maria-label[39m=[32m"Primary"[39m
+              [33mclass[39m=[32m"cover-fallback-glyph"[39m
+              [33mrole[39m=[32m"img"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"[39m
+                [33mfill[39m=[32m"currentColor"[39m
+                [33mopacity[39m=[32m"0.9"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M14 2v6h6"[39m
+                [33mfill[39m=[32m"currentColor"[39m
+                [33mopacity[39m=[32m"0.45"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"resume-line-body"[39m
+        [36m>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"resume-line-title"[39m
+          [36m>[39m
+            [0mPrimary[0m
+          [36m</span>[39m
+          [36m<p[39m
+            [33mclass[39m=[32m"resume-line-meta"[39m
+          [36m>[39m
+            [36m<span>[39m
+              [0mPage 10 of 100[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33maria-hidden[39m=[32m"true"[39m
+            [36m>[39m
+              [0m · [0m
+            [36m</span>[39m
+            [36m<span>[39m
+              [0m10[0m
+              [0m%[0m
+            [36m</span>[39m
+          [36m</p>[39m
+          [36m<progress[39m
+            [33maria-label[39m=[32m"Primary progress"[39m
+            [33mclass[39m=[32m"sr-only"[39m
+            [33mmax[39m=[32m"100"[39m
+            [33mvalue[39m=[32m"10"[39m
+          [36m/>[39m
+          [36m<span[39m
+            [33maria-hidden[39m=[32m"true"[39m
+            [33mclass[39m=[32m"resume-line-bar"[39m
+          [36m>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"resume-line-bar-fill"[39m
+              [33mstyle[39m=[32m"width: 10%;"[39m
+            [36m/>[39m
+          [36m</span>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"resume-line-actions"[39m
+          [36m>[39m
+            [36m<button[39m
+              [33maria-label[39m=[32m"Resume Primary, page 10 of 100, 10%"[39m
+              [33mclass[39m=[32m"button button--primary button--md"[39m
+            [36m>[39m
+              [36m<span[39m
+                [33mclass[39m=[32m"button__content"[39m
+              [36m>[39m
+                [0mResume[0m
+              [36m</span>[39m
+            [36m</button>[39m
+            [36m<button[39m
+              [33maria-label[39m=[32m"Resume Primary and start reading aloud"[39m
+              [33mclass[39m=[32m"icon-button icon-button--ghost icon-button--sm resume-line-play"[39m
+            [36m>[39m
+              [36m<span[39m
+                [33mclass[39m=[32m"icon-button__icon"[39m
+              [36m>[39m
+                [36m<svg[39m
+                  [33maria-hidden[39m=[32m"true"[39m
+                  [33mviewBox[39m=[32m"0 0 16 16"[39m
+                [36m>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M4 2.5v11l9-5.5-9-5.5z"[39m
+                    [33mfill[39m=[32m"currentColor"[39m
+                  [36m/>[39m
+                [36m</svg>[39m
+              [36m</span>[39m
+            [36m</button>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+      [36m</div>[39m
+      [36m<p[39m
+        [33mclass[39m=[32m"resume-section-tts-signal"[39m
+      [36m>[39m
+        [36m<span>[39m
+          [0mAI TTS requires an ElevenLabs API key[0m
+        [36m</span>[39m
+        [36m<button[39m
+          [33mclass[39m=[32m"resume-section-tts-signal-action"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [0mConfigure[0m
+        [36m</button>[39m
+      [36m</p>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"also-in-progress"[39m
+      [36m>[39m
+        [36m<h3[39m
+          [33mclass[39m=[32m"also-in-progress-heading"[39m
+        [36m>[39m
+          [0mAlso in progress[0m
+        [36m</h3>[39m
+        [36m<ul[39m
+          [33mclass[39m=[32m"also-in-progress-list"[39m
+        [36m>[39m
+          [36m<li[39m
+            [33mclass[39m=[32m"also-in-progress-row"[39m
+          [36m>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"document-cover document-cover--sm"[39m
+              [33mdata-seed[39m=[32m"NaN"[39m
+              [33mdata-state[39m=[32m"loading"[39m
+            [36m>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"cover-fallback cover-fallback--NaN"[39m
+              [36m>[39m
+                [36m<svg[39m
+                  [33maria-hidden[39m=[32m"true"[39m
+                  [33mclass[39m=[32m"cover-fallback-glyph"[39m
+                  [33mviewBox[39m=[32m"0 0 24 24"[39m
+                [36m>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"[39m
+                    [33mfill[39m=[32m"currentColor"[39m
+                    [33mopacity[39m=[32m"0.9"[39m
+                  [36m/>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M14 2v6h6"[39m
+                    [33mfill[39m=[32m"currentColor"[39m
+                    [33mopacity[39m=[32m"0.45"[39m
+                  [36m/>[39m
+                [36m</svg>[39m
+              [36m</div>[39m
+            [36m</div>[39m
+            [36m<button[39m
+              [33maria-label[39m=[32m"Resume Row Book, page 5 of 100"[39m
+              [33maria-selected[39m=[32m"false"[39m
+              [33mclass[39m=[32m"list-row list-row--interactive also-in-progress-row-main"[39m
+              [33mtype[39m=[32m"button"[39m
+            [36m>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"list-row__content"[39m
+              [36m>[39m
+                [36m<span[39m
+                  [33mclass[39m=[32m"list-row__primary"[39m
+                [36m>[39m
+                  [0mRow Book[0m
+                [36m</span>[39m
+              [36m</div>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"list-row__metadata"[39m
+              [36m>[39m
+                [0mPage 5 of 100[0m
+              [36m</div>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"list-row__trailing"[39m
+              [36m>[39m
+                [36m<svg[39m
+                  [33maria-hidden[39m=[32m"true"[39m
+                  [33mclass[39m=[32m"also-in-progress-chevron"[39m
+                  [33mviewBox[39m=[32m"0 0 16 16"[39m
+                [36m>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M6 4l4 4-4 4"[39m
+                    [33mfill[39m=[32m"none"[39m
+                    [33mstroke[39m=[32m"currentColor"[39m
+                    [33mstroke-width[39m=[32m"2"[39m
+                  [36m/>[39m
+                [36m</svg>[39m
+              [36m</div>[39m
+            [36m</button>[39m
+            [36m<button[39m
+              [33maria-label[39m=[32m"Resume Row Book and start reading aloud"[39m
+              [33mclass[39m=[32m"icon-button icon-button--ghost icon-button--sm also-in-progress-row-play"[39m
+            [36m>[39m
+              [36m<span[39m
+                [33mclass[39m=[32m"icon-button__icon"[39m
+              [36m>[39m
+                [36m<svg[39m
+                  [33maria-hidden[39m=[32m"true"[39m
+                  [33mviewBox[39m=[32m"0 0 16 16"[39m
+                [36m>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M4 2.5v11l9-5.5-9-5.5z"[39m
+                    [33mfill[39m=[32m"currentColor"[39m
+                  [36m/>[39m
+                [36m</svg>[39m
+              [36m</span>[39m
+            [36m</button>[39m
+          [36m</li>[39m
+        [36m</ul>[39m
+      [36m</div>[39m
+      [0m    [0m
+    [36m</section>[39m
+  [36m</div>[39m
+[36m</body>[39m
+   × FR-1: resume-and-read-aloud is visibly labeled (not icon-only) > RETENTION: DOM tab order inside the resume line is Resume → Read aloud 14ms
+     → (container.querySelector ?? []) is not iterable
+   × FR-2: 0% progress is distinct from a divider > renders the empty-track state for a 0% in-flight book 9ms
+     → expected null not to be null
+   × FR-3: legibility contract (wrap, hollow track, rem scale, pinned form) > wraps the resume actions so narrow windows never clip the labels 2ms
+     → expected '\n  display: flex;\n  align-items: ce…' to match /flex-wrap:\s*wrap/
+   × FR-3: legibility contract (wrap, hollow track, rem scale, pinned form) > renders the track as a hollow container, never a solid divider hairline 1ms
+     → expected '\n  display: block;\n  height: 4px;\n…' to match /background(?:-color)?:\s*transparent/
+   × FR-3: legibility contract (wrap, hollow track, rem scale, pinned form) > draws the 0% start-position nub from the accent token 2ms
+     → expected '.resume-section {\n  margin-bottom: v…' to match /\.resume-line-bar--empty::before\s*\…/s
+   × FR-3: legibility contract (wrap, hollow track, rem scale, pinned form) > pins the New shelf form outside the scrolling shelf list (stretch) 2ms
+     → expected '\n  list-style: none;\n  margin: 0;\n…' to match /flex(?:-grow)?:\s*1/
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 9 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/ui/library-202-affordances.test.tsx > FR-1: resume-and-read-aloud is visibly labeled (not icon-only) > renders a visible 'Read aloud' label on the resume line control
+TestingLibraryElementError: Unable to find an accessible element with the role "button" and name `/Resume Moby and read aloud/`
+
+Here are the accessible roles:
+
+  region:
+
+  Name "Continue reading":
+  [36m<section[39m
+    [33maria-labelledby[39m=[32m"continue-reading-heading"[39m
+    [33mclass[39m=[32m"resume-section"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  heading:
+
+  Name "Continue reading":
+  [36m<h2[39m
+    [33mclass[39m=[32m"resume-section-heading"[39m
+    [33mid[39m=[32m"continue-reading-heading"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  img:
+
+  Name "Moby":
+  [36m<svg[39m
+    [33maria-label[39m=[32m"Moby"[39m
+    [33mclass[39m=[32m"cover-fallback-glyph"[39m
+    [33mrole[39m=[32m"img"[39m
+    [33mviewBox[39m=[32m"0 0 24 24"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"resume-line-meta"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"resume-section-tts-signal"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  progressbar:
+
+  Name "Moby progress":
+  [36m<progress[39m
+    [33maria-label[39m=[32m"Moby progress"[39m
+    [33mclass[39m=[32m"sr-only"[39m
+    [33mmax[39m=[32m"100"[39m
+    [33mvalue[39m=[32m"42"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  button:
+
+  Name "Resume Moby, page 42 of 100, 42%":
+  [36m<button[39m
+    [33maria-label[39m=[32m"Resume Moby, page 42 of 100, 42%"[39m
+    [33mclass[39m=[32m"button button--primary button--md"[39m
+  [36m/>[39m
+
+  Name "Resume Moby and start reading aloud":
+  [36m<button[39m
+    [33maria-label[39m=[32m"Resume Moby and start reading aloud"[39m
+    [33mclass[39m=[32m"icon-button icon-button--ghost icon-button--sm resume-line-play"[39m
+  [36m/>[39m
+
+  Name "Configure":
+  [36m<button[39m
+    [33mclass[39m=[32m"resume-section-tts-signal-action"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<section[39m
+      [33maria-labelledby[39m=[32m"continue-reading-heading"[39m
+      [33mclass[39m=[32m"resume-section"[39m
+    [36m>[39m
+      [36m<h2[39m
+        [33mclass[39m=[32m"resume-section-heading"[39m
+        [33mid[39m=[32m"continue-reading-heading"[39m
+      [36m>[39m
+        [0mContinue reading[0m
+      [36m</h2>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"resume-line"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"document-cover document-cover--lg"[39m
+          [33mdata-seed[39m=[32m"13"[39m
+          [33mdata-state[39m=[32m"loading"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"cover-fallback cover-fallback--1"[39m
+          [36m>[39m
+            [36m<svg[39m
+              [33maria-label[39m=[32m"Moby"[39m
+              [33mclass[39m=[32m"cover-fallback-glyph"[39m
+              [33mrole[39m=[32m"img"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"[39m
+                [33mfill[39m=[32m"currentColor"[39m
+                [33mopacity[39m=[32m"0.9"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M14 2v6h6"[39m
+                [33mfill[39m=[32m"currentColor"[39m
+                [33mopacity[39m=[32m"0.45"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"resume-line-body"[39m
+        [36m>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"resume-line-title"[39m
+          [36m>[39m
+            [0mMoby[0m
+          [36m</span>[39m
+          [36m<p[39m
+            [33mclass[39m=[32m"resume-line-meta"[39m
+          [36m>[39m
+            [36m<span>[39m
+              [0mPage 42 of 100[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33maria-hidden[39m=[32m"true"[39m
+            [36m>[39m
+              [0m · [0m
+            [36m</span>[39m
+            [36m<span>[39m
+              [0m42[0m
+              [0m%[0m
+            [36m</span>[39m
+          [36m</p>[39m
+          [36m<progress[39m
+            [33maria-label[39m=[32m"Moby progress"[39m
+            [33mclass[39m=[32m"sr-only"[39m
+            [33mmax[39m=[32m"100"[39m
+            [33mvalue[39m=[32m"42"[39m
+          [36m/>[39m
+          [36m<span[39m
+            [33maria-hidden[39m=[32m"true"[39m
+            [33mclass[39m=[32m"resume-line-bar"[39m
+          [36m>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"resume-line-bar-fill"[39m
+              [33mstyle[39m=[32m"width: 42%;"[39m
+            [36m/>[39m
+          [36m</span>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"resume-line-actions"[39m
+          [36m>[39m
+            [36m<button[39m
+              [33maria-label[39m=[32m"Resume Moby, page 42 of 100, 42%"[39m
+              [33mclass[39m=[32m"button button--primary button--md"[39m
+            [36m>[39m
+              [36m<span[39m
+                [33mclass[39m=[32m"button__content"[39m
+              [36m>[39m
+                [0mResume[0m
+              [36m</span>[39m
+            [36m</button>[39m
+            [36m<button[39m
+              [33maria-label[39m=[32m"Resume Moby and start reading aloud"[39m
+              [33mclass[39m=[32m"icon-button icon-button--ghost icon-button--sm resume-line-play"[39m
+            [36m>[39m
+              [36m<span[39m
+                [33mclass[39m=[32m"icon-button__icon"[39m
+              [36m>[39m
+                [36m<svg[39m
+                  [33maria-hidden[39m=[32m"true"[39m
+                  [33mviewBox[39m=[32m"0 0 16 16"[39m
+                [36m>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M4 2.5v11l9-5.5-9-5.5z"[39m
+                    [33mfill[39m=[32m"currentColor"[39m
+                  [36m/>[39m
+                [36m</svg>[39m
+              [36m</span>[39m
+            [36m</button>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+      [36m</div>[39m
+      [36m<p[39m
+        [33mclass[39m=[32m"resume-section-tts-signal"[39m
+      [36m>[39m
+        [36m<span>[39m
+          [0mAI TTS requires an ElevenLabs API key[0m
+        [36m</span>[39m
+        [36m<button[39m
+          [33mclass[39m=[32m"resume-section-tts-signal-action"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [0mConfigure[0m
+        [36m</button>[39m
+      [36m</p>[39m
+      [0m    [0m
+    [36m</section>[39m
+  [36m</div>[39m
+[36m</body>[39m
+ ❯ Object.getElementError node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ src/__tests__/ui/library-202-affordances.test.tsx:69:28
+     67|     // Visible text is present INSIDE the control (not an aria-only na…
+     68|     // a glyph): the icon-only regression this gate exists for.
+     69|     const control = screen.getByRole("button", {
+       |                            ^
+     70|       name: /Resume Moby and read aloud/,
+     71|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/9]⎯
+
+ FAIL  src/__tests__/ui/library-202-affordances.test.tsx > FR-1: resume-and-read-aloud is visibly labeled (not icon-only) > keeps the resume verb + book title in the accessible name (Label in Name)
+TestingLibraryElementError: Unable to find an accessible element with the role "button" and name "Resume Moby and read aloud"
+
+Here are the accessible roles:
+
+  region:
+
+  Name "Continue reading":
+  [36m<section[39m
+    [33maria-labelledby[39m=[32m"continue-reading-heading"[39m
+    [33mclass[39m=[32m"resume-section"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  heading:
+
+  Name "Continue reading":
+  [36m<h2[39m
+    [33mclass[39m=[32m"resume-section-heading"[39m
+    [33mid[39m=[32m"continue-reading-heading"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  img:
+
+  Name "Moby":
+  [36m<svg[39m
+    [33maria-label[39m=[32m"Moby"[39m
+    [33mclass[39m=[32m"cover-fallback-glyph"[39m
+    [33mrole[39m=[32m"img"[39m
+    [33mviewBox[39m=[32m"0 0 24 24"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"resume-line-meta"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"resume-section-tts-signal"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  progressbar:
+
+  Name "Moby progress":
+  [36m<progress[39m
+    [33maria-label[39m=[32m"Moby progress"[39m
+    [33mclass[39m=[32m"sr-only"[39m
+    [33mmax[39m=[32m"100"[39m
+    [33mvalue[39m=[32m"42"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  button:
+
+  Name "Resume Moby, page 42 of 100, 42%":
+  [36m<button[39m
+    [33maria-label[39m=[32m"Resume Moby, page 42 of 100, 42%"[39m
+    [33mclass[39m=[32m"button button--primary button--md"[39m
+  [36m/>[39m
+
+  Name "Resume Moby and start reading aloud":
+  [36m<button[39m
+    [33maria-label[39m=[32m"Resume Moby and start reading aloud"[39m
+    [33mclass[39m=[32m"icon-button icon-button--ghost icon-button--sm resume-line-play"[39m
+  [36m/>[39m
+
+  Name "Configure":
+  [36m<button[39m
+    [33mclass[39m=[32m"resume-section-tts-signal-action"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<section[39m
+      [33maria-labelledby[39m=[32m"continue-reading-heading"[39m
+      [33mclass[39m=[32m"resume-section"[39m
+    [36m>[39m
+      [36m<h2[39m
+        [33mclass[39m=[32m"resume-section-heading"[39m
+        [33mid[39m=[32m"continue-reading-heading"[39m
+      [36m>[39m
+        [0mContinue reading[0m
+      [36m</h2>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"resume-line"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"document-cover document-cover--lg"[39m
+          [33mdata-seed[39m=[32m"13"[39m
+          [33mdata-state[39m=[32m"loading"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"cover-fallback cover-fallback--1"[39m
+          [36m>[39m
+            [36m<svg[39m
+              [33maria-label[39m=[32m"Moby"[39m
+              [33mclass[39m=[32m"cover-fallback-glyph"[39m
+              [33mrole[39m=[32m"img"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"[39m
+                [33mfill[39m=[32m"currentColor"[39m
+                [33mopacity[39m=[32m"0.9"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M14 2v6h6"[39m
+                [33mfill[39m=[32m"currentColor"[39m
+                [33mopacity[39m=[32m"0.45"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"resume-line-body"[39m
+        [36m>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"resume-line-title"[39m
+          [36m>[39m
+            [0mMoby[0m
+          [36m</span>[39m
+          [36m<p[39m
+            [33mclass[39m=[32m"resume-line-meta"[39m
+          [36m>[39m
+            [36m<span>[39m
+              [0mPage 42 of 100[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33maria-hidden[39m=[32m"true"[39m
+            [36m>[39m
+              [0m · [0m
+            [36m</span>[39m
+            [36m<span>[39m
+              [0m42[0m
+              [0m%[0m
+            [36m</span>[39m
+          [36m</p>[39m
+          [36m<progress[39m
+            [33maria-label[39m=[32m"Moby progress"[39m
+            [33mclass[39m=[32m"sr-only"[39m
+            [33mmax[39m=[32m"100"[39m
+            [33mvalue[39m=[32m"42"[39m
+          [36m/>[39m
+          [36m<span[39m
+            [33maria-hidden[39m=[32m"true"[39m
+            [33mclass[39m=[32m"resume-line-bar"[39m
+          [36m>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"resume-line-bar-fill"[39m
+              [33mstyle[39m=[32m"width: 42%;"[39m
+            [36m/>[39m
+          [36m</span>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"resume-line-actions"[39m
+          [36m>[39m
+            [36m<button[39m
+              [33maria-label[39m=[32m"Resume Moby, page 42 of 100, 42%"[39m
+              [33mclass[39m=[32m"button button--primary button--md"[39m
+            [36m>[39m
+              [36m<span[39m
+                [33mclass[39m=[32m"button__content"[39m
+              [36m>[39m
+                [0mResume[0m
+              [36m</span>[39m
+            [36m</button>[39m
+            [36m<button[39m
+              [33maria-label[39m=[32m"Resume Moby and start reading aloud"[39m
+              [33mclass[39m=[32m"icon-button icon-button--ghost icon-button--sm resume-line-play"[39m
+            [36m>[39m
+              [36m<span[39m
+                [33mclass[39m=[32m"icon-button__icon"[39m
+              [36m>[39m
+                [36m<svg[39m
+                  [33maria-hidden[39m=[32m"true"[39m
+                  [33mviewBox[39m=[32m"0 0 16 16"[39m
+                [36m>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M4 2.5v11l9-5.5-9-5.5z"[39m
+                    [33mfill[39m=[32m"currentColor"[39m
+                  [36m/>[39m
+                [36m</svg>[39m
+              [36m</span>[39m
+            [36m</button>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+      [36m</div>[39m
+      [36m<p[39m
+        [33mclass[39m=[32m"resume-section-tts-signal"[39m
+      [36m>[39m
+        [36m<span>[39m
+          [0mAI TTS requires an ElevenLabs API key[0m
+        [36m</span>[39m
+        [36m<button[39m
+          [33mclass[39m=[32m"resume-section-tts-signal-action"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [0mConfigure[0m
+        [36m</button>[39m
+      [36m</p>[39m
+      [0m    [0m
+    [36m</section>[39m
+  [36m</div>[39m
+[36m</body>[39m
+ ❯ Object.getElementError node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ src/__tests__/ui/library-202-affordances.test.tsx:89:14
+     87|     // name (WCAG 2.5.3): name = "Resume Moby and read aloud".
+     88|     expect(
+     89|       screen.getByRole("button", { name: "Resume Moby and read aloud" …
+       |              ^
+     90|     ).toBeInTheDocument();
+     91|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/9]⎯
+
+ FAIL  src/__tests__/ui/library-202-affordances.test.tsx > FR-1: resume-and-read-aloud is visibly labeled (not icon-only) > labels the row control on every 'Also in progress' book
+TestingLibraryElementError: Unable to find an accessible element with the role "button" and name "Resume Row Book and read aloud"
+
+Here are the accessible roles:
+
+  region:
+
+  Name "Continue reading":
+  [36m<section[39m
+    [33maria-labelledby[39m=[32m"continue-reading-heading"[39m
+    [33mclass[39m=[32m"resume-section"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  heading:
+
+  Name "Continue reading":
+  [36m<h2[39m
+    [33mclass[39m=[32m"resume-section-heading"[39m
+    [33mid[39m=[32m"continue-reading-heading"[39m
+  [36m/>[39m
+
+  Name "Also in progress":
+  [36m<h3[39m
+    [33mclass[39m=[32m"also-in-progress-heading"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  img:
+
+  Name "Primary":
+  [36m<svg[39m
+    [33maria-label[39m=[32m"Primary"[39m
+    [33mclass[39m=[32m"cover-fallback-glyph"[39m
+    [33mrole[39m=[32m"img"[39m
+    [33mviewBox[39m=[32m"0 0 24 24"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"resume-line-meta"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"resume-section-tts-signal"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  progressbar:
+
+  Name "Primary progress":
+  [36m<progress[39m
+    [33maria-label[39m=[32m"Primary progress"[39m
+    [33mclass[39m=[32m"sr-only"[39m
+    [33mmax[39m=[32m"100"[39m
+    [33mvalue[39m=[32m"10"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  button:
+
+  Name "Resume Primary, page 10 of 100, 10%":
+  [36m<button[39m
+    [33maria-label[39m=[32m"Resume Primary, page 10 of 100, 10%"[39m
+    [33mclass[39m=[32m"button button--primary button--md"[39m
+  [36m/>[39m
+
+  Name "Resume Primary and start reading aloud":
+  [36m<button[39m
+    [33maria-label[39m=[32m"Resume Primary and start reading aloud"[39m
+    [33mclass[39m=[32m"icon-button icon-button--ghost icon-button--sm resume-line-play"[39m
+  [36m/>[39m
+
+  Name "Configure":
+  [36m<button[39m
+    [33mclass[39m=[32m"resume-section-tts-signal-action"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  Name "Resume Row Book, page 5 of 100":
+  [36m<button[39m
+    [33maria-label[39m=[32m"Resume Row Book, page 5 of 100"[39m
+    [33maria-selected[39m=[32m"false"[39m
+    [33mclass[39m=[32m"list-row list-row--interactive also-in-progress-row-main"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  Name "Resume Row Book and start reading aloud":
+  [36m<button[39m
+    [33maria-label[39m=[32m"Resume Row Book and start reading aloud"[39m
+    [33mclass[39m=[32m"icon-button icon-button--ghost icon-button--sm also-in-progress-row-play"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  list:
+
+  Name "":
+  [36m<ul[39m
+    [33mclass[39m=[32m"also-in-progress-list"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  listitem:
+
+  Name "":
+  [36m<li[39m
+    [33mclass[39m=[32m"also-in-progress-row"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<section[39m
+      [33maria-labelledby[39m=[32m"continue-reading-heading"[39m
+      [33mclass[39m=[32m"resume-section"[39m
+    [36m>[39m
+      [36m<h2[39m
+        [33mclass[39m=[32m"resume-section-heading"[39m
+        [33mid[39m=[32m"continue-reading-heading"[39m
+      [36m>[39m
+        [0mContinue reading[0m
+      [36m</h2>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"resume-line"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"document-cover document-cover--lg"[39m
+          [33mdata-seed[39m=[32m"NaN"[39m
+          [33mdata-state[39m=[32m"loading"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"cover-fallback cover-fallback--NaN"[39m
+          [36m>[39m
+            [36m<svg[39m
+              [33maria-label[39m=[32m"Primary"[39m
+              [33mclass[39m=[32m"cover-fallback-glyph"[39m
+              [33mrole[39m=[32m"img"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"[39m
+                [33mfill[39m=[32m"currentColor"[39m
+                [33mopacity[39m=[32m"0.9"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M14 2v6h6"[39m
+                [33mfill[39m=[32m"currentColor"[39m
+                [33mopacity[39m=[32m"0.45"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"resume-line-body"[39m
+        [36m>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"resume-line-title"[39m
+          [36m>[39m
+            [0mPrimary[0m
+          [36m</span>[39m
+          [36m<p[39m
+            [33mclass[39m=[32m"resume-line-meta"[39m
+          [36m>[39m
+            [36m<span>[39m
+              [0mPage 10 of 100[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33maria-hidden[39m=[32m"true"[39m
+            [36m>[39m
+              [0m · [0m
+            [36m</span>[39m
+            [36m<span>[39m
+              [0m10[0m
+              [0m%[0m
+            [36m</span>[39m
+          [36m</p>[39m
+          [36m<progress[39m
+            [33maria-label[39m=[32m"Primary progress"[39m
+            [33mclass[39m=[32m"sr-only"[39m
+            [33mmax[39m=[32m"100"[39m
+            [33mvalue[39m=[32m"10"[39m
+          [36m/>[39m
+          [36m<span[39m
+            [33maria-hidden[39m=[32m"true"[39m
+            [33mclass[39m=[32m"resume-line-bar"[39m
+          [36m>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"resume-line-bar-fill"[39m
+              [33mstyle[39m=[32m"width: 10%;"[39m
+            [36m/>[39m
+          [36m</span>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"resume-line-actions"[39m
+          [36m>[39m
+            [36m<button[39m
+              [33maria-label[39m=[32m"Resume Primary, page 10 of 100, 10%"[39m
+              [33mclass[39m=[32m"button button--primary button--md"[39m
+            [36m>[39m
+              [36m<span[39m
+                [33mclass[39m=[32m"button__content"[39m
+              [36m>[39m
+                [0mResume[0m
+              [36m</span>[39m
+            [36m</button>[39m
+            [36m<button[39m
+              [33maria-label[39m=[32m"Resume Primary and start reading aloud"[39m
+              [33mclass[39m=[32m"icon-button icon-button--ghost icon-button--sm resume-line-play"[39m
+            [36m>[39m
+              [36m<span[39m
+                [33mclass[39m=[32m"icon-button__icon"[39m
+              [36m>[39m
+                [36m<svg[39m
+                  [33maria-hidden[39m=[32m"true"[39m
+                  [33mviewBox[39m=[32m"0 0 16 16"[39m
+                [36m>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M4 2.5v11l9-5.5-9-5.5z"[39m
+                    [33mfill[39m=[32m"currentColor"[39m
+                  [36m/>[39m
+                [36m</svg>[39m
+              [36m</span>[39m
+            [36m</button>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+      [36m</div>[39m
+      [36m<p[39m
+        [33mclass[39m=[32m"resume-section-tts-signal"[39m
+      [36m>[39m
+        [36m<span>[39m
+          [0mAI TTS requires an ElevenLabs API key[0m
+        [36m</span>[39m
+        [36m<button[39m
+          [33mclass[39m=[32m"resume-section-tts-signal-action"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [0mConfigure[0m
+        [36m</button>[39m
+      [36m</p>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"also-in-progress"[39m
+      [36m>[39m
+        [36m<h3[39m
+          [33mclass[39m=[32m"also-in-progress-heading"[39m
+        [36m>[39m
+          [0mAlso in progress[0m
+        [36m</h3>[39m
+        [36m<ul[39m
+          [33mclass[39m=[32m"also-in-progress-list"[39m
+        [36m>[39m
+          [36m<li[39m
+            [33mclass[39m=[32m"also-in-progress-row"[39m
+          [36m>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"document-cover document-cover--sm"[39m
+              [33mdata-seed[39m=[32m"NaN"[39m
+              [33mdata-state[39m=[32m"loading"[39m
+            [36m>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"cover-fallback cover-fallback--NaN"[39m
+              [36m>[39m
+                [36m<svg[39m
+                  [33maria-hidden[39m=[32m"true"[39m
+                  [33mclass[39m=[32m"cover-fallback-glyph"[39m
+                  [33mviewBox[39m=[32m"0 0 24 24"[39m
+                [36m>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"[39m
+                    [33mfill[39m=[32m"currentColor"[39m
+                    [33mopacity[39m=[32m"0.9"[39m
+                  [36m/>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M14 2v6h6"[39m
+                    [33mfill[39m=[32m"currentColor"[39m
+                    [33mopacity[39m=[32m"0.45"[39m
+                  [36m/>[39m
+                [36m</svg>[39m
+              [36m</div>[39m
+            [36m</div>[39m
+            [36m<button[39m
+              [33maria-label[39m=[32m"Resume Row Book, page 5 of 100"[39m
+              [33maria-selected[39m=[32m"false"[39m
+              [33mclass[39m=[32m"list-row list-row--interactive also-in-progress-row-main"[39m
+              [33mtype[39m=[32m"button"[39m
+            [36m>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"list-row__content"[39m
+              [36m>[39m
+                [36m<span[39m
+                  [33mclass[39m=[32m"list-row__primary"[39m
+                [36m>[39m
+                  [0mRow Book[0m
+                [36m</span>[39m
+              [36m</div>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"list-row__metadata"[39m
+              [36m>[39m
+                [0mPage 5 of 100[0m
+              [36m</div>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"list-row__trailing"[39m
+              [36m>[39m
+                [36m<svg[39m
+                  [33maria-hidden[39m=[32m"true"[39m
+                  [33mclass[39m=[32m"also-in-progress-chevron"[39m
+                  [33mviewBox[39m=[32m"0 0 16 16"[39m
+                [36m>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M6 4l4 4-4 4"[39m
+                    [33mfill[39m=[32m"none"[39m
+                    [33mstroke[39m=[32m"currentColor"[39m
+                    [33mstroke-width[39m=[32m"2"[39m
+                  [36m/>[39m
+                [36m</svg>[39m
+              [36m</div>[39m
+            [36m</button>[39m
+            [36m<button[39m
+              [33maria-label[39m=[32m"Resume Row Book and start reading aloud"[39m
+              [33mclass[39m=[32m"icon-button icon-button--ghost icon-button--sm also-in-progress-row-play"[39m
+            [36m>[39m
+              [36m<span[39m
+                [33mclass[39m=[32m"icon-button__icon"[39m
+              [36m>[39m
+                [36m<svg[39m
+                  [33maria-hidden[39m=[32m"true"[39m
+                  [33mviewBox[39m=[32m"0 0 16 16"[39m
+                [36m>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M4 2.5v11l9-5.5-9-5.5z"[39m
+                    [33mfill[39m=[32m"currentColor"[39m
+                  [36m/>[39m
+                [36m</svg>[39m
+              [36m</span>[39m
+            [36m</button>[39m
+          [36m</li>[39m
+        [36m</ul>[39m
+      [36m</div>[39m
+      [0m    [0m
+    [36m</section>[39m
+  [36m</div>[39m
+[36m</body>[39m
+ ❯ Object.getElementError node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ src/__tests__/ui/library-202-affordances.test.tsx:106:31
+    104|     );
+    105| 
+    106|     const rowControl = screen.getByRole("button", {
+       |                               ^
+    107|       name: "Resume Row Book and read aloud",
+    108|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/9]⎯
+
+ FAIL  src/__tests__/ui/library-202-affordances.test.tsx > FR-1: resume-and-read-aloud is visibly labeled (not icon-only) > RETENTION: DOM tab order inside the resume line is Resume → Read aloud
+TypeError: (container.querySelector ?? []) is not iterable
+ ❯ src/__tests__/ui/library-202-affordances.test.tsx:140:62
+    138| 
+    139|     const buttons = [
+    140|       ...(container.querySelector(".resume-line-actions") ?? []),
+       |                                                              ^
+    141|     ].filter((el) => el.tagName === "BUTTON");
+    142|     expect(buttons).toHaveLength(2);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/9]⎯
+
+ FAIL  src/__tests__/ui/library-202-affordances.test.tsx > FR-2: 0% progress is distinct from a divider > renders the empty-track state for a 0% in-flight book
+AssertionError: expected null not to be null
+ ❯ src/__tests__/ui/library-202-affordances.test.tsx:172:11
+    170|     expect(
+    171|       container.querySelector(".resume-line-bar--empty"),
+    172|     ).not.toBeNull();
+       |           ^
+    173|     // The percent readout stays honest.
+    174|     expect(screen.getByText("0%")).toBeInTheDocument();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/9]⎯
+
+ FAIL  src/__tests__/ui/library-202-affordances.test.tsx > FR-3: legibility contract (wrap, hollow track, rem scale, pinned form) > wraps the resume actions so narrow windows never clip the labels
+AssertionError: expected '\n  display: flex;\n  align-items: ce…' to match /flex-wrap:\s*wrap/
+
+- Expected: 
+/flex-wrap:\s*wrap/
+
++ Received: 
+"
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+"
+
+ ❯ src/__tests__/ui/library-202-affordances.test.tsx:202:21
+    200|   it("wraps the resume actions so narrow windows never clip the labels…
+    201|     const actions = css.match(/\.resume-line-actions\s*\{([^}]*)\}/s)?…
+    202|     expect(actions).toMatch(/flex-wrap:\s*wrap/);
+       |                     ^
+    203|   });
+    204| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/9]⎯
+
+ FAIL  src/__tests__/ui/library-202-affordances.test.tsx > FR-3: legibility contract (wrap, hollow track, rem scale, pinned form) > renders the track as a hollow container, never a solid divider hairline
+AssertionError: expected '\n  display: block;\n  height: 4px;\n…' to match /background(?:-color)?:\s*transparent/
+
+- Expected: 
+/background(?:-color)?:\s*transparent/
+
++ Received: 
+"
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-border);
+  overflow: hidden;
+"
+
+ ❯ src/__tests__/ui/library-202-affordances.test.tsx:207:17
+    205|   it("renders the track as a hollow container, never a solid divider h…
+    206|     const bar = css.match(/\.resume-line-bar\s*\{([^}]*)\}/s)?.[1] ?? …
+    207|     expect(bar).toMatch(/background(?:-color)?:\s*transparent/);
+       |                 ^
+    208|     expect(bar).toMatch(/box-shadow:[^;]*inset[^;]*var\(--color-border…
+    209|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/9]⎯
+
+ FAIL  src/__tests__/ui/library-202-affordances.test.tsx > FR-3: legibility contract (wrap, hollow track, rem scale, pinned form) > draws the 0% start-position nub from the accent token
+AssertionError: expected '.resume-section {\n  margin-bottom: v…' to match /\.resume-line-bar--empty::before\s*\…/s
+
+- Expected: 
+/\.resume-line-bar--empty::before\s*\{[^}]*\}/s
+
++ Received: 
+".resume-section {
+  margin-bottom: var(--space-8);
+}
+
+.resume-section-heading {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-3);
+}
+
+.resume-line {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+
+.resume-line-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
+}
+
+.resume-line-title {
+  font-family: var(--font-family-display);
+  font-size: var(--text-2xl);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+}
+
+.resume-line-meta {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Full-width progress, thin, accent fill — navigation chrome, NOT the TTS
+   voice colour (--color-speak is that; --color-accent is this). */
+.resume-line-bar {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-border);
+  overflow: hidden;
+}
+
+.resume-line-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--color-accent);
+}
+
+.resume-line-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.resume-line-play {
+  flex-shrink: 0;
+}
+
+.also-in-progress {
+  margin-top: var(--space-8);
+}
+
+.also-in-progress-heading {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-2);
+}
+
+.also-in-progress-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.also-in-progress-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.also-in-progress-row-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.also-in-progress-row-play {
+  flex-shrink: 0;
+}
+
+.also-in-progress-chevron {
+  width: 16px;
+  height: 16px;
+  color: var(--color-text-secondary);
+}
+
+/* The quiet TTS-setup signal: one line under the resume-line actions. It
+   must not outrank the book someone came back to read — body-size text, no
+   card, no accent. */
+.resume-section-tts-signal {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.resume-section-tts-signal-action {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--color-accent-text);
+  text-decoration: underline;
+  cursor: pointer;
+}
+"
+
+ ❯ src/__tests__/ui/library-202-affordances.test.tsx:212:17
+    210| 
+    211|   it("draws the 0% start-position nub from the accent token", () => {
+    212|     expect(css).toMatch(/\.resume-line-bar--empty::before\s*\{[^}]*\}/…
+       |                 ^
+    213|     const nub = css.match(
+    214|       /\.resume-line-bar--empty::before\s*\{([^}]*)\}/s,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/9]⎯
+
+ FAIL  src/__tests__/ui/library-202-affordances.test.tsx > FR-3: legibility contract (wrap, hollow track, rem scale, pinned form) > pins the New shelf form outside the scrolling shelf list (stretch)
+AssertionError: expected '\n  list-style: none;\n  margin: 0;\n…' to match /flex(?:-grow)?:\s*1/
+
+- Expected: 
+/flex(?:-grow)?:\s*1/
+
++ Received: 
+"
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+"
+
+ ❯ src/__tests__/ui/library-202-affordances.test.tsx:233:18
+    231|     // The LIST is the scroll container; the sidebar itself stops scro…
+    232|     // so the form stays visible when the list overflows.
+    233|     expect(list).toMatch(/flex(?:-grow)?:\s*1/);
+       |                  ^
+    234|     expect(list).toMatch(/min-height:\s*0/);
+    235|     expect(list).toMatch(/overflow-y:\s*auto/);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/9]⎯
+
+ Test Files  1 failed (1)
+      Tests  9 failed | 4 passed (13)
+   Start at  13:10:56
+   Duration  2.37s (transform 342ms, setup 253ms, collect 412ms, tests 628ms, environment 700ms, prepare 104ms)
+
+[ELIFECYCLE] Command failed with exit code 1.

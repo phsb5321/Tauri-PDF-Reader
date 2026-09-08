@@ -5,7 +5,6 @@ import {
 import { formatRelativeReadTime } from "../../domain/library/relative-time";
 import { Button } from "../../ui/components/Button/Button";
 import { ListRow } from "../../ui/components/ListRow/ListRow";
-import { IconButton } from "../../ui/components/IconButton/IconButton";
 import { DocumentCover } from "./DocumentCover";
 import { useAiTtsStore, selectNeedsApiKey } from "../../stores/ai-tts-store";
 import { AI_TTS_SETUP_MESSAGE } from "../../lib/constants";
@@ -63,13 +62,11 @@ export function ResumeSection({
       <h2 id="continue-reading-heading" className="resume-section-heading">
         Continue reading
       </h2>
-
       <ResumeLine
         document={primary}
         onResume={onResume}
         onResumeAndPlay={onResumeAndPlay}
       />
-
       {needsApiKey && (
         <p className="resume-section-tts-signal">
           <span>{AI_TTS_SETUP_MESSAGE}</span>
@@ -82,14 +79,14 @@ export function ResumeSection({
           </button>
         </p>
       )}
-
       {rest.length > 0 && (
         <AlsoInProgress
           documents={rest}
           onResume={onResume}
           onResumeAndPlay={onResumeAndPlay}
         />
-      )}    </section>
+      )}{" "}
+    </section>
   );
 }
 
@@ -105,6 +102,9 @@ function ResumeLine({
   onResumeAndPlay,
 }: Readonly<ResumeLineProps>) {
   const percent = progressPercent(document);
+  // #183: a 0% in-flight book (barely started long document, or unknown
+  // page count) must not paint its track as a full-width divider hairline.
+  const isAtZero = percent === 0;
   const label = document.title || document.filePath;
   const relative = formatRelativeReadTime(document.lastOpenedAt);
 
@@ -145,7 +145,10 @@ function ResumeLine({
           max={100}
           aria-label={`${label} progress`}
         />
-        <span className="resume-line-bar" aria-hidden="true">
+        <span
+          className={`resume-line-bar${isAtZero ? " resume-line-bar--empty" : ""}`}
+          aria-hidden="true"
+        >
           <span
             className="resume-line-bar-fill"
             style={{ width: `${percent}%` }}
@@ -164,15 +167,21 @@ function ResumeLine({
           >
             Resume
           </Button>
-          <IconButton
-            label={`Resume ${label} and start reading aloud`}
-            variant="ghost"
+          {/* #183: discoverable by LABEL, not only by glyph. The visible
+              "Read aloud" text is contained in the accessible name (WCAG
+              2.5.3 Label in Name); the name keeps the resume verb + book
+              title the tests and screen readers depend on. Still calls ONLY
+              onResumeAndPlay — the plain resume stays silent. */}
+          <Button
+            variant="secondary"
             size="sm"
             className="resume-line-play"
+            aria-label={`Resume ${label} and read aloud`}
             onClick={() => onResumeAndPlay(document)}
           >
             <PlayIcon />
-          </IconButton>
+            Read aloud
+          </Button>
         </div>
       </div>
     </div>
@@ -219,16 +228,18 @@ function AlsoInProgress({
                 }`}
               />
               {/* Sibling, not nested — two interactive elements inside one
-                  <button> is invalid HTML and mangles the accessibility tree. */}
-              <IconButton
-                label={`Resume ${label} and start reading aloud`}
-                variant="ghost"
+                  <button> is invalid HTML and mangles the accessibility tree.
+                  #183: labeled like the resume line's control. */}
+              <Button
+                variant="secondary"
                 size="sm"
                 className="also-in-progress-row-play"
+                aria-label={`Resume ${label} and read aloud`}
                 onClick={() => onResumeAndPlay(document)}
               >
                 <PlayIcon />
-              </IconButton>
+                Read aloud
+              </Button>
             </li>
           );
         })}
@@ -247,8 +258,17 @@ function PlayIcon() {
 
 function ChevronIcon() {
   return (
-    <svg viewBox="0 0 16 16" className="also-in-progress-chevron" aria-hidden="true">
-      <path d="M6 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="2" />
+    <svg
+      viewBox="0 0 16 16"
+      className="also-in-progress-chevron"
+      aria-hidden="true"
+    >
+      <path
+        d="M6 4l4 4-4 4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
     </svg>
   );
 }
