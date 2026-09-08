@@ -64,13 +64,14 @@ probe of the track's container treatment on the existing seeded book.
 3. The track is a hollow container (inset ring on `--color-border`) at every
    percent, so it never reads as a divider (packaged computed-style probe on
    the existing seed).
-4. SEAM GAP (documented, not silently skipped): no existing public control or
-   seed lane reaches a 0% in-flight book in the packaged app — fixtures are
-   fixed at 20%/33% and fresh adds start at page 1 ("unread", not in-flight).
-   The packaged 0% probe would require amending the shared e2e bootstrap,
-   which this slice's brief forbids. The 0% branch is gated deterministically
-   at the jsdom + CSS-contract tier; the packaged tier proves the track
-   treatment. A future bootstrap seed lane is the named upgrade path.
+4. PACKAGED GATE (required primary acceptance, per QA): the authorized
+   `zero-progress` bootstrap seed lane places a 500-page fixture at page 2
+   (→ 0% in flight, stamped most-recently-opened so it IS the resume line);
+   the packaged journey asserts the empty modifier present, the accent nub
+   token-equal to the fill, the hollow track, and the "0%" readout — with
+   the 40% book asserted modifier-free in the no-key lane as the contrast
+   pair. The gate FAILS (never skips) if the seed is absent (packaged RED
+   tripwire).
 
 ### User Story 3 — Keep the home legible at every width and text scale (P2)
 
@@ -81,30 +82,32 @@ maximum 150% UI text scale.
 **Independent test**: packaged journey at 640/1200/2560 — no horizontal
 overflow, controls visible and clickable; keyboard-only tab walk reaches
 Resume then Read aloud in DOM order with a visible focus indicator, and Enter
-on the focused control fires the same action as click; the public UI-scale
-slider set to 150% leaves the resume controls visible with no overflow at 640. Rem-based sizing is retained by a CSS contract (no px font sizes in the
-slice's stylesheet).
+on the focused control fires the same action as click. The DECLARED 125%
+scale state is explicitly observed (inline `documentElement.style.fontSize`
+=== "125%", asserted not inferred); an optional stronger run drives the
+public slider to its 150% max and re-probes. Rem-based sizing is retained by
+a CSS contract (no px font sizes in the slice's stylesheet).
 
 **Acceptance scenarios**:
 
-1. At 640/1200/2560 (100% scale): no horizontal overflow; "Read aloud" is
-   visible and clickable.
+1. At 640/1200/2560 (declared 125% scale): no horizontal overflow; "Read
+   aloud" is visible and clickable.
 2. Keyboard-only: Tab order within the resume line is Resume → Read aloud
    (DOM order); the focused control matches `:focus-visible`; Enter fires the
    read-aloud action (no page turn beyond the stored page; idle stays idle in
    the no-key lane).
-3. At 150% UI scale (public slider, its max): controls remain visible, no
-   horizontal overflow at 640; stylesheet keeps rem-based type.
+3. The declared 125% state is explicitly observed before any increased-scale
+   run; the optional 150% run (public slider, its max) keeps controls visible
+   with no overflow at 640; stylesheet keeps rem-based type.
 4. No dialog or popover is touched by this slice, so Escape-focus-return is
    n/a here (the rename dialog's existing behavior is out of scope).
 
-### User Story 4 — Create a shelf without losing the form (P3, stretch)
+### User Story 4 — Create a shelf without losing the form (P3, stretch — DROPPED)
 
-As a reader with many shelves, the New shelf form stays pinned while the shelf
-list scrolls.
-
-**Independent test**: create enough shelves through the public form to overflow
-the list at a short window height; the form remains visible in the viewport.
+DROPPED from this slice at review: the packaged 640×500 pinning probe could
+not hold without touching layout outside the owned files, and the stretch is
+optional. The `ShelfSidebar.css` change was reverted to the parent commit;
+the #183 bullet remains open debt for a future slice.
 
 ## Scope (bounded slice)
 
@@ -112,26 +115,28 @@ the list at a short window height; the form remains visible in the viewport.
   0% empty-track state.
 - `src/components/library/ResumeSection.css` — wrap behavior, hollow track,
   0% start-nub modifier.
-- `src/components/library/ShelfSidebar.css` — pin the New shelf form outside
-  the scrolling list (#183: "keep the New shelf form near the shelf list /
-  pinned when the list scrolls"). NON-BLOCKING STRETCH: primary acceptance is
-  resume/read-aloud + 0% distinctness; a shelf-probe failure is reported as a
-  secondary finding and cannot displace the primary verdict.
+- `src/components/library/ShelfSidebar.css` — DROPPED (was the New-shelf-form
+  pinning stretch); reverted to the parent state, #183 bullet stays open
+  debt. See User Story 4.
 - Targeted tests: new `library-202-affordances` control-state + CSS-contract
   tests (including 150% UI-scale retention guards and DOM tab-order);
   mechanical accessible-name updates in `ResumeSection.test.tsx` and
   `resume-and-play.test.tsx` (same strictness, new name shape).
+- `src/e2e-native-bootstrap.ts` — ONE narrowly named additive seed lane
+  `zero-progress` (authorized durably by tauri-pdf-eng; every existing seed
+  lane preserved verbatim; ownership of this file granted to this seat
+  alone; no actor-side mutation). The zero fixture comes from the unique
+  `scripts/gen-e2e-zero-fixture.mjs` (no shared-script edits).
 - Packaged journey `e2e/library-202-journey.e2e.mjs` + runner
   `e2e/run-202-library-journey.sh` (flock `/tmp/lectrice-heavy-gate.lock`),
-  using EXISTING seed lanes and fixtures only.
+  lane-gated its (`E2E_202_LANE`), frontend build on the pinned devShell
+  pnpm.
 
 ## Out of scope (hard bans from brief)
 
-- `useOpenPdf` / `usePdfDropSession` / `Toolbar`, the shared e2e bootstrap
-  (`src/e2e-native-bootstrap.ts` — including its seed lanes; the earlier
-  coordinator grant for an additive seed is WITHDRAWN in favour of the
-  reviewer's lower-risk alternative), provider state, fleet-shared tokens,
-  `.github`.
+- `useOpenPdf` / `usePdfDropSession` / `Toolbar`, any bootstrap change beyond
+  the ONE authorized additive `zero-progress` seed lane, provider state,
+  fleet-shared tokens, `.github`.
 - Any second settings/transport surface; sort-select contrast (separate
   #183 bullet, needs the packaged contrast sweep — not this slice).
 - Merge authority, done-state assertion, parent-branch edits.
@@ -166,36 +171,36 @@ the list at a short window height; the form remains visible in the viewport.
   clips the labeled buttons; the actions stay focus-reachable in DOM order.
 - No horizontal overflow at 640/1200/2560 in the packaged journey.
 
-### FR-4 New-shelf form pinned (stretch, same component family)
-
-- The shelf LIST is the scroll container (`.shelf-list { flex:1; min-height:0;
-overflow-y:auto }`); `.shelf-sidebar` stops scrolling itself, so the form
-  stays visible whenever the list overflows.
-
-### FR-5 Packaged zero-progress seed (test seam only, no product change)
+### FR-4 Packaged zero-progress seed (test seam only, no product change)
 
 - Bootstrap gains seed lane `zero-progress`: additionally registers a
-  250-page fixture at page 2 (→ 0%) when the observer pre-placed
-  `e2e-resume-fixture-zero.pdf` in the profile. All existing lanes and their
-  fixtures behave exactly as before.
+  500-page fixture at page 2 (→ 0%) when the observer pre-placed
+  `e2e-resume-fixture-zero.pdf` in the profile, then stamps it
+  most-recently-opened so the resume LINE is the 0% book (the 40% fixture A
+  drops to the row — the contrast pair in one run). All existing lanes and
+  their fixtures behave exactly as before.
 
 ## Acceptance (executable)
 
 1. RED-first `library-202-affordances` tests: visible "Read aloud" text;
    accessible names; 0% empty-modifier present at 0% / absent at >0%;
-   CSS contract (wrap, hollow track, nub, pinned form) — all fail before the
-   implementation, pass after.
+   CSS contract (wrap, hollow track, nub) — fail before the
+   implementation, pass after (first-red receipt at 951c342).
 2. Updated name-shape assertions in `ResumeSection.test.tsx` +
    `resume-and-play.test.tsx` keep their strictness (role+name driven).
 3. Seeded fuzz `pnpm test:fuzz` green (seed + replay recorded).
-4. Packaged journey (both lanes, under the shared heavy lock, existing seeds
-   only): "Read aloud" visible + clickable at 640/1200/2560; no horizontal
-   overflow; click lands the stored page with NO page turn; keyboard-only
-   Tab/Enter path fires the same action with a `:focus-visible` indicator;
-   150% UI-scale probe keeps controls visible without overflow at 640; no-key
-   lane stays idle with the honest setup signal; key lane reaches `playing`
-   via the labeled control; shelf form stays visible with a scrolled list
-   (stretch, non-blocking).
+4. Packaged journey (three lanes, under the shared heavy lock, lane-gated
+   its with explicit EXECUTED/SKIPPED identity):
+   - no-key: "Read aloud" visible + labeled at 640/1200/2560; no overflow;
+     hollow track with NO empty modifier at 40%; EXPLICIT declared-125%
+     observation; keyboard-only Tab/Enter path with `:focus-visible`, lands
+     the stored page, NO page turn, idle + honest setup signal; optional
+     150% run after the 125% observation.
+   - key: the row-level labeled control reaches `playing`.
+   - zero: the named packaged 0% gate — empty modifier, accent nub
+     (token-equal to the fill), hollow track, "0%" readout on the line;
+     hard RED tripwire when the seed is absent; keyboard path on the zero
+     book.
 5. Evidence in `docs/evidence/202-*` + run-root `reports/library.md`.
 
 ## Risks

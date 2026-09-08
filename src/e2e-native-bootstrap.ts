@@ -205,6 +205,44 @@ async function seedLibraryProfile(): Promise<void> {
     }
   }
 
+  // Slice 202 zero-progress lane (#183 tail): the packaged 0%-vs-divider
+  // gate needs a 0% IN-FLIGHT book, which no public control or existing
+  // seed can produce (fresh adds start at page 1 = "unread"). Authorized
+  // narrowly by tauri-pdf-eng (durable in briefs/library.md): a 500-page
+  // fixture registered at page 2 → round(2/500*100) = 0% while
+  // readingState() is "reading", then stamped most-recently-opened so the
+  // resume LINE is the 0% book (fixture A drops to the row — the contrast
+  // pair in one run). Purely additive: every lane above is untouched, and
+  // no actor ever mutates stores/IPC directly (this is pre-render seeding).
+  if (SEED_LANE === "zero-progress") {
+    const zeroPath = `${PROFILE_DIR}/e2e-resume-fixture-zero.pdf`;
+    const knownZero = await commands.libraryGetDocumentByPath(zeroPath);
+    if (knownZero.status === "error")
+      throw new Error(`probe zero: ${knownZero.error}`);
+    if (!knownZero.data) {
+      const addedZero = await commands.libraryAddDocument(
+        zeroPath,
+        "E2E Zero Progress Fixture",
+        500,
+        null,
+      );
+      if (addedZero.status === "error")
+        throw new Error(`seed zero: ${addedZero.error}`);
+      const progZero = await commands.libraryUpdateProgress(
+        addedZero.data.id,
+        2,
+        null,
+        null,
+      );
+      if (progZero.status === "error")
+        throw new Error(`seed zero progress: ${progZero.error}`);
+      // Stamped AFTER A, so the zero book is the resume line's primary.
+      const openedZero = await commands.libraryOpenDocument(addedZero.data.id);
+      if (openedZero.status === "error")
+        throw new Error(`stamp zero: ${openedZero.error}`);
+    }
+  }
+
   // The read oracle's target: the seeded resume book.
   seededDocId = docAId;
 }

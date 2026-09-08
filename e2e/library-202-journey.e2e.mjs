@@ -208,9 +208,21 @@ async function keyboardJourney(targetLabel, storedPage) {
   );
 }
 
+/** Explicit lane identity: an inactive lane's early return must be visible
+ * as SKIPPED in the run output — never masquerade as an executed pass. */
+function laneGate(expected) {
+  const lane = process.env.E2E_202_LANE;
+  if (lane !== expected) {
+    console.info(`[library-202] lane=${lane} it="${expected}" SKIPPED (this run is lane ${lane})`);
+    return false;
+  }
+  console.info(`[library-202] lane=${lane} it="${expected}" EXECUTED`);
+  return true;
+}
+
 describe("Packaged library-202 journey (#183 tail: labels, 0% vs divider, scale)", () => {
   it("no-key lane: visible labels, width matrix, declared 125%, keyboard-only path, optional 150%", async () => {
-    if (process.env.E2E_202_LANE !== "no-key") return; // skipped, not passed
+    if (!laneGate("no-key")) return;
     await waitReady();
     await browser.setWindowSize(1200, 800);
 
@@ -296,7 +308,7 @@ describe("Packaged library-202 journey (#183 tail: labels, 0% vs divider, scale)
   });
 
   it("key lane: the row's labeled control drives narration from the home", async () => {
-    if (process.env.E2E_202_LANE !== "key") return; // skipped, not passed
+    if (!laneGate("key")) return;
     await waitReady();
     await browser.setWindowSize(1200, 800);
 
@@ -338,13 +350,16 @@ describe("Packaged library-202 journey (#183 tail: labels, 0% vs divider, scale)
   });
 
   it("zero lane: 0% in-flight book reads as progress — empty modifier, accent nub, hollow track", async () => {
-    if (process.env.E2E_202_LANE !== "zero") return; // skipped, not passed
+    if (!laneGate("zero")) return;
     await waitReady();
     await browser.setWindowSize(1200, 800);
 
     // RED TRIPWIRE (packaged tier): the zero-progress seed must be present —
     // a 0% in-flight book is unreachable through any public control, so a
     // missing seed means the gate cannot run and MUST fail, never skip.
+    // (Wait for the line to exist first: the home's mount query is async.)
+    const lineMetaEl = await $(".resume-line-meta");
+    await lineMetaEl.waitForExist({ timeout: 15000 });
     const lineMeta = await browser.execute(
       () => document.querySelector(".resume-line-meta")?.textContent ?? "",
     );
