@@ -1,14 +1,10 @@
-/* #183: the LIST is the scroll container (flex:1 + min-height:0 so it
-   fills and shrinks inside the flex column); the sidebar itself stops
-   scrolling, so the New shelf form stays pinned and visible however long
-   the shelf list grows. */
 .shelf-sidebar {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
   width: 200px;
   flex-shrink: 0;
-  overflow: hidden;
+  overflow-y: auto;
   padding-right: var(--space-3);
   border-right: 1px solid var(--border-color, #ddd);
 }
@@ -20,9 +16,6 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
 }
 
 .shelf-row {
@@ -114,8 +107,7 @@
   grid-template-columns: 1fr auto;
   gap: var(--space-2);
   align-items: center;
-  /* Pinned by the sidebar's overflow:hidden above — no margin-top:auto
-     growth into the scroll region any more. */
+  margin-top: auto;
   padding-top: var(--space-3);
   border-top: 1px solid var(--border-color, #ddd);
 }

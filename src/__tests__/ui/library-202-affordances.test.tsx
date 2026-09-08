@@ -12,10 +12,11 @@
  *   FR-2  a 0% in-flight book renders the empty-track state
  *         (`resume-line-bar--empty`, accent start nub) and the track is a
  *         hollow container (inset ring), so it never reads as a divider.
- *   FR-3  the actions wrap at narrow widths, the stylesheet stays
- *         rem-based (legible at increased UI text scale — 125% declared,
- *         150% slider max), and the New shelf form is pinned outside the
- *         scrolling shelf list (stretch).
+ *   FR-3  the actions wrap at narrow widths and the stylesheet stays
+ *         rem-based (legible at the declared 125% UI text scale — the
+ *         150% slider max is exercised in the packaged journey). The New
+ *         shelf form pinning (#183 stretch) was DROPPED from this slice —
+ *         optional scope cut at review; the #183 bullet remains open debt.
  *
  * CSS assertions follow the repo's established source-contract pattern
  * (library-legibility.test.ts): the packaged computed-style checks live in
@@ -29,9 +30,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { render, screen } from "@testing-library/react";
 import { ResumeSection } from "../../components/library/ResumeSection";
-import { ShelfSidebar } from "../../components/library/ShelfSidebar";
 import type { Document } from "../../lib/schemas";
-import type { Collection } from "../../lib/schemas";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const read = (path: string) => readFileSync(resolve(ROOT, path), "utf8");
@@ -217,44 +216,5 @@ describe("FR-3: legibility contract (wrap, hollow track, rem scale, pinned form)
     // The app declares 125% root scale (slider max 150%); px font sizes
     // would opt this surface out of both.
     expect(css).not.toMatch(/font-size:\s*[\d.]+px/);
-  });
-
-  it("pins the New shelf form outside the scrolling shelf list (stretch)", () => {
-    const shelfCss = read("src/components/library/ShelfSidebar.css");
-    const sidebar = shelfCss.match(/\.shelf-sidebar\s*\{([^}]*)\}/s)?.[1] ?? "";
-    const list = shelfCss.match(/\.shelf-list\s*\{([^}]*)\}/s)?.[1] ?? "";
-
-    // The LIST is the scroll container; the sidebar itself stops scrolling,
-    // so the form stays visible when the list overflows.
-    expect(list).toMatch(/flex(?:-grow)?:\s*1/);
-    expect(list).toMatch(/min-height:\s*0/);
-    expect(list).toMatch(/overflow-y:\s*auto/);
-    expect(sidebar).toMatch(/overflow:\s*hidden/);
-    expect(sidebar).not.toMatch(/overflow-y:\s*auto/);
-  });
-
-  it("RETENTION: the shelf form still renders below a long shelf list", () => {
-    const shelves = Array.from({ length: 30 }, (_, i) => ({
-      id: `shelf-${i}`,
-      name: `Shelf ${i}`,
-      documentCount: 0,
-    })) as unknown as Collection[];
-
-    render(
-      <ShelfSidebar
-        shelves={shelves}
-        selectedShelfId={null}
-        totalCount={0}
-        unfiledCount={0}
-        onSelect={noop}
-        onCreate={noop}
-        onRename={noop}
-        onDelete={noop}
-      />,
-    );
-
-    expect(screen.getByText("New shelf")).toBeInTheDocument();
-    expect(screen.getByLabelText("New shelf")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Add" })).toBeInTheDocument();
   });
 });

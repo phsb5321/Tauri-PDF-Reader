@@ -2,40 +2,49 @@
 #
 # Reproducible runner for the packaged library-202 journey E2E
 # (e2e/library-202-journey.e2e.mjs) — the user-gate lane for slice 202
-# (#183 tail: labeled read-aloud controls, 0%-vs-divider track treatment,
-# width/scale legibility, keyboard reachability, pinned New shelf form).
+# (#183 tail: labeled read-aloud controls, 0%-vs-divider packaged gate via
+# the authorized zero-progress seed, declared-125% + keyboard reachability).
 #
 # HEAVY LANE — holds the shared serial-work lock for its whole run:
 #
 #   flock -w 1500 is taken on /tmp/lectrice-heavy-gate.lock (bounded wait;
 #   the runner refuses with BLOCKED rather than racing QA/siblings).
 #
-# Two lanes, one spec; the lane decides seed + TTS env (same contract as
-# scripts/e2e-home.sh):
+# THREE lanes, one spec; the lane decides seed + TTS env (contract of
+# scripts/e2e-home.sh) AND exports E2E_202_LANE so the spec's lane-gated
+# its are distinguishable from skipped ones in evidence:
 #
-#   E2E_LANE=no-key   (default) VITE_E2E_NATIVE_TTS=none, seed=single
-#   E2E_LANE=key      VITE_E2E_NATIVE_TTS=fixture, seed=dual
-#   E2E_202_LANES="no-key key" (default: both, serial, one lock hold)
+#   no-key   VITE_E2E_NATIVE_TTS=none,    seed=single
+#   key      VITE_E2E_NATIVE_TTS=fixture, seed=dual
+#   zero     VITE_E2E_NATIVE_TTS=none,    seed=zero-progress
+#            (the ONE authorized additive bootstrap seed: a 500-page fixture
+#            registered at page 2 → 0% in flight; all existing seeds
+#            preserved; no actor-side mutation)
+#   E2E_202_LANES="no-key key zero" (default: all three, serial, one lock)
 #
 # Hermetic profile via the SHARED helpers (scripts/e2e-profile.sh +
-# scripts/e2e-toolchain.sh + scripts/gen-e2e-fixtures.mjs) — unchanged
-# fixtures; this slice adds NO bootstrap seed (the 0% packaged probe is
-# documented as a seam gap; the jsdom suite owns that branch).
+# scripts/e2e-toolchain.sh + scripts/gen-e2e-fixtures.mjs); the zero lane
+# additionally generates scripts/gen-e2e-zero-fixture.mjs (unique file, no
+# shared-script edits).
 #
-# The cargo build is bounded separately (timeout 1500s) and reports
+# The FRONTEND build runs INSIDE the pinned devShell (pinned pnpm — the host
+# pnpm is not used), then the bounded cargo build (timeout 1500s) reports
 # BLOCKED-with-reason on timeout — a build timeout is NOT a journey verdict
-# (the 08/09 #200 seat's 900s cold-build timeout is the recorded precedent).
+# (08/09 #200 seat's 900s cold-build timeout is the recorded precedent).
 #
-# Xvfb screen is 3200x1400 so the journey's 2560px width fits.
+# Xvfb screen is 3200x1400 so the journey's 2560px width fits. Identity is
+# recorded per lane: git head + binary sha256 + lane exit.
 #
-# Requires on PATH: pnpm, node, tauri-driver (~/.cargo/bin); nix provides
-# WebKitGTK/GTK + Xvfb.
-#     E2E_LANE=no-key bash e2e/run-202-library-journey.sh
-#     E2E_202_LANES="no-key key" bash e2e/run-202-library-journey.sh
+# Requires on PATH: node, tauri-driver (~/.cargo/bin); nix provides the
+# WebKitGTK/GTK toolchain, Xvfb and the pinned pnpm.
+#     E2E_202_LANES="zero" bash e2e/run-202-library-journey.sh
+#     bash e2e/run-202-library-journey.sh   (all three lanes)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 LOCK_PATH=/tmp/lectrice-heavy-gate.lock
+
+echo "== library-202 journey identity: head=$(git rev-parse HEAD) branch=$(git branch --show-current)"
 
 # One lock hold for the whole run (bounded wait, then BLOCKED — never race).
 exec 9>"$LOCK_PATH"
@@ -44,14 +53,15 @@ if ! flock -w 1500 9; then
   exit 3
 fi
 
-mapfile -t LANES < <(tr ' ' '\n' <<< "${E2E_202_LANES:-no-key key}")
+mapfile -t LANES < <(tr ' ' '\n' <<< "${E2E_202_LANES:-no-key key zero}")
 
 OVERALL=0
 for LANE in "${LANES[@]}"; do
   case "$LANE" in
     no-key) TTS_ENV="none"; SEED_ENV="single" ;;
     key)    TTS_ENV="fixture"; SEED_ENV="dual" ;;
-    *) echo "ERROR: unknown E2E_LANE=$LANE (no-key|key)" >&2; exit 2 ;;
+    zero)   TTS_ENV="none"; SEED_ENV="zero-progress" ;;
+    *) echo "ERROR: unknown lane=$LANE (no-key|key|zero)" >&2; exit 2 ;;
   esac
 
   # Fresh hermetic profile PER LANE (the helper mktemps a new dir per run).
@@ -61,21 +71,19 @@ for LANE in "${LANES[@]}"; do
   APP_DIR="$E2E_PROFILE_DIR/com.lectrice.reader"
   mkdir -p "$APP_DIR"
   node scripts/gen-e2e-fixtures.mjs "$APP_DIR"
+  if [ "$LANE" = "zero" ]; then
+    node scripts/gen-e2e-zero-fixture.mjs "$APP_DIR"
+  fi
 
-  echo "==> [lane=$LANE] Building frontend (VITE_E2E_NATIVE=true, seed=$SEED_ENV)"
-  VITE_E2E_NATIVE=true \
-    VITE_E2E_NATIVE_TTS="$TTS_ENV" \
-    VITE_E2E_NATIVE_SEED="$SEED_ENV" \
-    VITE_E2E_PROFILE_DIR="$APP_DIR" \
-    pnpm build
-  # Force tauri::generate_context! to re-embed the freshly built dist/.
-  touch src-tauri/src/lib.rs
-
-  echo "==> [lane=$LANE] Building debug binary (bounded 1500s) + running journey under Xvfb"
-  # toolchain_run (NOT toolchain_exec: that execs away the process and a
-  # second lane would never run). Exit status propagates through nix develop.
+  echo "==> [lane=$LANE] Building (frontend on the PINNED devShell pnpm) + journey under Xvfb"
+  # toolchain_run (NOT toolchain_exec: that execs away the process and the
+  # remaining lanes would never run). Exit status propagates through nix
+  # develop. Frontend build AND cargo build both run inside the pinned shell.
   if ! toolchain_run "
     set -euo pipefail
+    export VITE_E2E_NATIVE=true VITE_E2E_NATIVE_TTS='$TTS_ENV' VITE_E2E_NATIVE_SEED='$SEED_ENV' VITE_E2E_PROFILE_DIR='$APP_DIR'
+    pnpm build
+    touch src-tauri/src/lib.rs
     if ! timeout 1500 cargo build --features e2e-tts-fixture --manifest-path src-tauri/Cargo.toml; then
       echo 'BLOCKED: cargo build timed out (1500s) or failed — build identity unknown, NOT a journey verdict' >&2
       exit 4
@@ -92,12 +100,12 @@ for LANE in "${LANES[@]}"; do
     [ -n \"\$DISPNUM\" ] || { echo 'ERROR: Xvfb failed to start' >&2; exit 1; }
     export DISPLAY=:\$DISPNUM
     echo \"Xvfb ready on DISPLAY=\$DISPLAY profile=\$XDG_DATA_HOME\"
-    E2E_SPEC=./e2e/library-202-journey.e2e.mjs pnpm test:e2e
+    E2E_SPEC=./e2e/library-202-journey.e2e.mjs E2E_202_LANE='$LANE' pnpm test:e2e
   "; then
-    echo "==> [lane=$LANE] FAILED" >&2
+    echo "==> [lane=$LANE] FAILED (head=$(git rev-parse HEAD) binary=$(sha256sum "$E2E_APP_PATH" 2>/dev/null | cut -c1-16 || echo unknown))" >&2
     OVERALL=1
   else
-    echo "==> [lane=$LANE] PASSED"
+    echo "==> [lane=$LANE] PASSED (head=$(git rev-parse HEAD) binary=$(sha256sum "$E2E_APP_PATH" 2>/dev/null | cut -c1-16 || echo unknown))"
   fi
 done
 
