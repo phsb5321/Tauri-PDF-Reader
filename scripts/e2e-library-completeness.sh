@@ -113,6 +113,27 @@ SQL
   MEMBER_COUNT=$(sqlite3 "$DB" "SELECT COUNT(*) FROM session_documents;")
   [ "$MEMBER_COUNT" = 1 ] || { echo "ERROR: dropped session does not contain exactly one PDF row" >&2; exit 1; }
 
+  # Issue #185: the invalid drop must also be pinned at the documents table —
+  # not only sessions/members. Expected: the 2 legacy rows + the 1 dropped PDF,
+  # and NOTHING from the rejected non-PDF drag.
+  DOCUMENT_COUNT=$(sqlite3 "$DB" "SELECT COUNT(*) FROM documents;")
+  [ "$DOCUMENT_COUNT" = 3 ] || { echo "ERROR: expected exactly three document rows (2 legacy + 1 dropped; invalid drop adds none), got $DOCUMENT_COUNT" >&2; exit 1; }
+
+  # Pin the DB counts into the receipt so the packaged journey carries them.
+  # (No single quotes here: this whole body is a toolchain_exec argument.)
+  export DOCUMENT_COUNT SESSION_COUNT MEMBER_COUNT
+  node - <<EOF
+const fs = require("fs");
+const out = process.env.LIBRARY_COMPLETENESS_OUT;
+const receipt = JSON.parse(fs.readFileSync(out, "utf8"));
+receipt.dropDbCounts = {
+  documents: Number(process.env.DOCUMENT_COUNT),
+  sessions: Number(process.env.SESSION_COUNT),
+  members: Number(process.env.MEMBER_COUNT),
+};
+fs.writeFileSync(out, JSON.stringify(receipt, null, 2) + "\n");
+EOF
+
   # Pinned Tauri/plugin-fs behavior: all native dropped paths are scoped before
   # the frontend event. The app rejects this invalid drop without a row/session,
   # but the dependency scope side effect is retained as evidence for issue #184.

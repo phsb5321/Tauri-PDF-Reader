@@ -3,10 +3,24 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Document } from "../lib/schemas";
 import type { NativeFileDropEvent } from "../lib/api/file-drop";
 import { droppedSessionName, usePdfDropSession } from "./usePdfDropSession";
+import { useOpenPdf } from "./useOpenPdf";
+import { useDocumentStore } from "../stores/document-store";
+import { mockInvoke } from "../../tests/setup";
 
 vi.mock("../lib/api/file-drop", () => ({
   onNativeFileDrop: vi.fn(),
 }));
+
+vi.mock("../services/pdf-service", () => ({
+  pdfService: { loadDocument: vi.fn(), loadDocumentBound: vi.fn() },
+  isScopeDenial: (e: unknown) =>
+    /not allowed on the configured scope|forbidden path: .*not allowed on the scope/i.test(
+      e instanceof Error ? e.message : String(e),
+    ),
+}));
+
+const { pdfService } = await import("../services/pdf-service");
+const loadDocument = vi.mocked(pdfService.loadDocument);
 
 const { onNativeFileDrop } = await import("../lib/api/file-drop");
 const subscribe = vi.mocked(onNativeFileDrop);
@@ -43,6 +57,10 @@ beforeEach(() => {
     emit = handler;
     return unlisten;
   });
+  useDocumentStore.getState().reset();
+  loadDocument.mockReset();
+  mockInvoke.mockReset();
+  mockInvoke.mockResolvedValue(null);
 });
 
 function dependencies() {
@@ -86,6 +104,9 @@ describe("usePdfDropSession", () => {
 
     expect(deps.openDroppedPdf).toHaveBeenCalledWith(
       "/books/Data Engineering.pdf",
+      // The drop transaction holds the open lease itself (issue #185); the
+      // import runs inside it instead of acquiring its own.
+      { leaseHeldByCaller: true },
     );
     expect(deps.createSession).toHaveBeenCalledWith("Data Engineering", [
       document.id,
@@ -161,6 +182,79 @@ describe("usePdfDropSession", () => {
 
     expect(deps.onSessionCreated).not.toHaveBeenCalled();
     expect(deps.onError).toHaveBeenCalledWith("DROP_FAILED: restore failed");
+  });
+
+  it("consumes the restore authority's success=false rejection (issue #185)", async () => {
+    // The store is the single success=false decision point; the drop flow
+    // only consumes its rejection: roll the session back, surface the code,
+    // never activate.
+    const deps = dependencies();
+    deps.restoreSession.mockRejectedValue(
+      new Error(
+        "SESSION_RESTORE_FAILED: The reading session could not be restored — the reader stayed on the current document. Try again.",
+      ),
+    );
+    renderHook(() => usePdfDropSession(deps));
+    await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      emit({ type: "drop", paths: ["/books/one.pdf"] });
+    });
+    await waitFor(() =>
+      expect(deps.deleteSession).toHaveBeenCalledWith("session-1"),
+    );
+
+    expect(deps.onSessionCreated).not.toHaveBeenCalled();
+    expect(deps.onError).toHaveBeenCalledWith(
+      expect.stringContaining("DROP_FAILED: SESSION_RESTORE_FAILED"),
+    );
+  });
+
+  it("holds one open lease from import start through session activation (issue #185)", async () => {
+    // Falsifier for the old release/re-acquire boundary: the first code that
+    // used to run AFTER `openDroppedPdf` released the shared open mutex was
+    // `createSession`. The lease must already be held there — and a competing
+    // public open attempted in that window must be refused, not interleaved.
+    const deps = dependencies();
+    let leaseHeldAtOldBoundary: boolean | null = null;
+    let resolveCreate: (value: typeof session) => void = () => {};
+    deps.createSession.mockImplementation(() => {
+      leaseHeldAtOldBoundary = useDocumentStore.getState().isLoading;
+      return new Promise<typeof session>((resolve) => {
+        resolveCreate = resolve;
+      });
+    });
+
+    const { result } = renderHook(() => ({
+      drop: usePdfDropSession(deps),
+      open: useOpenPdf(),
+    }));
+    await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      emit({ type: "drop", paths: ["/books/Data Engineering.pdf"] });
+    });
+    await waitFor(() => expect(deps.createSession).toHaveBeenCalled());
+    expect(leaseHeldAtOldBoundary).toBe(true);
+
+    // A rapid second public action in the transaction window must be refused
+    // with the shared-store busy error — never loaded over the in-flight
+    // transaction's document.
+    let resumed: boolean | undefined;
+    await act(async () => {
+      resumed = await result.current.open.resumeDocument(document);
+    });
+    expect(resumed).toBe(false);
+    expect(loadDocument).not.toHaveBeenCalled();
+    expect(useDocumentStore.getState().error).toContain("OPEN_BUSY");
+
+    // The transaction itself completes once its own steps resolve.
+    await act(async () => resolveCreate(session));
+    await waitFor(() => expect(deps.onSessionCreated).toHaveBeenCalled());
+    expect(useDocumentStore.getState().isLoading).toBe(false);
+    // The refused resume reported through the document store, not the drop
+    // flow's error channel; the transaction itself succeeded.
+    expect(deps.onError).not.toHaveBeenCalled();
   });
 
   it("unsubscribes on unmount, including a subscription that resolves late", async () => {

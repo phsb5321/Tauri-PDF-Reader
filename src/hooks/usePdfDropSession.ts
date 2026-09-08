@@ -7,6 +7,7 @@ import {
   onNativeFileDrop,
   type NativeFileDropEvent,
 } from "../lib/api/file-drop";
+import { beginOpenTransaction } from "../stores/document-store";
 import type { Document } from "../lib/schemas";
 
 const SESSION_NAME_MAX_BYTES = 100;
@@ -17,7 +18,10 @@ export interface PdfDropStatus {
 }
 
 interface UsePdfDropSessionOptions {
-  openDroppedPdf: (filePath: string) => Promise<Document | null>;
+  openDroppedPdf: (
+    filePath: string,
+    options?: { leaseHeldByCaller?: boolean },
+  ) => Promise<Document | null>;
   createSession: (
     name: string,
     documentIds: string[],
@@ -80,17 +84,32 @@ export function usePdfDropSession({
         return;
       }
 
+      // Issue #185: ONE lease held from import start through session
+      // activation. Releasing it between the import and the session steps
+      // let a rapid second public action interleave and reopen the wrong
+      // document under this transaction's session.
+      const releaseLease = beginOpenTransaction();
+      if (!releaseLease) {
+        onError("OPEN_BUSY: Wait for the current PDF to finish opening.");
+        return;
+      }
+
       inFlightRef.current = true;
       setIsImporting(true);
       setStatus(null);
       let createdSession: ReadingSession | null = null;
       try {
-        const document = await openDroppedPdf(paths[0]);
+        const document = await openDroppedPdf(paths[0], {
+          leaseHeldByCaller: true,
+        });
         if (!document) return;
 
         const name = droppedSessionName(document);
         const session = await createSession(name, [document.id]);
         createdSession = session;
+        // The store is the single restore-success authority: it rejects when
+        // the backend resolves `success=false`, so a failed restore takes the
+        // same rollback path as any other activation failure (#185).
         await restoreSession(session.id);
         onSessionCreated(document, session);
         setStatus({ kind: "success", message: `Session “${name}” created` });
@@ -110,6 +129,7 @@ export function usePdfDropSession({
         }
         onError(`DROP_FAILED: ${message}${rollback}`);
       } finally {
+        releaseLease();
         inFlightRef.current = false;
         setIsImporting(false);
       }

@@ -18,7 +18,10 @@
 import { useCallback } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { useFileDialog, FILE_FILTERS } from "./useFileDialog";
-import { useDocumentStore } from "../stores/document-store";
+import {
+  useDocumentStore,
+  beginOpenTransaction,
+} from "../stores/document-store";
 import { isScopeDenial, pdfService } from "../services/pdf-service";
 import {
   libraryAddDocument,
@@ -31,7 +34,7 @@ import type { Document } from "../lib/schemas";
 /** Provides the shared open-a-document actions. */
 export function useOpenPdf() {
   const { openFile } = useFileDialog();
-  const { setDocument, setPdfDocument, setLoading, setError, setCurrentPage } =
+  const { setDocument, setPdfDocument, setError, setCurrentPage } =
     useDocumentStore();
 
   /**
@@ -179,12 +182,13 @@ export function useOpenPdf() {
 
   /** Pick a PDF through the native dialog and open it. */
   const openPdf = useCallback(async (): Promise<boolean> => {
-    if (useDocumentStore.getState().isLoading) {
+    // Issue #185: the open mutex is held for the whole dialog + import body.
+    const releaseLease = beginOpenTransaction();
+    if (!releaseLease) {
       setError("OPEN_BUSY: Wait for the current PDF to finish opening.");
       return false;
     }
     try {
-      setLoading(true);
       setError(null);
       const selected = await openFile({
         multiple: false,
@@ -201,9 +205,9 @@ export function useOpenPdf() {
       console.error("Error opening PDF:", error);
       return false;
     } finally {
-      setLoading(false);
+      releaseLease();
     }
-  }, [openAuthorizedPath, openFile, setError, setLoading]);
+  }, [openAuthorizedPath, openFile, setError]);
 
   /**
    * Open a path received from Tauri's native drop stream.
@@ -213,13 +217,20 @@ export function useOpenPdf() {
    * reuses the same hash-bound import sequence as `openPdf`.
    */
   const openDroppedPdf = useCallback(
-    async (filePath: string): Promise<Document | null> => {
-      if (useDocumentStore.getState().isLoading) {
+    async (
+      filePath: string,
+      options?: { leaseHeldByCaller?: boolean },
+    ): Promise<Document | null> => {
+      // When the drop-to-session transaction already holds the open lease,
+      // this import runs inside it (issue #185). Direct callers get the
+      // fail-fast guard instead.
+      const leaseHeldByCaller = options?.leaseHeldByCaller === true;
+      const releaseLease = leaseHeldByCaller ? null : beginOpenTransaction();
+      if (!leaseHeldByCaller && !releaseLease) {
         setError("OPEN_BUSY: Wait for the current PDF to finish opening.");
         return null;
       }
       try {
-        setLoading(true);
         setError(null);
         if (!/\.pdf$/i.test(filePath)) {
           throw new Error(
@@ -234,10 +245,10 @@ export function useOpenPdf() {
         console.error("Error opening dropped PDF:", error);
         return null;
       } finally {
-        setLoading(false);
+        releaseLease?.();
       }
     },
-    [openAuthorizedPath, setError, setLoading],
+    [openAuthorizedPath, setError],
   );
 
   /**
@@ -254,8 +265,15 @@ export function useOpenPdf() {
    */
   const resumeDocument = useCallback(
     async (document: Document): Promise<boolean> => {
+      // Issue #185: library/session resume is a public open like any other;
+      // hold the shared open mutex across the whole resume (reauthorization
+      // dialog included) instead of racing an in-flight transaction.
+      const releaseLease = beginOpenTransaction();
+      if (!releaseLease) {
+        setError("OPEN_BUSY: Wait for the current PDF to finish opening.");
+        return false;
+      }
       try {
-        setLoading(true);
         setError(null);
 
         let pdf: PDFDocumentProxy;
@@ -316,10 +334,10 @@ export function useOpenPdf() {
         console.error("Error resuming document:", error);
         return false;
       } finally {
-        setLoading(false);
+        releaseLease();
       }
     },
-    [setLoading, setError, showInReader, reauthorizeAccess],
+    [setError, showInReader, reauthorizeAccess],
   );
 
   return { openPdf, openDroppedPdf, resumeDocument };
