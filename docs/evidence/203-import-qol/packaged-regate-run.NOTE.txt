@@ -1,0 +1,14 @@
+14:58:08-15:00:02 BRT 08/09/2026 — TERMINATED (SIGTERM, exit 143) during the
+cold cargo build, BEFORE any assertion ran. Coordinator stopped this descendant
+after spotting a deterministic runner defect in live argv: SQL literals around
+REAL_ID/MISSING_ID/NON_PDF used single quotes, which the outer single-quoted
+toolchain_exec body consumed — the SQL reached sqlite3 WITHOUT its literal
+quotes. Log preserved as pre-assertion interrupted/red. Persistent target
+src-tauri/target (partial cold build) deliberately kept for the next
+authorized run. No assertion, no receipt, no pass/fail from this attempt.
+
+FIX (15:0x): gate SQL rewritten to sqlite3 .parameter binding via a q()
+helper heredoc — zero literal single quotes remain in the toolchain_exec
+body (verified by delimiter scan); mechanism validated against a scratch
+DB reproducing the seeded identity set (documents=2, seeded=2, unexpected=0,
+member=real, non_pdf_rows=0) BEFORE any further native slot is spent.

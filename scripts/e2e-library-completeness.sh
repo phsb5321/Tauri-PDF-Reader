@@ -119,15 +119,27 @@ SQL
   # EXACTLY the two seeded rows, membership bound to the source hash, no row
   # for the rejected non-PDF path. An extra/wrong document, wrong membership,
   # or rejected-input row fails these gates.
-  DOCUMENT_COUNT=$(sqlite3 "$DB" "SELECT COUNT(*) FROM documents;")
+  # SQL values are bound via sqlite3 .parameter (NO literal single quotes may
+  # appear anywhere in this toolchain_exec body — the outer quoting eats them,
+  # which silently stripped SQL quotes in the 14:58 attempt).
+  q() {
+    sqlite3 "$DB" <<SQL
+.parameter init
+.parameter set @real_id "$REAL_ID"
+.parameter set @missing_id "$MISSING_ID"
+.parameter set @non_pdf "$NON_PDF"
+$1
+SQL
+  }
+  DOCUMENT_COUNT=$(q "SELECT COUNT(*) FROM documents;")
   [ "$DOCUMENT_COUNT" = 2 ] || { echo "ERROR: expected exactly the two seeded document rows (valid drop reuses the seeded row; invalid drop adds none), got $DOCUMENT_COUNT" >&2; exit 1; }
-  SEEDED_IDS=$(sqlite3 "$DB" "SELECT COUNT(*) FROM documents WHERE id IN ('$REAL_ID', '$MISSING_ID');")
+  SEEDED_IDS=$(q "SELECT COUNT(*) FROM documents WHERE id IN (@real_id, @missing_id);")
   [ "$SEEDED_IDS" = 2 ] || { echo "ERROR: seeded identity set incomplete (real+missing), got $SEEDED_IDS" >&2; exit 1; }
-  UNEXPECTED_IDS=$(sqlite3 "$DB" "SELECT COUNT(*) FROM documents WHERE id NOT IN ('$REAL_ID', '$MISSING_ID');")
+  UNEXPECTED_IDS=$(q "SELECT COUNT(*) FROM documents WHERE id NOT IN (@real_id, @missing_id);")
   [ "$UNEXPECTED_IDS" = 0 ] || { echo "ERROR: unexpected document identities present, got $UNEXPECTED_IDS" >&2; exit 1; }
-  MEMBER_DOC=$(sqlite3 "$DB" "SELECT document_id FROM session_documents LIMIT 1;")
+  MEMBER_DOC=$(q "SELECT document_id FROM session_documents LIMIT 1;")
   [ "$MEMBER_DOC" = "$REAL_ID" ] || { echo "ERROR: session membership must point at the dropped source hash $REAL_ID, got $MEMBER_DOC" >&2; exit 1; }
-  NON_PDF_ROWS=$(sqlite3 "$DB" "SELECT COUNT(*) FROM documents WHERE file_path = '$NON_PDF';")
+  NON_PDF_ROWS=$(q "SELECT COUNT(*) FROM documents WHERE file_path = @non_pdf;")
   [ "$NON_PDF_ROWS" = 0 ] || { echo "ERROR: rejected non-PDF drag must not persist a document row" >&2; exit 1; }
 
   # Pin the DB counts into the receipt so the packaged journey carries them.
