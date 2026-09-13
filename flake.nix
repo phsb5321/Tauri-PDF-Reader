@@ -154,6 +154,63 @@
         };
 
         packages.tauri-driver = tauri-driver;
+
+        # Linux desktop package (spec 216): mirrors the Darwin scheme via
+        # nix/lectrice-linux.nix — real binary + icon + .desktop/MIME +
+        # WebKitGTK/GStreamer runtime wrapper. Darwin outputs untouched.
+        lectrice = import ./nix/lectrice-linux.nix {
+          inherit pkgs;
+          src = self;
+        };
+
+        packages = {
+          inherit lectrice;
+          default = lectrice;
+        };
+
+        apps.default = {
+          type = "app";
+          program = "${lectrice}/bin/lectrice";
+          meta.description = "Launch the Lectrice desktop reader";
+        };
+
+        # Static package contract (spec 216): ONE verifier script run twice.
+        # Positive: the real package must pass every condition. Negative
+        # control: a deliberately MALFORMED fixture must FAIL the SAME
+        # verifier — if the verifier wrongly passes it, this check fails.
+        checks.package-contract = pkgs.runCommand "lectrice-package-contract"
+          {
+            nativeBuildInputs = [pkgs.file];
+            pkg = lectrice;
+            inherit (lectrice) version;
+            verifier = ./package-contract.sh;
+          }
+          ''
+            set -eu
+            chmod +x "$verifier"
+
+            # Positive: real package passes.
+            "$verifier" "$pkg" "$version"
+
+            # Negative control: break the Exec line + drop the binary in a
+            # copy; the SAME verifier must exit nonzero.
+            bad="$TMPDIR/malformed-fixture"
+            cp -r "$pkg" "$bad"
+            chmod -R u+w "$bad"
+            sed -i "s|^Exec=.*|Exec=/nonexistent/lectrice|" "$bad/share/applications/lectrice.desktop"
+            rm "$bad/bin/tauri-pdf-reader"
+            if "$verifier" "$bad" "$version" >/dev/null 2>&1; then
+              echo "FAIL: negative control PASSED the verifier on a malformed fixture"
+              exit 1
+            fi
+            echo "negative control OK: malformed fixture correctly rejected"
+
+            # Cross-platform hygiene (ordinary assertion, not the control).
+            if [ -e "$pkg/Applications/Lectrice.app" ]; then
+              echo "FAIL: Darwin .app layout leaked into Linux package"; exit 1
+            fi
+            touch "$out"
+          '';
       });
 
     darwinOutputs = flake-utils.lib.eachSystem ["aarch64-darwin"] (system: let

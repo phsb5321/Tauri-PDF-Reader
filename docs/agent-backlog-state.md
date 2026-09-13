@@ -1368,3 +1368,15 @@ Driven by a request from the Pearson knowledge-gap work, not by the backlog: `an
 ### Next command
 
 None scheduled. Pick up from the "next cheap wins" line in iteration #27, or drive a slice with `/goal`.
+
+### 216 Linux flake package — blocked on serial build budget (13/09/2026)
+
+`packages.x86_64-linux.lectrice` + `apps.default` + `checks.package-contract`
+implemented in worktree `216-linux-flake-package` per the upstream
+cargo-tauri hook recipe (deb install + wrapGAppsHook3 + alsa/openssl deps).
+Eval + dry-run pass (243 MiB / 1.3 GiB closure, 760 paths). The initial
+build hits the coordinator's 25-minute serial (`-j1`) cap while compiling
+the final application crate — timeout, not a proven source bug; partial
+compiler log flushed to the run evidence dir. Remaining work (coordinator
+window): one resumed/longer-window build, then `checks.package-contract`
+(positive + malformed-fixture negative) and the native-launch gate.
