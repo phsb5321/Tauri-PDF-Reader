@@ -6,6 +6,6 @@
 - [x] T004 Replay frozen 248 test plus existing library regressions; preserve failure logs and exact source IDs (45pass/3fail; no acceptance).
 - [x] T005 Route measured failures to the existing 248 worker within its remaining cap, then freeze/replay (final2/2:53/53; original failures retained).
 - [x] T006 Integrate only qualified src/stores/library-store.ts, src/components/library/LibraryView.tsx hunks and its synthetic regression into 251 (14:55:32, base047cc4f).
-- [x] T007 Run exact-source lint/typecheck/library regressions and seed fuzz; record the native journey gate truthfully (56/56, seed20260914/runs2000; normal hooks pass; native BLOCKED).
+- [x] T007 Run exact-source lint/typecheck/library regressions and seed fuzz; record the native journey gate truthfully (56/56 initial,63/63 after normal main5e merge; seed20260914/runs2000; normal hooks pass; native BLOCKED).
 - [ ] T008 Obtain capable different-family exact-head review, normal hooks and protected CI; merge only if all real gates pass.
 - [x] T009 Update reports/DELIVERY.md with authored/executed/integrated/PR receipts and the one-line reversal path (draftPR209, exact cb9947f source ALLOW; no merge/activation).
