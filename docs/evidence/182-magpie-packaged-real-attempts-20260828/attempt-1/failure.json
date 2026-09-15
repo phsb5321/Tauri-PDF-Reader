@@ -1,0 +1,8 @@
+{
+  "status": "FAIL",
+  "buildRevision": "4453baaec842da6f8c69c961ffe56b6451870c90",
+  "stage": "Performance measurement verdict",
+  "failure": "The latest 90-byte uncached unit measured 1.003 RTF and truthfully displayed that it may outrun the buffer; the actor incorrectly required the sustain label.",
+  "falseGreenHazard": "The failed runner left the previous successful receipt in the evidence directory. It is renamed stale-prior-pass-receipt.json and cannot be consumed as this attempt's result.",
+  "repair": "Delete receipt.json before every lane, parse the displayed RTF, and require the matching truthful verdict. Aggregate held-out-page RTF remains the sustained-performance gate."
+}

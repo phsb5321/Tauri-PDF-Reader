@@ -602,6 +602,7 @@ impl SynthesizerPort for ElevenLabsClient {
                 word_timings: result.word_timings,
                 total_duration: result.total_duration,
                 provider_revision: self.provider_revision().to_string(),
+                from_cache: false,
             });
         }
         let audio_data = self
@@ -613,6 +614,7 @@ impl SynthesizerPort for ElevenLabsClient {
             word_timings: Vec::new(),
             total_duration: 0.0,
             provider_revision: self.provider_revision().to_string(),
+            from_cache: false,
         })
     }
 }

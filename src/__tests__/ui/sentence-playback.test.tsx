@@ -13,8 +13,27 @@ import { useDocumentStore } from "../../stores/document-store";
 const h = vi.hoisted(() => ({
   complete: null as (() => void) | null,
   maxTextUtf8Bytes: 8192,
+  playbackState: "idle" as "idle" | "playing",
   announce: vi.fn(),
   speakWithHighlight: vi.fn(() => Promise.resolve(true)),
+  stop: vi.fn(() => Promise.resolve()),
+  getPage: vi.fn(() =>
+    Promise.resolve({
+      getTextContent: () =>
+        Promise.resolve({
+          items: [
+            {
+              str: "Auto page sentence.",
+              transform: [1, 0, 0, 1, 0, 10],
+              width: 100,
+              height: 12,
+              fontName: "Body",
+              hasEOL: true,
+            },
+          ],
+        }),
+    }),
+  ),
   prebuffer: vi.fn(() =>
     Promise.resolve({
       success: true,
@@ -28,11 +47,11 @@ const h = vi.hoisted(() => ({
 vi.mock("../../hooks/useAiTts", () => ({
   useAiTts: () => ({
     initialized: true,
-    playbackState: "idle",
+    playbackState: h.playbackState,
     needsApiKey: false,
     error: null,
     speak: vi.fn(),
-    stop: vi.fn(),
+    stop: h.stop,
     pause: vi.fn(),
     resume: vi.fn(),
     clearError: vi.fn(),
@@ -58,6 +77,9 @@ vi.mock("../../hooks/useTtsWordHighlight", () => ({
   },
 }));
 vi.mock("../../hooks/useAudioCache", () => ({ useAudioCache: vi.fn() }));
+vi.mock("../../services/pdf-service", () => ({
+  pdfService: { getPage: h.getPage },
+}));
 vi.mock("../../hooks/useAnnounce", () => ({
   useAnnounce: () => ({ announce: h.announce }),
   ANNOUNCEMENTS: {
@@ -87,6 +109,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   h.complete = null;
   h.maxTextUtf8Bytes = 8192;
+  h.playbackState = "idle";
+  h.getPage.mockClear();
   useAiTtsStore.setState({
     provider: "local",
     supportsWordTimings: false,
@@ -97,6 +121,7 @@ beforeEach(() => {
       local: "F1-en",
     },
     autoPageEnabled: false,
+    performanceProfile: "balanced",
     naturalCompletionCount: 0,
     error: null,
   });
@@ -202,6 +227,176 @@ describe("local sentence playback", () => {
         "sentence",
       ),
     );
+  });
+
+  it("queues two Continuous look-ahead units sequentially", async () => {
+    let releaseFirst: (() => void) | undefined;
+    h.prebuffer.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseFirst = () =>
+            resolve({
+              success: true,
+              cached: false,
+              wordCount: 0,
+              totalDuration: 8,
+            });
+        }),
+    );
+    useAiTtsStore.setState({ performanceProfile: "continuous" });
+    const unit = (label: string) =>
+      `${label} ${"bounded context ".repeat(11)}ends.`;
+    const text = [unit("One"), unit("Two"), unit("Three"), unit("Four")].join(
+      " ",
+    );
+    render(<AiPlaybackBar getText={() => Promise.resolve(text)} />);
+
+    fireEvent.click(screen.getByTitle("Play (Ctrl+Space)"));
+    await waitFor(() => expect(h.prebuffer).toHaveBeenCalledTimes(1));
+    expect(h.prebuffer.mock.calls[0]?.[0]).toMatch(/^Two /u);
+
+    await act(async () => releaseFirst?.());
+    await waitFor(() => expect(h.prebuffer).toHaveBeenCalledTimes(2));
+    expect(h.prebuffer.mock.calls[1]?.[0]).toMatch(/^Three /u);
+  });
+
+  it("invalidates queued and future prefetch work on a reader page turn", async () => {
+    h.playbackState = "playing";
+    let releaseFirst: (() => void) | undefined;
+    h.prebuffer.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseFirst = () =>
+            resolve({
+              success: true,
+              cached: false,
+              wordCount: 0,
+              totalDuration: 8,
+            });
+        }),
+    );
+    useAiTtsStore.setState({ performanceProfile: "continuous" });
+    const unit = (label: string) =>
+      `${label} ${"bounded context ".repeat(11)}ends.`;
+    render(
+      <AiPlaybackBar
+        getText={() =>
+          Promise.resolve(
+            [unit("One"), unit("Two"), unit("Three"), unit("Four")].join(" "),
+          )
+        }
+      />,
+    );
+
+    fireEvent.click(screen.getByTitle("Play (Ctrl+Space)"));
+    await waitFor(() => expect(h.prebuffer).toHaveBeenCalledTimes(1));
+    act(() => useDocumentStore.getState().setCurrentPage(2));
+    await waitFor(() => expect(h.stop).toHaveBeenCalledTimes(1));
+    await act(async () => releaseFirst?.());
+    await act(async () => h.complete?.());
+
+    expect(h.prebuffer).toHaveBeenCalledTimes(1);
+    expect(h.speakWithHighlight).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps public Stop available while auto-page continuation is pending", async () => {
+    vi.useFakeTimers();
+    try {
+      useAiTtsStore.setState({ autoPageEnabled: true });
+      useDocumentStore.setState({ totalPages: 2 });
+      render(
+        <AiPlaybackBar getText={() => Promise.resolve("Last sentence.")} />,
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByTitle("Play (Ctrl+Space)"));
+      });
+      await act(async () => h.complete?.());
+
+      const stopButton = screen.getByTitle("Stop (Esc)");
+      expect(stopButton).toBeEnabled();
+      await act(async () => fireEvent.click(stopButton));
+      await act(async () => vi.advanceTimersByTimeAsync(500));
+
+      expect(h.getPage).not.toHaveBeenCalled();
+      expect(h.speakWithHighlight).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("cancels a pending auto-page continuation after a manual page turn", async () => {
+    vi.useFakeTimers();
+    try {
+      useAiTtsStore.setState({ autoPageEnabled: true });
+      useDocumentStore.setState({ totalPages: 3 });
+      render(
+        <AiPlaybackBar getText={() => Promise.resolve("Last sentence.")} />,
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByTitle("Play (Ctrl+Space)"));
+      });
+      expect(h.speakWithHighlight).toHaveBeenCalledTimes(1);
+
+      await act(async () => h.complete?.());
+      expect(useDocumentStore.getState().currentPage).toBe(2);
+
+      act(() => useDocumentStore.getState().setCurrentPage(3));
+      await act(async () => vi.advanceTimersByTimeAsync(500));
+
+      expect(h.getPage).not.toHaveBeenCalled();
+      expect(h.speakWithHighlight).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("cancels an in-flight auto-page extraction after a manual page turn", async () => {
+    vi.useFakeTimers();
+    try {
+      let releasePage: (() => void) | undefined;
+      h.getPage.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            releasePage = () =>
+              resolve({
+                getTextContent: () =>
+                  Promise.resolve({
+                    items: [
+                      {
+                        str: "Delayed auto page sentence.",
+                        transform: [1, 0, 0, 1, 0, 10],
+                        width: 100,
+                        height: 12,
+                        fontName: "Body",
+                        hasEOL: true,
+                      },
+                    ],
+                  }),
+              });
+          }),
+      );
+      useAiTtsStore.setState({ autoPageEnabled: true });
+      useDocumentStore.setState({ totalPages: 3 });
+      render(
+        <AiPlaybackBar getText={() => Promise.resolve("Last sentence.")} />,
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByTitle("Play (Ctrl+Space)"));
+      });
+      await act(async () => h.complete?.());
+      await act(async () => vi.advanceTimersByTimeAsync(500));
+      expect(h.getPage).toHaveBeenCalledWith(expect.anything(), 2);
+
+      act(() => useDocumentStore.getState().setCurrentPage(3));
+      await act(async () => releasePage?.());
+
+      expect(h.speakWithHighlight).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("synthesizes a spoken-only period while retaining source queue offsets", async () => {

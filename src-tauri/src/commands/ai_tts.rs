@@ -6,7 +6,10 @@
 #[cfg(not(feature = "e2e-tts-fixture"))]
 use crate::adapters::GroqTtsClient;
 use crate::adapters::{CacheInfo, ClearResult, LocalTtsClient};
-use crate::ai_tts::{AiTtsEngine, ProsodyBoundary, TtsConfig, TtsProvider, VoiceInfo, WordTiming};
+use crate::ai_tts::{
+    AiTtsEngine, ProsodyBoundary, TtsConfig, TtsPerformanceSnapshot, TtsProvider, VoiceInfo,
+    WordTiming,
+};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::sync::Arc;
@@ -571,6 +574,19 @@ pub async fn ai_tts_get_state(state: State<'_, AiTtsEngineState>) -> Result<Stat
         is_paused: tts_state.is_paused,
         current_voice_id: tts_state.current_voice_id,
     })
+}
+
+/// Get factual active-engine runtime and the latest uncached synthesis measure.
+#[tauri::command]
+#[specta::specta]
+pub async fn ai_tts_get_performance(
+    state: State<'_, AiTtsEngineState>,
+) -> Result<TtsPerformanceSnapshot, String> {
+    let engine = state.0.read().await;
+    engine
+        .performance_snapshot()
+        .await
+        .ok_or_else(|| "NOT_INITIALIZED: initialize a TTS provider first".to_string())
 }
 
 /// Get current TTS configuration

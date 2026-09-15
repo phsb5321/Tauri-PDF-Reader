@@ -1,0 +1,7 @@
+{
+  "status": "FAIL",
+  "buildRevision": "8584c73d3ed48e0ab7f4acd5602c53a331b6c198",
+  "stage": "Performance profile public control",
+  "failure": "WebKitWebDriver pointer click did not activate the enabled native radio control.",
+  "repair": "Focus the same visible radio and press Space through the public keyboard path, matching the existing Play-control WebKit workaround. No product threshold or assertion was weakened."
+}

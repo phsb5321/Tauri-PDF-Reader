@@ -1,0 +1,7 @@
+{
+  "status": "FAIL",
+  "buildRevision": "5f2055d2482c485307b45106603598aca9b9b7b2",
+  "stage": "Close and reopen Performance settings",
+  "failure": "WebKitWebDriver pointer click missed the dialog close control, leaving the modal over the toolbar.",
+  "repair": "Use the dialog's public Escape path and wait for the modal to disappear before reopening. The successful keyboard profile selection remains retained."
+}

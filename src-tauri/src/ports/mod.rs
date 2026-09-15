@@ -30,8 +30,8 @@ pub use session_repository::{
 };
 pub use settings_repository::SettingsRepository;
 pub use synthesizer::{
-    AudioMediaType, SynthesisProvider, SynthesisRequest, SynthesisResult, SynthesisVoice,
-    SynthesizerPort, WordTiming as SynthesisWordTiming,
+    AudioMediaType, ProviderRuntimeInfo, SynthesisProvider, SynthesisRequest, SynthesisResult,
+    SynthesisVoice, SynthesizerPort, WordTiming as SynthesisWordTiming,
 };
 pub use tts_engine::{TtsCapabilities, TtsChunk, TtsEngine, TtsInitResponse, TtsState, VoiceInfo};
 

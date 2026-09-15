@@ -125,6 +125,7 @@ function clearInMemorySession(): void {
     selectedVoiceId: "21m00Tcm4TlvDq8ikWAM",
     speed: 1,
     autoPageEnabled: true,
+    performanceProfile: "balanced",
     cacheCoverage: null,
     maxTextUtf8Bytes: 10_000,
     providerVoiceIds: {
@@ -236,15 +237,38 @@ describe("AI TTS session-secret persistence", () => {
           selectedVoiceId: voice,
           speed: 1.75,
           autoPageEnabled: false,
+          performanceProfile: "balanced",
           providerVoiceIds: {
             elevenlabs: voice,
           },
         },
-        version: 2,
+        version: 3,
       });
       expect(persistenceEvidence()).not.toContain(PERSISTENCE_TEST_MARKER);
     },
   );
+
+  it("falls back from an unknown persisted performance profile", async () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        version: 3,
+        state: {
+          selectedVoiceId: "safe-voice",
+          speed: 1,
+          autoPageEnabled: true,
+          performanceProfile: "unsafe-turbo",
+        },
+      }),
+    );
+
+    await act(async () => {
+      await useAiTtsStore.persist.rehydrate();
+    });
+
+    expect(useAiTtsStore.getState().performanceProfile).toBe("balanced");
+    expect(localStorage.getItem(STORAGE_KEY)).not.toContain("unsafe-turbo");
+  });
 
   it("removes malformed persisted bytes containing a plaintext key", async () => {
     const malformedStorage = `{"state":{"apiKey":"${PERSISTENCE_TEST_MARKER}","selectedVoiceId":"unterminated`;
@@ -270,6 +294,7 @@ describe("AI TTS session-secret persistence", () => {
       useAiTtsStore.getState().setSelectedVoice("safe-current-voice");
       useAiTtsStore.getState().setSpeed(2.25);
       useAiTtsStore.getState().setAutoPageEnabled(false);
+      useAiTtsStore.getState().setPerformanceProfile("continuous");
       useAiTtsStore.getState().setApiKey(PERSISTENCE_TEST_MARKER);
     });
 
@@ -281,11 +306,12 @@ describe("AI TTS session-secret persistence", () => {
         selectedVoiceId: "safe-current-voice",
         speed: 2.25,
         autoPageEnabled: false,
+        performanceProfile: "continuous",
         providerVoiceIds: {
           elevenlabs: "safe-current-voice",
         },
       },
-      version: 2,
+      version: 3,
     });
     expect(persistedPayload.state).not.toHaveProperty("apiKey");
     expect(persistenceEvidence()).not.toContain(PERSISTENCE_TEST_MARKER);
