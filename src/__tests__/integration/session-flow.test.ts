@@ -261,6 +261,32 @@ describe("Session Lifecycle Integration", () => {
       expect(useSessionStore.getState().activeSession).toBeNull();
     });
 
+    it("fails closed when the backend resolves success=false (issue #185)", async () => {
+      // `session_restore` reports a failed restore as a VALID response, not a
+      // rejected command. The store is the shared restore authority: it must
+      // turn `success=false` into a rejection BEFORE any state is committed,
+      // so every caller (SessionMenu, drop flow, shell) sees one failure.
+      mockRestore.mockResolvedValue({
+        success: false,
+        session: mockSession,
+        missingDocuments: [],
+      });
+      mockList.mockResolvedValue(mockSummaries);
+
+      const store = useSessionStore.getState();
+
+      await expect(store.restoreSession("session-1")).rejects.toThrow(
+        "SESSION_RESTORE_FAILED",
+      );
+
+      const state = useSessionStore.getState();
+      expect(state.activeSession).toBeNull();
+      expect(state.activeSessionId).toBeNull();
+      expect(state.missingDocuments).toEqual([]);
+      expect(state.error).toContain("SESSION_RESTORE_FAILED");
+      expect(state.isRestoring).toBe(false);
+    });
+
     it("clears active session", () => {
       // Set up active session
       useSessionStore.setState({

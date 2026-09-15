@@ -153,6 +153,88 @@ describe("resumeDocument", () => {
     expect(state.pdfDocument).toBeNull();
     expect(state.error).toBe("No such file");
   });
+
+  it("refuses a resume while another open holds the shared store (issue #185)", async () => {
+    // The library/session resume is a public open like any other: while a
+    // drop import (or any open) is in flight, a resume must be refused
+    // instead of racing it onto the reader surface.
+    useDocumentStore.setState({ isLoading: true });
+    const { result } = renderHook(() => useOpenPdf());
+
+    let resumed: boolean | undefined;
+    await act(async () => {
+      resumed = await result.current.resumeDocument(doc({ currentPage: 12 }));
+    });
+
+    expect(resumed).toBe(false);
+    expect(loadDocument).not.toHaveBeenCalled();
+    const state = useDocumentStore.getState();
+    expect(state.currentDocument).toBeNull();
+    expect(state.pdfDocument).toBeNull();
+    expect(state.error).toContain("OPEN_BUSY");
+  });
+});
+
+describe("openDroppedPdf", () => {
+  it("does not race another open already using the shared document store", async () => {
+    useDocumentStore.setState({ isLoading: true });
+    const { result } = renderHook(() => useOpenPdf());
+
+    let opened: Document | null | undefined;
+    await act(async () => {
+      opened = await result.current.openDroppedPdf("/drop/new.pdf");
+    });
+
+    expect(opened).toBeNull();
+    expect(loadDocumentBound).not.toHaveBeenCalled();
+    expect(useDocumentStore.getState().error).toContain("OPEN_BUSY");
+  });
+
+  it("uses the native-authorized path, runs the bound import, and returns its row", async () => {
+    loadDocumentBound.mockResolvedValue(bytesOf(pdf(30)));
+    loadDocument.mockResolvedValue(pdf(30));
+    library({ known: null });
+
+    const { result } = renderHook(() => useOpenPdf());
+    let opened: Document | null = null;
+    await act(async () => {
+      opened = await result.current.openDroppedPdf("/drop/new.pdf");
+    });
+
+    expect(loadDocumentBound).toHaveBeenCalledWith("/drop/new.pdf", undefined);
+    expect(opened?.id).toBe("doc-1");
+    expect(useDocumentStore.getState().currentDocument?.id).toBe("doc-1");
+  });
+
+  it("reuses a known row and its saved page instead of duplicating it", async () => {
+    const known = doc({ currentPage: 88 });
+    loadDocumentBound.mockResolvedValue(bytesOf(pdf(300)));
+    library({ known });
+
+    const { result } = renderHook(() => useOpenPdf());
+    await act(async () => {
+      await result.current.openDroppedPdf("/books/one.pdf");
+    });
+
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "library_add_document",
+      expect.anything(),
+    );
+    expect(useDocumentStore.getState().currentPage).toBe(88);
+  });
+
+  it("returns null and creates no row for a non-PDF drop", async () => {
+    const { result } = renderHook(() => useOpenPdf());
+    let opened: Document | null | undefined;
+    await act(async () => {
+      opened = await result.current.openDroppedPdf("/drop/notes.txt");
+    });
+
+    expect(opened).toBeNull();
+    expect(loadDocumentBound).not.toHaveBeenCalled();
+    expect(useDocumentStore.getState().currentDocument).toBeNull();
+    expect(useDocumentStore.getState().error).toContain("DROP_INVALID");
+  });
 });
 
 describe("openDroppedPdf", () => {
