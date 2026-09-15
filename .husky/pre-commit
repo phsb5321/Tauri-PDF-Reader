@@ -24,11 +24,13 @@ pnpm typecheck
 if git diff --cached --name-only | grep -q "src-tauri/"; then
   echo "🦀 Running Rust checks..."
 
-  # Invoke the flake-pinned components directly. `cargo fmt/clippy` can resolve
-  # an unrelated rustup shim from CARGO_HOME before these pinned binaries.
+  # Format check
   echo "  → cargo-fmt --check"
   cd src-tauri && cargo-fmt --check
 
+  # Cargo searches $CARGO_HOME/bin before PATH for subcommands; Pedro's
+  # rustup shims there have no default toolchain. Invoke the flake-pinned
+  # components directly instead of silently escaping the dev shell.
   echo "  → cargo-clippy"
   CARGO_BUILD_JOBS=1 cargo-clippy clippy -- -D warnings
 

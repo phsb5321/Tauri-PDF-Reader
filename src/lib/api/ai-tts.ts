@@ -231,8 +231,16 @@ export function onAiTtsFinished(
   );
 }
 
-export function onAiTtsStopped(callback: () => void): Promise<UnlistenFn> {
-  return listen("ai-tts:stopped", () => callback());
+export interface AiTtsStoppedEvent {
+  generation: number;
+}
+
+export function onAiTtsStopped(
+  callback: (event: AiTtsStoppedEvent) => void,
+): Promise<UnlistenFn> {
+  return listen<number>("ai-tts:stopped", (event) =>
+    callback({ generation: event.payload }),
+  );
 }
 
 export function onAiTtsPaused(callback: () => void): Promise<UnlistenFn> {

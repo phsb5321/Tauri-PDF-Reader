@@ -23,10 +23,11 @@ cd "$(dirname "$0")/.."
 # fresh temp dir; the e2e-tts-fixture build refuses to boot without it.
 source ./scripts/e2e-profile.sh
 source ./scripts/e2e-toolchain.sh
+export LECTRICE_NATIVE_E2E_SPEC="${E2E_SPEC:-./e2e/native-play.e2e.mjs}"
 
 
 echo "==> Building frontend (VITE_E2E_NATIVE=true)"
-VITE_E2E_NATIVE=true pnpm build
+CI=true VITE_E2E_NATIVE=true pnpm build
 # Force tauri::generate_context! to re-embed the freshly built dist/.
 touch src-tauri/src/lib.rs
 
@@ -55,5 +56,5 @@ toolchain_exec '
   [ -n "$DISPNUM" ] || { echo "ERROR: Xvfb failed to start (no display number)"; exit 1; }
   export DISPLAY=:$DISPNUM
   echo "Xvfb ready on DISPLAY=$DISPLAY"
-  E2E_SPEC=./e2e/native-play.e2e.mjs pnpm test:e2e
+  E2E_SPEC="$LECTRICE_NATIVE_E2E_SPEC" pnpm test:e2e
 '
