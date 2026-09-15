@@ -2,7 +2,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   overflow: auto;
   background: var(--viewer-bg);
   padding: 2rem;
@@ -13,12 +13,25 @@
 .pdf-page-container {
   position: relative;
   display: inline-block;
+  flex: none;
+  margin-inline: auto;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-xl);
   background: white;
+  opacity: 1;
+  transition: opacity var(--transition-fast);
   /* Prevent selecting the page container itself */
   user-select: none;
+}
+
+.pdf-page-container[data-render-ready="false"] {
+  opacity: 0.82;
+}
+
+/* Never paint source-coordinate overlays against an in-between zoom preview. */
+.pdf-page-container[data-render-ready="false"] .highlight-overlay {
+  visibility: hidden;
 }
 
 .pdf-canvas {
@@ -53,6 +66,16 @@
 .pdf-page-container .highlight-overlay,
 .pdf-page-container .tts-word-highlight-layer {
   user-select: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pdf-page-container {
+    transition: none;
+  }
+
+  .pdf-page-container[data-render-ready="false"] {
+    opacity: 1;
+  }
 }
 
 /* Empty state */

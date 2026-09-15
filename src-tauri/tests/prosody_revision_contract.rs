@@ -3,7 +3,7 @@ const TTS_ENGINE: &str = include_str!("../src/ai_tts/mod.rs");
 
 #[test]
 fn prosody_revision_contract() {
-    const REVISION: &str = "source-aligned-v2";
+    const REVISION: &str = "source-aligned-v4";
     assert!(
         FRONTEND_PLAN.contains(&format!("PROSODY_PLAN_REVISION = \"{REVISION}\"")),
         "frontend source/spoken planner revision drifted"

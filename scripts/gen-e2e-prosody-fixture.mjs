@@ -11,16 +11,21 @@ if (!output) {
 const heading = "What This Book Is About";
 const body =
   "This book aims to fill a gap. It connects the dots. Readers benefit.";
-const stream =
+const pageOne =
   `BT /F1 21.2475 Tf 72 700.5 Td (${heading}) Tj ET\n` +
   `BT /F2 15 Tf 72 673.5 Td (${body}) Tj ET`;
+const pageTwo =
+  "BT /F1 21.2475 Tf 72 700.5 Td (Second page ready) Tj ET\n" +
+  "BT /F2 15 Tf 72 673.5 Td (Playback starts immediately after a manual page turn.) Tj ET";
 const objects = [
   "<< /Type /Catalog /Pages 2 0 R >>",
-  "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+  "<< /Type /Pages /Kids [3 0 R 7 0 R] /Count 2 >>",
   "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 6 0 R /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> >>",
   "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>",
   "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-  `<< /Length ${Buffer.byteLength(stream, "latin1")} >>\nstream\n${stream}\nendstream`,
+  `<< /Length ${Buffer.byteLength(pageOne, "latin1")} >>\nstream\n${pageOne}\nendstream`,
+  "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 8 0 R /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> >>",
+  `<< /Length ${Buffer.byteLength(pageTwo, "latin1")} >>\nstream\n${pageTwo}\nendstream`,
 ];
 
 let pdf = "%PDF-1.4\n";

@@ -124,8 +124,9 @@ export function buildPdfText(items: readonly unknown[]): BuiltPdfText {
 export function annotatePdfTextLayer(
   container: HTMLElement,
   items: readonly unknown[],
-): void {
-  const { text } = buildPdfText(items);
+): BuiltPdfText {
+  const built = buildPdfText(items);
+  const { text } = built;
   const spans = Array.from(container.querySelectorAll<HTMLElement>("span"));
   let searchStart = 0;
 
@@ -138,6 +139,7 @@ export function annotatePdfTextLayer(
     span.dataset.ttsText = normalized;
     searchStart = start + normalized.length;
   }
+  return built;
 }
 
 /** Map normalized-string boundaries back to raw text-node boundaries. */

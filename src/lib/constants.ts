@@ -1,10 +1,10 @@
 // Highlight colors
 export const HIGHLIGHT_COLORS = [
-  { id: 'yellow', hex: '#ffff00', name: 'Yellow' },
-  { id: 'green', hex: '#00ff00', name: 'Green' },
-  { id: 'blue', hex: '#00bfff', name: 'Blue' },
-  { id: 'pink', hex: '#ff69b4', name: 'Pink' },
-  { id: 'orange', hex: '#ffa500', name: 'Orange' },
+  { id: "yellow", hex: "#ffff00", name: "Yellow" },
+  { id: "green", hex: "#00ff00", name: "Green" },
+  { id: "blue", hex: "#00bfff", name: "Blue" },
+  { id: "pink", hex: "#ff69b4", name: "Pink" },
+  { id: "orange", hex: "#ffa500", name: "Orange" },
 ] as const;
 
 export const DEFAULT_HIGHLIGHT_COLORS = HIGHLIGHT_COLORS.map((c) => c.hex);
@@ -12,15 +12,18 @@ export const DEFAULT_HIGHLIGHT_COLOR = HIGHLIGHT_COLORS[0].hex;
 
 // Zoom levels - higher defaults for better readability
 export const ZOOM_LEVELS = [
-  { value: 0.5, label: '50%' },
-  { value: 0.75, label: '75%' },
-  { value: 1.0, label: '100%' },
-  { value: 1.25, label: '125%' },
-  { value: 1.5, label: '150%' },
-  { value: 1.75, label: '175%' },
-  { value: 2.0, label: '200%' },
-  { value: 2.5, label: '250%' },
-  { value: 3.0, label: '300%' },
+  { value: 0.5, label: "50%" },
+  { value: 0.75, label: "75%" },
+  { value: 1.0, label: "100%" },
+  { value: 1.25, label: "125%" },
+  { value: 1.5, label: "150%" },
+  { value: 1.75, label: "175%" },
+  { value: 2.0, label: "200%" },
+  { value: 2.5, label: "250%" },
+  { value: 2.8, label: "280%" },
+  { value: 3.0, label: "300%" },
+  { value: 3.3, label: "330%" },
+  { value: 4.0, label: "400%" },
 ] as const;
 
 export const DEFAULT_ZOOM_LEVEL = 1.5; // 150% for better readability
@@ -39,11 +42,11 @@ export const TOOLBAR_HEIGHT = 48;
 
 // Storage keys
 export const STORAGE_KEYS = {
-  THEME: 'theme',
-  ZOOM_LEVEL: 'zoom_level',
-  TTS_RATE: 'tts_rate',
-  TTS_VOICE: 'tts_voice',
-  DEFAULT_HIGHLIGHT_COLOR: 'default_highlight_color',
+  THEME: "theme",
+  ZOOM_LEVEL: "zoom_level",
+  TTS_RATE: "tts_rate",
+  TTS_VOICE: "tts_voice",
+  DEFAULT_HIGHLIGHT_COLOR: "default_highlight_color",
 } as const;
 
 /**
@@ -51,5 +54,4 @@ export const STORAGE_KEYS = {
  * playback bar's setup prompt AND the reading home's quiet setup signal
  * (slice 093). Never duplicate this copy at a call site.
  */
-export const AI_TTS_SETUP_MESSAGE =
-  "AI TTS requires an ElevenLabs API key";
+export const AI_TTS_SETUP_MESSAGE = "AI TTS requires an ElevenLabs API key";

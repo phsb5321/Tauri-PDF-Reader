@@ -25,8 +25,10 @@
   --ctp-text: #4c4f69;
   --ctp-subtext1: #5c5f77;
   --ctp-subtext0: #6c6f85;
-  --ctp-blue: #1e66f5;
-  --ctp-mauve: #8839ef;
+  --ctp-latte-blue: #1e66f5;
+  --ctp-blue: var(--ctp-latte-blue);
+  --ctp-latte-mauve: #8839ef;
+  --ctp-mauve: var(--ctp-latte-mauve);
   --ctp-red: #d20f39;
   --ctp-peach: #fe640b;
   --ctp-green: #40a02b;
@@ -84,6 +86,15 @@
     var(--ctp-mauve) 80%,
     var(--ctp-text)
   ); /* 4.57 minimum */
+  /* Ink painted on the PDF's white paper in both app themes. */
+  --color-paper-speak: var(--ctp-latte-mauve); /* 5.41 on white */
+  --color-paper-on-speak: #ffffff; /* 5.41 on paper-speak */
+  --color-paper-focus: var(--ctp-latte-blue); /* 4.91 on white */
+  --color-paper-tick: color-mix(
+    in srgb,
+    var(--ctp-latte-mauve) 70%,
+    #ffffff
+  ); /* 3.20 on white */
 
   /* ── 2e. Semantics — `-text` variants clear AA; the bare token is a fill ── */
   --color-error: var(--ctp-red);
@@ -247,6 +258,7 @@
     --color-border: var(--ctp-subtext0);
     --color-border-hover: var(--ctp-text);
     --color-accent-text: var(--ctp-text);
+    --color-paper-tick: var(--color-paper-speak);
   }
 }
 

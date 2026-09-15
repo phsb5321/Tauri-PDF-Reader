@@ -5,9 +5,9 @@
  * No side effects, no I/O - just calculations based on inputs.
  */
 
-import type { DisplayInfo, RenderPlan, RenderSettings } from './types';
-import { RENDER_CONSTANTS } from './types';
-import { getMinOutputScale } from './QualityMode';
+import type { DisplayInfo, RenderPlan, RenderSettings } from "./types";
+import { RENDER_CONSTANTS } from "./types";
+import { getMinOutputScale } from "./QualityMode";
 
 /**
  * Input parameters for calculating a render plan
@@ -42,61 +42,70 @@ export interface FitModeInput {
 }
 
 /**
- * Calculate the optimal output scale that stays within megapixel limits
- * Uses a fallback cascade to find the highest acceptable scale
+ * Calculate the highest output scale that fits both the configurable memory
+ * budget and WebKit's non-configurable backing-canvas side. `maxMegapixels=0`
+ * disables only the former; it can never make an unsupported canvas valid.
  */
 export function calculateOptimalOutputScale(
   viewportWidth: number,
   viewportHeight: number,
   targetScale: number,
-  maxMegapixels: number
+  maxMegapixels: number,
 ): { outputScale: number; wasCapped: boolean } {
-  // Try the target scale first
-  let outputScale = targetScale;
-  let wasCapped = false;
+  const fits = (scale: number): boolean => {
+    const canvasWidth = Math.floor(viewportWidth * scale);
+    const canvasHeight = Math.floor(viewportHeight * scale);
+    const megapixels =
+      (canvasWidth * canvasHeight) / RENDER_CONSTANTS.MEGAPIXEL_DIVISOR;
 
-  // Calculate megapixels at target scale
-  let canvasWidth = Math.floor(viewportWidth * outputScale);
-  let canvasHeight = Math.floor(viewportHeight * outputScale);
-  let megapixels = (canvasWidth * canvasHeight) / RENDER_CONSTANTS.MEGAPIXEL_DIVISOR;
+    return (
+      canvasWidth <= RENDER_CONSTANTS.MAX_CANVAS_DIMENSION &&
+      canvasHeight <= RENDER_CONSTANTS.MAX_CANVAS_DIMENSION &&
+      (maxMegapixels === 0 || megapixels <= maxMegapixels)
+    );
+  };
 
-  // If maxMegapixels is 0, no cap - return target scale immediately
-  if (maxMegapixels === 0) {
-    return { outputScale, wasCapped: false };
+  if (fits(targetScale)) {
+    return { outputScale: targetScale, wasCapped: false };
   }
 
-  // If under limit, we're done
-  if (megapixels <= maxMegapixels) {
-    return { outputScale, wasCapped: false };
-  }
-
-  // Find the highest scale from fallback cascade that fits
-  wasCapped = true;
   for (const fallbackScale of RENDER_CONSTANTS.FALLBACK_SCALES) {
-    if (fallbackScale >= targetScale) continue; // Skip scales >= target
-
-    outputScale = fallbackScale;
-    canvasWidth = Math.floor(viewportWidth * outputScale);
-    canvasHeight = Math.floor(viewportHeight * outputScale);
-    megapixels = (canvasWidth * canvasHeight) / RENDER_CONSTANTS.MEGAPIXEL_DIVISOR;
-
-    if (megapixels <= maxMegapixels) {
-      break;
+    if (fallbackScale >= targetScale) continue;
+    if (fits(fallbackScale)) {
+      return { outputScale: fallbackScale, wasCapped: true };
     }
   }
 
-  // Ensure minimum scale of 1
-  if (outputScale < 1) {
-    outputScale = 1;
-  }
-
-  return { outputScale, wasCapped };
+  // CSS zoom stays truthful even when the logical page itself is wider than
+  // WebKit's backing-store limit. A fractional raster scale preserves that
+  // geometry while bounding both the hard side and optional memory budget.
+  const sideScale = Math.min(
+    RENDER_CONSTANTS.MAX_CANVAS_DIMENSION / viewportWidth,
+    RENDER_CONSTANTS.MAX_CANVAS_DIMENSION / viewportHeight,
+  );
+  const megapixelScale =
+    maxMegapixels === 0
+      ? Number.POSITIVE_INFINITY
+      : Math.sqrt(
+          (maxMegapixels * RENDER_CONSTANTS.MEGAPIXEL_DIVISOR) /
+            (viewportWidth * viewportHeight),
+        );
+  return {
+    outputScale: Math.max(
+      Number.EPSILON,
+      Math.min(targetScale, sideScale, megapixelScale),
+    ),
+    wasCapped: true,
+  };
 }
 
 /**
  * Calculate memory usage for a canvas in MB
  */
-export function calculateMemoryMB(canvasWidth: number, canvasHeight: number): number {
+export function calculateMemoryMB(
+  canvasWidth: number,
+  canvasHeight: number,
+): number {
   const bytes = canvasWidth * canvasHeight * RENDER_CONSTANTS.BYTES_PER_PIXEL;
   return bytes / RENDER_CONSTANTS.MEGABYTE_DIVISOR;
 }
@@ -104,7 +113,10 @@ export function calculateMemoryMB(canvasWidth: number, canvasHeight: number): nu
 /**
  * Calculate megapixels for canvas dimensions
  */
-export function calculateMegapixels(canvasWidth: number, canvasHeight: number): number {
+export function calculateMegapixels(
+  canvasWidth: number,
+  canvasHeight: number,
+): number {
   return (canvasWidth * canvasHeight) / RENDER_CONSTANTS.MEGAPIXEL_DIVISOR;
 }
 
@@ -123,19 +135,22 @@ export function calculateRenderPlan(input: RenderPlanInput): RenderPlan {
   const viewportHeight = pageHeight * zoomLevel;
 
   // Get the target output scale based on quality mode and DPR
-  const targetOutputScale = getMinOutputScale(settings.qualityMode, displayInfo.devicePixelRatio);
+  const targetOutputScale = getMinOutputScale(
+    settings.qualityMode,
+    displayInfo.devicePixelRatio,
+  );
 
   // Calculate optimal output scale with megapixel capping
   const { outputScale, wasCapped } = calculateOptimalOutputScale(
     viewportWidth,
     viewportHeight,
     targetOutputScale,
-    settings.maxMegapixels
+    settings.maxMegapixels,
   );
 
   // Calculate physical canvas dimensions
-  const canvasWidth = Math.floor(viewportWidth * outputScale);
-  const canvasHeight = Math.floor(viewportHeight * outputScale);
+  const canvasWidth = Math.max(1, Math.floor(viewportWidth * outputScale));
+  const canvasHeight = Math.max(1, Math.floor(viewportHeight * outputScale));
 
   // Calculate metrics
   const megapixels = calculateMegapixels(canvasWidth, canvasHeight);
@@ -176,11 +191,22 @@ export function calculateFitWidthZoom(input: FitModeInput): number {
  * Calculates the zoom level that makes the entire page visible in the container.
  */
 export function calculateFitPageZoom(input: FitModeInput): number {
-  const { pageWidth, pageHeight, containerWidth, containerHeight, padding = 0 } = input;
+  const {
+    pageWidth,
+    pageHeight,
+    containerWidth,
+    containerHeight,
+    padding = 0,
+  } = input;
   const availableWidth = containerWidth - padding * 2;
   const availableHeight = containerHeight - padding * 2;
 
-  if (pageWidth <= 0 || pageHeight <= 0 || availableWidth <= 0 || availableHeight <= 0) {
+  if (
+    pageWidth <= 0 ||
+    pageHeight <= 0 ||
+    availableWidth <= 0 ||
+    availableHeight <= 0
+  ) {
     return 1.0;
   }
 
@@ -197,7 +223,7 @@ export function calculateFitPageZoom(input: FitModeInput): number {
 export function formatDebugOverlayData(
   plan: RenderPlan,
   settings: RenderSettings,
-  displayInfo: DisplayInfo
+  displayInfo: DisplayInfo,
 ): {
   viewport: string;
   canvas: string;
@@ -213,10 +239,12 @@ export function formatDebugOverlayData(
     canvas: `${plan.canvasWidth}x${plan.canvasHeight}`,
     megapixels: `${plan.megapixels.toFixed(1)} MP`,
     memory: `~${Math.round(plan.memoryMB)} MB`,
-    qualityMode: settings.qualityMode.charAt(0).toUpperCase() + settings.qualityMode.slice(1),
+    qualityMode:
+      settings.qualityMode.charAt(0).toUpperCase() +
+      settings.qualityMode.slice(1),
     outputScale: `${plan.outputScale.toFixed(1)}x`,
     dpr: `${displayInfo.devicePixelRatio.toFixed(1)}x`,
-    capped: plan.wasCapped ? 'Yes' : 'No',
+    capped: plan.wasCapped ? "Yes" : "No",
   };
 }
 
@@ -226,7 +254,9 @@ export function formatDebugOverlayData(
  * When outputScale !== 1, we need to apply a transform matrix
  * to the canvas context for proper HiDPI rendering.
  */
-export function getTransformMatrix(outputScale: number): [number, number, number, number, number, number] | undefined {
+export function getTransformMatrix(
+  outputScale: number,
+): [number, number, number, number, number, number] | undefined {
   if (outputScale === 1) {
     return undefined;
   }
@@ -253,7 +283,9 @@ export interface FitModeMultiPageInput {
  * For mixed page sizes, we use the widest page to ensure all pages
  * fit within the container width without horizontal scrolling.
  */
-export function calculateFitWidthZoomMultiPage(input: FitModeMultiPageInput): number {
+export function calculateFitWidthZoomMultiPage(
+  input: FitModeMultiPageInput,
+): number {
   const { pageDimensions, containerWidth, padding = 0 } = input;
 
   if (pageDimensions.length === 0) {
@@ -278,8 +310,15 @@ export function calculateFitWidthZoomMultiPage(input: FitModeMultiPageInput): nu
  * For mixed page sizes, we use the largest page (by diagonal) to ensure
  * all pages fit within the container. This handles both wider and taller pages.
  */
-export function calculateFitPageZoomMultiPage(input: FitModeMultiPageInput): number {
-  const { pageDimensions, containerWidth, containerHeight, padding = 0 } = input;
+export function calculateFitPageZoomMultiPage(
+  input: FitModeMultiPageInput,
+): number {
+  const {
+    pageDimensions,
+    containerWidth,
+    containerHeight,
+    padding = 0,
+  } = input;
 
   if (pageDimensions.length === 0) {
     return 1.0;
@@ -294,7 +333,7 @@ export function calculateFitPageZoomMultiPage(input: FitModeMultiPageInput): num
       containerWidth,
       containerHeight,
       padding,
-    })
+    }),
   );
 
   return Math.min(...zooms);

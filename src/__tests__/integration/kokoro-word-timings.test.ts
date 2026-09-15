@@ -58,6 +58,7 @@ vi.mock("../../lib/api/ai-tts", () => ({
     h.finishedCb = cb;
     return Promise.resolve(() => {});
   }),
+  onAiTtsStopped: vi.fn(() => Promise.resolve(() => {})),
 }));
 vi.mock("../../lib/tauri-invoke", () => ({
   aiTtsSpeakWithTimestamps: vi.fn(() => Promise.resolve(h.speakResult)),
