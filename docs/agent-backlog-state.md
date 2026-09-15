@@ -1,5 +1,13 @@
 # Lectrice — Agent Backlog State
 
+## Sonar follow-through249 — 15/09/2026
+
+Scope: ten first-party findings in seven files, preserving provider generation ownership, speech UTF-16/UTF-8 boundaries and fail-closed behavior, settings/status output and DOM theme/selection behavior. No workflow, secret, rule/exclusion/threshold, backend or deployment changes. Manual branch-bound spec artifacts used because the installed speckit-make driver pins incompatible models; no pipeline-execution claim.
+
+First frozen source on8e383fe:98/98tests across16suites, seed20260915, lint/typecheck/harness0; unchanged225 restored after51.863seconds. Subsequent mainadc6300 (#205) was fast-forwarded into249 with all14WIP paths unchanged and no incoming overlap. The new analysis38035a59-2539-4838-830b-81deb5ffdcba reports26issues, not23; all23original issue keys persist. Actual Sonar remediation requires a future naturally triggered analysis at the authorized landed SHA, not a blind rerun.
+
+Current execution/review/PR receipts are maintained in durable coordination `lectrice-reader-experience-20260914/reports/sonar-quality-249.md` and `evidence/sonar-249-*`. This source checkpoint does not assert native acceptance, different-family approval, merge or incident resolution. Remaining original13findings plus3new findings stay separate from this ten-finding slice. REST issue lookup resolved the earlier GraphQL duplicate-lookup limitation; no exact incident duplicate was established.
+
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
 
 ## Iteration #84 — 31/08/2026 (exact-head adversarial repairs + executable geometry)

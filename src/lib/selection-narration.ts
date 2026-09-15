@@ -110,9 +110,9 @@ export function selectionToPageEnd(
   const selectedRange = selection.getRangeAt(0);
   const startNode = selectedRange.startContainer;
   if (startNode.nodeType === Node.TEXT_NODE) {
-    const annotatedSpan = (
-      startNode.parentElement as HTMLElement | null
-    )?.closest<HTMLElement>("span[data-tts-start]");
+    const annotatedSpan = startNode.parentElement?.closest<HTMLElement>(
+      "span[data-tts-start]",
+    );
     if (annotatedSpan) {
       const spans = Array.from(
         textLayer.querySelectorAll<HTMLElement>("span[data-tts-start]"),
