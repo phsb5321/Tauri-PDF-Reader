@@ -51,6 +51,7 @@ jobs:
         uses: pnpm/action-setup@v4
         with:
           version: 10
+          dest: ${{ runner.temp }}/setup-pnpm-${{ github.run_id }}-${{ github.job }}
 
       # No pnpm store cache. The runner is self-hosted (vm103) and the store
       # lives at ~/.local/share/pnpm/store — outside the workspace, so it
