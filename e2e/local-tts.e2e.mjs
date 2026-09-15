@@ -19,6 +19,16 @@ describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
     );
     await browser.setWindowSize(1200, 800);
     await browser.keys(["Control", "l"]);
+    await browser.pause(250);
+    if (
+      !(await $(".ai-playback-button").isExisting()) &&
+      (await $(".library-view").isExisting())
+    ) {
+      // WebKit occasionally drops the first chord while focus settles after
+      // resize. Retry only while the public Library surface is still visible;
+      // never toggle a reader that already opened back to the library.
+      await browser.keys(["Control", "l"]);
+    }
 
     await browser.waitUntil(
       async () =>
@@ -44,50 +54,93 @@ describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
       false,
     );
 
+    const playbackStartedAt = Date.now();
+    // WebKitWebDriver's pointer click is observed as a document mouseup outside
+    // the page and can miss React activation. Focus the same public Play button
+    // and activate it with Enter — the keyboard-reachable user path, with no
+    // store/IPC action performed by observer instrumentation.
     await browser.execute(() =>
-      document.querySelector(".ai-playback-button").click(),
+      document.querySelector(".ai-playback-button").focus(),
     );
-
-    await browser.waitUntil(
-      async () => {
-        const body = await readFixtureRequests();
-        return body.requests.length >= 1;
-      },
-      {
-        timeout: 15000,
-        timeoutMsg: "local fixture received no synthesis request",
-      },
-    );
-    const receipt = await readFixtureRequests();
-    expect(receipt.requests[0].body.voice).toBe("F1-pt");
-    expect(receipt.requests[0].body.input).toMatch(/alpha|lectrice|fixture/i);
-    expect(receipt.requests[0].idempotencyKey).toMatch(/^[0-9a-f]{64}$/);
-
-    await browser.waitUntil(
-      async () =>
-        browser.execute(
-          () =>
-            window.__E2E_READ__.wordCount() > 0 &&
-            window.__E2E_READ__.isActive() &&
-            document.querySelector(".ai-playback-progress") !== null &&
-            CSS.highlights?.has("tts-current-word") === true,
-        ),
-      {
-        timeout: 15000,
-        timeoutMsg: "estimated local read-along did not become active",
-      },
-    );
-
+    await browser.keys(["Enter"]);
+    let alignedHighlight = null;
+    const seenHighlights = [];
+    const readHighlight = () =>
+      browser.execute(() => {
+        const highlight = CSS.highlights?.get("tts-current-word");
+        const sources = [];
+        highlight?.forEach((range) => sources.push(range.toString()));
+        return {
+          spoken: window.__E2E_READ__.currentWordText(),
+          sources,
+          active: window.__E2E_READ__.isActive(),
+          logs: window.__E2E_READ__.logs().slice(-12),
+        };
+      });
+    try {
+      await browser.waitUntil(
+        async () => {
+          alignedHighlight = await readHighlight();
+          const signature = JSON.stringify({
+            spoken: alignedHighlight.spoken,
+            sources: alignedHighlight.sources,
+            active: alignedHighlight.active,
+          });
+          if (
+            !seenHighlights.some((sample) => sample.signature === signature)
+          ) {
+            seenHighlights.push({ signature, sample: alignedHighlight });
+          }
+          return (
+            alignedHighlight.spoken === "What" &&
+            alignedHighlight.sources.includes("What")
+          );
+        },
+        {
+          timeout: 15000,
+          interval: 40,
+          timeoutMsg:
+            "standalone heading did not retain the exact source highlight",
+        },
+      );
+    } catch (error) {
+      console.warn(
+        "[local-tts-e2e] last highlight",
+        JSON.stringify({ alignedHighlight, seenHighlights }),
+      );
+      throw error;
+    }
+    expect(alignedHighlight).toMatchObject({
+      spoken: "What",
+      sources: ["What"],
+      active: true,
+    });
     expect(
       await browser.execute(
-        () => document.querySelector(".tts-word-debug") === null,
+        () =>
+          document.querySelector(".ai-playback-progress") !== null &&
+          document.querySelector(".tts-word-debug") === null,
       ),
     ).toBe(true);
 
+    const receipt = await readFixtureRequests();
+    expect(receipt.requests.length).toBeGreaterThanOrEqual(1);
+    expect(receipt.requests[0].body.voice).toBe("F1-pt");
+    expect(receipt.requests[0].body.input).toBe("What This Book Is About.");
+    expect(receipt.requests[0].idempotencyKey).toMatch(/^[0-9a-f]{64}$/);
+
+    const stop = await $('button[title="Stop (Esc)"]');
+    await stop.waitForEnabled({ timeout: 5000 });
+    await browser.execute(() =>
+      document.querySelector('button[title="Stop (Esc)"]').click(),
+    );
     await browser.waitUntil(
       async () =>
         browser.execute(() => window.__E2E_READ__.playbackState() === "idle"),
-      { timeout: 15000, timeoutMsg: "WAV sink did not finish back at idle" },
+      {
+        timeout: 5000,
+        timeoutMsg: "public Stop did not return playback to idle",
+      },
     );
     expect(await browser.execute(() => window.__E2E_READ__.wordCount())).toBe(
       0,
@@ -100,5 +153,12 @@ describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
         () => document.querySelector(".ai-playback-progress") === null,
       ),
     ).toBe(true);
+
+    expect(Date.now() - playbackStartedAt).toBeLessThan(15000);
+    const completed = await readFixtureRequests();
+    expect(completed.requests.map((request) => request.body.input)).toEqual([
+      "What This Book Is About.",
+      "This book aims to fill a gap. It connects the dots. Readers benefit.",
+    ]);
   });
 });

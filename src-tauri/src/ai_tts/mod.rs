@@ -8,14 +8,19 @@ mod elevenlabs;
 mod player;
 mod stretch; // pitch-preserving playback speed (spec 039)
 
-pub use elevenlabs::{ElevenLabsClient, TtsWithTimings, WordTiming};
+pub use elevenlabs::{
+    ElevenLabsClient, TtsWithTimings, WordTiming, ELEVEN_DEFAULT_MODEL_ID,
+    ELEVEN_PROSODY_COMPILER_REVISION,
+};
 pub use player::AudioPlayer;
 
 use crate::adapters::{
+    wav::{equalize_pcm16_wav_boundary, PCM_PROSODY_REVISION},
     AudioCacheAdapter, CacheInfo, CachedWordTiming, ClearResult, LocalTtsClient,
 };
 use crate::ports::{
-    AudioMediaType, SynthesisProvider, SynthesisRequest, SynthesisVoice, SynthesizerPort,
+    AudioMediaType, SynthesisProvider, SynthesisRequest, SynthesisResult, SynthesisVoice,
+    SynthesizerPort,
 };
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -24,6 +29,9 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::{watch, Mutex, RwLock};
+
+/// Cache contract shared with `src/lib/prosody-plan.ts`.
+const SOURCE_PROSODY_REVISION: &str = "source-aligned-v2";
 
 /// Supported TTS providers
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Type, Default)]
@@ -41,6 +49,36 @@ impl From<SynthesisProvider> for TtsProvider {
             SynthesisProvider::ElevenLabs => Self::ElevenLabs,
             SynthesisProvider::Local => Self::Local,
             SynthesisProvider::Groq => Self::Groq,
+        }
+    }
+}
+
+/// Provider-neutral boundary class selected by the source/spoken planner.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "lowercase")]
+pub enum ProsodyBoundary {
+    Clause,
+    Sentence,
+    Paragraph,
+    Section,
+}
+
+impl ProsodyBoundary {
+    fn target_ms(self) -> usize {
+        match self {
+            Self::Clause => 200,
+            Self::Sentence => 350,
+            Self::Paragraph => 650,
+            Self::Section => 800,
+        }
+    }
+
+    fn cache_coordinate(self) -> &'static str {
+        match self {
+            Self::Clause => "clause",
+            Self::Sentence => "sentence",
+            Self::Paragraph => "paragraph",
+            Self::Section => "section",
         }
     }
 }
@@ -73,7 +111,7 @@ impl Default for TtsConfig {
         Self {
             provider: TtsProvider::ElevenLabs,
             voice_id: None,
-            model_id: Some("eleven_monolingual_v1".to_string()),
+            model_id: Some(ELEVEN_DEFAULT_MODEL_ID.to_string()),
             stability: 0.5,
             similarity_boost: 0.75,
             speed: 1.0,
@@ -470,22 +508,61 @@ impl AiTtsEngine {
         Self::synthesize_with(connection.synthesizer, request, cancelled).await
     }
 
+    fn inferred_boundary(text: &str) -> ProsodyBoundary {
+        let ending = text.trim_end().trim_end_matches(['"', '\'', ')', ']']);
+        if ending.ends_with(['.', '!', '?', '…']) {
+            ProsodyBoundary::Sentence
+        } else {
+            ProsodyBoundary::Clause
+        }
+    }
+
+    fn apply_wav_prosody(
+        text: &str,
+        boundary_after: Option<ProsodyBoundary>,
+        mut result: SynthesisResult,
+    ) -> Result<SynthesisResult, String> {
+        if result.media_type != AudioMediaType::Wav || !result.word_timings.is_empty() {
+            return Ok(result);
+        }
+        let target = boundary_after
+            .unwrap_or_else(|| Self::inferred_boundary(text))
+            .target_ms();
+        let (audio_data, stats) =
+            equalize_pcm16_wav_boundary(&result.audio_data, target, "TTS_PROSODY")?;
+        result.audio_data = audio_data;
+        result.total_duration = stats.total_duration;
+        result.provider_revision = format!("{}+{PCM_PROSODY_REVISION}", result.provider_revision);
+        tracing::debug!(
+            activity_found = stats.activity_found,
+            leading_ms = stats.leading_ms,
+            trailing_ms = stats.trailing_ms,
+            target_ms = target,
+            "normalized no-mark WAV boundary"
+        );
+        Ok(result)
+    }
+
     fn cache_coordinates(
         provider: &dyn SynthesizerPort,
         text: &str,
         voice: &str,
         config: &TtsConfig,
         with_word_timings: bool,
+        boundary_after: Option<ProsodyBoundary>,
     ) -> (String, AudioMediaType) {
+        let boundary_coordinate = boundary_after
+            .unwrap_or_else(|| Self::inferred_boundary(text))
+            .cache_coordinate();
         match provider.provider() {
             SynthesisProvider::ElevenLabs => {
                 let model_id = config
                     .model_id
                     .clone()
-                    .unwrap_or_else(|| "eleven_monolingual_v1".to_string());
+                    .unwrap_or_else(|| ELEVEN_DEFAULT_MODEL_ID.to_string());
                 let suffix = if with_word_timings { "_ts" } else { "" };
                 let settings_hash = format!(
-                    "{:.2}_{:.2}{suffix}",
+                    "{:.2}_{:.2}_{ELEVEN_PROSODY_COMPILER_REVISION}_{SOURCE_PROSODY_REVISION}{suffix}",
                     config.stability, config.similarity_boost
                 );
                 (
@@ -495,9 +572,12 @@ impl AiTtsEngine {
             }
             SynthesisProvider::Local => {
                 let settings_hash = format!(
-                    "local_{}_{}",
+                    "local_{}_{}_{}_{}_{}",
                     config.speed,
-                    AudioMediaType::Wav.content_type()
+                    AudioMediaType::Wav.content_type(),
+                    PCM_PROSODY_REVISION,
+                    SOURCE_PROSODY_REVISION,
+                    boundary_coordinate
                 );
                 (
                     AudioCacheAdapter::generate_cache_key(
@@ -514,7 +594,9 @@ impl AiTtsEngine {
                     text,
                     voice,
                     provider.provider_revision(),
-                    "groq_audio/wav",
+                    &format!(
+                        "groq_audio/wav_{PCM_PROSODY_REVISION}_{SOURCE_PROSODY_REVISION}_{boundary_coordinate}"
+                    ),
                 ),
                 AudioMediaType::Wav,
             ),
@@ -552,6 +634,7 @@ impl AiTtsEngine {
             &voice,
             &config,
             false,
+            None,
         );
 
         {
@@ -596,6 +679,7 @@ impl AiTtsEngine {
                         return Err(error);
                     }
                 };
+                let result = Self::apply_wav_prosody(text, None, result)?;
                 if result.media_type != expected_media {
                     return Err("TTS_MEDIA_MISMATCH: provider returned an unexpected format".into());
                 }
@@ -618,6 +702,7 @@ impl AiTtsEngine {
         &self,
         text: &str,
         voice_id: Option<&str>,
+        boundary_after: Option<ProsodyBoundary>,
     ) -> Result<PreparedTtsWithTimings, String> {
         let (generation, connection, cancelled) = self.synthesis_context().await?;
         let config = self.config.read().await.clone();
@@ -632,8 +717,14 @@ impl AiTtsEngine {
         {
             return Err(format!("UNKNOWN_VOICE: {voice}"));
         }
-        let (cache_key, media_type) =
-            Self::cache_coordinates(connection.synthesizer.as_ref(), text, &voice, &config, true);
+        let (cache_key, media_type) = Self::cache_coordinates(
+            connection.synthesizer.as_ref(),
+            text,
+            &voice,
+            &config,
+            true,
+            boundary_after,
+        );
 
         {
             let mut state = self.state.write().await;
@@ -693,6 +784,7 @@ impl AiTtsEngine {
                 return Err(error);
             }
         };
+        let result = Self::apply_wav_prosody(text, boundary_after, result)?;
         if result.media_type != media_type {
             return Err("TTS_MEDIA_MISMATCH: provider returned an unexpected format".into());
         }
@@ -828,6 +920,7 @@ impl AiTtsEngine {
         &self,
         text: &str,
         voice_id: Option<&str>,
+        boundary_after: Option<ProsodyBoundary>,
     ) -> Result<PrebufferResult, String> {
         let (_, connection, cancelled) = self.synthesis_context().await?;
         let config = self.config.read().await.clone();
@@ -842,8 +935,14 @@ impl AiTtsEngine {
         {
             return Err(format!("UNKNOWN_VOICE: {voice}"));
         }
-        let (cache_key, media_type) =
-            Self::cache_coordinates(connection.synthesizer.as_ref(), text, &voice, &config, true);
+        let (cache_key, media_type) = Self::cache_coordinates(
+            connection.synthesizer.as_ref(),
+            text,
+            &voice,
+            &config,
+            true,
+            boundary_after,
+        );
         if let Some(cache) = &self.cache {
             match cache.get_with_timestamps_media(&cache_key, media_type) {
                 Ok(Some(cached)) => {
@@ -869,6 +968,7 @@ impl AiTtsEngine {
             cancelled,
         )
         .await?;
+        let result = Self::apply_wav_prosody(text, boundary_after, result)?;
         if result.media_type != media_type {
             return Err("TTS_MEDIA_MISMATCH: provider returned an unexpected format".into());
         }
@@ -1105,6 +1205,22 @@ mod tests {
     }
 
     #[test]
+    fn prosody_boundary_targets_scale_by_document_structure() {
+        assert_eq!(ProsodyBoundary::Clause.target_ms(), 200);
+        assert_eq!(ProsodyBoundary::Sentence.target_ms(), 350);
+        assert_eq!(ProsodyBoundary::Paragraph.target_ms(), 650);
+        assert_eq!(ProsodyBoundary::Section.target_ms(), 800);
+        assert_eq!(
+            AiTtsEngine::inferred_boundary("A complete sentence."),
+            ProsodyBoundary::Sentence
+        );
+        assert_eq!(
+            AiTtsEngine::inferred_boundary("forced byte split"),
+            ProsodyBoundary::Clause
+        );
+    }
+
+    #[test]
     fn cache_identity_is_provider_scoped_and_only_rendered_speed_changes_audio() {
         let calls = Arc::new(AtomicUsize::new(0));
         let local = CountingSynthesizer {
@@ -1126,17 +1242,30 @@ mod tests {
             speed: 1.0,
             ..TtsConfig::default()
         };
-        let (local_one, _) = AiTtsEngine::cache_coordinates(&local, "text", "voice", &config, true);
-        let (groq_one, _) = AiTtsEngine::cache_coordinates(&groq, "text", "voice", &config, true);
+        let (local_one, _) =
+            AiTtsEngine::cache_coordinates(&local, "text", "voice", &config, true, None);
+        let (groq_one, _) =
+            AiTtsEngine::cache_coordinates(&groq, "text", "voice", &config, true, None);
         let (elevenlabs_one, _) =
-            AiTtsEngine::cache_coordinates(&elevenlabs, "text", "voice", &config, true);
+            AiTtsEngine::cache_coordinates(&elevenlabs, "text", "voice", &config, true, None);
+        let (section, _) = AiTtsEngine::cache_coordinates(
+            &local,
+            "text",
+            "voice",
+            &config,
+            true,
+            Some(ProsodyBoundary::Section),
+        );
         config.speed = 2.0;
-        let (local_two, _) = AiTtsEngine::cache_coordinates(&local, "text", "voice", &config, true);
-        let (groq_two, _) = AiTtsEngine::cache_coordinates(&groq, "text", "voice", &config, true);
+        let (local_two, _) =
+            AiTtsEngine::cache_coordinates(&local, "text", "voice", &config, true, None);
+        let (groq_two, _) =
+            AiTtsEngine::cache_coordinates(&groq, "text", "voice", &config, true, None);
         let (elevenlabs_two, _) =
-            AiTtsEngine::cache_coordinates(&elevenlabs, "text", "voice", &config, true);
+            AiTtsEngine::cache_coordinates(&elevenlabs, "text", "voice", &config, true, None);
 
         assert_ne!(local_one, groq_one, "provider identities cannot collide");
+        assert_ne!(local_one, section, "boundary target changes cached WAV");
         assert_ne!(local_one, local_two, "Local renders speed into its WAV");
         assert_eq!(groq_one, groq_two, "Groq speed is player-side stretch");
         assert_eq!(

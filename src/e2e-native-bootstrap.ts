@@ -111,6 +111,10 @@ const TTS_LANE: "fixture" | "none" | "local" =
 /** Home-profile seeding: unset (native-play lane), `"single"` or `"dual"`. */
 const SEED_LANE: string | undefined = import.meta.env.VITE_E2E_NATIVE_SEED;
 
+/** Observer-selected bundled PDF; actions still use only the public reader UI. */
+const READER_FIXTURE_URL: string =
+  import.meta.env.VITE_E2E_NATIVE_PDF_URL || "/e2e-fixture.pdf";
+
 /** Observer-placed profile dir (scripts/e2e-home.sh → gen-e2e-fixtures.mjs). */
 const PROFILE_DIR: string | undefined = import.meta.env.VITE_E2E_PROFILE_DIR;
 
@@ -336,12 +340,12 @@ export async function installE2ENativeBootstrap(): Promise<void> {
 
     // 2) Real PDF load path (no native dialog) — the native-play lane's reader
     //    document. Harmless for the home lane, which navigates via resume.
-    const pdf = await pdfService.loadDocumentFromUrl("/e2e-fixture.pdf");
+    const pdf = await pdfService.loadDocumentFromUrl(READER_FIXTURE_URL);
     const store = useDocumentStore.getState();
     store.setPdfDocument(pdf);
     store.setDocument({
       id: "e2e-native-fixture",
-      filePath: "/e2e-fixture.pdf",
+      filePath: READER_FIXTURE_URL,
       title: "E2E Native Fixture",
       pageCount: pdf.numPages,
       currentPage: 1,

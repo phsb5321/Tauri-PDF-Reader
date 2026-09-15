@@ -1,0 +1,95 @@
+{
+  "schema": "lectrice/prosody-packaged-attempts/1",
+  "sourceDate": "27/08/2026",
+  "immutableHistory": [
+    {
+      "attempt": 1,
+      "status": "FAILED",
+      "failure": "public Play did not dispatch; fixture received no synthesis request",
+      "requests": []
+    },
+    {
+      "attempt": 2,
+      "status": "FAILED",
+      "failure": "WebKit pointer click produced mouseup but did not activate React Play",
+      "requests": []
+    },
+    {
+      "attempt": 3,
+      "status": "FAILED",
+      "failure": "CSS Highlight observer missed the brief final word",
+      "requests": [
+        "storage, ingestion, transformation, and serving.",
+        "Since the dawn of data"
+      ]
+    },
+    {
+      "attempt": 4,
+      "status": "FAILED",
+      "failure": "CSS Highlight iterable assumption was incompatible with WebKit",
+      "requests": [
+        "storage, ingestion, transformation, and serving.",
+        "Since the dawn of data"
+      ]
+    },
+    {
+      "attempt": 5,
+      "status": "FAILED",
+      "failure": "public Play activation was intermittently dropped while focus settled",
+      "requests": [
+        "storage, ingestion, transformation, and serving.",
+        "Since the dawn of data"
+      ]
+    },
+    {
+      "attempt": 6,
+      "status": "FAILED",
+      "failure": "final source-mapped word was shorter than observer polling window",
+      "requests": [
+        "storage, ingestion, transformation, and serving.",
+        "Since the dawn of data"
+      ]
+    },
+    {
+      "attempt": 7,
+      "status": "FAILED",
+      "failure": "first clip drained before final-word highlight could be observed",
+      "requests": [
+        "storage, ingestion, transformation, and serving.",
+        "Since the dawn of data"
+      ]
+    },
+    {
+      "attempt": 8,
+      "status": "FAILED",
+      "failure": "diagnostic trace confirmed only first and successor initial words were observable",
+      "requests": [
+        "storage, ingestion, transformation, and serving.",
+        "Since the dawn of data"
+      ]
+    },
+    {
+      "attempt": 9,
+      "status": "FAILED",
+      "failure": "first Ctrl+L chord was dropped after resize; reader Play control remained absent",
+      "requests": []
+    },
+    {
+      "attempt": 10,
+      "status": "PASS",
+      "scope": "spoken-only punctuation and exact source highlight",
+      "requests": ["serving.", "Since the dawn of data"]
+    },
+    {
+      "attempt": 11,
+      "status": "PASS",
+      "scope": "standalone heading and connected body context before native boundary metadata",
+      "requests": [
+        "What This Book Is About.",
+        "This book aims to fill a gap. It connects the dots. Readers benefit."
+      ]
+    }
+  ],
+  "currentRevisionReceipt": "docs/evidence/188-prosody-packaged-20260827/receipt.json",
+  "note": "This compact immutable history replaces transient per-attempt fixture/process logs. Current-revision health is intentionally represented only by the separate current receipt."
+}

@@ -6,7 +6,7 @@
 #[cfg(not(feature = "e2e-tts-fixture"))]
 use crate::adapters::GroqTtsClient;
 use crate::adapters::{CacheInfo, ClearResult, LocalTtsClient};
-use crate::ai_tts::{AiTtsEngine, TtsConfig, TtsProvider, VoiceInfo, WordTiming};
+use crate::ai_tts::{AiTtsEngine, ProsodyBoundary, TtsConfig, TtsProvider, VoiceInfo, WordTiming};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::sync::Arc;
@@ -338,12 +338,14 @@ pub async fn ai_tts_speak_with_timestamps(
     state: State<'_, AiTtsEngineState>,
     text: String,
     voice_id: Option<String>,
+    boundary_after: Option<ProsodyBoundary>,
 ) -> Result<SpeakWithTimestampsResponse, String> {
     // E2E fixture mode: return deterministic marks + emit playback-starting with
     // NO network and NO audio output. The real frontend karaoke loop then runs
     // off these real marks against wall-clock — driven by the real play button.
     #[cfg(feature = "e2e-tts-fixture")]
     {
+        let _ = boundary_after;
         let provider = state
             .0
             .read()
@@ -395,7 +397,7 @@ pub async fn ai_tts_speak_with_timestamps(
         tracing::info!("Speaking with timestamps: {} chars", text.len());
 
         match engine
-            .speak_with_timestamps(&text, voice_id.as_deref())
+            .speak_with_timestamps(&text, voice_id.as_deref(), boundary_after)
             .await
         {
             Ok(prepared) => {
@@ -642,12 +644,16 @@ pub async fn ai_tts_prebuffer(
     state: State<'_, AiTtsEngineState>,
     text: String,
     voice_id: Option<String>,
+    boundary_after: Option<ProsodyBoundary>,
 ) -> Result<PrebufferResponse, String> {
     let engine = state.0.read().await;
 
     tracing::info!("Pre-buffering TTS: {} chars", text.len());
 
-    match engine.prebuffer(&text, voice_id.as_deref()).await {
+    match engine
+        .prebuffer(&text, voice_id.as_deref(), boundary_after)
+        .await
+    {
         Ok(result) => {
             tracing::info!(
                 "Pre-buffered TTS: {} words, {:.2}s duration, cached={}",
