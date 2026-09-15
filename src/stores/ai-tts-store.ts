@@ -5,6 +5,12 @@ import type {
   AiTtsState as BackendTtsState,
 } from "../lib/tauri-invoke";
 import type { CoverageResponse } from "../lib/api/audio-cache";
+import {
+  DEFAULT_NARRATION_PERFORMANCE_PROFILE,
+  isNarrationPerformanceProfile,
+  type NarrationPerformanceProfile,
+} from "../lib/narration-performance";
+import type { ProsodyLanguage } from "../lib/prosody-plan";
 
 export type AiTtsProvider = "elevenlabs" | "local" | "groq";
 export const AI_TTS_PROVIDERS: readonly AiTtsProvider[] = [
@@ -43,6 +49,7 @@ const VALID_TRANSITIONS: Record<AiTtsPlaybackState, AiTtsPlaybackState[]> = {
 };
 
 export type ProviderVoiceIds = Record<AiTtsProvider, string | null>;
+export type NarrationLanguage = ProsodyLanguage;
 
 interface AiTtsState {
   initialized: boolean;
@@ -67,6 +74,9 @@ interface AiTtsState {
   selectedVoiceId: string | null;
   speed: number;
   autoPageEnabled: boolean;
+  performanceProfile: NarrationPerformanceProfile;
+  numberNormalizationEnabled: boolean;
+  narrationLanguage: NarrationLanguage;
   cacheCoverage: CoverageResponse | null;
 
   setApiKey: (key: string | null) => void;
@@ -89,6 +99,9 @@ interface AiTtsState {
   setSelectedVoice: (voiceId: string | null) => void;
   setSpeed: (speed: number) => void;
   setAutoPageEnabled: (enabled: boolean) => void;
+  setPerformanceProfile: (profile: NarrationPerformanceProfile) => void;
+  setNumberNormalizationEnabled: (enabled: boolean) => void;
+  setNarrationLanguage: (language: NarrationLanguage) => void;
   setCacheCoverage: (coverage: CoverageResponse | null) => void;
   setPlaybackState: (state: AiTtsPlaybackState) => void;
   transitionTo: (nextState: AiTtsPlaybackState, force?: boolean) => boolean;
@@ -158,6 +171,9 @@ const initialState = {
   selectedVoiceId: DEFAULT_VOICE_ID,
   speed: DEFAULT_SPEED,
   autoPageEnabled: true,
+  performanceProfile: DEFAULT_NARRATION_PERFORMANCE_PROFILE,
+  numberNormalizationEnabled: true,
+  narrationLanguage: "auto" as NarrationLanguage,
   cacheCoverage: null as CoverageResponse | null,
 };
 
@@ -166,13 +182,20 @@ interface PersistedAiTtsPreferences {
   providerVoiceIds: ProviderVoiceIds;
   speed: number;
   autoPageEnabled: boolean;
+  performanceProfile: NarrationPerformanceProfile;
+  numberNormalizationEnabled: boolean;
+  narrationLanguage: NarrationLanguage;
 }
 
-const PERSISTENCE_VERSION = 2;
+const PERSISTENCE_VERSION = 4;
 const PERSISTENCE_KEY = "ai-tts-storage";
 
 function safeVoice(value: unknown, fallback: string | null): string | null {
   return typeof value === "string" || value === null ? value : fallback;
+}
+
+function isNarrationLanguage(value: unknown): value is NarrationLanguage {
+  return value === "auto" || value === "en" || value === "pt-BR";
 }
 
 function sanitizePersistedPreferences(
@@ -211,6 +234,18 @@ function sanitizePersistedPreferences(
       typeof candidate.autoPageEnabled === "boolean"
         ? candidate.autoPageEnabled
         : initialState.autoPageEnabled,
+    performanceProfile: isNarrationPerformanceProfile(
+      candidate.performanceProfile,
+    )
+      ? candidate.performanceProfile
+      : initialState.performanceProfile,
+    numberNormalizationEnabled:
+      typeof candidate.numberNormalizationEnabled === "boolean"
+        ? candidate.numberNormalizationEnabled
+        : initialState.numberNormalizationEnabled,
+    narrationLanguage: isNarrationLanguage(candidate.narrationLanguage)
+      ? candidate.narrationLanguage
+      : initialState.narrationLanguage,
   };
 }
 
@@ -293,15 +328,16 @@ export const useAiTtsStore = create<AiTtsState>()(
 
       setInitialized: (initialized, error) => {
         const provider = get().provider;
+        const fallbackStatus = error ? "error" : "setup";
         get().setConnectionStatus(
           provider,
-          initialized ? "connected" : error ? "error" : "setup",
+          initialized ? "connected" : fallbackStatus,
           { error: error ?? null },
         );
         set({
           initialized,
           initError: error ?? null,
-          playbackState: initialized ? "idle" : error ? "error" : "idle",
+          playbackState: initialized || !error ? "idle" : "error",
         });
       },
 
@@ -331,6 +367,10 @@ export const useAiTtsStore = create<AiTtsState>()(
       },
 
       setAutoPageEnabled: (enabled) => set({ autoPageEnabled: enabled }),
+      setPerformanceProfile: (profile) => set({ performanceProfile: profile }),
+      setNumberNormalizationEnabled: (enabled) =>
+        set({ numberNormalizationEnabled: enabled }),
+      setNarrationLanguage: (language) => set({ narrationLanguage: language }),
       setCacheCoverage: (coverage) => set({ cacheCoverage: coverage }),
 
       setPlaybackState: (state) => {
@@ -424,6 +464,9 @@ export const useAiTtsStore = create<AiTtsState>()(
         providerVoiceIds: state.providerVoiceIds,
         speed: state.speed,
         autoPageEnabled: state.autoPageEnabled,
+        performanceProfile: state.performanceProfile,
+        numberNormalizationEnabled: state.numberNormalizationEnabled,
+        narrationLanguage: state.narrationLanguage,
       }),
       migrate: (persistedState) => sanitizePersistedPreferences(persistedState),
       merge: (persistedState, currentState) => ({

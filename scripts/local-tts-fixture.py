@@ -14,12 +14,23 @@ from pathlib import Path
 
 
 def wav_bytes() -> bytes:
+    """6.8s raw clip: 0.5s head, 5.0s signal, 1.3s tail.
+
+    Production prosody normalization reduces this to 5.35s (50ms + signal +
+    300ms). The sustained signal keeps the final source-mapped word observable
+    under a real sink while the actor inspects the public highlight, then Stop.
+    """
+    rate = 16_000
+    silence_head = [0] * (rate // 2)
+    signal = [8_000 if index % 2 == 0 else -8_000 for index in range(rate * 5)]
+    silence_tail = [0] * (rate * 13 // 10)
+    samples = silence_head + signal + silence_tail
     output = BytesIO()
     with wave.open(output, "wb") as wav:
         wav.setnchannels(1)
         wav.setsampwidth(2)
-        wav.setframerate(16_000)
-        wav.writeframes(b"\0\0" * 32_000)  # 2 seconds for observable playback.
+        wav.setframerate(rate)
+        wav.writeframes(struct.pack(f"<{len(samples)}h", *samples))
     return output.getvalue()
 
 
@@ -50,13 +61,31 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if self.path == "/health":
-            self.json_response({"status": "ok", "ready": True, "version": "fixture-1"})
+            self.json_response(
+                {
+                    "status": "ok",
+                    "ready": True,
+                    "version": "magpie-fixture-chunk-v1",
+                }
+            )
         elif self.path == "/v1/capabilities":
             self.json_response(
                 {
                     "status": "ok",
                     "ready": True,
-                    "limits": {"maxTextUtf8Bytes": 8192},
+                    "limits": {
+                        "maxTextUtf8Bytes": 300,
+                        "queueCapacity": 1,
+                    },
+                    "runtime": {
+                        "model": "Magpie TTS Multilingual 357M",
+                        "modelRevision": "fixture-model",
+                        "quantization": "Q6_K",
+                        "backend": "Vulkan/RADV fixture",
+                        "device": "Fixture GPU",
+                        "acceleration": "gpu",
+                        "chunkMaxUtf8Bytes": 300,
+                    },
                     "tts": {
                         "voices": [
                             {

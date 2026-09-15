@@ -409,6 +409,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
         ai_tts_init_local,
         ai_tts_init_groq,
         ai_tts_switch_provider,
+        ai_tts_get_performance,
     ])
 }
 
@@ -781,6 +782,8 @@ pub fn run() {
             ai_tts_set_speed,
             #[cfg(feature = "elevenlabs-tts")]
             ai_tts_get_state,
+            #[cfg(feature = "elevenlabs-tts")]
+            ai_tts_get_performance,
             #[cfg(feature = "elevenlabs-tts")]
             ai_tts_get_config,
             // AI TTS cache commands

@@ -6,17 +6,26 @@ import { useAnnounce, ANNOUNCEMENTS } from "../../hooks/useAnnounce";
 import { useDocumentStore } from "../../stores/document-store";
 import { useAiTtsStore } from "../../stores/ai-tts-store";
 import { pdfService } from "../../services/pdf-service";
-import { reducedMotionScrollBehavior } from "../../lib/reduced-motion";
 import { aiTtsPrebuffer } from "../../lib/api/ai-tts";
 import {
-  segmentSpeechWithOffsets,
-  type SentenceSpan,
-} from "../../lib/tts-tracking";
+  planProsodyRuns,
+  resolveProsodyLanguage,
+  type AlignmentSegment,
+  type ProsodyBoundary,
+  type ProsodyLanguage,
+  type ProsodySource,
+  type SpokenRun,
+} from "../../lib/prosody-plan";
 import { AI_TTS_SETUP_MESSAGE } from "../../lib/constants";
-import { buildPdfText } from "../../lib/pdf-text";
+import { narrationPerformancePolicy } from "../../lib/narration-performance";
+import {
+  getPdfPageReadyEpoch,
+  waitForPdfPageReady,
+} from "../../lib/pdf-page-ready";
+import { buildPdfText, type BuiltPdfText } from "../../lib/pdf-text";
 import { AiVoiceSelector } from "./AiVoiceSelector";
 import { AiSpeedSlider } from "./AiSpeedSlider";
-import { AiTtsSettings } from "./AiTtsSettings";
+import { NarrationCockpit } from "./NarrationCockpit";
 import { AudioCacheProgress } from "../audio-progress/AudioCacheProgress";
 import { AudioExportDialog } from "../export-dialog/AudioExportDialog";
 import "./AiPlaybackBar.css";
@@ -37,19 +46,49 @@ export function consumeNaturalCompletion(
   };
 }
 
+const PAGE_READY_TIMEOUT_MS = 8_000;
+
+type NarrationSource = string | BuiltPdfText;
+
+function sourceText(source: NarrationSource): string {
+  return typeof source === "string" ? source : source.text;
+}
+
+function prosodySource(
+  source: NarrationSource,
+  language: ProsodyLanguage,
+  normalizeNumbers: boolean,
+): ProsodySource {
+  return typeof source === "string"
+    ? { text: source, language, normalizeNumbers }
+    : {
+        text: source.text,
+        boundaries: source.boundaries,
+        segments: source.segments,
+        language,
+        normalizeNumbers,
+      };
+}
+
 interface SentencePlaybackQueue {
   pageNumber: number;
-  sentences: SentenceSpan[];
+  sentences: SpokenRun[];
   index: number;
   generation: number;
   baseOffset: number;
-  prefetchIndex: number | null;
-  prefetch: Promise<void> | null;
+  lookaheadUnits: number;
+  prefetches: Map<number, Promise<void>>;
+  prefetchTail: Promise<void>;
+}
+
+interface SelectionPlayRequest {
+  token: number;
+  text: string;
+  baseOffset: number;
 }
 
 interface AiPlaybackBarProps {
-  getText: () => Promise<string | null>;
-  getTextBaseOffset?: () => number;
+  getText: () => Promise<NarrationSource | null>;
   enableHighlighting?: boolean;
   /**
    * Incremented by the catch-up shelf's opt-in "Resume & play" action. Any
@@ -58,13 +97,22 @@ interface AiPlaybackBarProps {
    * first even if the first never actually started (e.g. no API key yet).
    */
   autoPlayToken?: number;
+  /**
+   * Immutable “Read from here” intent. Unlike generic Play, it replaces any
+   * paused/active narration and binds text + offset to this exact request.
+   */
+  selectionPlayRequest?: SelectionPlayRequest | null;
+  onAutoPlayConsumed?: (token: number) => void;
+  onSelectionPlayConsumed?: (token: number) => void;
 }
 
 export function AiPlaybackBar({
   getText,
-  getTextBaseOffset,
   enableHighlighting = true,
   autoPlayToken = 0,
+  selectionPlayRequest = null,
+  onAutoPlayConsumed,
+  onSelectionPlayConsumed,
 }: AiPlaybackBarProps) {
   const {
     initialized,
@@ -91,13 +139,30 @@ export function AiPlaybackBar({
     currentDocument,
   } = useDocumentStore();
   const [showSettings, setShowSettings] = useState(false);
+  const settingsButtonRef = useRef<HTMLButtonElement>(null);
   const [showExportDialog, setShowExportDialog] = useState(false);
+  const closeNarrationCockpit = useCallback(() => {
+    setShowSettings(false);
+    window.requestAnimationFrame(() => settingsButtonRef.current?.focus());
+  }, []);
   // T033: Use store for autoPageEnabled (persisted setting)
   const autoPageEnabled = useAiTtsStore((s) => s.autoPageEnabled);
-  const setAutoPageEnabled = useAiTtsStore((s) => s.setAutoPageEnabled);
   const naturalCompletionCount = useAiTtsStore((s) => s.naturalCompletionCount);
   const provider = useAiTtsStore((s) => s.provider);
   const selectedVoiceId = useAiTtsStore((s) => s.selectedVoiceId);
+  const selectedVoice = useAiTtsStore(
+    (s) => s.voices.find((voice) => voice.id === s.selectedVoiceId) ?? null,
+  );
+  const performanceProfile = useAiTtsStore((s) => s.performanceProfile);
+  const numberNormalizationEnabled = useAiTtsStore(
+    (s) => s.numberNormalizationEnabled,
+  );
+  const narrationLanguage = useAiTtsStore((s) => s.narrationLanguage);
+  const resolvedNarrationLanguage = resolveProsodyLanguage(
+    narrationLanguage,
+    selectedVoiceId,
+    selectedVoice?.labels ?? null,
+  );
   const playingRef = useRef(false);
   // Providers without marks use measured-duration word estimates. The UI must
   // remain on the same real audio clock instead of hiding karaoke and leaving
@@ -109,11 +174,31 @@ export function AiPlaybackBar({
         pageNumber: number,
         voiceId?: string,
         baseOffset?: number,
+        alignment?: readonly AlignmentSegment[],
+        boundaryAfter?: ProsodyBoundary,
       ) => Promise<boolean>)
     | null
   >(null);
   const playbackGenerationRef = useRef(0);
+  const selectionRestartEpochRef = useRef(0);
   const sentenceQueueRef = useRef<SentencePlaybackQueue | null>(null);
+  const pageContinuationAbortRef = useRef<AbortController | null>(null);
+  const pendingContinuationPageRef = useRef<number | null>(null);
+  const [continuationPending, setContinuationPending] = useState(false);
+  const readerPageRef = useRef(currentPage);
+  const cancelPageContinuation = useCallback(() => {
+    pageContinuationAbortRef.current?.abort();
+    pageContinuationAbortRef.current = null;
+    pendingContinuationPageRef.current = null;
+    setContinuationPending(false);
+  }, []);
+  useEffect(
+    () => () => {
+      selectionRestartEpochRef.current += 1;
+      cancelPageContinuation();
+    },
+    [cancelPageContinuation],
+  );
   const [sentenceProgress, setSentenceProgress] = useState<{
     completedWords: number;
     totalWords: number;
@@ -124,11 +209,36 @@ export function AiPlaybackBar({
   // cannot advance a sentence or page while the switch is settling.
   useEffect(() => {
     if (!switchingProvider) return;
+    selectionRestartEpochRef.current += 1;
+    playingRef.current = false;
+    playbackGenerationRef.current += 1;
+    sentenceQueueRef.current = null;
+    cancelPageContinuation();
+    setSentenceProgress(null);
+  }, [switchingProvider, cancelPageContinuation]);
+
+  // A reader-driven page turn can arrive through several public surfaces, not
+  // all of which call this component's handleStop. Invalidate the private
+  // no-mark queue at the shared page authority. Natural auto-page clears the
+  // completed queue before changing currentPage, so it is not cancelled here.
+  useEffect(() => {
+    if (readerPageRef.current !== currentPage) {
+      readerPageRef.current = currentPage;
+      selectionRestartEpochRef.current += 1;
+    }
+    const pendingPage = pendingContinuationPageRef.current;
+    if (pendingPage !== null && pendingPage !== currentPage) {
+      cancelPageContinuation();
+    }
+
+    const queue = sentenceQueueRef.current;
+    if (!queue || queue.pageNumber === currentPage) return;
     playingRef.current = false;
     playbackGenerationRef.current += 1;
     sentenceQueueRef.current = null;
     setSentenceProgress(null);
-  }, [switchingProvider]);
+    if (playbackState !== "idle") void stop();
+  }, [currentPage, playbackState, stop, cancelPageContinuation]);
 
   // T050: Audio cache coverage for current document
   const documentId = currentDocument?.id ?? null;
@@ -145,12 +255,13 @@ export function AiPlaybackBar({
 
   // Get text for a specific page
   const getPageText = useCallback(
-    async (pageNum: number): Promise<string | null> => {
+    async (pageNum: number): Promise<BuiltPdfText | null> => {
       if (!pdfDocument) return null;
       try {
         const page = await pdfService.getPage(pdfDocument, pageNum);
         const textContent = await page.getTextContent();
-        return buildPdfText(textContent.items).text || null;
+        const built = buildPdfText(textContent.items);
+        return built.text ? built : null;
       } catch (err) {
         console.error("Error extracting text for page", pageNum, err);
         return null;
@@ -159,62 +270,60 @@ export function AiPlaybackBar({
     [pdfDocument],
   );
 
-  /**
-   * Scroll to make the current TTS word visible (T036)
-   *
-   * Finds the word highlight element and scrolls the PDF viewer to show it
-   * when it's near the edge of the viewport.
-   */
-  const scrollToWord = useCallback((_wordIndex: number, _word: string) => {
-    // Find the word highlight element
-    const highlight = document.querySelector(".tts-word-highlight");
-    if (!highlight) return;
-
-    const rect = highlight.getBoundingClientRect();
-    const container = document.querySelector(".pdf-viewer");
-    if (!container) return;
-
-    const containerRect = container.getBoundingClientRect();
-    const margin = 100; // Pixels from edge to trigger scroll
-
-    // Respect prefers-reduced-motion: jump instantly instead of smooth-scrolling
-    // for users who opt out of motion.
-    const behavior = reducedMotionScrollBehavior();
-
-    // Check if word is near bottom edge
-    if (rect.bottom > containerRect.bottom - margin) {
-      highlight.scrollIntoView({ behavior, block: "center" });
-    }
-    // Check if word is near top edge
-    else if (rect.top < containerRect.top + margin) {
-      highlight.scrollIntoView({ behavior, block: "center" });
-    }
-  }, []);
-
-  const prefetchSentence = useCallback(
-    (queue: SentencePlaybackQueue, index: number) => {
-      if (supportsWordTimings || index >= queue.sentences.length) return;
-      const sentence = queue.sentences[index];
-      queue.prefetchIndex = index;
-      queue.prefetch = aiTtsPrebuffer(
-        sentence.text,
-        selectedVoiceId ?? undefined,
-      )
-        .then(() => undefined)
-        .catch((error) => {
-          console.warn("[AiPlaybackBar] Sentence prebuffer failed:", error);
-        });
+  const prefetchSentences = useCallback(
+    (queue: SentencePlaybackQueue, startIndex: number) => {
+      if (supportsWordTimings) return;
+      const endIndex = Math.min(
+        queue.sentences.length,
+        startIndex + queue.lookaheadUnits,
+      );
+      for (let index = startIndex; index < endIndex; index += 1) {
+        if (queue.prefetches.has(index)) continue;
+        const sentence = queue.sentences[index];
+        const task = queue.prefetchTail
+          .then(async () => {
+            if (
+              queue.generation !== playbackGenerationRef.current ||
+              sentenceQueueRef.current !== queue
+            ) {
+              return;
+            }
+            await aiTtsPrebuffer(
+              sentence.spokenText,
+              selectedVoiceId ?? undefined,
+              sentence.boundaryAfter,
+            );
+          })
+          .catch((error) => {
+            console.warn("[AiPlaybackBar] Sentence prebuffer failed:", error);
+          });
+        queue.prefetchTail = task;
+        queue.prefetches.set(index, task);
+      }
     },
     [supportsWordTimings, selectedVoiceId],
   );
 
-  const startNoMarkSentenceSequence = useCallback(
+  const startSentenceSequence = useCallback(
     async (
-      text: string,
+      source: NarrationSource,
       pageNumber: number,
       baseOffset = 0,
     ): Promise<boolean> => {
-      const sentences = segmentSpeechWithOffsets(text, maxTextUtf8Bytes);
+      const text = sourceText(source);
+      const policy = narrationPerformancePolicy(
+        performanceProfile,
+        maxTextUtf8Bytes,
+      );
+      const sentences = planProsodyRuns(
+        prosodySource(
+          source,
+          resolvedNarrationLanguage,
+          numberNormalizationEnabled,
+        ),
+        maxTextUtf8Bytes,
+        policy.contextMaxUtf8Bytes,
+      );
       if (sentences.length === 0) {
         if (text.trim()) {
           useAiTtsStore
@@ -233,15 +342,16 @@ export function AiPlaybackBar({
         index: 0,
         generation,
         baseOffset,
-        prefetchIndex: null,
-        prefetch: null,
+        lookaheadUnits: policy.lookaheadUnits,
+        prefetches: new Map(),
+        prefetchTail: Promise.resolve(),
       };
       sentenceQueueRef.current = queue;
       setSentenceProgress({
         completedWords: 0,
         totalWords: sentences.reduce(
           (total, sentence) =>
-            total + sentence.text.split(/\s+/u).filter(Boolean).length,
+            total + sentence.spokenText.split(/\s+/u).filter(Boolean).length,
           0,
         ),
       });
@@ -249,16 +359,26 @@ export function AiPlaybackBar({
       const first = sentences[0];
       const started =
         (await speakWithHighlightRef.current?.(
-          first.text,
+          first.spokenText,
           pageNumber,
           selectedVoiceId ?? undefined,
-          baseOffset + first.charStart,
+          baseOffset + first.sourceStart,
+          first.alignment,
+          first.boundaryAfter,
         )) ?? false;
       if (generation !== playbackGenerationRef.current) return false;
-      if (started) prefetchSentence(queue, 1);
+      if (started) prefetchSentences(queue, 1);
       return started;
     },
-    [maxTextUtf8Bytes, prefetchSentence, provider, selectedVoiceId],
+    [
+      maxTextUtf8Bytes,
+      performanceProfile,
+      prefetchSentences,
+      provider,
+      selectedVoiceId,
+      resolvedNarrationLanguage,
+      numberNormalizationEnabled,
+    ],
   );
 
   // Handle multi-page continuation
@@ -274,11 +394,13 @@ export function AiPlaybackBar({
     ) {
       const completed = queue.sentences[queue.index];
       const nextIndex = queue.index + 1;
-      if (queue.prefetchIndex === nextIndex && queue.prefetch) {
+      const prefetched = queue.prefetches.get(nextIndex);
+      if (prefetched) {
         await Promise.race([
-          queue.prefetch,
+          prefetched,
           new Promise<void>((resolve) => setTimeout(resolve, 2_500)),
         ]);
+        queue.prefetches.delete(nextIndex);
       }
       if (queue.generation !== playbackGenerationRef.current) return;
 
@@ -289,17 +411,19 @@ export function AiPlaybackBar({
               ...progress,
               completedWords:
                 progress.completedWords +
-                completed.text.split(/\s+/u).filter(Boolean).length,
+                completed.spokenText.split(/\s+/u).filter(Boolean).length,
             }
           : null,
       );
       const next = queue.sentences[nextIndex];
       const started =
         (await speakWithHighlightRef.current?.(
-          next.text,
+          next.spokenText,
           queue.pageNumber,
           selectedVoiceId ?? undefined,
-          queue.baseOffset + next.charStart,
+          queue.baseOffset + next.sourceStart,
+          next.alignment,
+          next.boundaryAfter,
         )) ?? false;
       if (
         queue.generation !== playbackGenerationRef.current ||
@@ -313,7 +437,7 @@ export function AiPlaybackBar({
         setSentenceProgress(null);
         return;
       }
-      prefetchSentence(queue, nextIndex + 1);
+      prefetchSentences(queue, nextIndex + 1);
       return;
     }
 
@@ -336,31 +460,75 @@ export function AiPlaybackBar({
       const nextPage = page + 1;
       console.debug("[AiPlaybackBar] Moving to next page:", nextPage);
 
-      // Navigate to next page
-      setCurrentPage(nextPage);
-
-      // Small delay to let page render, then continue TTS. A Stop or newer
-      // Play invalidates this delayed continuation.
+      const previousReadyEpoch = getPdfPageReadyEpoch(nextPage);
       const generation = playbackGenerationRef.current;
-      setTimeout(async () => {
-        if (
-          playingRef.current &&
-          generation === playbackGenerationRef.current
-        ) {
-          const nextText = await getPageText(nextPage);
-          if (nextText && playingRef.current) {
-            if (!supportsWordTimings) {
-              await startNoMarkSentenceSequence(nextText, nextPage, 0);
-            } else if (usesWordHighlighting) {
-              await speakWithHighlightRef.current?.(nextText, nextPage);
-            } else {
-              await speak(nextText);
-            }
-          } else {
-            playingRef.current = false;
-          }
+      cancelPageContinuation();
+      const controller = new AbortController();
+      pageContinuationAbortRef.current = controller;
+      pendingContinuationPageRef.current = nextPage;
+      setContinuationPending(true);
+
+      // Navigate, then wait for this exact render's canvas, text layer, and
+      // source annotations. An older ready marker for the same page is stale.
+      setCurrentPage(nextPage);
+      const releaseContinuation = () => {
+        if (pageContinuationAbortRef.current === controller) {
+          pageContinuationAbortRef.current = null;
+          pendingContinuationPageRef.current = null;
+          setContinuationPending(false);
         }
-      }, 500);
+      };
+      const ready = await waitForPdfPageReady(nextPage, previousReadyEpoch, {
+        signal: controller.signal,
+        timeoutMs: PAGE_READY_TIMEOUT_MS,
+      });
+      if (
+        ready.status === "aborted" ||
+        controller.signal.aborted ||
+        !playingRef.current ||
+        generation !== playbackGenerationRef.current
+      ) {
+        releaseContinuation();
+        return;
+      }
+      if (ready.status === "timeout") {
+        releaseContinuation();
+        playingRef.current = false;
+        playbackGenerationRef.current += 1;
+        useAiTtsStore
+          .getState()
+          .setError(
+            `TTS_PAGE_NOT_READY: Page ${nextPage} did not finish rendering`,
+          );
+        return;
+      }
+
+      // Keep the same ticket alive through text extraction. A public page
+      // change or Stop after render-readiness aborts this controller, so the
+      // old page can never start after its asynchronous extraction resolves.
+      const nextText = await getPageText(nextPage);
+      releaseContinuation();
+      if (
+        controller.signal.aborted ||
+        !nextText ||
+        !playingRef.current ||
+        generation !== playbackGenerationRef.current
+      ) {
+        if (!nextText && !controller.signal.aborted) {
+          playingRef.current = false;
+          useAiTtsStore
+            .getState()
+            .setError(
+              `TTS_PAGE_TEXT_UNAVAILABLE: Page ${nextPage} has no readable text`,
+            );
+        }
+        return;
+      }
+      if (usesWordHighlighting) {
+        await startSentenceSequence(nextText, nextPage, 0);
+      } else {
+        await speak(sourceText(nextText));
+      }
     } else {
       console.debug("[AiPlaybackBar] Reached last page, stopping");
       playingRef.current = false;
@@ -370,11 +538,11 @@ export function AiPlaybackBar({
     setCurrentPage,
     getPageText,
     usesWordHighlighting,
-    startNoMarkSentenceSequence,
+    startSentenceSequence,
     selectedVoiceId,
-    prefetchSentence,
+    prefetchSentences,
     speak,
-    supportsWordTimings,
+    cancelPageContinuation,
   ]);
 
   // Plain/no-mark providers complete from the real sink-drained event recorded
@@ -408,8 +576,6 @@ export function AiPlaybackBar({
     onWordChange: useCallback((wordIndex: number, word: string) => {
       console.debug("[AiPlaybackBar] Word changed:", wordIndex, word);
     }, []),
-    // Wire up scroll callback to keep current word visible (T037)
-    onScrollNeeded: scrollToWord,
   });
 
   useEffect(() => {
@@ -457,45 +623,58 @@ export function AiPlaybackBar({
     prevPausedRef.current = isPaused;
   }, [isPlaying, isPaused, announce]);
 
+  const startFreshPlayback = useCallback(
+    async (requestedSource?: NarrationSource, requestedBaseOffset = 0) => {
+      if (!canPlay) return;
+      cancelPageContinuation();
+      if (supportsWordTimings) playbackGenerationRef.current += 1;
+      playingRef.current = true;
+      const source = requestedSource ?? (await getText());
+      const baseOffset =
+        requestedSource === undefined ? 0 : requestedBaseOffset;
+      if (source) {
+        const text = sourceText(source);
+        const started = usesWordHighlighting
+          ? await startSentenceSequence(source, currentPage, baseOffset)
+          : await speak(text);
+        if (started === false) playingRef.current = false;
+      } else {
+        playingRef.current = false;
+      }
+    },
+    [
+      canPlay,
+      getText,
+      speak,
+      usesWordHighlighting,
+      supportsWordTimings,
+      startSentenceSequence,
+      currentPage,
+      cancelPageContinuation,
+    ],
+  );
+
   const handlePlay = useCallback(async () => {
     if (!canPlay || isLoading) return;
-
     if (isPaused) {
+      cancelPageContinuation();
       if (usesWordHighlighting) {
         await resumeHighlight();
       } else {
         await resume();
       }
-    } else {
-      if (supportsWordTimings) playbackGenerationRef.current += 1;
-      playingRef.current = true;
-      const text = await getText();
-      const baseOffset = getTextBaseOffset?.() ?? 0;
-      if (text) {
-        const started = !supportsWordTimings
-          ? await startNoMarkSentenceSequence(text, currentPage, baseOffset)
-          : usesWordHighlighting
-            ? await speakWithHighlight(text, currentPage, undefined, baseOffset)
-            : await speak(text);
-        if (started === false) playingRef.current = false;
-      } else {
-        playingRef.current = false;
-      }
+      return;
     }
+    await startFreshPlayback();
   }, [
     canPlay,
     isLoading,
     isPaused,
-    getText,
-    getTextBaseOffset,
-    speak,
     resume,
-    speakWithHighlight,
     resumeHighlight,
     usesWordHighlighting,
-    supportsWordTimings,
-    startNoMarkSentenceSequence,
-    currentPage,
+    cancelPageContinuation,
+    startFreshPlayback,
   ]);
 
   const handlePause = useCallback(async () => {
@@ -522,21 +701,72 @@ export function AiPlaybackBar({
       !isLoading
     ) {
       consumedAutoPlayToken.current = autoPlayToken;
+      onAutoPlayConsumed?.(autoPlayToken);
       void handlePlay();
     }
-  }, [autoPlayToken, canPlay, isLoading, handlePlay]);
+  }, [autoPlayToken, canPlay, isLoading, handlePlay, onAutoPlayConsumed]);
 
   const handleStop = useCallback(async () => {
+    selectionRestartEpochRef.current += 1;
     playingRef.current = false;
     playbackGenerationRef.current += 1;
     sentenceQueueRef.current = null;
+    cancelPageContinuation();
     setSentenceProgress(null);
     if (usesWordHighlighting) {
       await stopHighlight();
     } else {
       await stop();
     }
-  }, [stop, stopHighlight, usesWordHighlighting]);
+  }, [stop, stopHighlight, usesWordHighlighting, cancelPageContinuation]);
+
+  // A selection is a replace request, never a synonym for generic Play. Its
+  // immutable text/offset travels with the token, and an epoch makes any Stop,
+  // page/provider change, unmount, or newer selection cancel the async handoff.
+  const consumedSelectionPlayToken = useRef(0);
+  useEffect(() => {
+    if (!canPlay) selectionRestartEpochRef.current += 1;
+  }, [canPlay]);
+  useEffect(() => {
+    const request = selectionPlayRequest;
+    if (
+      !request ||
+      request.token <= consumedSelectionPlayToken.current ||
+      !canPlay
+    ) {
+      return;
+    }
+    consumedSelectionPlayToken.current = request.token;
+    onSelectionPlayConsumed?.(request.token);
+    const requestedPage = currentPage;
+    const requestedProvider = provider;
+    void (async () => {
+      const stopPromise = handleStop();
+      const restartEpoch = selectionRestartEpochRef.current;
+      await stopPromise;
+      const liveDocument = useDocumentStore.getState();
+      const liveTts = useAiTtsStore.getState();
+      if (
+        restartEpoch !== selectionRestartEpochRef.current ||
+        liveDocument.currentPage !== requestedPage ||
+        liveTts.provider !== requestedProvider ||
+        !liveTts.initialized ||
+        liveTts.error !== null ||
+        liveTts.switchingProvider !== null
+      ) {
+        return;
+      }
+      await startFreshPlayback(request.text, request.baseOffset);
+    })();
+  }, [
+    selectionPlayRequest,
+    canPlay,
+    handleStop,
+    startFreshPlayback,
+    onSelectionPlayConsumed,
+    currentPage,
+    provider,
+  ]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -555,7 +785,13 @@ export function AiPlaybackBar({
         } else {
           handlePlay();
         }
-      } else if (e.key === "Escape" && (isPlaying || isPaused)) {
+      } else if (e.key === "Escape" && showSettings) {
+        e.preventDefault();
+        closeNarrationCockpit();
+      } else if (
+        e.key === "Escape" &&
+        (isPlaying || isPaused || continuationPending)
+      ) {
         e.preventDefault();
         handleStop();
       }
@@ -563,12 +799,24 @@ export function AiPlaybackBar({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isPlaying, isPaused, handlePlay, handlePause, handleStop]);
+  }, [
+    isPlaying,
+    isPaused,
+    continuationPending,
+    showSettings,
+    closeNarrationCockpit,
+    handlePlay,
+    handlePause,
+    handleStop,
+  ]);
 
   // Show settings if API key is needed
   if (needsApiKey) {
     return (
       <div className="ai-playback-bar ai-playback-bar-setup">
+        {showSettings && (
+          <NarrationCockpit onClose={closeNarrationCockpit} controlsDisabled />
+        )}
         <div className="ai-playback-setup-message">
           <svg
             viewBox="0 0 24 24"
@@ -597,25 +845,30 @@ export function AiPlaybackBar({
           </svg>
           <span>{AI_TTS_SETUP_MESSAGE}</span>
           <button
+            ref={settingsButtonRef}
             className="ai-playback-setup-btn"
             onClick={() => setShowSettings(true)}
+            aria-expanded={showSettings}
+            aria-controls="narration-cockpit"
           >
             Configure
           </button>
         </div>
-        {showSettings && (
-          <div className="ai-playback-settings-overlay">
-            <div className="ai-playback-settings-container">
-              <AiTtsSettings onClose={() => setShowSettings(false)} />
-            </div>
-          </div>
-        )}
       </div>
     );
   }
 
   return (
     <div className="ai-playback-bar">
+      {showSettings && (
+        <NarrationCockpit
+          onClose={closeNarrationCockpit}
+          controlsDisabled={
+            isPlaying || isPaused || isLoading || Boolean(switchingProvider)
+          }
+        />
+      )}
+
       <div className="ai-playback-controls">
         {isPlaying ? (
           <button
@@ -662,30 +915,15 @@ export function AiPlaybackBar({
         <button
           className="ai-playback-button"
           onClick={handleStop}
-          disabled={!isHighlightActive && playbackState === "idle"}
+          disabled={
+            !isHighlightActive &&
+            playbackState === "idle" &&
+            !continuationPending
+          }
           title="Stop (Esc)"
         >
           <svg viewBox="0 0 24 24" className="ai-playback-icon">
             <rect x="4" y="4" width="16" height="16" fill="currentColor" />
-          </svg>
-        </button>
-
-        {/* Auto-page toggle */}
-        <button
-          className={
-            "ai-playback-button ai-playback-button-toggle " +
-            (autoPageEnabled ? "active" : "")
-          }
-          onClick={() => setAutoPageEnabled(!autoPageEnabled)}
-          title={autoPageEnabled ? "Auto-page: ON" : "Auto-page: OFF"}
-        >
-          <svg viewBox="0 0 24 24" className="ai-playback-icon">
-            <path
-              d="M13 5l7 7-7 7M5 5l7 7-7 7"
-              stroke="currentColor"
-              strokeWidth="2"
-              fill="none"
-            />
           </svg>
         </button>
       </div>
@@ -771,10 +1009,15 @@ export function AiPlaybackBar({
         </button>
 
         <button
+          ref={settingsButtonRef}
           className="ai-playback-button ai-playback-button-settings"
-          onClick={() => setShowSettings(!showSettings)}
-          title="Voice settings"
-          aria-label="Voice settings"
+          onClick={() =>
+            showSettings ? closeNarrationCockpit() : setShowSettings(true)
+          }
+          title="Narration settings"
+          aria-label="Narration settings"
+          aria-expanded={showSettings}
+          aria-controls="narration-cockpit"
         >
           <svg viewBox="0 0 24 24" className="ai-playback-icon">
             <path
@@ -789,14 +1032,6 @@ export function AiPlaybackBar({
           </svg>
         </button>
       </div>
-
-      {showSettings && (
-        <div className="ai-playback-settings-overlay">
-          <div className="ai-playback-settings-container">
-            <AiTtsSettings onClose={() => setShowSettings(false)} />
-          </div>
-        </div>
-      )}
 
       {error && (
         <div className="ai-playback-error">

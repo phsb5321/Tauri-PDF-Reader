@@ -25,12 +25,14 @@ if git diff --cached --name-only | grep -q "src-tauri/"; then
   echo "🦀 Running Rust checks..."
 
   # Format check
-  echo "  → cargo fmt --check"
-  cd src-tauri && cargo fmt --check
+  echo "  → cargo-fmt --check"
+  cd src-tauri && cargo-fmt --check
 
-  # Clippy linting
-  echo "  → cargo clippy"
-  cargo clippy -- -D warnings
+  # Cargo searches $CARGO_HOME/bin before PATH for subcommands; Pedro's
+  # rustup shims there have no default toolchain. Invoke the flake-pinned
+  # components directly instead of silently escaping the dev shell.
+  echo "  → cargo-clippy"
+  CARGO_BUILD_JOBS=1 cargo-clippy clippy -- -D warnings
 
   # Run tests with test-mocks feature
   echo "  → cargo test"

@@ -1,0 +1,78 @@
+{
+  "status": "PASS",
+  "buildRevision": "aec02dc73009707ad0b97bf3bf3118f5de87f25a",
+  "binarySha256": "3d5767f8c054e52fe0b0811a48c105649e58e348b90b0f70ae0cb53e1fb8231a",
+  "fixtureSha256": "d3fa22af5c53c92125ec9a03970d01e50182569afe1369527eaf3c7aed64d827",
+  "observedAt": "2026-08-31T02:20:22-03:00",
+  "journey": "all Narration tabs -> Continuous + English normalization -> public Play -> Pause -> excerpt Read from here -> Stop -> paragraph margin action -> Stop -> manual next page -> immediate fresh Play -> Stop -> measured RTF",
+  "assertions": {
+    "performanceModel": "Magpie TTS Multilingual 357M",
+    "performanceBackend": "Vulkan/RADV fixture",
+    "performanceDevice": "Fixture GPU",
+    "performanceProfile": "continuous",
+    "uncachedRtfVisible": true,
+    "sourceText": "What This Book Is About / This book aims to fill a gap. It connects the dots. Readers benefit.",
+    "spokenFirstRun": "What This Book Is About.",
+    "highlightedSourceRange": "What",
+    "secondRun": "This book aims to fill a gap. It connects the dots. Readers benefit.",
+    "readFromHereReplacedPausedQueue": true,
+    "paragraphActionStartedAtChosenParagraph": true,
+    "paragraphActionNonOverlapping": true,
+    "paragraphActionFocusVisible": true,
+    "paragraphActionPaperMarker": true,
+    "manualPageFreshPlay": "Second page ready.",
+    "provider": "local",
+    "credentialPresent": false,
+    "finalPlaybackState": "idle"
+  },
+  "requests": [
+    {
+      "body": {
+        "input": "What This Book Is About.",
+        "speed": 1.0,
+        "voice": "F1-pt"
+      },
+      "idempotencyKeyValid": true
+    },
+    {
+      "body": {
+        "input": "This book aims to fill a gap. It connects the dots. Readers benefit.",
+        "speed": 1.0,
+        "voice": "F1-pt"
+      },
+      "idempotencyKeyValid": true
+    },
+    {
+      "body": {
+        "input": "This book aims to fill a gap.",
+        "speed": 1.0,
+        "voice": "F1-pt"
+      },
+      "idempotencyKeyValid": true
+    },
+    {
+      "body": {
+        "input": "It connects the dots. Readers benefit.",
+        "speed": 1.0,
+        "voice": "F1-pt"
+      },
+      "idempotencyKeyValid": true
+    },
+    {
+      "body": {
+        "input": "Second page ready.",
+        "speed": 1.0,
+        "voice": "F1-pt"
+      },
+      "idempotencyKeyValid": true
+    },
+    {
+      "body": {
+        "input": "Playback starts immediately after a manual page turn.",
+        "speed": 1.0,
+        "voice": "F1-pt"
+      },
+      "idempotencyKeyValid": true
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 use crate::adapters::wav::validate_pcm16_wav;
 use crate::ports::{
-    AudioMediaType, SynthesisProvider, SynthesisRequest, SynthesisResult, SynthesisVoice,
-    SynthesizerPort,
+    AudioMediaType, ProviderRuntimeInfo, SynthesisProvider, SynthesisRequest, SynthesisResult,
+    SynthesisVoice, SynthesizerPort,
 };
 use async_trait::async_trait;
 use futures::StreamExt;
@@ -28,6 +28,8 @@ struct HealthResponse {
 struct CapabilitiesResponse {
     ready: bool,
     limits: CapabilityLimits,
+    #[serde(default)]
+    runtime: Option<RuntimeCapabilities>,
     tts: TtsCapabilities,
 }
 
@@ -35,6 +37,27 @@ struct CapabilitiesResponse {
 #[serde(rename_all = "camelCase")]
 struct CapabilityLimits {
     max_text_utf8_bytes: usize,
+    #[serde(default)]
+    queue_capacity: Option<usize>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct RuntimeCapabilities {
+    #[serde(default)]
+    model: Option<String>,
+    #[serde(default)]
+    model_revision: Option<String>,
+    #[serde(default)]
+    quantization: Option<String>,
+    #[serde(default)]
+    backend: Option<String>,
+    #[serde(default)]
+    device: Option<String>,
+    #[serde(default)]
+    acceleration: Option<String>,
+    #[serde(default)]
+    chunk_max_utf8_bytes: Option<usize>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -64,6 +87,7 @@ pub struct LocalTtsClient {
     revision: String,
     max_text_utf8_bytes: usize,
     voices: Vec<SynthesisVoice>,
+    runtime_info: ProviderRuntimeInfo,
 }
 
 impl LocalTtsClient {
@@ -92,6 +116,8 @@ impl LocalTtsClient {
         if !capabilities.ready {
             return Err("LOCAL_TTS_NOT_READY: capabilities reported not ready".to_string());
         }
+        let queue_capacity = capabilities.limits.queue_capacity;
+        let runtime = capabilities.runtime.unwrap_or_default();
         let voices: Vec<SynthesisVoice> = capabilities
             .tts
             .voices
@@ -116,12 +142,27 @@ impl LocalTtsClient {
         if max_text_utf8_bytes == 0 {
             return Err("LOCAL_TTS_INVALID_LIMIT: maxTextUtf8Bytes must be positive".to_string());
         }
+        let runtime_info = ProviderRuntimeInfo {
+            provider_revision: health.version.clone(),
+            model: runtime.model,
+            model_revision: runtime.model_revision,
+            quantization: runtime.quantization,
+            backend: runtime.backend,
+            device: runtime.device,
+            acceleration: runtime.acceleration,
+            queue_capacity,
+            chunk_max_utf8_bytes: runtime
+                .chunk_max_utf8_bytes
+                .unwrap_or(max_text_utf8_bytes)
+                .min(max_text_utf8_bytes),
+        };
         Ok(Self {
             client,
             base_url: base_url.trim_end_matches('/').to_string(),
             revision: health.version,
             max_text_utf8_bytes,
             voices,
+            runtime_info,
         })
     }
 
@@ -243,6 +284,10 @@ impl SynthesizerPort for LocalTtsClient {
         false
     }
 
+    fn runtime_info(&self) -> ProviderRuntimeInfo {
+        self.runtime_info.clone()
+    }
+
     async fn list_voices(&self) -> Result<Vec<SynthesisVoice>, String> {
         Ok(self.voices.clone())
     }
@@ -277,6 +322,11 @@ impl SynthesizerPort for LocalTtsClient {
         if !response.status().is_success() {
             return Err(format!("LOCAL_TTS_HTTP_{}", response.status().as_u16()));
         }
+        let from_cache = response
+            .headers()
+            .get("x-cache-hit")
+            .and_then(|value| value.to_str().ok())
+            .is_some_and(|value| value.eq_ignore_ascii_case("true"));
         let content_type = response
             .headers()
             .get(reqwest::header::CONTENT_TYPE)
@@ -299,6 +349,7 @@ impl SynthesizerPort for LocalTtsClient {
             word_timings: Vec::new(),
             total_duration,
             provider_revision: self.revision.clone(),
+            from_cache,
         })
     }
 }
@@ -314,6 +365,20 @@ mod tests {
 
     fn pcm_wav() -> Vec<u8> {
         fixture_pcm_wav()
+    }
+
+    fn runtime_info(revision: &str, max_text_utf8_bytes: usize) -> ProviderRuntimeInfo {
+        ProviderRuntimeInfo {
+            provider_revision: revision.to_string(),
+            model: None,
+            model_revision: None,
+            quantization: None,
+            backend: None,
+            device: None,
+            acceleration: None,
+            queue_capacity: None,
+            chunk_max_utf8_bytes: max_text_utf8_bytes,
+        }
     }
 
     fn read_request(stream: &mut std::net::TcpStream) -> String {
@@ -361,13 +426,18 @@ mod tests {
                     ),
                     1 => (
                         "application/json",
-                        br#"{"status":"ok","ready":true,"limits":{"maxTextUtf8Bytes":8192},"tts":{"voices":[{"id":"F1-pt","language":"pt-BR","mediaTypes":["audio/wav"],"markKinds":[]}]}}"#.to_vec(),
+                        br#"{"status":"ok","ready":true,"limits":{"maxTextUtf8Bytes":300,"queueCapacity":1},"runtime":{"model":"Magpie TTS Multilingual 357M","modelRevision":"model-sha","quantization":"Q6_K","backend":"Vulkan/RADV","device":"Fixture GPU","acceleration":"gpu","chunkMaxUtf8Bytes":300},"tts":{"voices":[{"id":"F1-pt","language":"pt-BR","mediaTypes":["audio/wav"],"markKinds":[]}]}}"#.to_vec(),
                     ),
                     _ => ("audio/wav", wav.clone()),
                 };
+                let cache_header = if index == 2 {
+                    "X-Cache-Hit: true\r\n"
+                } else {
+                    ""
+                };
                 write!(
                     stream,
-                    "HTTP/1.1 200 OK\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    "HTTP/1.1 200 OK\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\n{cache_header}Connection: close\r\n\r\n",
                     body.len()
                 )
                 .unwrap();
@@ -382,8 +452,22 @@ mod tests {
         let (url, requests) = fixture();
         let client = LocalTtsClient::connect_for_test(&url).await.unwrap();
         assert_eq!(client.provider_revision(), "fixture-1");
-        assert_eq!(client.max_text_utf8_bytes(), 8192);
+        assert_eq!(client.max_text_utf8_bytes(), 300);
         assert!(!client.supports_word_timings());
+        assert_eq!(
+            client.runtime_info(),
+            ProviderRuntimeInfo {
+                provider_revision: "fixture-1".to_string(),
+                model: Some("Magpie TTS Multilingual 357M".to_string()),
+                model_revision: Some("model-sha".to_string()),
+                quantization: Some("Q6_K".to_string()),
+                backend: Some("Vulkan/RADV".to_string()),
+                device: Some("Fixture GPU".to_string()),
+                acceleration: Some("gpu".to_string()),
+                queue_capacity: Some(1),
+                chunk_max_utf8_bytes: 300,
+            }
+        );
         assert_eq!(client.list_voices().await.unwrap()[0].id, "F1-pt");
 
         let result = client
@@ -398,6 +482,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(result.media_type, AudioMediaType::Wav);
+        assert!(result.from_cache);
         assert!(result.word_timings.is_empty());
         assert!((result.total_duration - 0.1).abs() < 0.000_001);
         let requests = requests.lock().unwrap();
@@ -407,6 +492,16 @@ mod tests {
             .contains("idempotency-key: "));
         assert!(requests[2].contains("\"input\":\"Olá do Lectrice.\""));
         assert!(requests[2].contains("\"voice\":\"F1-pt\""));
+    }
+
+    #[test]
+    fn older_supertonic_capabilities_remain_compatible() {
+        let parsed: CapabilitiesResponse = serde_json::from_str(
+            r#"{"ready":true,"limits":{"maxTextUtf8Bytes":8192},"tts":{"voices":[]}}"#,
+        )
+        .unwrap();
+        assert_eq!(parsed.limits.queue_capacity, None);
+        assert!(parsed.runtime.is_none());
     }
 
     #[test]
@@ -467,6 +562,7 @@ mod tests {
                 preview_url: None,
                 labels: None,
             }],
+            runtime_info: runtime_info("fixture-bound", 3),
         };
         let error = local
             .synthesize(SynthesisRequest {
@@ -513,6 +609,7 @@ mod tests {
                 preview_url: None,
                 labels: None,
             }],
+            runtime_info: runtime_info("fixture-timeout", 8_192),
         };
         let future = local.synthesize(SynthesisRequest {
             text: "timeout".to_string(),

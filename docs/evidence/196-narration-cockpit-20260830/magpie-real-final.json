@@ -1,0 +1,62 @@
+{
+  "status": "PASS",
+  "buildRevision": "aec02dc73009707ad0b97bf3bf3118f5de87f25a",
+  "binarySha256": "07506d9a8ad2029099bf19fa307b1a2ef4718ef69c18964e4925315588bbf955",
+  "fixtureSha256": "7fd875209b7aa1f9473eda19d46f5a8e1c7bb8cc5c9a209bf0d5e133a853a978",
+  "observedAt": "2026-08-31T15:28:29-03:00",
+  "serviceRevision": "8291ffde2e13e2e9221a000669b5f7814c7ecc858eb0a1a9de8ee77d8da05736",
+  "runtime": {
+    "model": "Magpie TTS Multilingual 357M",
+    "modelRevision": "8291ffde2e13e2e9221a000669b5f7814c7ecc858eb0a1a9de8ee77d8da05736",
+    "quantization": "Q6_K",
+    "backend": "Vulkan/RADV",
+    "device": "AMD Radeon RX 5700 XT",
+    "acceleration": "gpu",
+    "chunkMaxUtf8Bytes": 300
+  },
+  "journey": "Performance -> Continuous -> public Play -> exact highlight -> natural page advance -> public Stop",
+  "assertions": {
+    "profile": "continuous",
+    "firstHighlightedSource": "Reliable",
+    "pageAdvancedFrom": 1,
+    "pageAdvancedTo": 2,
+    "advanceCount": 1,
+    "finalPlaybackState": "idle",
+    "allRequestsAtMost300Bytes": true,
+    "everyBridgeCallOneChunk": true,
+    "gpuDeviceOpened": true,
+    "vramIncreased": true,
+    "credentialPresent": false,
+    "ggmlAssertion": false
+  },
+  "requestTrace": [
+    {
+      "chunks": 1,
+      "chunkBytes": [84]
+    },
+    {
+      "chunks": 1,
+      "chunkBytes": [87]
+    },
+    {
+      "chunks": 1,
+      "chunkBytes": [86]
+    },
+    {
+      "chunks": 1,
+      "chunkBytes": [93]
+    },
+    {
+      "chunks": 1,
+      "chunkBytes": [90]
+    },
+    {
+      "chunks": 1,
+      "chunkBytes": [20]
+    }
+  ],
+  "vramBaselineBytes": 2309300224,
+  "vramPeakBytes": 2892275712,
+  "vramDeltaBytes": 582975488,
+  "gpuHandleSamples": 96
+}

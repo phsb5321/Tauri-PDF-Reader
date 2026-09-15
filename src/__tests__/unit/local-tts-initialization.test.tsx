@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   listVoices: vi.fn(),
   setVoice: vi.fn(),
   setSpeed: vi.fn(),
+  stopped: null as ((event: { generation: number }) => void) | null,
   listen: vi.fn(async () => () => {}),
 }));
 
@@ -30,7 +31,12 @@ vi.mock("../../lib/tauri-invoke", () => ({
   onAiTtsStarted: mocks.listen,
   onAiTtsFinished: mocks.listen,
   onAiTtsPlaybackStarting: mocks.listen,
-  onAiTtsStopped: mocks.listen,
+  onAiTtsStopped: vi.fn(
+    async (callback: (event: { generation: number }) => void) => {
+      mocks.stopped = callback;
+      return () => {};
+    },
+  ),
   onAiTtsPaused: mocks.listen,
   onAiTtsResumed: mocks.listen,
   onAiTtsError: mocks.listen,
@@ -38,10 +44,13 @@ vi.mock("../../lib/tauri-invoke", () => ({
 
 import { useAiTts } from "../../hooks/useAiTts";
 import { useAiTtsStore } from "../../stores/ai-tts-store";
+import { useTtsHighlightStore } from "../../stores/tts-highlight-store";
 
 describe("local TTS initialization", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.stopped = null;
+    useTtsHighlightStore.getState().reset();
     useAiTtsStore.setState({
       provider: "local",
       localUrl: "http://127.0.0.1:5301",
@@ -115,6 +124,55 @@ describe("local TTS initialization", () => {
       selectedVoiceId: "F1-pt",
     });
     expect(mocks.listVoices).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops estimated highlighting when native playback stops", async () => {
+    renderHook(() => useAiTts());
+    await waitFor(() => expect(mocks.stopped).not.toBeNull());
+    act(() => {
+      useTtsHighlightStore.setState({
+        isActive: true,
+        currentWordIndex: 0,
+        currentText: "old page",
+        pageNumber: 1,
+      });
+      mocks.stopped?.({ generation: 1 });
+    });
+
+    expect(useTtsHighlightStore.getState()).toMatchObject({
+      isActive: false,
+      currentWordIndex: -1,
+      currentText: null,
+      pageNumber: null,
+    });
+  });
+
+  it("ignores a delayed stopped event from the generation already replaced", async () => {
+    renderHook(() => useAiTts());
+    await waitFor(() => expect(mocks.stopped).not.toBeNull());
+    act(() => {
+      useAiTtsStore.setState({
+        playbackState: "playing",
+        currentText: "new run",
+        backendPlaybackGeneration: 8,
+      });
+      useTtsHighlightStore.setState({ isActive: true, currentWordIndex: 0 });
+      mocks.stopped?.({ generation: 8 });
+    });
+    expect(useAiTtsStore.getState()).toMatchObject({
+      playbackState: "playing",
+      currentText: "new run",
+      backendPlaybackGeneration: 8,
+    });
+    expect(useTtsHighlightStore.getState().isActive).toBe(true);
+
+    act(() => mocks.stopped?.({ generation: 9 }));
+    expect(useAiTtsStore.getState()).toMatchObject({
+      playbackState: "idle",
+      currentText: null,
+      backendPlaybackGeneration: null,
+    });
+    expect(useTtsHighlightStore.getState().isActive).toBe(false);
   });
 
   it("keeps the provider blocked when native initialization fails", async () => {

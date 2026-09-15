@@ -1,0 +1,46 @@
+warning: Git tree '/home/notroot/Documents/Code/personal/tauri-pdf-reader-182-gpu-performance' is dirty
+   Compiling tauri-pdf-reader v0.2.0 (/home/notroot/Documents/Code/personal/tauri-pdf-reader-182-gpu-performance/src-tauri)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 41.53s
+
+> lectrice@0.2.0 test:e2e /home/notroot/Documents/Code/personal/tauri-pdf-reader-182-gpu-performance
+> wdio run wdio.conf.mjs
+
+
+Execution of 1 workers started at 2026-08-28T16:51:40.083Z
+
+[0-0] RUNNING in undefined - file:///e2e/magpie-real-page.e2e.mjs
+GStreamer element appsink not found. Please install it.
+[0-0] Error in "Magpie real-model page queue.narrates bounded units on Vulkan and advances exactly once"
+Error: expect(received).toContain(expected) // indexOf
+
+Expected substring: "Sustains continuous playback"
+Received string:    "1.003 RTF90 bytes · 4.61 s for 4.60 s audioThis sample may outrun the playback buffer"
+    at Context.<anonymous> (file:///home/notroot/Documents/Code/personal/tauri-pdf-reader-182-gpu-performance/e2e/magpie-real-page.e2e.mjs:112:25)
+[0-0] FAILED in undefined - file:///e2e/magpie-real-page.e2e.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[wry 0.53.5 linux #0-0] Running: wry (v0.53.5) on linux
+[wry 0.53.5 linux #0-0] Session ID: b416c3af-42a4-42ba-9ffd-f8fd41a212d7
+[wry 0.53.5 linux #0-0]
+[wry 0.53.5 linux #0-0] » e2e/magpie-real-page.e2e.mjs
+[wry 0.53.5 linux #0-0] Magpie real-model page queue
+[wry 0.53.5 linux #0-0]    ✖ narrates bounded units on Vulkan and advances exactly once
+[wry 0.53.5 linux #0-0]
+[wry 0.53.5 linux #0-0] 1 failing (34.8s)
+[wry 0.53.5 linux #0-0]
+[wry 0.53.5 linux #0-0] 1) Magpie real-model page queue narrates bounded units on Vulkan and advances exactly once
+[wry 0.53.5 linux #0-0] expect(received).toContain(expected) // indexOf
+
+Expected substring: "Sustains continuous playback"
+Received string:    "1.003 RTF90 bytes · 4.61 s for 4.60 s audioThis sample may outrun the playback buffer"
+[wry 0.53.5 linux #0-0] Error: expect(received).toContain(expected) // indexOf
+[wry 0.53.5 linux #0-0]
+[wry 0.53.5 linux #0-0] Expected substring: "Sustains continuous playback"
+[wry 0.53.5 linux #0-0] Received string:    "1.003 RTF90 bytes · 4.61 s for 4.60 s audioThis sample may outrun the playback buffer"
+[wry 0.53.5 linux #0-0]     at Context.<anonymous> (file:///home/notroot/Documents/Code/personal/tauri-pdf-reader-182-gpu-performance/e2e/magpie-real-page.e2e.mjs:112:25)
+
+
+Spec Files:	 0 passed, 1 failed, 1 total (100% completed) in 00:00:37
+
+ ELIFECYCLE  Command failed with exit code 1.

@@ -1,0 +1,39 @@
+{
+  "status": "PASS",
+  "observedAt": "2026-08-27T17:11:27-03:00",
+  "gitHead": "951c342a80c11af68784e88e0fb83e8c67e70b42",
+  "worktreeDirty": true,
+  "generatedTarget": "/home/notroot/.cache/lectrice/test-188-target",
+  "generatedTargetBytes": 14901398433,
+  "freeBytesBefore": 6265946112,
+  "checks": [
+    {
+      "command": "cargo test current_eleven_model --features test-mocks -j 1",
+      "status": "PASS",
+      "tests": 1
+    },
+    {
+      "command": "cargo test equalizer_ --features test-mocks -j 1",
+      "status": "PASS",
+      "tests": 3
+    },
+    {
+      "command": "cargo test prosody_revision_contract --features test-mocks -j 1",
+      "status": "PASS",
+      "tests": 1
+    },
+    {
+      "command": "bash scripts/e2e-prosody.sh",
+      "status": "PASS"
+    },
+    {
+      "command": "FC_SEED=20260827 FC_NUM_RUNS=2000 pnpm test:fuzz",
+      "status": "PASS",
+      "runs": 2000
+    }
+  ],
+  "note": "Generated Cargo target was holder-free after the recorded build and is safe to remove; repository evidence is retained separately.",
+  "removedAt": "2026-08-27T17:11:31-03:00",
+  "freeBytesAfter": 21230145536,
+  "observedFreedBytes": 14964199424
+}

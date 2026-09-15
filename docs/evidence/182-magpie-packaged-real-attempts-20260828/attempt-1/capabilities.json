@@ -1,0 +1,82 @@
+{
+  "status": "ok",
+  "ready": true,
+  "limits": {
+    "maxTextUtf8Bytes": 300,
+    "idempotencyRetentionSeconds": 900,
+    "queueCapacity": 1
+  },
+  "runtime": {
+    "model": "Magpie TTS Multilingual 357M",
+    "modelRevision": "8291ffde2e13e2e9221a000669b5f7814c7ecc858eb0a1a9de8ee77d8da05736",
+    "quantization": "Q6_K",
+    "backend": "Vulkan/RADV",
+    "device": "AMD Radeon RX 5700 XT",
+    "acceleration": "gpu",
+    "chunkMaxUtf8Bytes": 300
+  },
+  "tts": {
+    "voices": [
+      {
+        "id": "Aria-en",
+        "language": "en-US",
+        "mediaTypes": ["audio/wav"],
+        "markKinds": []
+      },
+      {
+        "id": "Jason-en",
+        "language": "en-US",
+        "mediaTypes": ["audio/wav"],
+        "markKinds": []
+      },
+      {
+        "id": "John-en",
+        "language": "en-US",
+        "mediaTypes": ["audio/wav"],
+        "markKinds": []
+      },
+      {
+        "id": "Leo-en",
+        "language": "en-US",
+        "mediaTypes": ["audio/wav"],
+        "markKinds": []
+      },
+      {
+        "id": "Sofia-en",
+        "language": "en-US",
+        "mediaTypes": ["audio/wav"],
+        "markKinds": []
+      },
+      {
+        "id": "Aria-pt-BR",
+        "language": "pt-BR",
+        "mediaTypes": ["audio/wav"],
+        "markKinds": []
+      },
+      {
+        "id": "Jason-pt-BR",
+        "language": "pt-BR",
+        "mediaTypes": ["audio/wav"],
+        "markKinds": []
+      },
+      {
+        "id": "John-pt-BR",
+        "language": "pt-BR",
+        "mediaTypes": ["audio/wav"],
+        "markKinds": []
+      },
+      {
+        "id": "Leo-pt-BR",
+        "language": "pt-BR",
+        "mediaTypes": ["audio/wav"],
+        "markKinds": []
+      },
+      {
+        "id": "Sofia-pt-BR",
+        "language": "pt-BR",
+        "mediaTypes": ["audio/wav"],
+        "markKinds": []
+      }
+    ]
+  }
+}

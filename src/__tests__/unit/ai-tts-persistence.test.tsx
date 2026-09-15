@@ -125,6 +125,9 @@ function clearInMemorySession(): void {
     selectedVoiceId: "21m00Tcm4TlvDq8ikWAM",
     speed: 1,
     autoPageEnabled: true,
+    performanceProfile: "balanced",
+    numberNormalizationEnabled: true,
+    narrationLanguage: "auto",
     cacheCoverage: null,
     maxTextUtf8Bytes: 10_000,
     providerVoiceIds: {
@@ -236,15 +239,47 @@ describe("AI TTS session-secret persistence", () => {
           selectedVoiceId: voice,
           speed: 1.75,
           autoPageEnabled: false,
+          performanceProfile: "balanced",
+          numberNormalizationEnabled: true,
+          narrationLanguage: "auto",
           providerVoiceIds: {
             elevenlabs: voice,
           },
         },
-        version: 2,
+        version: 4,
       });
       expect(persistenceEvidence()).not.toContain(PERSISTENCE_TEST_MARKER);
     },
   );
+
+  it("falls back from an unknown persisted performance profile", async () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        version: 4,
+        state: {
+          selectedVoiceId: "safe-voice",
+          speed: 1,
+          autoPageEnabled: true,
+          performanceProfile: "unsafe-turbo",
+          numberNormalizationEnabled: "yes",
+          narrationLanguage: "guess",
+        },
+      }),
+    );
+
+    await act(async () => {
+      await useAiTtsStore.persist.rehydrate();
+    });
+
+    expect(useAiTtsStore.getState()).toMatchObject({
+      performanceProfile: "balanced",
+      numberNormalizationEnabled: true,
+      narrationLanguage: "auto",
+    });
+    expect(localStorage.getItem(STORAGE_KEY)).not.toContain("unsafe-turbo");
+    expect(localStorage.getItem(STORAGE_KEY)).not.toContain('"guess"');
+  });
 
   it("removes malformed persisted bytes containing a plaintext key", async () => {
     const malformedStorage = `{"state":{"apiKey":"${PERSISTENCE_TEST_MARKER}","selectedVoiceId":"unterminated`;
@@ -270,6 +305,9 @@ describe("AI TTS session-secret persistence", () => {
       useAiTtsStore.getState().setSelectedVoice("safe-current-voice");
       useAiTtsStore.getState().setSpeed(2.25);
       useAiTtsStore.getState().setAutoPageEnabled(false);
+      useAiTtsStore.getState().setPerformanceProfile("continuous");
+      useAiTtsStore.getState().setNumberNormalizationEnabled(false);
+      useAiTtsStore.getState().setNarrationLanguage("pt-BR");
       useAiTtsStore.getState().setApiKey(PERSISTENCE_TEST_MARKER);
     });
 
@@ -281,11 +319,14 @@ describe("AI TTS session-secret persistence", () => {
         selectedVoiceId: "safe-current-voice",
         speed: 2.25,
         autoPageEnabled: false,
+        performanceProfile: "continuous",
+        numberNormalizationEnabled: false,
+        narrationLanguage: "pt-BR",
         providerVoiceIds: {
           elevenlabs: "safe-current-voice",
         },
       },
-      version: 2,
+      version: 4,
     });
     expect(persistedPayload.state).not.toHaveProperty("apiKey");
     expect(persistenceEvidence()).not.toContain(PERSISTENCE_TEST_MARKER);

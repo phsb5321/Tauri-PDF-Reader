@@ -12,7 +12,11 @@ import {
   aiTtsPause,
   aiTtsResume,
 } from "../lib/tauri-invoke";
-import { onAiTtsPlaybackStarting, onAiTtsFinished } from "../lib/api/ai-tts";
+import {
+  onAiTtsPlaybackStarting,
+  onAiTtsFinished,
+  onAiTtsStopped,
+} from "../lib/api/ai-tts";
 import {
   useTtsHighlightStore,
   selectIsHighlighting,
@@ -22,6 +26,11 @@ import {
   buildWordFallbackTimings,
   findWordIndexAtTime,
 } from "../lib/tts-tracking";
+import {
+  mapSpokenRangeToSource,
+  type AlignmentSegment,
+  type ProsodyBoundary,
+} from "../lib/prosody-plan";
 
 export interface UseTtsWordHighlightOptions {
   /** Callback when a new word becomes active */
@@ -198,6 +207,42 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
     };
   }, []);
 
+  // A native Stop can come from page navigation or provider switching rather
+  // than this hook's own Stop control. Clear the visual clock and duplicate-
+  // request guard at that shared authority, without treating Stop as natural
+  // completion (which would incorrectly advance a sentence/page).
+  useEffect(() => {
+    let unlistenFn: (() => void) | null = null;
+
+    onAiTtsStopped((event) => {
+      const activeGeneration = playbackGenerationRef.current;
+      if (activeGeneration !== null && event.generation <= activeGeneration) {
+        console.debug("[TtsWordHighlight] Ignoring stale stopped event", {
+          activeGeneration,
+          stoppedGeneration: event.generation,
+        });
+        return;
+      }
+      speakingRef.current = false;
+      requestIdRef.current += 1;
+      playbackStartTimeRef.current = null;
+      playbackGenerationRef.current = null;
+      lastWordIndexRef.current = -1;
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      useTtsHighlightStore.getState().stopHighlighting();
+      useAiTtsStore.getState().setPlaybackState("idle");
+    }).then((unlisten) => {
+      unlistenFn = unlisten;
+    });
+
+    return () => {
+      unlistenFn?.();
+    };
+  }, []);
+
   // Drive completion off the real audio-finished signal. The backend emits
   // `ai-tts:finished` when the rodio sink drains naturally; completing here
   // (not only on the rAF duration estimate) is what fixes the unknown-duration
@@ -241,6 +286,8 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
       pageNumber: number,
       voiceId?: string,
       baseOffset = 0,
+      alignment?: readonly AlignmentSegment[],
+      boundaryAfter?: ProsodyBoundary,
     ) => {
       if (!ttsStore.initialized) {
         console.warn("[TtsWordHighlight] TTS not initialized");
@@ -277,6 +324,7 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
         const result = await aiTtsSpeakWithTimestamps(
           text,
           voiceId ?? ttsStore.selectedVoiceId ?? undefined,
+          boundaryAfter,
         );
 
         // Check if this request was superseded
@@ -302,11 +350,25 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
           const relativeTimings = usingFallback
             ? buildWordFallbackTimings(text, result.totalDuration)
             : result.wordTimings;
-          const wordTimings = relativeTimings.map((timing) => ({
-            ...timing,
-            charStart: timing.charStart + baseOffset,
-            charEnd: timing.charEnd + baseOffset,
-          }));
+          const wordTimings = relativeTimings.flatMap((timing) => {
+            const mapped = alignment
+              ? mapSpokenRangeToSource(
+                  alignment,
+                  timing.charStart,
+                  timing.charEnd,
+                )
+              : { start: timing.charStart, end: timing.charEnd };
+            // An insertion-only mark has no PDF range. Punctuation attached to
+            // a real word still overlaps its copy segment and maps normally.
+            if (!mapped) return [];
+            return [
+              {
+                ...timing,
+                charStart: mapped.start + baseOffset,
+                charEnd: mapped.end + baseOffset,
+              },
+            ];
+          });
 
           // Start highlighting - this triggers the animation loop via useEffect
           highlightStore.startHighlighting(
