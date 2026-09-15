@@ -44,13 +44,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf \
-            libspeechd-dev libasound2-dev libssl-dev pkg-config clang libclang-dev \
-            fakeroot dpkg file
+      - name: Install missing system dependencies
+        run: ./scripts/ci-install-system-dependencies.sh fakeroot dpkg file
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
