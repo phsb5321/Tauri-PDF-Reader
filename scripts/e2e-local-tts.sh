@@ -46,7 +46,7 @@ status=$(curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/j
 [ "$status" = 409 ]
 : >"$REQUEST_LOG"
 
-VITE_E2E_NATIVE=true VITE_E2E_NATIVE_TTS=local pnpm build
+CI=true VITE_E2E_NATIVE=true VITE_E2E_NATIVE_TTS=local pnpm build
 touch src-tauri/src/lib.rs
 
 # cpal/rodio needs a real output device contract; ALSA's null PCM consumes the
@@ -80,5 +80,11 @@ toolchain_exec '
 ' 2>&1 | tee "$EVIDENCE_DIR/lane.log"
 
 jq -s '{requests: .}' "$REQUEST_LOG" >"$EVIDENCE_DIR/receipt.json"
-jq -e '.requests | length == 1' "$EVIDENCE_DIR/receipt.json" >/dev/null
+jq -e '
+  (.requests | length) >= 1 and
+  (.requests | all(.[];
+    (.body.input | type == "string" and length > 0) and
+    (.body.voice == "F1-pt") and
+    (.idempotencyKey | test("^[0-9a-f]{64}$"))))
+' "$EVIDENCE_DIR/receipt.json" >/dev/null
 printf 'local-tts packaged gate PASS — evidence %s\n' "$EVIDENCE_DIR/receipt.json"

@@ -1,4 +1,4 @@
-//! The typed config schema — the 17 settings that exist in Lectrice today.
+//! The typed config schema for the settings that exist in Lectrice today.
 //!
 //! Every key here was read off a real persistence site before being written
 //! down (`src/stores/settings-store.ts`, `src/db/migrations.rs`,

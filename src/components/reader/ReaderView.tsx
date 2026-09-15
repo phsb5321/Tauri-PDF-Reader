@@ -12,7 +12,7 @@
  * @module components/reader/ReaderView
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppLayout } from "../layout/AppLayout";
 import { Toolbar } from "../Toolbar";
 import { PdfViewer } from "../PdfViewer";
@@ -20,6 +20,7 @@ import { LibraryView } from "../library/LibraryView";
 import { AiPlaybackBar } from "../playback-bar/AiPlaybackBar";
 import { SettingsPanel } from "../settings/SettingsPanel";
 import { HighlightsPanel } from "../highlights/HighlightsPanel";
+import { TableOfContents } from "../sidebar/TableOfContents";
 import { useDocumentStore } from "../../stores/document-store";
 import { useAiTtsStore } from "../../stores/ai-tts-store";
 import { pdfService } from "../../services/pdf-service";
@@ -27,6 +28,7 @@ import { useAutoSave } from "../../hooks/useAutoSave";
 import { onAppCloseRequested, emitAppCloseAck } from "../../lib/api/app-close";
 import { useTtsPrebuffer } from "../../hooks/useTtsPrebuffer";
 import { useOpenPdf } from "../../hooks/useOpenPdf";
+import { usePdfDropSession } from "../../hooks/usePdfDropSession";
 import {
   useHighlightPersistence,
   loadHighlights,
@@ -39,6 +41,7 @@ import { useCommandKeys } from "../../hooks/useCommandKeys";
 import { usePageNavigation } from "../../hooks/usePageNavigation";
 import { aiTtsPause, aiTtsResume } from "../../lib/tauri-invoke";
 import { libraryGetDocument } from "../../lib/api/library";
+import { buildPdfText } from "../../lib/pdf-text";
 import { useSessionStore } from "../../stores/session-store";
 import type { Document, Highlight } from "../../lib/schemas";
 import "./ReaderView.css";
@@ -58,7 +61,11 @@ export function ReaderView() {
     error,
     setError,
   } = useDocumentStore();
-  const { openPdf, resumeDocument } = useOpenPdf();
+  const { openPdf, openDroppedPdf, resumeDocument } = useOpenPdf();
+  const createSession = useSessionStore((state) => state.createSession);
+  const restoreSession = useSessionStore((state) => state.restoreSession);
+  const deleteSession = useSessionStore((state) => state.deleteSession);
+  const playbackState = useAiTtsStore((state) => state.playbackState);
 
   // The reading home is the landing surface, so this starts true: a reader with
   // nothing loaded has nothing to show, and the library is where a returning
@@ -67,11 +74,29 @@ export function ReaderView() {
   // Library go back and forth without re-reading the file or losing the page.
   const [showLibrary, setShowLibrary] = useState(true);
 
+  const handleDroppedSessionCreated = useCallback(() => {
+    setShowLibrary(false);
+  }, []);
+  const {
+    isDragActive,
+    isImporting: isDropImporting,
+    status: dropStatus,
+    dismissStatus: dismissDropStatus,
+  } = usePdfDropSession({
+    openDroppedPdf,
+    createSession,
+    restoreSession,
+    deleteSession,
+    onSessionCreated: handleDroppedSessionCreated,
+    onError: setError,
+  });
+
   // Settings lives at the shell level, not inside `AiPlaybackBar`, precisely
   // because that bar only mounts once a document is open (below). A reader
   // on the reading home — where they would go first to enter an API key —
   // must be able to reach it too.
   const [showSettings, setShowSettings] = useState(false);
+  const [showContents, setShowContents] = useState(false);
 
   // Highlights: the panel is document-scoped, so it lives at the shell level
   // (like settings) and is gated on a document being open. The native
@@ -117,6 +142,16 @@ export function ReaderView() {
   // a second resume-and-play (a different book) fire again even if the
   // previous one never actually started.
   const [autoPlayToken, setAutoPlayToken] = useState(0);
+  const pendingNarrationRef = useRef<{
+    text: string;
+    baseOffset: number;
+  } | null>(null);
+  const activeNarrationOffsetRef = useRef(0);
+  const handleReadFromHere = useCallback((text: string, baseOffset: number) => {
+    pendingNarrationRef.current = { text, baseOffset };
+    setAutoPlayToken((token) => token + 1);
+  }, []);
+
   const handleResumeAndPlay = useCallback(
     async (document: Document) => {
       if (await resumeDocument(document)) {
@@ -279,30 +314,31 @@ export function ReaderView() {
 
   // Get text content from current page for TTS
   const getCurrentPageText = useCallback(async (): Promise<string | null> => {
+    const selectedTail = pendingNarrationRef.current;
+    if (selectedTail) {
+      pendingNarrationRef.current = null;
+      activeNarrationOffsetRef.current = selectedTail.baseOffset;
+      return selectedTail.text;
+    }
+    activeNarrationOffsetRef.current = 0;
     if (!pdfDocument) return null;
 
     try {
       const page = await pdfService.getPage(pdfDocument, currentPage);
       const textContent = await page.getTextContent();
 
-      // Extract text from text items
-      const text = textContent.items
-        .map((item) => {
-          if ("str" in item) {
-            return item.str;
-          }
-          return "";
-        })
-        .join(" ")
-        .replace(/\s+/g, " ")
-        .trim();
-
-      return text || null;
+      return buildPdfText(textContent.items).text || null;
     } catch (error) {
       console.error("Error extracting text:", error);
       return null;
     }
   }, [pdfDocument, currentPage]);
+
+  const consumeNarrationBaseOffset = useCallback(() => {
+    const offset = activeNarrationOffsetRef.current;
+    activeNarrationOffsetRef.current = 0;
+    return offset;
+  }, []);
 
   // Nothing loaded means nothing to read, so the home wins regardless of the
   // toggle. The playback bar is deliberately NOT tied to this: audio started in
@@ -316,12 +352,22 @@ export function ReaderView() {
         <Toolbar
           onSessionRestored={handleSessionRestored}
           onOpen={() => setShowLibrary(false)}
+          isLibraryShowing={libraryShowing}
+          onLibrary={() => {
+            setShowContents(false);
+            setShowLibrary(true);
+          }}
+          isContentsOpen={showContents}
+          onContents={() => setShowContents((open) => !open)}
+          onSettings={() => setShowSettings(true)}
         />
       }
       footer={
-        pdfDocument && (
+        pdfDocument &&
+        (!libraryShowing || playbackState !== "idle") && (
           <AiPlaybackBar
             getText={getCurrentPageText}
+            getTextBaseOffset={consumeNarrationBaseOffset}
             autoPlayToken={autoPlayToken}
           />
         )
@@ -335,6 +381,18 @@ export function ReaderView() {
           </button>
         </div>
       )}
+      {dropStatus && (
+        <div
+          className="library-drop-status"
+          role="status"
+          aria-label={dropStatus.message}
+        >
+          <span>{dropStatus.message}</span>
+          <button type="button" onClick={dismissDropStatus}>
+            Dismiss
+          </button>
+        </div>
+      )}
       {/* The reading surface and the highlights panel are SIBLINGS IN A ROW.
           `.app-layout-main` is a flex COLUMN, so mounting the 300px panel
           directly into it made the panel a column item: it stacked underneath
@@ -342,6 +400,27 @@ export function ReaderView() {
           instead of docking. The row wrapper is what makes "beside" possible;
           the panel's own width is meaningless without it. */}
       <div className="reader-surface">
+        {(isDragActive || isDropImporting) && (
+          <div
+            className="pdf-drop-overlay"
+            role="status"
+            aria-label={
+              isDropImporting
+                ? "Creating reading session from dropped PDF"
+                : "Drop one PDF to create a reading session"
+            }
+          >
+            <div className="pdf-drop-overlay__content">
+              <DropPdfIcon />
+              <strong>
+                {isDropImporting
+                  ? "Creating reading session…"
+                  : "Drop PDF to create a reading session"}
+              </strong>
+              {!isDropImporting && <span>One PDF at a time</span>}
+            </div>
+          </div>
+        )}
         {libraryShowing ? (
           <div className="library-surface">
             <LibraryView
@@ -356,7 +435,7 @@ export function ReaderView() {
             />
           </div>
         ) : (
-          <PdfViewer />
+          <PdfViewer onReadFromHere={handleReadFromHere} />
         )}
         {showHighlights && currentDocument && (
           <HighlightsPanel
@@ -368,10 +447,23 @@ export function ReaderView() {
           />
         )}
       </div>
+      <TableOfContents
+        isOpen={showContents && !libraryShowing}
+        onClose={() => setShowContents(false)}
+      />
       <SettingsPanel
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
       />
     </AppLayout>
+  );
+}
+
+function DropPdfIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <path d="M14 2v6h6M12 11v7M9 15l3 3 3-3" />
+    </svg>
   );
 }

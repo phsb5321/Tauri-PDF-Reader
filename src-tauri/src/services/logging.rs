@@ -257,16 +257,24 @@ pub fn redact_text(text: &str) -> String {
             i = j;
             continue;
         }
-        // ElevenLabs key shape (`sk_` + 20+ base62): redact the whole token.
-        if text[i..].starts_with("sk_") {
-            let mut j = i + 3;
+        // Session-only cloud key shapes (`sk_` ElevenLabs / `gsk_` Groq,
+        // followed by 20+ token characters): redact the whole token.
+        let secret_prefix = if text[i..].starts_with("gsk_") {
+            Some((4, "gsk_<redacted>"))
+        } else if text[i..].starts_with("sk_") {
+            Some((3, "sk_<redacted>"))
+        } else {
+            None
+        };
+        if let Some((prefix_len, replacement)) = secret_prefix {
+            let mut j = i + prefix_len;
             while j < bytes.len()
                 && (bytes[j].is_ascii_alphanumeric() || bytes[j] == b'_' || bytes[j] == b'-')
             {
                 j += 1;
             }
-            if j - (i + 3) >= 20 {
-                out.push_str("sk_<redacted>");
+            if j - (i + prefix_len) >= 20 {
+                out.push_str(replacement);
                 i = j;
                 continue;
             }
@@ -332,17 +340,25 @@ mod tests {
         format!("sk_{}", "ABCDEFGHIJKLMNOPQRSTUVWX1234567890xyz")
     }
 
+    fn groq_canary_key() -> String {
+        format!("gsk_{}", "ZYXWVUTSRQPONMLKJIHGFEDCBA9876543210")
+    }
+
     #[test]
     fn redacts_home_paths_and_secret_shaped_tokens() {
         let key = canary_key();
-        let text =
-            format!("FILE_READ_ERROR: Cannot open file: /home/alice/books/secret.pdf | {key}");
+        let groq_key = groq_canary_key();
+        let text = format!(
+            "FILE_READ_ERROR: Cannot open file: /home/alice/books/secret.pdf | {key} | {groq_key}"
+        );
         let redacted = redact_text(&text);
 
         assert!(!redacted.contains("alice"));
         assert!(redacted.contains("/home/<redacted-user>/books/secret.pdf"));
         assert!(!redacted.contains(&key));
+        assert!(!redacted.contains(&groq_key));
         assert!(redacted.contains("sk_<redacted>"));
+        assert!(redacted.contains("gsk_<redacted>"));
     }
 
     #[test]

@@ -404,9 +404,11 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
         session_remove_document,
         session_update_document,
         session_touch,
-        // User config file + config-owned local TTS initialization
+        // User config file + typed narration connection operations
         config_get_effective,
         ai_tts_init_local,
+        ai_tts_init_groq,
+        ai_tts_switch_provider,
     ])
 }
 
@@ -758,6 +760,10 @@ pub fn run() {
             #[cfg(feature = "elevenlabs-tts")]
             ai_tts_init_local,
             #[cfg(feature = "elevenlabs-tts")]
+            ai_tts_init_groq,
+            #[cfg(feature = "elevenlabs-tts")]
+            ai_tts_switch_provider,
+            #[cfg(feature = "elevenlabs-tts")]
             ai_tts_list_voices,
             #[cfg(feature = "elevenlabs-tts")]
             ai_tts_speak,
@@ -933,8 +939,8 @@ pub fn run() {
                     if let Some(cache_dir) = cache_dir {
                         engine.init_cache(cache_dir);
                     }
-                    engine.set_finished_callback(Box::new(move || {
-                        if let Err(e) = app_handle.emit("ai-tts:finished", ()) {
+                    engine.set_finished_callback(Box::new(move |generation| {
+                        if let Err(e) = app_handle.emit("ai-tts:finished", generation) {
                             tracing::warn!("Failed to emit ai-tts:finished: {e}");
                         }
                     }));

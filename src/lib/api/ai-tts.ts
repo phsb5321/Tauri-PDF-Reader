@@ -12,14 +12,13 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 export interface AiVoiceInfo {
   id: string;
   name: string;
-  provider: "elevenlabs" | "local";
+  provider: "elevenlabs" | "local" | "groq";
   previewUrl: string | null;
   labels: Record<string, unknown> | null;
 }
 
 export interface AiTtsConfig {
-  provider: "elevenlabs" | "local";
-  apiKey: string | null;
+  provider: "elevenlabs" | "local" | "groq";
   voiceId: string | null;
   modelId: string | null;
   stability: number;
@@ -56,9 +55,13 @@ export interface SpeakWithTimestampsResponse {
 
 // Commands
 
-export async function aiTtsInit(
-  apiKey: string,
-): Promise<{ success: boolean; voicesCount: number }> {
+export async function aiTtsInit(apiKey: string): Promise<{
+  success: boolean;
+  voicesCount: number;
+  provider: "elevenlabs";
+  supportsWordTimings: boolean;
+  maxTextUtf8Bytes: number;
+}> {
   return invoke("ai_tts_init", { apiKey });
 }
 
@@ -209,8 +212,16 @@ export function onAiTtsStarted(
  * real completion signal; the frontend drives completion off it instead of a
  * timer estimate, so it fires correctly even when the audio duration is unknown.
  */
-export function onAiTtsFinished(callback: () => void): Promise<UnlistenFn> {
-  return listen("ai-tts:finished", () => callback());
+export interface AiTtsFinishedEvent {
+  generation: number;
+}
+
+export function onAiTtsFinished(
+  callback: (event: AiTtsFinishedEvent) => void,
+): Promise<UnlistenFn> {
+  return listen<number>("ai-tts:finished", (event) =>
+    callback({ generation: event.payload }),
+  );
 }
 
 export function onAiTtsStopped(callback: () => void): Promise<UnlistenFn> {
@@ -239,6 +250,7 @@ export function onAiTtsError(
  */
 export interface AiTtsPlaybackStartingEvent {
   duration: number;
+  generation: number;
 }
 
 /**

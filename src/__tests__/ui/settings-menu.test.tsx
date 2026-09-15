@@ -41,7 +41,11 @@ vi.mock("../../components/PdfViewer", () => ({
   PdfViewer: () => <div data-testid="pdf-viewer" />,
 }));
 vi.mock("../../components/Toolbar", () => ({
-  Toolbar: () => <div data-testid="toolbar" />,
+  Toolbar: ({ onSettings }: { onSettings?: () => void }) => (
+    <button type="button" aria-label="Settings" onClick={onSettings}>
+      Settings
+    </button>
+  ),
 }));
 vi.mock("../../components/playback-bar/AiPlaybackBar", () => ({
   AiPlaybackBar: () => <div data-testid="playback-bar" />,
@@ -119,6 +123,16 @@ function activateSettingsFromMenu() {
 }
 
 describe("the Settings menu action", () => {
+  it("opens from the shared visible toolbar on the reading home", async () => {
+    render(<ReaderView />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
+
+    expect(
+      await screen.findByRole("dialog", { name: "Settings" }),
+    ).toBeInTheDocument();
+  });
+
   it("opens the settings panel from the reading home (no document open)", async () => {
     render(<ReaderView />);
     await waitFor(() => expect(menuActionListener).toBeDefined());

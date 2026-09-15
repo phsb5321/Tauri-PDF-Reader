@@ -42,6 +42,30 @@ pub trait AudioSink {
     fn is_empty(&self) -> bool;
 }
 
+#[cfg(test)]
+#[derive(Default)]
+struct NoopAudioSink {
+    empty: bool,
+}
+
+#[cfg(test)]
+impl AudioSink for NoopAudioSink {
+    fn play_mp3(&mut self, _data: &[u8]) -> Result<(), String> {
+        self.empty = false;
+        Ok(())
+    }
+    fn pause(&mut self) {}
+    fn resume(&mut self) {}
+    fn stop(&mut self) {
+        self.empty = true;
+    }
+    fn set_volume(&mut self, _volume: f32) {}
+    fn set_speed(&mut self, _speed: f32) {}
+    fn is_empty(&self) -> bool {
+        self.empty
+    }
+}
+
 /// Commands sent to the audio thread.
 enum Command {
     /// Play these bytes; the thread replies with THIS play's decode/start result
@@ -94,6 +118,14 @@ impl AudioPlayer {
         Self::with_backend(
             || RodioSink::new().map(|s| Box::new(s) as Box<dyn AudioSink>),
             Some(on_finished),
+        )
+    }
+
+    #[cfg(test)]
+    pub(crate) fn for_test() -> Self {
+        Self::with_backend(
+            || Ok(Box::new(NoopAudioSink::default()) as Box<dyn AudioSink>),
+            None,
         )
     }
 

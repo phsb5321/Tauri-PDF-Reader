@@ -9,7 +9,7 @@ const readFixtureRequests = () =>
     .then((response) => response.json());
 
 describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
-  it("plays through the configured local provider with no key or fake marks", async () => {
+  it("plays through local sentence audio with an estimated read-along", async () => {
     await browser.waitUntil(
       async () =>
         browser.execute(
@@ -51,7 +51,7 @@ describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
     await browser.waitUntil(
       async () => {
         const body = await readFixtureRequests();
-        return body.requests.length === 1;
+        return body.requests.length >= 1;
       },
       {
         timeout: 15000,
@@ -63,6 +63,32 @@ describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
     expect(receipt.requests[0].body.input).toMatch(/alpha|lectrice|fixture/i);
     expect(receipt.requests[0].idempotencyKey).toMatch(/^[0-9a-f]{64}$/);
 
+    await browser.waitUntil(
+      async () =>
+        browser.execute(
+          () =>
+            window.__E2E_READ__.wordCount() > 0 &&
+            window.__E2E_READ__.isActive() &&
+            document.querySelector(".ai-playback-progress") !== null &&
+            CSS.highlights?.has("tts-current-word") === true,
+        ),
+      {
+        timeout: 15000,
+        timeoutMsg: "estimated local read-along did not become active",
+      },
+    );
+
+    expect(
+      await browser.execute(
+        () => document.querySelector(".tts-word-debug") === null,
+      ),
+    ).toBe(true);
+
+    await browser.waitUntil(
+      async () =>
+        browser.execute(() => window.__E2E_READ__.playbackState() === "idle"),
+      { timeout: 15000, timeoutMsg: "WAV sink did not finish back at idle" },
+    );
     expect(await browser.execute(() => window.__E2E_READ__.wordCount())).toBe(
       0,
     );
@@ -74,11 +100,5 @@ describe("Local TTS (native config → Rust HTTP → WAV playback)", () => {
         () => document.querySelector(".ai-playback-progress") === null,
       ),
     ).toBe(true);
-
-    await browser.waitUntil(
-      async () =>
-        browser.execute(() => window.__E2E_READ__.playbackState() === "idle"),
-      { timeout: 15000, timeoutMsg: "WAV sink did not finish back at idle" },
-    );
   });
 });

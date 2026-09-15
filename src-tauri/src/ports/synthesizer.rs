@@ -1,12 +1,13 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum SynthesisProvider {
     #[default]
     ElevenLabs,
     Local,
+    Groq,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

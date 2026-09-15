@@ -87,13 +87,25 @@ export async function seedStoresFromConfigFile(): Promise<void> {
 
   useAiTtsStore.setState(
     definedOnly({
-      provider: config.ai_tts?.provider,
-      localUrl: config.ai_tts?.local_url,
-      supportsWordTimings:
-        config.ai_tts?.provider === "local" ? false : undefined,
       selectedVoiceId: config.ai_tts?.voice_id,
+      providerVoiceIds:
+        config.ai_tts?.provider && config.ai_tts.voice_id
+          ? {
+              ...useAiTtsStore.getState().providerVoiceIds,
+              [config.ai_tts.provider]: config.ai_tts.voice_id,
+            }
+          : undefined,
       speed: config.ai_tts?.speed,
       autoPageEnabled: config.ai_tts?.auto_page,
     }),
   );
+  if (config.ai_tts?.provider) {
+    useAiTtsStore
+      .getState()
+      .setProviderConfig(
+        config.ai_tts.provider,
+        config.ai_tts.local_url ?? null,
+        config.ai_tts.provider !== "local",
+      );
+  }
 }

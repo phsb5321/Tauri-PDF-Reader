@@ -601,12 +601,13 @@ function fontSizeViolations(
   ): number => {
     const value = rawValue.trim();
 
-    const length = /^([\d.]+)(px|rem)$/.exec(value);
+    const length = /^([\d.]+)(px|rem|%)$/.exec(value);
     if (length) {
       const amount = Number(length[1]);
       if (!Number.isFinite(amount))
         throw new Error(`invalid font-size value: ${value}`);
       if (length[2] === "rem") return amount * DEFAULT_ROOT_PX;
+      if (length[2] === "%") return (amount / 100) * DEFAULT_ROOT_PX;
       return amount;
     }
 
@@ -1347,6 +1348,18 @@ describe("design tokens: WCAG AA contrast floor", () => {
 
     expect(fontSizeViolations([probe], new Map())).toEqual([
       "probe.css:1  font-size 0.5rem resolves to 8px, below 12px",
+    ]);
+  });
+
+  it("rejects a relative percentage that renders below the default floor", () => {
+    const probe = {
+      file: join(REPO_ROOT, "probe.css"),
+      css: ":root { font-size: 50%; }",
+      startLine: 1,
+    };
+
+    expect(fontSizeViolations([probe], new Map())).toEqual([
+      "probe.css:1  font-size 50% resolves to 8px, below 12px",
     ]);
   });
 

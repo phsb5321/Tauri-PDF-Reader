@@ -12,7 +12,7 @@
 .cache-progress-bar__track {
   flex: 1;
   height: 6px;
-  background: var(--color-bg-secondary);
+  background: var(--color-track);
   border-radius: var(--radius-sm);
   overflow: hidden;
 }

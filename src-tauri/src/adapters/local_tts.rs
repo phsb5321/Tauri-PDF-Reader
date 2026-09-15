@@ -1,3 +1,4 @@
+use crate::adapters::wav::validate_pcm16_wav;
 use crate::ports::{
     AudioMediaType, SynthesisProvider, SynthesisRequest, SynthesisResult, SynthesisVoice,
     SynthesizerPort,
@@ -5,10 +6,8 @@ use crate::ports::{
 use async_trait::async_trait;
 use futures::StreamExt;
 use reqwest::{Client, Response};
-use rodio::{Decoder, Source};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::io::Cursor;
 use std::time::Duration;
 
 pub use crate::config::schema::LOCAL_TTS_URL;
@@ -221,89 +220,8 @@ impl LocalTtsClient {
         Ok(())
     }
 
-    fn read_u16(bytes: &[u8], at: usize) -> Result<u16, String> {
-        let raw: [u8; 2] = bytes
-            .get(at..at + 2)
-            .ok_or("LOCAL_TTS_INVALID_WAV: truncated u16")?
-            .try_into()
-            .map_err(|_| "LOCAL_TTS_INVALID_WAV: truncated u16")?;
-        Ok(u16::from_le_bytes(raw))
-    }
-
-    fn read_u32(bytes: &[u8], at: usize) -> Result<u32, String> {
-        let raw: [u8; 4] = bytes
-            .get(at..at + 4)
-            .ok_or("LOCAL_TTS_INVALID_WAV: truncated u32")?
-            .try_into()
-            .map_err(|_| "LOCAL_TTS_INVALID_WAV: truncated u32")?;
-        Ok(u32::from_le_bytes(raw))
-    }
-
     fn validate_wav(bytes: &[u8]) -> Result<f64, String> {
-        if bytes.len() < 44 || &bytes[0..4] != b"RIFF" || &bytes[8..12] != b"WAVE" {
-            return Err("LOCAL_TTS_INVALID_WAV: missing RIFF/WAVE header".to_string());
-        }
-        let declared = Self::read_u32(bytes, 4)? as usize + 8;
-        if declared != bytes.len() {
-            return Err("LOCAL_TTS_INVALID_WAV: RIFF size does not match bytes".to_string());
-        }
-        let mut cursor = 12_usize;
-        let mut format = None;
-        let mut data_size = None;
-        while cursor + 8 <= bytes.len() {
-            let id = &bytes[cursor..cursor + 4];
-            let size = Self::read_u32(bytes, cursor + 4)? as usize;
-            let start = cursor + 8;
-            let end = start
-                .checked_add(size)
-                .ok_or("LOCAL_TTS_INVALID_WAV: chunk size overflow")?;
-            if end > bytes.len() {
-                return Err("LOCAL_TTS_INVALID_WAV: truncated chunk".to_string());
-            }
-            if id == b"fmt " {
-                if size < 16 {
-                    return Err("LOCAL_TTS_INVALID_WAV: short fmt chunk".to_string());
-                }
-                format = Some((
-                    Self::read_u16(bytes, start)?,
-                    Self::read_u16(bytes, start + 2)?,
-                    Self::read_u32(bytes, start + 4)?,
-                    Self::read_u32(bytes, start + 8)?,
-                    Self::read_u16(bytes, start + 12)?,
-                    Self::read_u16(bytes, start + 14)?,
-                ));
-            } else if id == b"data" {
-                data_size = Some(size);
-            }
-            cursor = end + (size % 2);
-        }
-        let (audio_format, channels, sample_rate, byte_rate, block_align, bits) =
-            format.ok_or("LOCAL_TTS_INVALID_WAV: fmt chunk missing")?;
-        let data_size = data_size.ok_or("LOCAL_TTS_INVALID_WAV: data chunk missing")?;
-        if audio_format != 1 || !(1..=2).contains(&channels) || bits != 16 {
-            return Err("LOCAL_TTS_INVALID_WAV: only mono/stereo PCM16 is supported".to_string());
-        }
-        if !(8_000..=96_000).contains(&sample_rate) {
-            return Err("LOCAL_TTS_INVALID_WAV: sample rate out of bounds".to_string());
-        }
-        let expected_align = channels * (bits / 8);
-        let expected_rate = sample_rate * u32::from(expected_align);
-        if block_align != expected_align
-            || byte_rate != expected_rate
-            || data_size % usize::from(block_align) != 0
-        {
-            return Err("LOCAL_TTS_INVALID_WAV: inconsistent PCM format".to_string());
-        }
-        let duration = data_size as f64 / byte_rate as f64;
-        let decoder = Decoder::new(Cursor::new(bytes.to_vec()))
-            .map_err(|error| format!("LOCAL_TTS_INVALID_WAV: rodio decode failed: {error}"))?;
-        if let Some(decoded) = decoder.total_duration() {
-            let tolerance = 1.0 / sample_rate as f64;
-            if (decoded.as_secs_f64() - duration).abs() > tolerance {
-                return Err("LOCAL_TTS_INVALID_WAV: decoded duration mismatch".to_string());
-            }
-        }
-        Ok(duration)
+        validate_pcm16_wav(bytes, "LOCAL_TTS")
     }
 }
 
@@ -388,32 +306,14 @@ impl SynthesizerPort for LocalTtsClient {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::adapters::wav::fixture_pcm_wav;
     use crate::ports::AudioMediaType;
     use std::io::{Read, Write};
     use std::net::TcpListener;
     use std::sync::{Arc, Mutex};
 
     fn pcm_wav() -> Vec<u8> {
-        let sample_rate = 16_000_u32;
-        let samples = vec![0_i16; 1_600];
-        let data_len = (samples.len() * 2) as u32;
-        let mut wav = Vec::with_capacity(44 + data_len as usize);
-        wav.extend_from_slice(b"RIFF");
-        wav.extend_from_slice(&(36 + data_len).to_le_bytes());
-        wav.extend_from_slice(b"WAVEfmt ");
-        wav.extend_from_slice(&16_u32.to_le_bytes());
-        wav.extend_from_slice(&1_u16.to_le_bytes());
-        wav.extend_from_slice(&1_u16.to_le_bytes());
-        wav.extend_from_slice(&sample_rate.to_le_bytes());
-        wav.extend_from_slice(&(sample_rate * 2).to_le_bytes());
-        wav.extend_from_slice(&2_u16.to_le_bytes());
-        wav.extend_from_slice(&16_u16.to_le_bytes());
-        wav.extend_from_slice(b"data");
-        wav.extend_from_slice(&data_len.to_le_bytes());
-        for sample in samples {
-            wav.extend_from_slice(&sample.to_le_bytes());
-        }
-        wav
+        fixture_pcm_wav()
     }
 
     fn read_request(stream: &mut std::net::TcpStream) -> String {

@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { HIGHLIGHT_COLORS } from '../../lib/constants';
-import type { Rect } from '../../lib/schemas';
-import './HighlightToolbar.css';
+import { useCallback, useEffect, useRef, useState } from "react";
+import { HIGHLIGHT_COLORS } from "../../lib/constants";
+import type { Rect } from "../../lib/schemas";
+import "./HighlightToolbar.css";
 
 interface HighlightToolbarProps {
   position: { x: number; y: number } | null;
   onHighlight: (color: string) => void;
+  onReadFromHere?: () => void;
   onCancel: () => void;
   selectedRects: Rect[];
   containerRef: React.RefObject<HTMLElement>;
@@ -18,23 +19,28 @@ interface HighlightToolbarProps {
 export function HighlightToolbar({
   position,
   onHighlight,
+  onReadFromHere,
   onCancel,
   selectedRects,
   containerRef,
 }: HighlightToolbarProps) {
   const toolbarRef = useRef<HTMLDivElement>(null);
-  const [adjustedPosition, setAdjustedPosition] = useState<{ x: number; y: number } | null>(null);
+  const [adjustedPosition, setAdjustedPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
 
   // Calculate initial position based on selected rects (doesn't need ref)
-  const initialPosition = position && selectedRects.length > 0
-    ? {
-        x: selectedRects[0].x + selectedRects[0].width / 2 - 60, // Approximate toolbar width / 2
-        y: selectedRects[0].y - 50, // Position above selection
-      }
-    : position;
+  const initialPosition =
+    position && selectedRects.length > 0
+      ? {
+          x: selectedRects[0].x + selectedRects[0].width / 2 - 60, // Approximate toolbar width / 2
+          y: selectedRects[0].y - 50, // Position above selection
+        }
+      : position;
 
   // Debug logging
-  console.debug('[HighlightToolbar] Render state:', {
+  console.debug("[HighlightToolbar] Render state:", {
     hasPosition: !!position,
     hasInitialPosition: !!initialPosition,
     hasAdjustedPosition: !!adjustedPosition,
@@ -70,7 +76,10 @@ export function HighlightToolbar({
     // Adjust to keep within container bounds
     const adjustedX = Math.max(
       0,
-      Math.min(x - toolbarRect.width / 2, containerRect.width - toolbarRect.width)
+      Math.min(
+        x - toolbarRect.width / 2,
+        containerRect.width - toolbarRect.width,
+      ),
     );
 
     // Position above selection, or below if not enough space
@@ -94,19 +103,22 @@ export function HighlightToolbar({
     if (!position) return;
 
     const handleClickOutside = (e: MouseEvent) => {
-      if (toolbarRef.current && !toolbarRef.current.contains(e.target as Node)) {
+      if (
+        toolbarRef.current &&
+        !toolbarRef.current.contains(e.target as Node)
+      ) {
         onCancel();
       }
     };
 
     // Delay to avoid immediate trigger
     const timeout = setTimeout(() => {
-      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
     }, 100);
 
     return () => {
       clearTimeout(timeout);
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [position, onCancel]);
 
@@ -115,20 +127,20 @@ export function HighlightToolbar({
     if (!position) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         onCancel();
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, [position, onCancel]);
 
   const handleColorClick = useCallback(
     (color: string) => {
       onHighlight(color);
     },
-    [onHighlight]
+    [onHighlight],
   );
 
   // Use adjusted position if available, otherwise use initial position
@@ -149,6 +161,15 @@ export function HighlightToolbar({
       role="toolbar"
       aria-label="Highlight colors"
     >
+      {onReadFromHere && (
+        <button
+          type="button"
+          className="highlight-read-button"
+          onClick={onReadFromHere}
+        >
+          Read from here
+        </button>
+      )}
       <div className="highlight-toolbar-colors">
         {HIGHLIGHT_COLORS.map((color) => (
           <button
@@ -170,7 +191,7 @@ export function HighlightToolbar({
  */
 export function calculateToolbarPosition(
   rects: Rect[],
-  scale: number
+  scale: number,
 ): { x: number; y: number } | null {
   if (rects.length === 0) return null;
 

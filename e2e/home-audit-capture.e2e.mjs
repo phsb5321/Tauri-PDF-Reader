@@ -41,24 +41,29 @@ async function clickThemeButton(label) {
 }
 
 async function openSettings() {
-  // Empty library: the empty state's "Open Settings" action.
-  const hasEmptyAction = await browser.execute(() =>
-    [...document.querySelectorAll("button")]
-      .some((b) => b.textContent.trim() === "Open Settings"),
-  );
-  if (hasEmptyAction) {
-    await browser.execute(() =>
-      [...document.querySelectorAll("button")]
-        .find((b) => b.textContent.trim() === "Open Settings")
-        ?.click(),
-    );
-  } else {
-    // Seeded: the resume section's Configure signal.
-    const configure = await $(".resume-section-tts-signal-action");
-    await configure.waitForClickable({ timeout: 15000 });
-    await domClick(".resume-section-tts-signal-action");
-  }
+  const trigger = await $('button[aria-label="Settings"]');
+  await trigger.waitForClickable({
+    timeout: 15000,
+    timeoutMsg: "shared toolbar Settings action is unavailable",
+  });
+  await trigger.click();
   const settings = await $("dialog.settings-backdrop[open]");
+  // WebKitGTK software rendering can focus a visible control while dropping
+  // pointer dispatch. Enter on that same accessible control is the public
+  // keyboard fallback, not a store/IPC shortcut.
+  await browser.pause(100);
+  if (!(await settings.isExisting())) {
+    await browser.execute(() =>
+      document.querySelector('button[aria-label="Settings"]')?.focus(),
+    );
+    const focusedName = await browser.execute(() =>
+      document.activeElement?.getAttribute("aria-label"),
+    );
+    if (focusedName !== "Settings") {
+      throw new Error("Settings could not receive keyboard focus");
+    }
+    await browser.keys("Enter");
+  }
   await settings.waitForExist({ timeout: 10000 });
   return settings;
 }
@@ -94,9 +99,7 @@ async function probe() {
     );
 
     const grid = document.querySelector(".library-grid");
-    const gridCols = grid
-      ? getComputedStyle(grid).gridTemplateColumns
-      : null;
+    const gridCols = grid ? getComputedStyle(grid).gridTemplateColumns : null;
 
     const rect = (sel) => {
       const el = document.querySelector(sel);
@@ -111,11 +114,41 @@ async function probe() {
       };
     };
 
+    const computed = (selector) => {
+      const element = document.querySelector(selector);
+      if (!element) return null;
+      const style = getComputedStyle(element);
+      return {
+        color: style.color,
+        backgroundColor: style.backgroundColor,
+        fontSize: Number.parseFloat(style.fontSize),
+        appearance: style.appearance || style.webkitAppearance,
+      };
+    };
+
     const cardRects = Array.from(
       document.querySelectorAll(".document-card"),
-    ).map((c) => {
-      const r = c.getBoundingClientRect();
-      return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width) };
+    ).map((card) => {
+      const box = (element) => {
+        if (!element) return null;
+        const r = element.getBoundingClientRect();
+        return {
+          x: Math.round(r.x),
+          y: Math.round(r.y),
+          w: Math.round(r.width),
+          h: Math.round(r.height),
+          right: Math.round(r.right),
+          bottom: Math.round(r.bottom),
+        };
+      };
+      return {
+        card: box(card),
+        title: box(card.querySelector(".document-card-title")),
+        content: box(
+          card.querySelector(".document-card-content") ??
+            card.querySelector(".document-card-open"),
+        ),
+      };
     });
 
     const emptyState = (() => {
@@ -142,12 +175,17 @@ async function probe() {
       covers,
       resumeCoverCount,
       gridCols,
+      gridColumnCount: gridCols ? gridCols.split(/\s+/).length : 0,
       emptyState,
-      hScroll: document.documentElement.scrollWidth > window.innerWidth,
+      // WebKitGTK rounds the root box one CSS pixel wider than innerWidth on
+      // this lane. Treat only >1px as actual horizontal overflow.
+      hScroll: document.documentElement.scrollWidth > window.innerWidth + 1,
+      hOverflowPx: document.documentElement.scrollWidth - window.innerWidth,
       vScroll: document.documentElement.scrollHeight > window.innerHeight,
       bodyOverflowX: getComputedStyle(document.body).overflowX,
       scrollW: document.documentElement.scrollWidth,
       rects: {
+        toolbar: rect(".toolbar"),
         libraryView: rect(".library-view"),
         libraryBody: rect(".library-body"),
         shelfSidebar: rect(".shelf-sidebar"),
@@ -156,8 +194,123 @@ async function probe() {
         resumeLine: rect(".resume-line"),
       },
       cardRects,
+      legibility: {
+        root: computed("html"),
+        body: computed("body"),
+        search: computed(".search-input"),
+        sort: computed(".library-sort select"),
+        cardTitle: computed(".document-card-title"),
+      },
     };
   });
+}
+
+function rgb(color) {
+  const channels = color
+    ?.match(/[\d.]+/g)
+    ?.slice(0, 3)
+    .map(Number);
+  if (!channels || channels.length !== 3) {
+    throw new Error(`unparseable colour: ${color}`);
+  }
+  return channels;
+}
+
+function contrast(foreground, background) {
+  const luminance = (color) => {
+    const values = rgb(color).map((channel) => {
+      const value = channel / 255;
+      return value <= 0.04045
+        ? value / 12.92
+        : ((value + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * values[0] + 0.7152 * values[1] + 0.0722 * values[2];
+  };
+  const a = luminance(foreground);
+  const b = luminance(background);
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
+function assertLegibility(result, label) {
+  const { root, body, search, sort, cardTitle } = result.legibility;
+  if (!root || !body || !search || !sort) {
+    throw new Error(`${label}: missing legibility surface`);
+  }
+  if (Math.abs(root.fontSize - 18) > 0.1 || body.fontSize < 17.9) {
+    throw new Error(
+      `${label}: enlarged type scale missing (${JSON.stringify({ root, body })})`,
+    );
+  }
+  for (const [name, style] of Object.entries({ search, sort })) {
+    if (style.fontSize < 15.7) {
+      throw new Error(`${label}: ${name} text is only ${style.fontSize}px`);
+    }
+    const ratio = contrast(style.color, style.backgroundColor);
+    if (ratio < 4.5) {
+      throw new Error(`${label}: ${name} contrast ${ratio.toFixed(2)} < 4.5`);
+    }
+  }
+  if (sort.appearance !== "none") {
+    throw new Error(
+      `${label}: Sort still has native appearance ${sort.appearance}`,
+    );
+  }
+  if (cardTitle && cardTitle.fontSize < 15.7) {
+    throw new Error(`${label}: card title is only ${cardTitle.fontSize}px`);
+  }
+}
+
+function assertViewportContainment(result, label) {
+  for (const [name, box] of Object.entries({
+    toolbar: result.rects.toolbar,
+    libraryView: result.rects.libraryView,
+  })) {
+    if (!box || box.x < -1 || box.right > result.viewport.w + 1) {
+      throw new Error(
+        `${label}: ${name} escapes viewport (${JSON.stringify({ box, viewport: result.viewport })})`,
+      );
+    }
+  }
+}
+
+function assertCardGeometry(result, label) {
+  for (const [index, rects] of result.cardRects.entries()) {
+    const { card, title, content } = rects;
+    if (!card || !title || !content) {
+      throw new Error(`${label}: card ${index} is missing geometry`);
+    }
+    const visibleGridLeft = Math.max(0, result.rects.grid?.x ?? 0);
+    const visibleGridRight = Math.min(
+      result.viewport.w,
+      result.rects.grid?.right ?? result.viewport.w,
+    );
+    if (card.x < visibleGridLeft - 1 || card.right > visibleGridRight + 1) {
+      throw new Error(
+        `${label}: card ${index} escapes visible grid (${JSON.stringify({ card, visibleGridLeft, visibleGridRight })})`,
+      );
+    }
+    if (title.w < 24 || title.h < 12) {
+      throw new Error(
+        `${label}: card ${index} title collapsed (${JSON.stringify(title)})`,
+      );
+    }
+    if (title.y < card.y || title.bottom > card.bottom) {
+      throw new Error(
+        `${label}: card ${index} title escapes card (${JSON.stringify(rects)})`,
+      );
+    }
+    if (content.y < card.y || content.bottom > card.bottom) {
+      throw new Error(
+        `${label}: card ${index} content escapes card (${JSON.stringify(rects)})`,
+      );
+    }
+    const deadSpace = card.bottom - content.bottom;
+    if (deadSpace > 24) {
+      throw new Error(
+        `${label}: card ${index} has ${deadSpace}px stretched dead space`,
+      );
+    }
+  }
 }
 
 describe("Home/library audit capture", () => {
@@ -175,10 +328,12 @@ describe("Home/library audit capture", () => {
     await domClick("button.settings-close");
     await settings.waitForExist({ timeout: 5000, reverse: true });
     await waitForTheme("light");
-    console.log(`PROBE light-1200 ${JSON.stringify(await probe())}`);
-    await browser.saveScreenshot(
-      `/tmp/lectrice-audit-${SEED}-light-1200.png`,
-    );
+    let result = await probe();
+    assertCardGeometry(result, "light-1200");
+    assertLegibility(result, "light-1200");
+    assertViewportContainment(result, "light-1200");
+    console.log(`PROBE light-1200 ${JSON.stringify(result)}`);
+    await browser.saveScreenshot(`/tmp/lectrice-audit-${SEED}-light-1200.png`);
 
     // ---- Dark, wide ----
     settings = await openSettings();
@@ -186,7 +341,11 @@ describe("Home/library audit capture", () => {
     await domClick("button.settings-close");
     await settings.waitForExist({ timeout: 5000, reverse: true });
     await waitForTheme("dark");
-    console.log(`PROBE dark-1200 ${JSON.stringify(await probe())}`);
+    result = await probe();
+    assertCardGeometry(result, "dark-1200");
+    assertLegibility(result, "dark-1200");
+    assertViewportContainment(result, "dark-1200");
+    console.log(`PROBE dark-1200 ${JSON.stringify(result)}`);
     await browser.saveScreenshot(`/tmp/lectrice-audit-${SEED}-dark-1200.png`);
 
     // ---- Light, narrow (640×800) ----
@@ -196,7 +355,16 @@ describe("Home/library audit capture", () => {
     await domClick("button.settings-close");
     await settings.waitForExist({ timeout: 5000, reverse: true });
     await waitForTheme("light");
-    console.log(`PROBE light-640 ${JSON.stringify(await probe())}`);
+    result = await probe();
+    assertCardGeometry(result, "light-640");
+    assertLegibility(result, "light-640");
+    assertViewportContainment(result, "light-640");
+    if (result.viewport.w < 600 || result.viewport.w > 640) {
+      throw new Error(
+        `light-640: unexpected content viewport ${result.viewport.w}px`,
+      );
+    }
+    console.log(`PROBE light-640 ${JSON.stringify(result)}`);
     await browser.saveScreenshot(`/tmp/lectrice-audit-${SEED}-light-640.png`);
 
     // ---- Dark, narrow ----
@@ -205,7 +373,46 @@ describe("Home/library audit capture", () => {
     await domClick("button.settings-close");
     await settings.waitForExist({ timeout: 5000, reverse: true });
     await waitForTheme("dark");
-    console.log(`PROBE dark-640 ${JSON.stringify(await probe())}`);
+    result = await probe();
+    assertCardGeometry(result, "dark-640");
+    assertLegibility(result, "dark-640");
+    assertViewportContainment(result, "dark-640");
+    console.log(`PROBE dark-640 ${JSON.stringify(result)}`);
     await browser.saveScreenshot(`/tmp/lectrice-audit-${SEED}-dark-640.png`);
+
+    // ---- Dark, narrow list: the grid fix must not regress the alternate mode.
+    await domClick('button[aria-label="List view"]');
+    result = await probe();
+    assertCardGeometry(result, "dark-list-640");
+    assertLegibility(result, "dark-list-640");
+    assertViewportContainment(result, "dark-list-640");
+    if (result.cards > 0 && result.gridColumnCount !== 1) {
+      throw new Error(
+        `dark-list-640: expected one list column, got ${result.gridColumnCount}`,
+      );
+    }
+    console.log(`PROBE dark-list-640 ${JSON.stringify(result)}`);
+    await browser.saveScreenshot(
+      `/tmp/lectrice-audit-${SEED}-dark-list-640.png`,
+    );
+    await domClick('button[aria-label="Grid view"]');
+
+    // ---- Dark, ultrawide: keep useful title width instead of packing every
+    // book into minimally-sized columns. Xvfb is deliberately 2560-wide.
+    await browser.setWindowSize(2560, 1080);
+    result = await probe();
+    assertCardGeometry(result, "dark-2560");
+    assertLegibility(result, "dark-2560");
+    assertViewportContainment(result, "dark-2560");
+    if (result.cards > 0 && result.gridColumnCount > 9) {
+      throw new Error(
+        `dark-2560: ${result.gridColumnCount} columns exceed the readable cap`,
+      );
+    }
+    if (result.hScroll) {
+      throw new Error("dark-2560: library introduced horizontal overflow");
+    }
+    console.log(`PROBE dark-2560 ${JSON.stringify(result)}`);
+    await browser.saveScreenshot(`/tmp/lectrice-audit-${SEED}-dark-2560.png`);
   });
 });

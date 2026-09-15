@@ -1,13 +1,21 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import {
   DEFAULT_HIGHLIGHT_COLOR,
   DEFAULT_HIGHLIGHT_COLORS,
   DEFAULT_TTS_RATE,
-} from '../lib/constants';
-import { settingsGetAll, settingsSet, settingsSetBatch } from '../lib/tauri-invoke';
+} from "../lib/constants";
+import {
+  settingsGetAll,
+  settingsSet,
+  settingsSetBatch,
+} from "../lib/tauri-invoke";
 
-export type Theme = 'light' | 'dark' | 'system';
+export type Theme = "light" | "dark" | "system";
+
+export const UI_SCALE_MIN = 1;
+export const UI_SCALE_MAX = 1.5;
+export const UI_SCALE_DEFAULT = 1.25;
 
 interface SettingsState {
   // Loading state
@@ -24,8 +32,9 @@ interface SettingsState {
   highlightColors: string[];
   highlightDefaultColor: string;
 
-  // Theme
+  // Appearance
   theme: Theme;
+  uiScale: number;
 
   // Telemetry
   telemetryAnalytics: boolean;
@@ -44,6 +53,7 @@ interface SettingsState {
   setTtsRate: (rate: number) => void;
   setTtsFollowAlong: (followAlong: boolean) => void;
   setTheme: (theme: Theme) => void;
+  setUiScale: (scale: number) => void;
   setTelemetryAnalytics: (enabled: boolean) => void;
   setTelemetryErrors: (enabled: boolean) => void;
   setTtsAvailable: (available: boolean) => void;
@@ -60,7 +70,8 @@ const initialState = {
   ttsFollowAlong: true,
   highlightColors: DEFAULT_HIGHLIGHT_COLORS,
   highlightDefaultColor: DEFAULT_HIGHLIGHT_COLOR,
-  theme: 'system' as Theme,
+  theme: "system" as Theme,
+  uiScale: UI_SCALE_DEFAULT,
   telemetryAnalytics: false,
   telemetryErrors: false,
   ttsAvailable: false,
@@ -85,21 +96,41 @@ export const useSettingsStore = create<SettingsState>()(
           const settings = result.settings;
 
           set({
-            theme: parseValue<Theme>(settings['theme'], get().theme),
-            ttsRate: parseValue<number>(settings['tts.rate'], get().ttsRate),
-            ttsVoice: parseValue<string | null>(settings['tts.voice'], get().ttsVoice),
-            ttsFollowAlong: parseValue<boolean>(settings['tts.followAlong'], get().ttsFollowAlong),
-            highlightDefaultColor: parseValue<string>(settings['highlight.defaultColor'], get().highlightDefaultColor),
-            highlightColors: parseValue<string[]>(settings['highlight.colors'], get().highlightColors),
-            telemetryAnalytics: parseValue<boolean>(settings['telemetry.analytics'], get().telemetryAnalytics),
-            telemetryErrors: parseValue<boolean>(settings['telemetry.errors'], get().telemetryErrors),
+            theme: parseValue<Theme>(settings["theme"], get().theme),
+            uiScale: parseValue<number>(settings["uiScale"], get().uiScale),
+            ttsRate: parseValue<number>(settings["tts.rate"], get().ttsRate),
+            ttsVoice: parseValue<string | null>(
+              settings["tts.voice"],
+              get().ttsVoice,
+            ),
+            ttsFollowAlong: parseValue<boolean>(
+              settings["tts.followAlong"],
+              get().ttsFollowAlong,
+            ),
+            highlightDefaultColor: parseValue<string>(
+              settings["highlight.defaultColor"],
+              get().highlightDefaultColor,
+            ),
+            highlightColors: parseValue<string[]>(
+              settings["highlight.colors"],
+              get().highlightColors,
+            ),
+            telemetryAnalytics: parseValue<boolean>(
+              settings["telemetry.analytics"],
+              get().telemetryAnalytics,
+            ),
+            telemetryErrors: parseValue<boolean>(
+              settings["telemetry.errors"],
+              get().telemetryErrors,
+            ),
             isLoading: false,
             dbInitialized: true,
           });
         } catch (err) {
-          console.error('Failed to load settings from database:', err);
+          console.error("Failed to load settings from database:", err);
           set({
-            error: err instanceof Error ? err.message : 'Failed to load settings',
+            error:
+              err instanceof Error ? err.message : "Failed to load settings",
             isLoading: false,
             dbInitialized: true,
           });
@@ -110,59 +141,69 @@ export const useSettingsStore = create<SettingsState>()(
         const state = get();
         try {
           await settingsSetBatch({
-            'theme': state.theme,
-            'tts.rate': state.ttsRate,
-            'tts.voice': state.ttsVoice,
-            'tts.followAlong': state.ttsFollowAlong,
-            'highlight.defaultColor': state.highlightDefaultColor,
-            'highlight.colors': state.highlightColors,
-            'telemetry.analytics': state.telemetryAnalytics,
-            'telemetry.errors': state.telemetryErrors,
+            theme: state.theme,
+            uiScale: state.uiScale,
+            "tts.rate": state.ttsRate,
+            "tts.voice": state.ttsVoice,
+            "tts.followAlong": state.ttsFollowAlong,
+            "highlight.defaultColor": state.highlightDefaultColor,
+            "highlight.colors": state.highlightColors,
+            "telemetry.analytics": state.telemetryAnalytics,
+            "telemetry.errors": state.telemetryErrors,
           });
         } catch (err) {
-          console.error('Failed to sync settings to database:', err);
+          console.error("Failed to sync settings to database:", err);
         }
       },
 
       setHighlightDefaultColor: (color) => {
         set({ highlightDefaultColor: color });
-        settingsSet('highlight.defaultColor', color).catch(console.error);
+        settingsSet("highlight.defaultColor", color).catch(console.error);
       },
 
       setHighlightColors: (colors) => {
         set({ highlightColors: colors });
-        settingsSet('highlight.colors', colors).catch(console.error);
+        settingsSet("highlight.colors", colors).catch(console.error);
       },
 
       setTtsVoice: (voice) => {
         set({ ttsVoice: voice });
-        settingsSet('tts.voice', voice).catch(console.error);
+        settingsSet("tts.voice", voice).catch(console.error);
       },
 
       setTtsRate: (rate) => {
         const clampedRate = Math.max(0.5, Math.min(3.0, rate));
         set({ ttsRate: clampedRate });
-        settingsSet('tts.rate', clampedRate).catch(console.error);
+        settingsSet("tts.rate", clampedRate).catch(console.error);
       },
 
       setTtsFollowAlong: (followAlong) => {
         set({ ttsFollowAlong: followAlong });
-        settingsSet('tts.followAlong', followAlong).catch(console.error);
+        settingsSet("tts.followAlong", followAlong).catch(console.error);
       },
 
       setTheme: (theme) => {
         set({ theme });
-        settingsSet('theme', theme).catch(console.error);
+        settingsSet("theme", theme).catch(console.error);
+      },
+
+      setUiScale: (scale) => {
+        const clampedScale = Math.max(
+          UI_SCALE_MIN,
+          Math.min(UI_SCALE_MAX, scale),
+        );
+        set({ uiScale: clampedScale });
+        settingsSet("uiScale", clampedScale).catch(console.error);
       },
 
       setTelemetryAnalytics: (enabled) => {
         set({ telemetryAnalytics: enabled });
-        settingsSet('telemetry.analytics', enabled).catch(console.error);
+        settingsSet("telemetry.analytics", enabled).catch(console.error);
       },
 
       setTelemetryErrors: (enabled) => {
         set({ telemetryErrors: enabled });
-        settingsSet('telemetry.errors', enabled).catch(console.error);
+        settingsSet("telemetry.errors", enabled).catch(console.error);
       },
 
       setTtsAvailable: (available) => set({ ttsAvailable: available }),
@@ -172,19 +213,20 @@ export const useSettingsStore = create<SettingsState>()(
       reset: () => {
         set(initialState);
         settingsSetBatch({
-          'theme': initialState.theme,
-          'tts.rate': initialState.ttsRate,
-          'tts.voice': initialState.ttsVoice,
-          'tts.followAlong': initialState.ttsFollowAlong,
-          'highlight.defaultColor': initialState.highlightDefaultColor,
-          'highlight.colors': initialState.highlightColors,
-          'telemetry.analytics': initialState.telemetryAnalytics,
-          'telemetry.errors': initialState.telemetryErrors,
+          theme: initialState.theme,
+          uiScale: initialState.uiScale,
+          "tts.rate": initialState.ttsRate,
+          "tts.voice": initialState.ttsVoice,
+          "tts.followAlong": initialState.ttsFollowAlong,
+          "highlight.defaultColor": initialState.highlightDefaultColor,
+          "highlight.colors": initialState.highlightColors,
+          "telemetry.analytics": initialState.telemetryAnalytics,
+          "telemetry.errors": initialState.telemetryErrors,
         }).catch(console.error);
       },
     }),
     {
-      name: 'pdf-reader-settings',
+      name: "pdf-reader-settings",
       partialize: (state) => ({
         highlightDefaultColor: state.highlightDefaultColor,
         highlightColors: state.highlightColors,
@@ -192,9 +234,10 @@ export const useSettingsStore = create<SettingsState>()(
         ttsRate: state.ttsRate,
         ttsFollowAlong: state.ttsFollowAlong,
         theme: state.theme,
+        uiScale: state.uiScale,
         telemetryAnalytics: state.telemetryAnalytics,
         telemetryErrors: state.telemetryErrors,
       }),
-    }
-  )
+    },
+  ),
 );

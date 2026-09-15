@@ -1,0 +1,42 @@
+{
+  "date": "2026-08-25",
+  "host": "desktop",
+  "endpoint": "http://127.0.0.1:5301",
+  "runtime": "supertonic-1.3.1+proso-bridge.3",
+  "model": "Supertonic 3",
+  "execution": "CPU",
+  "voice": "F1-en",
+  "nativeMarkKinds": [],
+  "page": {
+    "document": "Fundamentals of Data Engineering",
+    "pdfPage": 5,
+    "characters": 834,
+    "utf8Bytes": 836
+  },
+  "controls": {
+    "coldFirstSentence": {
+      "characters": 37,
+      "timeStartTransferSeconds": 1.846795,
+      "timeTotalSeconds": 1.847272,
+      "wavBytes": 233516
+    },
+    "coldFullPage": {
+      "timeStartTransferSeconds": 46.477798,
+      "timeTotalSeconds": 46.485433,
+      "wavBytes": 5074988
+    }
+  },
+  "liveQueue": {
+    "firstSentence": "37 chars, cache hit, 233516 bytes, 0 native marks, 2.65s WAV",
+    "secondSentence": "83 chars, prebuffer cache hit, 534572 bytes, 0 native marks, 6.06s WAV",
+    "thirdSentence": "68 chars prebuffered, 430124 bytes, 0 native marks, 4.88s WAV",
+    "observedQueueProgress": "9 / 128 (Page 5/544)",
+    "processCount": 1,
+    "windowCount": 1
+  },
+  "notes": [
+    "Local text remains behind the public Play boundary; no pre-Play local prebuffer was enabled.",
+    "Fallback word timing is duration-bound and explicitly estimated; it does not claim provider-native marks.",
+    "Estimated chunks advance from the real sink-drained event so a timer cannot terminate the next sentence."
+  ]
+}

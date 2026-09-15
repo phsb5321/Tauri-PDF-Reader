@@ -21,11 +21,26 @@ interface ToolbarProps {
    * and the user kept staring at the library).
    */
   onOpen?: () => void;
+  /** Whether the shell is currently showing the Library home. */
+  isLibraryShowing?: boolean;
+  /** Returns from an open document to the Library without closing the book. */
+  onLibrary?: () => void;
+  /** Whether the PDF outline panel is open. */
+  isContentsOpen?: boolean;
+  /** Opens the current PDF's chapters/outline. */
+  onContents?: () => void;
+  /** Opens the app-wide settings panel owned by the reader shell. */
+  onSettings?: () => void;
 }
 
 export function Toolbar({
   onSessionRestored,
   onOpen,
+  isLibraryShowing = true,
+  onLibrary,
+  isContentsOpen = false,
+  onContents,
+  onSettings,
 }: Readonly<ToolbarProps>) {
   const [isSessionMenuOpen, setIsSessionMenuOpen] = useState(false);
   const { openPdf } = useOpenPdf();
@@ -34,14 +49,16 @@ export function Toolbar({
   // Roving tabindex for keyboard navigation within the toolbar
   const { getItemProps } = useRovingTabindex({
     containerRef: toolbarRef,
-    itemSelector: "button:not([disabled])",
+    itemSelector: "button.toolbar-roving-item",
     orientation: "horizontal",
     loop: true,
   });
 
   const { currentDocument, pdfDocument, isLoading } = useDocumentStore();
+  const readerActionOffset = !isLibraryShowing && pdfDocument ? 2 : 0;
 
   const handleOpenFile = async () => {
+    if (isLoading) return;
     // Slice 112: collapse onto the shared useOpenPdf flow — Toolbar kept its
     // own copy of the open logic (dialog -> load -> library upsert -> store)
     // which had already diverged once. One copy now.
@@ -64,13 +81,57 @@ export function Toolbar({
         aria-label="Document toolbar"
       >
         <div className="toolbar-section toolbar-left">
+          {!isLibraryShowing && (
+            <button
+              type="button"
+              className="toolbar-button toolbar-roving-item library-button"
+              onClick={onLibrary}
+              title="Back to library"
+              aria-label="Back to library"
+              {...getItemProps(0)}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="toolbar-icon"
+                aria-hidden="true"
+              >
+                <path d="M3 11.5L12 4l9 7.5" />
+                <path d="M5.5 10.5V20h13v-9.5M9 20v-6h6v6" />
+              </svg>
+              <span className="button-text">Back to library</span>
+            </button>
+          )}
+
+          {!isLibraryShowing && pdfDocument && (
+            <button
+              type="button"
+              className="toolbar-button toolbar-roving-item contents-button"
+              onClick={onContents}
+              title="Chapters"
+              aria-label="Chapters"
+              aria-pressed={isContentsOpen}
+              {...getItemProps(1)}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="toolbar-icon"
+                aria-hidden="true"
+              >
+                <path d="M4 5h3M4 12h3M4 19h3" />
+                <path d="M10 5h10M10 12h10M10 19h10" />
+              </svg>
+              <span className="button-text">Chapters</span>
+            </button>
+          )}
+
           <button
             type="button"
-            className="toolbar-button sessions-button"
+            className="toolbar-button toolbar-roving-item sessions-button"
             onClick={() => setIsSessionMenuOpen((open) => !open)}
             title="Reading Sessions"
+            aria-label="Sessions"
             aria-pressed={isSessionMenuOpen}
-            {...getItemProps(0)}
+            {...getItemProps(readerActionOffset)}
           >
             <svg
               viewBox="0 0 24 24"
@@ -86,11 +147,12 @@ export function Toolbar({
 
           <button
             type="button"
-            className="toolbar-button open-button"
+            className="toolbar-button toolbar-roving-item open-button"
             onClick={handleOpenFile}
-            disabled={isLoading}
+            aria-disabled={isLoading}
+            aria-label="Open PDF"
             title="Open PDF file"
-            {...(isLoading ? {} : getItemProps(1))}
+            {...getItemProps(readerActionOffset + 1)}
           >
             <svg
               viewBox="0 0 24 24"
@@ -102,7 +164,7 @@ export function Toolbar({
             <span className="button-text">Open</span>
           </button>
 
-          {currentDocument && (
+          {currentDocument && !isLibraryShowing && (
             <span className="document-title" title={currentDocument.filePath}>
               {currentDocument.title || "Untitled"}
             </span>
@@ -110,11 +172,29 @@ export function Toolbar({
         </div>
 
         <div className="toolbar-section toolbar-center">
-          {pdfDocument && <PageNavigation />}
+          {pdfDocument && !isLibraryShowing && <PageNavigation />}
         </div>
 
         <div className="toolbar-section toolbar-right">
-          {pdfDocument && <ZoomControls />}
+          {pdfDocument && !isLibraryShowing && <ZoomControls />}
+          <button
+            type="button"
+            className="toolbar-button toolbar-roving-item settings-button"
+            onClick={onSettings}
+            title="Settings"
+            aria-label="Settings"
+            {...getItemProps(readerActionOffset + 2)}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="toolbar-icon"
+              aria-hidden="true"
+            >
+              <path d="M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z" />
+              <path d="M19.4 15a1.7 1.7 0 00.34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 00-1.88-.34 1.7 1.7 0 00-1.03 1.56V21h-4v-.09A1.7 1.7 0 009 19.35a1.7 1.7 0 00-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 004.63 15a1.7 1.7 0 00-1.56-1.03H3v-4h.09A1.7 1.7 0 004.65 9a1.7 1.7 0 00-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 009 4.63 1.7 1.7 0 0010.03 3.1V3h4v.09A1.7 1.7 0 0015 4.65a1.7 1.7 0 001.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0019.37 9a1.7 1.7 0 001.56 1.03H21v4h-.09A1.7 1.7 0 0019.4 15z" />
+            </svg>
+            <span className="button-text">Settings</span>
+          </button>
         </div>
       </div>
 

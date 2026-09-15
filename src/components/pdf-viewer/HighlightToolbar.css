@@ -23,6 +23,29 @@
   }
 }
 
+.highlight-read-button {
+  min-height: var(--button-height-sm);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.highlight-read-button:hover {
+  background: var(--color-accent-hover);
+}
+
+.highlight-read-button:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
 .highlight-toolbar-colors {
   display: flex;
   align-items: center;
@@ -36,7 +59,9 @@
   border: 2px solid transparent;
   border-radius: 50%;
   cursor: pointer;
-  transition: transform 0.1s ease, border-color 0.1s ease;
+  transition:
+    transform 0.1s ease,
+    border-color 0.1s ease;
 }
 
 .highlight-color-button:hover {

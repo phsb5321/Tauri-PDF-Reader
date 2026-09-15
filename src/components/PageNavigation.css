@@ -8,8 +8,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: var(--button-height);
+  height: var(--button-height);
   padding: 0;
   border: 1px solid var(--border-color);
   border-radius: 6px;
@@ -34,8 +34,8 @@
 }
 
 .nav-icon {
-  width: 18px;
-  height: 18px;
+  width: 1.125rem;
+  height: 1.125rem;
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
@@ -51,7 +51,7 @@
 }
 
 .page-input {
-  width: 48px;
+  width: 3rem;
   padding: 0.25rem 0.5rem;
   border: 1px solid var(--border-color);
   border-radius: 4px;

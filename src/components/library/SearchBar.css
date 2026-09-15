@@ -16,17 +16,18 @@
 }
 
 .search-input {
+  -webkit-appearance: none;
+  appearance: none;
   width: 100%;
   padding: var(--space-2) 36px;
-  border: 1px solid var(--border-color, #ddd);
+  border: 1px solid var(--color-border);
   border-radius: 20px;
   font-size: var(--text-sm);
-  background: var(--bg-secondary, #fff);
-  /* UA-default form-control text (the contrast-sweep defect class): typed
-     search text is engine-painted without an explicit colour — bind it to
-     the primary text token so it tracks the theme. */
+  background-color: var(--color-input-bg);
   color: var(--color-text-primary);
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
 
 .search-input:focus {
@@ -52,7 +53,9 @@
   align-items: center;
   justify-content: center;
   color: var(--text-secondary, #666);
-  transition: background-color 0.2s, color 0.2s;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
 }
 
 .search-clear:hover {

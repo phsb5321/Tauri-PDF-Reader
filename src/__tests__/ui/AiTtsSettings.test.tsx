@@ -9,7 +9,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   initialize: vi.fn(),
+  initializeGroq: vi.fn(),
   initializeLocal: vi.fn(),
+  switchProvider: vi.fn(),
   onClose: vi.fn(),
   useAiTts: vi.fn(),
   cacheInfo: vi.fn(async () => ({
@@ -34,6 +36,8 @@ describe("AiTtsSettings session-secret setup", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.initialize.mockResolvedValue(undefined);
+    mocks.initializeGroq.mockResolvedValue(undefined);
+    mocks.switchProvider.mockResolvedValue(true);
     mocks.useAiTts.mockReturnValue({
       initialized: false,
       apiKey: null,
@@ -104,6 +108,53 @@ describe("AiTtsSettings session-secret setup", () => {
     expect(mocks.onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("lists independent connections, configures Groq, and switches a ready route", async () => {
+    const connections = {
+      ...useAiTtsStore.getState().connections,
+      local: {
+        ...useAiTtsStore.getState().connections.local,
+        status: "connected" as const,
+      },
+      groq: {
+        ...useAiTtsStore.getState().connections.groq,
+        status: "connected" as const,
+      },
+    };
+    mocks.useAiTts.mockReturnValue({
+      initialized: true,
+      provider: "local",
+      localUrl: "http://127.0.0.1:5301",
+      connections,
+      initialize: mocks.initialize,
+      initializeGroq: mocks.initializeGroq,
+      initializeLocal: mocks.initializeLocal,
+      switchProvider: mocks.switchProvider,
+      switchingProvider: null,
+    });
+
+    await act(async () => {
+      render(<AiTtsSettings onClose={mocks.onClose} />);
+    });
+
+    expect(
+      screen.getByRole("list", { name: "Text-to-speech connections" }),
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Use Groq" }));
+    expect(mocks.switchProvider).toHaveBeenCalledWith("groq");
+
+    fireEvent.click(screen.getByRole("button", { name: /Groq Connected/i }));
+    const groqKey = screen.getByLabelText("Groq API Key");
+    expect(groqKey).toHaveValue("");
+    expect(groqKey).toHaveAccessibleDescription(
+      /sent to Groq for speech generation/i,
+    );
+    fireEvent.change(groqKey, { target: { value: "gsk_fixture_not_real" } });
+    await act(async () => {
+      fireEvent.submit(screen.getByLabelText("Connect Groq"));
+    });
+    expect(mocks.initializeGroq).toHaveBeenCalledWith("gsk_fixture_not_real");
+  });
+
   it("shows the local destination without an ElevenLabs key field", async () => {
     mocks.useAiTts.mockReturnValue({
       initialized: true,
@@ -122,12 +173,14 @@ describe("AiTtsSettings session-secret setup", () => {
       render(<AiTtsSettings onClose={mocks.onClose} />);
     });
 
-    expect(screen.getByText("Local TTS")).toBeVisible();
+    expect(
+      screen.getByRole("heading", { level: 3, name: "Local TTS" }),
+    ).toBeVisible();
     expect(screen.getByText("http://127.0.0.1:5301")).toBeVisible();
     expect(
       screen.queryByLabelText("ElevenLabs API Key"),
     ).not.toBeInTheDocument();
-    expect(screen.getByText(/word highlighting is unavailable/i)).toBeVisible();
+    expect(screen.getByText(/estimated read-along/i)).toBeVisible();
   });
 
   it("offers an explicit retry after a local service failure", async () => {
@@ -176,6 +229,9 @@ describe("AiTtsSettings session-secret setup", () => {
       render(<AiTtsSettings onClose={mocks.onClose} />);
     });
 
+    const input = screen.getByLabelText("ElevenLabs API Key");
+    expect(input).toHaveValue("");
+    fireEvent.change(input, { target: { value: "current-session-key" } });
     expect(screen.getByRole("button", { name: "Update" })).toBeVisible();
 
     const form = screen.getByLabelText("Connect ElevenLabs");
@@ -189,8 +245,10 @@ describe("AiTtsSettings session-secret setup", () => {
     ).toBeDisabled();
 
     await act(async () => {
+      useAiTtsStore.getState().setConnectionStatus("elevenlabs", "connected");
       resolveInitialize();
     });
-    expect(mocks.onClose).toHaveBeenCalledTimes(1);
+    expect(input).toHaveValue("");
+    expect(mocks.onClose).not.toHaveBeenCalled();
   });
 });

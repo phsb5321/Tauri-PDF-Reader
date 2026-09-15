@@ -23,10 +23,16 @@
 
 pub mod audio_cache;
 #[cfg(feature = "elevenlabs-tts")]
+pub mod groq_tts;
+#[cfg(feature = "elevenlabs-tts")]
 pub mod local_tts;
 pub mod sqlite;
+#[cfg(feature = "elevenlabs-tts")]
+mod wav;
 
 pub use audio_cache::{AudioCacheAdapter, CacheInfo, CachedTtsData, CachedWordTiming, ClearResult};
+#[cfg(feature = "elevenlabs-tts")]
+pub use groq_tts::GroqTtsClient;
 #[cfg(feature = "elevenlabs-tts")]
 pub use local_tts::LocalTtsClient;
 pub use sqlite::{SqliteAudioCacheRepo, SqliteSessionRepo, SqliteSettingsRepo};

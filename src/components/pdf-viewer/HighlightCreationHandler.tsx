@@ -41,6 +41,7 @@ interface HighlightCreationHandlerProps {
   containerRef: React.RefObject<HTMLElement>;
   onSuccess?: (highlight: Highlight) => void;
   onError?: (error: Error) => void;
+  onReadFromHere?: (text: string, baseOffset: number) => void;
 }
 
 /**
@@ -62,6 +63,7 @@ export function useHighlightCreation({
   containerRef,
   onSuccess,
   onError,
+  onReadFromHere,
 }: Omit<HighlightCreationHandlerProps, "pageNumber">) {
   const [pendingSelection, setPendingSelection] =
     useState<TextSelection | null>(null);
@@ -160,6 +162,14 @@ export function useHighlightCreation({
     ],
   );
 
+  const handleReadFromHere = useCallback(() => {
+    const narrationText = pendingSelection?.narrationText;
+    if (!narrationText || !onReadFromHere) return;
+    onReadFromHere(narrationText, pendingSelection.narrationOffset ?? 0);
+    setPendingSelection(null);
+    window.getSelection()?.removeAllRanges();
+  }, [pendingSelection, onReadFromHere]);
+
   // Handle cancellation (click outside, Escape key)
   const handleCancel = useCallback(() => {
     setPendingSelection(null);
@@ -219,6 +229,11 @@ export function useHighlightCreation({
       <HighlightToolbar
         position={toolbarPosition}
         onHighlight={handleHighlight}
+        onReadFromHere={
+          pendingSelection.narrationText && onReadFromHere
+            ? handleReadFromHere
+            : undefined
+        }
         onCancel={handleCancel}
         selectedRects={scaledRects}
         containerRef={containerRef}

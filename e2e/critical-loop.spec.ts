@@ -126,8 +126,13 @@ describe("critical loop (mockIPC): speak → synced karaoke state machine", () =
     tick(850);
     expect(h().currentWordIndex).toBe(2); // gamma
 
-    // At totalDuration the state machine completes (back to idle, not playing).
+    // Visual timing never cuts the native sink; completion is event-driven in
+    // the packaged lane. This mockIPC rung has no native finished event, so it
+    // proves the clock holds the last word until an explicit terminal action.
     tick(1210);
+    expect(h().isActive).toBe(true);
+    expect(useAiTtsStore.getState().playbackState).toBe("playing");
+    await act(async () => result.current.stop());
     expect(h().isActive).toBe(false);
     expect(useAiTtsStore.getState().playbackState).toBe("idle");
   });

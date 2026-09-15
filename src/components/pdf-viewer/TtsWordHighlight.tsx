@@ -2,17 +2,20 @@
  * TTS Word Highlight Component
  *
  * Renders karaoke-style word highlighting on top of PDF text layer.
- * Uses CSS Custom Highlight API for clean, native text highlighting
- * (similar to VoxPage implementation).
- * 
- * Falls back to overlay-based highlighting if CSS Highlight API is not available.
+ * Uses CSS Custom Highlight API for clean, native text highlighting.
+ * On engines without that API the progress rail remains truthful, but no
+ * in-page word is painted; there is no fake overlay fallback.
  */
 
-import { useEffect, useRef, useCallback } from 'react';
-import { useTtsHighlightStore, selectCurrentWord } from '../../stores/tts-highlight-store';
-import { resolveCharRange } from '../../lib/tts-tracking';
-import type { WordTiming } from '../../lib/api/ai-tts';
-import './TtsWordHighlight.css';
+import { useEffect, useRef, useCallback } from "react";
+import {
+  useTtsHighlightStore,
+  selectCurrentWord,
+} from "../../stores/tts-highlight-store";
+import { resolveCharRange } from "../../lib/tts-tracking";
+import { rangeFromAnnotatedPdfText } from "../../lib/pdf-text";
+import type { WordTiming } from "../../lib/api/ai-tts";
+import "./TtsWordHighlight.css";
 
 interface TtsWordHighlightProps {
   pageNumber: number;
@@ -20,19 +23,20 @@ interface TtsWordHighlightProps {
 }
 
 // Check if CSS Custom Highlight API is supported
-const isHighlightApiSupported = 
-  typeof CSS !== 'undefined' && 
-  'highlights' in CSS;
+const isHighlightApiSupported =
+  typeof CSS !== "undefined" && "highlights" in CSS;
 
 /**
  * Find the text layer div for a specific page number
  */
 function findTextLayerDiv(pageNumber: number): HTMLDivElement | null {
-  const pageContainer = document.querySelector(`[data-page-number="${pageNumber}"]`);
+  const pageContainer = document.querySelector(
+    `[data-page-number="${pageNumber}"]`,
+  );
   if (!pageContainer) {
     return null;
   }
-  return pageContainer.querySelector('.textLayer') as HTMLDivElement | null;
+  return pageContainer.querySelector(".textLayer") as HTMLDivElement | null;
 }
 
 /**
@@ -42,8 +46,20 @@ function findTextLayerDiv(pageNumber: number): HTMLDivElement | null {
 function createWordRange(
   element: Element,
   charOffset: number,
-  charLength: number
+  charLength: number,
 ): Range | null {
+  const annotated = rangeFromAnnotatedPdfText(
+    element,
+    charOffset,
+    charOffset + charLength,
+  );
+  if (annotated) return annotated;
+  // A partially annotated layer has a known normalized coordinate model. If a
+  // word cannot resolve inside it, fail closed rather than drifting through raw
+  // PDF.js node lengths. The raw fallback is only for wholly legacy layers.
+  if (element.querySelector("span[data-tts-start]")) return null;
+
+  // Fallback for text layers created before annotation was available.
   // Collect the text-layer's text nodes in document order.
   const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null);
   const nodes: Text[] = [];
@@ -56,7 +72,7 @@ function createWordRange(
   // null when the word starts beyond this page's text (it belongs to another
   // page); when the word straddles the page boundary the end is clamped to the
   // last node so the on-page portion still highlights.
-  const lengths = nodes.map((t) => (t.textContent ?? '').length);
+  const lengths = nodes.map((t) => (t.textContent ?? "").length);
   const resolved = resolveCharRange(lengths, charOffset, charLength);
   if (!resolved) return null;
 
@@ -75,14 +91,14 @@ function createWordRange(
  */
 function applyHighlight(range: Range): void {
   if (!isHighlightApiSupported) return;
-  
+
   try {
     // Create a Highlight object with the range
     const highlight = new Highlight(range);
     // Register it with CSS highlights registry
-    CSS.highlights.set('tts-current-word', highlight);
+    CSS.highlights.set("tts-current-word", highlight);
   } catch (e) {
-    console.warn('[TtsHighlight] Failed to apply highlight:', e);
+    console.warn("[TtsHighlight] Failed to apply highlight:", e);
   }
 }
 
@@ -91,20 +107,16 @@ function applyHighlight(range: Range): void {
  */
 function clearHighlight(): void {
   if (!isHighlightApiSupported) return;
-  
+
   try {
-    CSS.highlights.delete('tts-current-word');
+    CSS.highlights.delete("tts-current-word");
   } catch {
     // Ignore errors
   }
 }
 
-export function TtsWordHighlight({
-  pageNumber,
-  scale,
-}: TtsWordHighlightProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const lastWordKeyRef = useRef<string>('');
+export function TtsWordHighlight({ pageNumber, scale }: TtsWordHighlightProps) {
+  const lastWordKeyRef = useRef<string>("");
   const lastScaleRef = useRef<number>(scale);
   const observerRef = useRef<MutationObserver | null>(null);
   const textLayerRef = useRef<HTMLDivElement | null>(null);
@@ -112,28 +124,33 @@ export function TtsWordHighlight({
   const isActive = useTtsHighlightStore((s) => s.isActive);
   const storePageNumber = useTtsHighlightStore((s) => s.pageNumber);
   const currentWordIndex = useTtsHighlightStore((s) => s.currentWordIndex);
-  const wordTimings = useTtsHighlightStore((s) => s.wordTimings);
   const currentText = useTtsHighlightStore((s) => s.currentText);
   const currentWord = useTtsHighlightStore(selectCurrentWord);
 
   const isActiveOnThisPage = isActive && storePageNumber === pageNumber;
 
   // Highlight the current word
-  const highlightWord = useCallback((word: WordTiming) => {
-    const textLayer = textLayerRef.current;
-    if (!textLayer || !currentText) return;
+  const highlightWord = useCallback(
+    (word: WordTiming) => {
+      const textLayer = textLayerRef.current;
+      if (!textLayer || !currentText) return;
 
-    const charOffset = word.charStart;
-    const charLength = word.charEnd - word.charStart;
+      const charOffset = word.charStart;
+      const charLength = word.charEnd - word.charStart;
 
-    const range = createWordRange(textLayer, charOffset, charLength);
-    
-    if (range) {
-      applyHighlight(range);
-    } else {
-      console.warn('[TtsHighlight] Could not create range for word:', word.word);
-    }
-  }, [currentText]);
+      const range = createWordRange(textLayer, charOffset, charLength);
+
+      if (range) {
+        applyHighlight(range);
+      } else {
+        console.warn(
+          "[TtsHighlight] Could not create range for word:",
+          word.word,
+        );
+      }
+    },
+    [currentText],
+  );
 
   // Set up text layer reference and observer
   useEffect(() => {
@@ -150,18 +167,18 @@ export function TtsWordHighlight({
     const setupTextLayer = () => {
       const textLayer = findTextLayerDiv(pageNumber);
       if (!textLayer) return false;
-      
-      const spans = textLayer.querySelectorAll('span');
+
+      const spans = textLayer.querySelectorAll("span");
       if (spans.length === 0) return false;
 
       textLayerRef.current = textLayer;
-      
+
       // Re-highlight current word after text layer setup
       if (currentWord) {
-        lastWordKeyRef.current = ''; // Force re-highlight
+        lastWordKeyRef.current = ""; // Force re-highlight
         highlightWord(currentWord);
       }
-      
+
       return true;
     };
 
@@ -205,7 +222,7 @@ export function TtsWordHighlight({
     if (scale !== lastScaleRef.current) {
       lastScaleRef.current = scale;
       clearHighlight();
-      lastWordKeyRef.current = ''; // Force re-highlight after scale change
+      lastWordKeyRef.current = ""; // Force re-highlight after scale change
     }
   }, [scale]);
 
@@ -231,20 +248,8 @@ export function TtsWordHighlight({
     };
   }, []);
 
-  // Don't render anything if TTS is not active
-  if (!isActive) {
-    return null;
-  }
-
-  // Only render debug pill - highlights are handled by CSS Highlight API
-  return (
-    <div ref={containerRef} className="tts-word-highlight-layer">
-      {currentWord && (
-        <div className="tts-word-debug">
-          "{currentWord.word}" ({currentWordIndex + 1}/{wordTimings.length})
-          {!isHighlightApiSupported && ' (no API)'}
-        </div>
-      )}
-    </div>
-  );
+  // The visible treatment is the in-page CSS Highlight. A floating debug pill
+  // duplicated the bottom progress and obscured the book, so production renders
+  // no extra overlay chrome.
+  return null;
 }

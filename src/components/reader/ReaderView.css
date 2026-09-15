@@ -12,6 +12,7 @@
    automatic minimum (content height) instead of the parent's height, and the
    page's own scroll container grows past the viewport rather than scrolling. */
 .reader-surface {
+  position: relative;
   display: flex;
   flex-direction: row;
   flex: 1;
@@ -54,4 +55,70 @@
   color: var(--color-error-text);
   font: inherit;
   cursor: pointer;
+}
+
+.library-drop-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-3);
+  background: var(--color-success-bg);
+  border: 1px solid var(--color-success);
+  border-radius: var(--radius-md);
+  color: var(--color-success-text);
+  font-size: var(--text-sm);
+}
+
+.library-drop-status button {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pdf-drop-overlay {
+  position: absolute;
+  inset: var(--space-4);
+  z-index: var(--z-modal);
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--color-accent);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-bg-surface) 92%, transparent);
+  color: var(--color-text-primary);
+  pointer-events: none;
+}
+
+.pdf-drop-overlay__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  text-align: center;
+}
+
+.pdf-drop-overlay__content svg {
+  width: 56px;
+  height: 56px;
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pdf-drop-overlay__content strong {
+  font-family: var(--font-family-display);
+  font-size: var(--text-xl);
+}
+
+.pdf-drop-overlay__content span {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
 }

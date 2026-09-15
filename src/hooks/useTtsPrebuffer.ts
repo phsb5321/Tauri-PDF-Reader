@@ -11,6 +11,7 @@ import type { PDFDocumentProxy } from "pdfjs-dist";
 import { aiTtsPrebuffer } from "../lib/tauri-invoke";
 import { pdfService } from "../services/pdf-service";
 import { useAiTtsStore } from "../stores/ai-tts-store";
+import { buildPdfText } from "../lib/pdf-text";
 
 export interface UseTtsPrebufferOptions {
   /** Whether pre-buffering is enabled (default: true) */
@@ -59,13 +60,7 @@ export function useTtsPrebuffer(
       try {
         const page = await pdfService.getPage(pdfDocument, pageNum);
         const textContent = await page.getTextContent();
-        const text = textContent.items
-          .map((item) => ("str" in item ? item.str : ""))
-          .join(" ")
-          .split(/\s+/)
-          .join(" ")
-          .trim();
-        return text || null;
+        return buildPdfText(textContent.items).text || null;
       } catch (err) {
         console.error(
           "[TtsPrebuffer] Error extracting text for page",
@@ -83,8 +78,9 @@ export function useTtsPrebuffer(
    */
   const prebufferPage = useCallback(
     async (pageNum: number): Promise<boolean> => {
-      // Local mode sends page text only after the reader presses Play. Existing
-      // ElevenLabs prebuffer semantics remain unchanged.
+      // Local text stays on-device, but it still crosses into a model process.
+      // Preserve the explicit Play boundary; sentence pipelining starts only
+      // after that user action.
       if (provider !== "elevenlabs") return false;
       const state = stateRef.current;
 

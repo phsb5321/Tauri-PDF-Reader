@@ -50,9 +50,12 @@ fi
 export E2E_APP_PATH="$E2E_TARGET_DIR/debug/tauri-pdf-reader"
 
 toolchain_run() {
-  nix develop -c bash -c "$1"
+  # E2E must never trigger Nix's host-wide auto-GC while other worktrees and
+  # agents are building. The lane owns its temporary profile, not global store
+  # collection; zero free-space watermarks disable that implicit sweep.
+  nix develop --option min-free 0 --option max-free 0 -c bash -c "$1"
 }
 
 toolchain_exec() {
-  exec nix develop -c bash -c "$1"
+  exec nix develop --option min-free 0 --option max-free 0 -c bash -c "$1"
 }
