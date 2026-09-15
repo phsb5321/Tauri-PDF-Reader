@@ -49,6 +49,23 @@ function runVerify(env: Record<string, string>): { status: number } {
 }
 
 describe("the verify receipt (M2.4)", () => {
+  it("keeps strict coverage failures blocking", () => {
+    execFileSync(
+      process.execPath,
+      [
+        "--test",
+        "--test-concurrency=1",
+        "tools/test/analysis-enforcement.test.mjs",
+      ],
+      {
+        cwd: REPO_ROOT,
+        env: { ...process.env, ANALYSIS_SUBJECT_ROOT: REPO_ROOT },
+        stdio: "pipe",
+        timeout: 5000,
+      },
+    );
+  });
+
   it("records the failing gate when a gate fails", () => {
     const receipt = join(
       mkdtempSync(join(tmpdir(), "verify-receipt-")),

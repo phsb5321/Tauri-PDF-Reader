@@ -13,7 +13,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:coverage:check": "vitest run --coverage --coverage.thresholds.100 || echo 'Coverage below threshold!'",
+    "test:coverage:check": "vitest run --coverage --coverage.thresholds.100",
     "test:arch": "vitest run src/__tests__/architecture/",
     "test:rust": "cd src-tauri && cargo test --features test-mocks",
     "test:rust:coverage": "cd src-tauri && cargo llvm-cov --features test-mocks",

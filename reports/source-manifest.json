@@ -1,0 +1,23 @@
+{
+  "created_at": "2026-09-15T16:12:35.268975-03:00",
+  "base": "35801daa8657a8c0b72c3b06a04c994b6a46bc8c",
+  "worktree": "/home/notroot/Documents/Code/personal/tauri-pdf-reader-255-analysis-enforcement",
+  "generator_family": "openai",
+  "checks_executed": 5,
+  "repair_rounds_used": 2,
+  "source_sha256": {
+    "package.json": "1f7d7a9c3554b836305add8a47a3e2aab3b468e5c1a4c30555223dea3c7caf25",
+    "tools/test/analysis-enforcement.test.mjs": "890dee0bcbdace433891ebd452e0f16aa704b2b7d572497909b4582f74ed8ba9",
+    "specs/255-analysis-enforcement/spec.md": "cd0f8bfdaaf6dcbdf11ad8f1939bb7616d69228fa5ae51adbb5afb35eeea4b43",
+    "specs/255-analysis-enforcement/plan.md": "ea42fc9757e8a9066145f8162dcc3dc6d7be6214fd2e5b1f6927ad7bf6e1ae63",
+    "specs/255-analysis-enforcement/tasks.md": "585c76b48ea19d6c3c4dd1b8c0af162b8c9ffe138134396ab1dba6932919f170",
+    "reports/DELIVERY.md": "ff803b4eb3135a4f2786a3be4113883b855c1a08247ea271399a4f9c1af6ca28",
+    "src/__tests__/integration/verify-receipt.test.ts": "d0d1bf830aacc2a6e84a8b8f1478d2dc06e2e6414b3f91706cd42f3dd3fb9483",
+    "reports/source-review.md": "75cd8aac76b971fddd433b66a3c1c39950ec6070d921b818573ed40a3a2ad0b4"
+  },
+  "baseline_package": "/home/notroot/.local/state/fleet-coordination/lectrice-analysis-enforcement-20260915/baseline/package.json",
+  "baseline_sha256": "7315975cadbd7520c2fbf9122963479746e4267386db39dff4cf16db8bdf93ee",
+  "snapshot": "normal-hooks",
+  "source_budget_exhausted": true,
+  "next_check": "normal git commit hooks in251 slot; capture formatter changes and bind eventual head to review; no repair, push or native"
+}
