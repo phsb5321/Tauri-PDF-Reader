@@ -260,17 +260,7 @@ export function useAiTts() {
         });
         if (mounted) unsubscribers.push(unsub3);
 
-        const unsub4 = await onAiTtsStopped(() => {
-          if (mounted) {
-            console.debug("[TTS] State transition: -> idle (stopped event)");
-            store.setPlaybackState("idle");
-            store.setCurrentText(null);
-            store.setBackendPlaybackGeneration(null);
-          }
-        });
-        if (mounted) unsubscribers.push(unsub4);
-
-        const unsub5 = await onAiTtsStopped((event) => {
+        const unsub4 = await onAiTtsStopped((event) => {
           if (!mounted) return;
           const currentGeneration =
             useAiTtsStore.getState().backendPlaybackGeneration;
@@ -291,15 +281,15 @@ export function useAiTts() {
           current.setCurrentText(null);
           current.setBackendPlaybackGeneration(null);
         });
-        if (mounted) unsubscribers.push(unsub5);
+        if (mounted) unsubscribers.push(unsub4);
 
-        const unsub6 = await onAiTtsPaused(() => {
+        const unsub5 = await onAiTtsPaused(() => {
           if (mounted) {
             console.debug("[TTS] State transition: -> paused (paused event)");
             useAiTtsStore.getState().setPlaybackState("paused");
           }
         });
-        if (mounted) unsubscribers.push(unsub6);
+        if (mounted) unsubscribers.push(unsub5);
 
         const unsub6 = await onAiTtsResumed(() => {
           if (mounted) {
