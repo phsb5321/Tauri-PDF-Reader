@@ -96,6 +96,72 @@ beforeEach(() => {
 });
 
 describe("provider connection races", () => {
+  it("does not let stale activation finalization clear the newer loading operation", async () => {
+    const current = useAiTtsStore.getState();
+    current.setConnectionStatus("elevenlabs", "connected");
+    current.setConnectionStatus("groq", "connected");
+    current.setInitialized(true);
+    const older = deferred<unknown>();
+    const newer = deferred<unknown>();
+    mocks.switchProvider
+      .mockReturnValueOnce(older.promise)
+      .mockReturnValueOnce(newer.promise);
+    const { result } = renderHook(() => useAiTts());
+    let first!: Promise<boolean>;
+    let second!: Promise<boolean>;
+    act(() => {
+      first = result.current.switchProvider("elevenlabs");
+      second = result.current.switchProvider("groq");
+    });
+    const response = {
+      status: "ok",
+      data: {
+        success: true,
+        provider: "groq",
+        voicesCount: 1,
+        supportsWordTimings: false,
+        maxTextUtf8Bytes: 200,
+      },
+    };
+    await act(async () => {
+      older.resolve({
+        ...response,
+        data: { ...response.data, provider: "elevenlabs" },
+      });
+      expect(await first).toBe(false);
+    });
+    expect(useAiTtsStore.getState()).toMatchObject({
+      switchingProvider: "groq",
+      playbackState: "loading",
+    });
+    await act(async () => {
+      newer.resolve(response);
+      expect(await second).toBe(true);
+    });
+    expect(useAiTtsStore.getState()).toMatchObject({
+      switchingProvider: null,
+      playbackState: "idle",
+      provider: "groq",
+    });
+  });
+
+  it("retires a failed current activation without masking its error", async () => {
+    useAiTtsStore.getState().setConnectionStatus("groq", "connected");
+    mocks.switchProvider.mockResolvedValueOnce({
+      status: "error",
+      error: "synthetic switch failure",
+    });
+    const { result } = renderHook(() => useAiTts());
+    await act(async () => {
+      expect(await result.current.switchProvider("groq")).toBe(false);
+    });
+    expect(useAiTtsStore.getState()).toMatchObject({
+      switchingProvider: null,
+      playbackState: "error",
+      error: "synthetic switch failure",
+    });
+  });
+
   it("keeps a failed reconnect ready on its previously validated client", async () => {
     useAiTtsStore.setState({
       provider: "local",

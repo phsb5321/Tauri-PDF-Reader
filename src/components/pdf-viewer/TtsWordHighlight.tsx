@@ -45,7 +45,7 @@ function findTextLayerDiv(pageNumber: number): HTMLDivElement | null {
   if (!pageContainer) {
     return null;
   }
-  return pageContainer.querySelector(".textLayer") as HTMLDivElement | null;
+  return pageContainer.querySelector<HTMLDivElement>(".textLayer");
 }
 
 /**
