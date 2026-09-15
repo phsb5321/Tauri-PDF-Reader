@@ -307,15 +307,16 @@ export const useAiTtsStore = create<AiTtsState>()(
 
       setInitialized: (initialized, error) => {
         const provider = get().provider;
+        const fallbackStatus = error ? "error" : "setup";
         get().setConnectionStatus(
           provider,
-          initialized ? "connected" : error ? "error" : "setup",
+          initialized ? "connected" : fallbackStatus,
           { error: error ?? null },
         );
         set({
           initialized,
           initError: error ?? null,
-          playbackState: initialized ? "idle" : error ? "error" : "idle",
+          playbackState: initialized || !error ? "idle" : "error",
         });
       },
 

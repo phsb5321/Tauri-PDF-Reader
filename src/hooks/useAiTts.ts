@@ -21,6 +21,16 @@ import { commands } from "../lib/bindings";
 import { useAiTtsStore, type AiTtsProvider } from "../stores/ai-tts-store";
 import { useTtsHighlightStore } from "../stores/tts-highlight-store";
 
+/** Retire only the current activation; stale operations cannot clear its state. */
+function finishProviderActivation(operation: number): void {
+  const current = useAiTtsStore.getState();
+  if (!current.isCurrentProviderOperation(operation)) return;
+  current.setSwitchingProvider(null);
+  if (current.playbackState === "loading") {
+    current.setPlaybackState(current.initialized ? "idle" : "error");
+  }
+}
+
 /** Provider-neutral AI TTS operations and live connection switching. */
 export function useAiTts() {
   const store = useAiTtsStore();
@@ -83,13 +93,7 @@ export function useAiTts() {
         }
         return false;
       } finally {
-        const current = useAiTtsStore.getState();
-        if (current.isCurrentProviderOperation(operation)) {
-          current.setSwitchingProvider(null);
-          if (current.playbackState === "loading") {
-            current.setPlaybackState(current.initialized ? "idle" : "error");
-          }
-        }
+        finishProviderActivation(operation);
       }
     },
     [],

@@ -366,6 +366,65 @@ function graphemeSpans(text: string): GraphemeSpan[] {
   return spans;
 }
 
+/** Prefer the last whitespace boundary within the byte budget, never splitting a grapheme. */
+function boundedGraphemeEnd(
+  graphemes: GraphemeSpan[],
+  start: number,
+  maxTextUtf8Bytes: number,
+): number {
+  let end = start;
+  let bytes = 0;
+  let lastWhitespace = -1;
+  while (end < graphemes.length) {
+    const nextBytes = graphemes[end].bytes;
+    if (bytes + nextBytes > maxTextUtf8Bytes) break;
+    bytes += nextBytes;
+    end++;
+    if (/^\s+$/u.test(graphemes[end - 1].text)) lastWhitespace = end;
+  }
+  return end < graphemes.length && lastWhitespace > start
+    ? lastWhitespace
+    : end;
+}
+
+/** Null rejects the entire request if any indivisible grapheme exceeds the bound. */
+function splitOversizedSentence(
+  sentence: SentenceSpan,
+  maxTextUtf8Bytes: number,
+): SentenceSpan[] | null {
+  const output: SentenceSpan[] = [];
+  const graphemes = graphemeSpans(sentence.text);
+  let cursor = 0;
+  while (cursor < graphemes.length) {
+    while (cursor < graphemes.length && /^\s+$/u.test(graphemes[cursor].text)) {
+      cursor++;
+    }
+    if (cursor >= graphemes.length) break;
+
+    const end = boundedGraphemeEnd(graphemes, cursor, maxTextUtf8Bytes);
+    if (end === cursor) return null;
+
+    let contentEnd = end;
+    while (
+      contentEnd > cursor &&
+      /^\s+$/u.test(graphemes[contentEnd - 1].text)
+    ) {
+      contentEnd--;
+    }
+    if (contentEnd > cursor) {
+      const localStart = graphemes[cursor].start;
+      const localEnd = graphemes[contentEnd - 1].end;
+      output.push({
+        text: sentence.text.slice(localStart, localEnd),
+        charStart: sentence.charStart + localStart,
+        charEnd: sentence.charStart + localEnd,
+      });
+    }
+    cursor = end;
+  }
+  return output;
+}
+
 /**
  * Keep sentence boundaries when possible, then split oversized sentences at a
  * whitespace/grapheme boundary while retaining original UTF-16 offsets.
@@ -385,58 +444,10 @@ export function segmentSpeechWithOffsets(
       output.push(sentence);
       continue;
     }
-
-    const graphemes = graphemeSpans(sentence.text);
-    let cursor = 0;
-    while (cursor < graphemes.length) {
-      while (
-        cursor < graphemes.length &&
-        /^\s+$/u.test(graphemes[cursor].text)
-      ) {
-        cursor++;
-      }
-      if (cursor >= graphemes.length) break;
-
-      const start = cursor;
-      let end = cursor;
-      let bytes = 0;
-      let lastWhitespace = -1;
-      while (end < graphemes.length) {
-        const nextBytes = graphemes[end].bytes;
-        if (bytes + nextBytes > maxTextUtf8Bytes) break;
-        bytes += nextBytes;
-        end++;
-        if (/^\s+$/u.test(graphemes[end - 1].text)) lastWhitespace = end;
-      }
-      if (end === start) {
-        // A single grapheme larger than the provider bound cannot be split
-        // without corrupting text. Fail closed; the caller surfaces no start.
-        return [];
-      }
-      if (end < graphemes.length && lastWhitespace > start) {
-        end = lastWhitespace;
-      }
-
-      let contentEnd = end;
-      while (
-        contentEnd > start &&
-        /^\s+$/u.test(graphemes[contentEnd - 1].text)
-      ) {
-        contentEnd--;
-      }
-      if (contentEnd > start) {
-        const localStart = graphemes[start].start;
-        const localEnd = graphemes[contentEnd - 1].end;
-        output.push({
-          text: sentence.text.slice(localStart, localEnd),
-          charStart: sentence.charStart + localStart,
-          charEnd: sentence.charStart + localEnd,
-        });
-      }
-      cursor = end;
-    }
+    const chunks = splitOversizedSentence(sentence, maxTextUtf8Bytes);
+    if (!chunks) return [];
+    for (const chunk of chunks) output.push(chunk);
   }
-
   return output;
 }
 

@@ -4,6 +4,7 @@ import {
   AI_TTS_PROVIDERS,
   useAiTtsStore,
   type AiTtsProvider,
+  type AiTtsConnectionStatus,
 } from "../../stores/ai-tts-store";
 import {
   aiTtsCacheInfo,
@@ -286,6 +287,13 @@ const PROVIDER_NAMES: Record<AiTtsProvider, string> = {
   groq: "Groq",
 };
 
+const CONNECTION_STATUS_CLASSES: Record<AiTtsConnectionStatus, string> = {
+  setup: "ai-tts-status-pending",
+  connecting: "ai-tts-status-pending",
+  connected: "ai-tts-status-ok",
+  error: "ai-tts-status-warning",
+};
+
 function connectionLabel(
   provider: AiTtsProvider,
   status: "setup" | "connecting" | "connected" | "error",
@@ -319,11 +327,12 @@ export function AiTtsSettings({ onClose }: Readonly<AiTtsSettingsProps>) {
   const [cacheInfo, setCacheInfo] = useState<AiTtsCacheInfo | null>(null);
   const [isClearingCache, setIsClearingCache] = useState(false);
   const submittingRef = useRef(false);
+  const fallbackStatus = initError ? "error" : "setup";
   const connections = providedConnections ?? {
     ...useAiTtsStore.getState().connections,
     [provider]: {
       ...useAiTtsStore.getState().connections[provider],
-      status: initialized ? "connected" : initError ? "error" : "setup",
+      status: initialized ? "connected" : fallbackStatus,
       error: error ?? initError,
       destination: provider === "local" ? localUrl : null,
       supportsWordTimings,
@@ -451,13 +460,7 @@ export function AiTtsSettings({ onClose }: Readonly<AiTtsSettingsProps>) {
                 >
                   <span>{PROVIDER_NAMES[connectionProvider]}</span>
                   <span
-                    className={
-                      connection.status === "connected"
-                        ? "ai-tts-status-ok"
-                        : connection.status === "error"
-                          ? "ai-tts-status-warning"
-                          : "ai-tts-status-pending"
-                    }
+                    className={CONNECTION_STATUS_CLASSES[connection.status]}
                   >
                     {connection.status === "connected" && connection.error
                       ? "Connected · last attempt failed"

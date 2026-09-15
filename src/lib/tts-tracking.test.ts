@@ -43,6 +43,35 @@ describe("segmentSpeechWithOffsets", () => {
     }
   });
 
+  it("rejects all earlier output when a later grapheme cannot fit", () => {
+    expect(segmentSpeechWithOffsets("OK. e\u0301", 2)).toEqual([]);
+  });
+
+  it("prefers whitespace boundaries and trims without shifting source offsets", () => {
+    expect(segmentSpeechWithOffsets("ab cd  ef", 4)).toEqual([
+      { text: "ab", charStart: 0, charEnd: 2 },
+      { text: "cd", charStart: 3, charEnd: 5 },
+      { text: "ef", charStart: 7, charEnd: 9 },
+    ]);
+  });
+
+  it.each([0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])(
+    "rejects an invalid byte bound %s",
+    (bound) => expect(segmentSpeechWithOffsets("hello", bound)).toEqual([]),
+  );
+
+  it("aggregates very many chunks without an argument-spread limit", () => {
+    const text = "x".repeat(150_000);
+    const spans = segmentSpeechWithOffsets(text, 1);
+    expect(spans).toHaveLength(text.length);
+    expect(spans[0]).toEqual({ text: "x", charStart: 0, charEnd: 1 });
+    expect(spans[spans.length - 1]).toEqual({
+      text: "x",
+      charStart: text.length - 1,
+      charEnd: text.length,
+    });
+  });
+
   it("hard-splits a long token but fails closed when one grapheme exceeds the bound", () => {
     const longToken = `${"x".repeat(450)}.`;
     const spans = segmentSpeechWithOffsets(longToken, 200);
