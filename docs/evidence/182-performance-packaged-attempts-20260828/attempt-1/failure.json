@@ -1,0 +1,7 @@
+{
+  "status": "FAIL",
+  "buildRevision": "7edfc158738261aa3c5f2d57e83f1ce4091d9dfe",
+  "stage": "Performance profile public control",
+  "failure": "Continuous radio was clicked before the provider transition left loading, so the disabled fieldset correctly ignored it.",
+  "repair": "Wait for the public radio control to become enabled, then wait for its selected state. No product threshold or assertion was weakened."
+}

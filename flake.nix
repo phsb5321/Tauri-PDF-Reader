@@ -115,6 +115,8 @@
             tauri-driver
             pkgs.rustc
             pkgs.cargo
+            pkgs.rustfmt
+            pkgs.clippy
           ] ++ tauriLinuxDeps;
 
           # bindgen (used transitively by several -sys crates) needs libclang.

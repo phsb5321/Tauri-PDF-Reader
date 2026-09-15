@@ -1,32 +1,123 @@
+export type PdfTextBoundaryKind = "line" | "paragraph" | "section";
+
+export interface PdfTextBoundary {
+  /** UTF-16 offset in the unchanged normalized page text. */
+  offset: number;
+  kind: PdfTextBoundaryKind;
+}
+
 export interface PdfTextSegment {
   text: string;
   start: number;
+  end: number;
+  hasEol: boolean;
+  x: number | null;
+  y: number | null;
+  width: number | null;
+  height: number | null;
+  fontName: string | null;
 }
 
 export interface BuiltPdfText {
   text: string;
   segments: PdfTextSegment[];
+  boundaries: PdfTextBoundary[];
 }
 
-function itemText(item: unknown): string | null {
+interface ParsedPdfItem {
+  text: string;
+  hasEol: boolean;
+  x: number | null;
+  y: number | null;
+  width: number | null;
+  height: number | null;
+  fontName: string | null;
+}
+
+function finiteNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function parseItem(item: unknown): ParsedPdfItem | null {
   if (!item || typeof item !== "object" || !("str" in item)) return null;
-  const raw = String((item as { str: unknown }).str);
+  const value = item as Record<string, unknown>;
+  const raw = String(value.str);
   const text = raw.replace(/\s+/gu, " ").trim();
-  return text || null;
+  if (!text) return null;
+  const transform = Array.isArray(value.transform) ? value.transform : [];
+  return {
+    text,
+    hasEol: value.hasEOL === true,
+    x: finiteNumber(transform[4]),
+    y: finiteNumber(transform[5]),
+    width: finiteNumber(value.width),
+    height: finiteNumber(value.height),
+    fontName: typeof value.fontName === "string" ? value.fontName : null,
+  };
 }
 
-/** Build the one normalized page string used by TTS and highlight offsets. */
+function inferBoundary(
+  previous: ParsedPdfItem,
+  current: ParsedPdfItem,
+): PdfTextBoundaryKind | null {
+  if (
+    previous.y === null ||
+    current.y === null ||
+    previous.height === null ||
+    current.height === null
+  ) {
+    return previous.hasEol ? "line" : null;
+  }
+
+  const smallerHeight = Math.max(Math.min(previous.height, current.height), 1);
+  const lineHeight = Math.max(previous.height, current.height, 1);
+  const verticalGap = Math.abs(previous.y - current.y);
+  const sizeRatio = lineHeight / smallerHeight;
+  const styleChanged =
+    previous.fontName !== null &&
+    current.fontName !== null &&
+    previous.fontName !== current.fontName;
+
+  // Real PDFs often omit `hasEOL` on a heading even though the next body line
+  // starts a new block. A strong size+font change and a body-relative baseline
+  // gap are sufficient section evidence; requiring hasEOL flattened the real
+  // “What This Book Is About” heading into its first paragraph.
+  if (sizeRatio >= 1.25 && styleChanged && verticalGap >= smallerHeight * 1.5) {
+    return "section";
+  }
+  if (!previous.hasEol) return null;
+  if (verticalGap >= lineHeight * 1.45) return "paragraph";
+  return "line";
+}
+
+/**
+ * Build the one normalized page string used by TTS and highlight offsets while
+ * retaining PDF.js structure evidence. Boundaries are metadata only: normalized
+ * source text remains the same one-space model used by the rendered text layer.
+ */
 export function buildPdfText(items: readonly unknown[]): BuiltPdfText {
   const segments: PdfTextSegment[] = [];
+  const boundaries: PdfTextBoundary[] = [];
   let text = "";
+  let previous: ParsedPdfItem | null = null;
   for (const item of items) {
-    const segment = itemText(item);
-    if (!segment) continue;
-    if (text) text += " ";
-    segments.push({ text: segment, start: text.length });
-    text += segment;
+    const parsed = parseItem(item);
+    if (!parsed) continue;
+    if (text) {
+      const kind = previous ? inferBoundary(previous, parsed) : null;
+      if (kind) boundaries.push({ offset: text.length, kind });
+      text += " ";
+    }
+    const start = text.length;
+    text += parsed.text;
+    segments.push({
+      ...parsed,
+      start,
+      end: text.length,
+    });
+    previous = parsed;
   }
-  return { text, segments };
+  return { text, segments, boundaries };
 }
 
 /** Annotate PDF.js spans with offsets in the same normalized page string. */

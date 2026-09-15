@@ -22,6 +22,11 @@ import {
   buildWordFallbackTimings,
   findWordIndexAtTime,
 } from "../lib/tts-tracking";
+import {
+  mapSpokenRangeToSource,
+  type AlignmentSegment,
+  type ProsodyBoundary,
+} from "../lib/prosody-plan";
 
 export interface UseTtsWordHighlightOptions {
   /** Callback when a new word becomes active */
@@ -241,6 +246,8 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
       pageNumber: number,
       voiceId?: string,
       baseOffset = 0,
+      alignment?: readonly AlignmentSegment[],
+      boundaryAfter?: ProsodyBoundary,
     ) => {
       if (!ttsStore.initialized) {
         console.warn("[TtsWordHighlight] TTS not initialized");
@@ -277,6 +284,7 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
         const result = await aiTtsSpeakWithTimestamps(
           text,
           voiceId ?? ttsStore.selectedVoiceId ?? undefined,
+          boundaryAfter,
         );
 
         // Check if this request was superseded
@@ -302,11 +310,25 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
           const relativeTimings = usingFallback
             ? buildWordFallbackTimings(text, result.totalDuration)
             : result.wordTimings;
-          const wordTimings = relativeTimings.map((timing) => ({
-            ...timing,
-            charStart: timing.charStart + baseOffset,
-            charEnd: timing.charEnd + baseOffset,
-          }));
+          const wordTimings = relativeTimings.flatMap((timing) => {
+            const mapped = alignment
+              ? mapSpokenRangeToSource(
+                  alignment,
+                  timing.charStart,
+                  timing.charEnd,
+                )
+              : { start: timing.charStart, end: timing.charEnd };
+            // An insertion-only mark has no PDF range. Punctuation attached to
+            // a real word still overlaps its copy segment and maps normally.
+            if (!mapped) return [];
+            return [
+              {
+                ...timing,
+                charStart: mapped.start + baseOffset,
+                charEnd: mapped.end + baseOffset,
+              },
+            ];
+          });
 
           // Start highlighting - this triggers the animation loop via useEffect
           highlightStore.startHighlighting(

@@ -39,10 +39,11 @@ describe("ai-tts api → invoke wire contract", () => {
   });
 
   it("aiTtsSpeakWithTimestamps → ai_tts_speak_with_timestamps", async () => {
-    await api.aiTtsSpeakWithTimestamps("hi", "v2");
+    await api.aiTtsSpeakWithTimestamps("hi", "v2", "section");
     expect(mockInvoke).toHaveBeenCalledWith("ai_tts_speak_with_timestamps", {
       text: "hi",
       voiceId: "v2",
+      boundaryAfter: "section",
     });
   });
 
@@ -89,11 +90,12 @@ describe("ai-tts api → invoke wire contract", () => {
   });
 
   it("aiTtsPrebuffer → ai_tts_prebuffer", async () => {
-    await api.aiTtsPrebuffer("text", "v1");
-    expect(mockInvoke).toHaveBeenCalledWith(
-      "ai_tts_prebuffer",
-      expect.objectContaining({ text: "text" }),
-    );
+    await api.aiTtsPrebuffer("text", "v1", "paragraph");
+    expect(mockInvoke).toHaveBeenCalledWith("ai_tts_prebuffer", {
+      text: "text",
+      voiceId: "v1",
+      boundaryAfter: "paragraph",
+    });
   });
 });
 

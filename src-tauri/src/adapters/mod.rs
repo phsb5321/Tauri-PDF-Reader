@@ -28,7 +28,7 @@ pub mod groq_tts;
 pub mod local_tts;
 pub mod sqlite;
 #[cfg(feature = "elevenlabs-tts")]
-mod wav;
+pub(crate) mod wav;
 
 pub use audio_cache::{AudioCacheAdapter, CacheInfo, CachedTtsData, CachedWordTiming, ClearResult};
 #[cfg(feature = "elevenlabs-tts")]

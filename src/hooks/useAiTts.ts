@@ -263,6 +263,7 @@ export function useAiTts() {
         const unsub4 = await onAiTtsStopped(() => {
           if (mounted) {
             console.debug("[TTS] State transition: -> idle (stopped event)");
+            useTtsHighlightStore.getState().stopHighlighting();
             store.setPlaybackState("idle");
             store.setCurrentText(null);
             store.setBackendPlaybackGeneration(null);

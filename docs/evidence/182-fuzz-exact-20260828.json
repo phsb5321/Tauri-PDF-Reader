@@ -1,0 +1,18 @@
+{
+  "status": "PASS",
+  "buildRevision": "7640c821d72f2c3a03e9c51aed89949cc8efbe68",
+  "seed": 20260828,
+  "numRuns": 2000,
+  "testFiles": [
+    "src/hooks/usePageNavigation.property.test.ts",
+    "src/hooks/useTtsProviderRouting.property.test.ts"
+  ],
+  "tests": 3,
+  "replayCommand": "FC_SEED=20260828 FC_NUM_RUNS=2000 pnpm test:fuzz",
+  "assertions": {
+    "pageBoundsAndStopBeforeNavigation": true,
+    "providerNeverActivatesDisconnectedRoute": true,
+    "cloudKeyNeverPersists": true,
+    "performanceProfileAlwaysValidAndPersisted": true
+  }
+}

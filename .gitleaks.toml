@@ -33,6 +33,7 @@ description = "Proven non-secrets and vendored/build paths."
 paths = [
   # Build/vendor trees — never repo-authored, never scanned by `git` mode.
   '''(^|/)node_modules/''',
+  '''(^|/)\.pnpm-store/''',
   '''(^|/)src-tauri/target/''',
   '''(^|/)dist/''',
   '''(^|/)coverage/''',
