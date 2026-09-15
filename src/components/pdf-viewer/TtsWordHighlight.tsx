@@ -1,10 +1,11 @@
 /**
  * TTS Word Highlight Component
  *
- * Renders karaoke-style word highlighting on top of PDF text layer.
- * Uses CSS Custom Highlight API for clean, native text highlighting.
- * On engines without that API the progress rail remains truthful, but no
- * in-page word is painted; there is no fake overlay fallback.
+ * Renders karaoke-style read-along highlighting inside the PDF text layer
+ * using the CSS Custom Highlight API. Two tiers are painted: a calm band over
+ * the spoken run so the eye has a landing zone, and a strong mark on the
+ * current word. On engines without that API the progress rail remains
+ * truthful, but no in-page word is painted; there is no fake overlay fallback.
  */
 
 import { useEffect, useRef, useCallback } from "react";
@@ -14,13 +15,21 @@ import {
 } from "../../stores/tts-highlight-store";
 import { resolveCharRange } from "../../lib/tts-tracking";
 import { rangeFromAnnotatedPdfText } from "../../lib/pdf-text";
+import { readingBandScrollTarget } from "../../lib/read-along-motion";
+import { reducedMotionScrollBehavior } from "../../lib/reduced-motion";
 import type { WordTiming } from "../../lib/api/ai-tts";
+import { useSettingsStore } from "../../stores/settings-store";
 import "./TtsWordHighlight.css";
 
 interface TtsWordHighlightProps {
   pageNumber: number;
   scale: number;
 }
+
+const SENTENCE_HIGHLIGHT = "tts-active-sentence";
+const WORD_HIGHLIGHT = "tts-current-word";
+const TEXT_LAYER_POLL_MS = 50;
+const TEXT_LAYER_TIMEOUT_MS = 2000;
 
 // Check if CSS Custom Highlight API is supported
 const isHighlightApiSupported =
@@ -40,10 +49,9 @@ function findTextLayerDiv(pageNumber: number): HTMLDivElement | null {
 }
 
 /**
- * Create a Range for a word using character offsets.
- * Uses TreeWalker to traverse text nodes (like VoxPage).
+ * Create a Range spanning a character interval of the annotated text layer.
  */
-function createWordRange(
+function createCharRange(
   element: Element,
   charOffset: number,
   charLength: number,
@@ -87,163 +95,236 @@ function createWordRange(
 }
 
 /**
- * Apply highlight using CSS Custom Highlight API
+ * Register exactly one range under `name`. The previous entry is deleted
+ * first so a late callback can never leave two words painted at once.
  */
-function applyHighlight(range: Range): void {
+function setHighlightRange(
+  name: string,
+  range: Range | null,
+  priority: number,
+): void {
   if (!isHighlightApiSupported) return;
 
   try {
-    // Create a Highlight object with the range
+    CSS.highlights.delete(name);
+    if (!range) return;
     const highlight = new Highlight(range);
-    // Register it with CSS highlights registry
-    CSS.highlights.set("tts-current-word", highlight);
+    highlight.priority = priority;
+    CSS.highlights.set(name, highlight);
   } catch (e) {
-    console.warn("[TtsHighlight] Failed to apply highlight:", e);
+    console.warn(`[TtsHighlight] Failed to apply ${name}:`, e);
   }
 }
 
 /**
- * Clear the CSS highlight
+ * Clear both read-along tiers.
  */
 function clearHighlight(): void {
   if (!isHighlightApiSupported) return;
 
   try {
-    CSS.highlights.delete("tts-current-word");
+    CSS.highlights.delete(WORD_HIGHLIGHT);
+    CSS.highlights.delete(SENTENCE_HIGHLIGHT);
   } catch {
     // Ignore errors
   }
 }
 
 export function TtsWordHighlight({ pageNumber, scale }: TtsWordHighlightProps) {
-  const lastWordKeyRef = useRef<string>("");
-  const lastScaleRef = useRef<number>(scale);
-  const observerRef = useRef<MutationObserver | null>(null);
+  // One cursor epoch. Every deferred callback captures it, so a repaint
+  // scheduled for a previous word, page, or scale is dropped instead of
+  // overwriting the current one.
+  const epochRef = useRef(0);
   const textLayerRef = useRef<HTMLDivElement | null>(null);
+  const scrollFrameRef = useRef<number | null>(null);
 
   const isActive = useTtsHighlightStore((s) => s.isActive);
   const storePageNumber = useTtsHighlightStore((s) => s.pageNumber);
   const currentWordIndex = useTtsHighlightStore((s) => s.currentWordIndex);
   const currentText = useTtsHighlightStore((s) => s.currentText);
+  const wordTimings = useTtsHighlightStore((s) => s.wordTimings);
   const currentWord = useTtsHighlightStore(selectCurrentWord);
+  const followAlong = useSettingsStore((state) => state.ttsFollowAlong);
 
   const isActiveOnThisPage = isActive && storePageNumber === pageNumber;
 
-  // Highlight the current word
-  const highlightWord = useCallback(
-    (word: WordTiming) => {
+  /** Paint the calm band covering the whole run being spoken. */
+  const paintSentence = useCallback(
+    (epoch: number) => {
       const textLayer = textLayerRef.current;
-      if (!textLayer || !currentText) return;
+      if (!textLayer || epoch !== epochRef.current) return;
 
-      const charOffset = word.charStart;
-      const charLength = word.charEnd - word.charStart;
+      const first = wordTimings[0];
+      const last = wordTimings[wordTimings.length - 1];
+      if (!first || !last || last.charEnd <= first.charStart) {
+        setHighlightRange(SENTENCE_HIGHLIGHT, null, 0);
+        return;
+      }
+      setHighlightRange(
+        SENTENCE_HIGHLIGHT,
+        createCharRange(
+          textLayer,
+          first.charStart,
+          last.charEnd - first.charStart,
+        ),
+        0,
+      );
+    },
+    [wordTimings],
+  );
 
-      const range = createWordRange(textLayer, charOffset, charLength);
+  const scheduleFollowScroll = useCallback(
+    (range: Range, epoch: number) => {
+      if (scrollFrameRef.current !== null) {
+        cancelAnimationFrame(scrollFrameRef.current);
+        scrollFrameRef.current = null;
+      }
+      if (!followAlong || typeof range.getBoundingClientRect !== "function") {
+        return;
+      }
+      const viewer = textLayerRef.current?.closest<HTMLElement>(".pdf-viewer");
+      if (!viewer) return;
+      const rangeRect = range.getBoundingClientRect();
+      const viewportRect = viewer.getBoundingClientRect();
+      const target = readingBandScrollTarget(rangeRect, {
+        top: viewportRect.top,
+        bottom: viewportRect.bottom,
+        scrollTop: viewer.scrollTop,
+        scrollHeight: viewer.scrollHeight,
+        clientHeight: viewer.clientHeight,
+      });
+      if (target === null) return;
+      scrollFrameRef.current = requestAnimationFrame(() => {
+        scrollFrameRef.current = null;
+        if (epoch !== epochRef.current) return;
+        viewer.scrollTo({
+          top: target,
+          behavior: reducedMotionScrollBehavior(),
+        });
+      });
+    },
+    [followAlong],
+  );
 
-      if (range) {
-        applyHighlight(range);
-      } else {
+  /** Paint the strong mark on the word currently being spoken. */
+  const paintWord = useCallback(
+    (word: WordTiming, epoch: number) => {
+      const textLayer = textLayerRef.current;
+      if (!textLayer || epoch !== epochRef.current) return;
+
+      const range = createCharRange(
+        textLayer,
+        word.charStart,
+        word.charEnd - word.charStart,
+      );
+      if (!range) {
         console.warn(
           "[TtsHighlight] Could not create range for word:",
           word.word,
         );
+        return;
       }
+      setHighlightRange(WORD_HIGHLIGHT, range, 1);
+      scheduleFollowScroll(range, epoch);
     },
-    [currentText],
+    [scheduleFollowScroll],
   );
 
-  // Set up text layer reference and observer
+  // Resolve the text layer once per page/scale/run — never per word — and keep
+  // every timer and observer callback cancellable.
   useEffect(() => {
-    if (!isActiveOnThisPage || !currentText) {
-      clearHighlight();
-      textLayerRef.current = null;
-      if (observerRef.current) {
-        observerRef.current.disconnect();
-        observerRef.current = null;
-      }
-      return;
-    }
+    const epoch = ++epochRef.current;
+    clearHighlight();
+    textLayerRef.current = null;
 
-    const setupTextLayer = () => {
+    if (!isActiveOnThisPage || !currentText) return;
+
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+    let giveUpTimer: ReturnType<typeof setTimeout> | null = null;
+    let rebuildTimer: ReturnType<typeof setTimeout> | null = null;
+    let observer: MutationObserver | null = null;
+
+    const stopPolling = () => {
+      if (pollTimer) clearInterval(pollTimer);
+      if (giveUpTimer) clearTimeout(giveUpTimer);
+      pollTimer = null;
+      giveUpTimer = null;
+    };
+
+    const setupTextLayer = (): boolean => {
+      if (epoch !== epochRef.current) return true;
       const textLayer = findTextLayerDiv(pageNumber);
-      if (!textLayer) return false;
-
-      const spans = textLayer.querySelectorAll("span");
-      if (spans.length === 0) return false;
+      if (!textLayer || textLayer.querySelectorAll("span").length === 0) {
+        return false;
+      }
 
       textLayerRef.current = textLayer;
-
-      // Re-highlight current word after text layer setup
-      if (currentWord) {
-        lastWordKeyRef.current = ""; // Force re-highlight
-        highlightWord(currentWord);
-      }
-
+      paintSentence(epoch);
+      const word = useTtsHighlightStore.getState();
+      const active = selectCurrentWord(word);
+      if (active) paintWord(active, epoch);
       return true;
     };
 
-    // Try setup immediately
     if (!setupTextLayer()) {
-      // Poll for text layer
-      const interval = setInterval(() => {
-        if (setupTextLayer()) {
-          clearInterval(interval);
-        }
-      }, 50);
-
-      setTimeout(() => clearInterval(interval), 2000);
+      pollTimer = setInterval(() => {
+        if (setupTextLayer()) stopPolling();
+      }, TEXT_LAYER_POLL_MS);
+      giveUpTimer = setTimeout(stopPolling, TEXT_LAYER_TIMEOUT_MS);
     }
 
-    // Set up observer to detect text layer rebuilds
-    const textLayer = findTextLayerDiv(pageNumber);
-    if (textLayer) {
-      observerRef.current = new MutationObserver(() => {
-        // Text layer was rebuilt, re-setup
-        setTimeout(setupTextLayer, 50);
+    const observed = findTextLayerDiv(pageNumber);
+    if (observed) {
+      observer = new MutationObserver(() => {
+        if (rebuildTimer) clearTimeout(rebuildTimer);
+        rebuildTimer = setTimeout(() => {
+          rebuildTimer = null;
+          setupTextLayer();
+        }, TEXT_LAYER_POLL_MS);
       });
-
-      observerRef.current.observe(textLayer, {
-        childList: true,
-        subtree: true,
-      });
+      observer.observe(observed, { childList: true, subtree: true });
     }
 
     return () => {
-      clearHighlight();
-      if (observerRef.current) {
-        observerRef.current.disconnect();
-        observerRef.current = null;
+      // Retiring the epoch is what makes any callback already in flight a
+      // no-op, even if its timer fires before this cleanup cancels it.
+      epochRef.current += 1;
+      stopPolling();
+      if (rebuildTimer) clearTimeout(rebuildTimer);
+      observer?.disconnect();
+      if (scrollFrameRef.current !== null) {
+        cancelAnimationFrame(scrollFrameRef.current);
+        scrollFrameRef.current = null;
       }
-    };
-  }, [isActiveOnThisPage, pageNumber, currentText, currentWord, highlightWord]);
-
-  // Detect scale changes
-  useEffect(() => {
-    if (scale !== lastScaleRef.current) {
-      lastScaleRef.current = scale;
       clearHighlight();
-      lastWordKeyRef.current = ""; // Force re-highlight after scale change
-    }
-  }, [scale]);
+      textLayerRef.current = null;
+    };
+  }, [
+    isActiveOnThisPage,
+    pageNumber,
+    scale,
+    currentText,
+    paintSentence,
+    paintWord,
+  ]);
 
-  // Update highlight when word changes
+  // Advance the word mark. The band is repainted only when the run changes.
   useEffect(() => {
     if (!isActiveOnThisPage || !currentWord) {
-      clearHighlight();
+      setHighlightRange(WORD_HIGHLIGHT, null, 1);
       return;
     }
-
-    // Skip if same word (perf optimization)
-    const wordKey = `${currentWordIndex}-${currentWord.charStart}`;
-    if (wordKey === lastWordKeyRef.current) return;
-    lastWordKeyRef.current = wordKey;
-
-    highlightWord(currentWord);
-  }, [isActiveOnThisPage, currentWord, currentWordIndex, highlightWord]);
+    paintWord(currentWord, epochRef.current);
+  }, [isActiveOnThisPage, currentWord, currentWordIndex, paintWord]);
 
   // Clean up on unmount
   useEffect(() => {
     return () => {
+      epochRef.current += 1;
+      if (scrollFrameRef.current !== null) {
+        cancelAnimationFrame(scrollFrameRef.current);
+        scrollFrameRef.current = null;
+      }
       clearHighlight();
     };
   }, []);

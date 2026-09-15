@@ -2,12 +2,38 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+BUILD_REVISION=$(git rev-parse HEAD)
+[[ "$BUILD_REVISION" =~ ^[0-9a-f]{40}$ ]]
+git diff --quiet HEAD -- || {
+  echo "local-tts: tracked worktree changes make buildRevision dishonest" >&2
+  exit 2
+}
+git diff --cached --quiet -- || {
+  echo "local-tts: staged changes make buildRevision dishonest" >&2
+  exit 2
+}
+[ -z "$(git status --porcelain --untracked-files=all)" ] || {
+  echo "local-tts: untracked source makes buildRevision dishonest" >&2
+  exit 2
+}
+
 source ./scripts/e2e-profile.sh
 source ./scripts/e2e-toolchain.sh
 
 EVIDENCE_DIR="${LECTRICE_LOCAL_TTS_EVIDENCE_DIR:-$PWD/ci-evidence/local-tts}"
-mkdir -p "$EVIDENCE_DIR" "$XDG_CONFIG_HOME/lectrice"
-rm -f "$EVIDENCE_DIR/receipt.json"
+export LECTRICE_LOCAL_TTS_EVIDENCE_DIR="$EVIDENCE_DIR"
+mkdir -p "$EVIDENCE_DIR" "$XDG_CONFIG_HOME/lectrice" \
+  "$XDG_CONFIG_HOME/gtk-3.0" "$XDG_CONFIG_HOME/gtk-4.0"
+for gtk_settings in \
+  "$XDG_CONFIG_HOME/gtk-3.0/settings.ini" \
+  "$XDG_CONFIG_HOME/gtk-4.0/settings.ini"; do
+  cat >"$gtk_settings" <<'GTK'
+[Settings]
+gtk-enable-animations=0
+GTK
+done
+OBSERVED="$EVIDENCE_DIR/observed.json"
+rm -f "$EVIDENCE_DIR/receipt.json" "$OBSERVED"
 REQUEST_LOG="$EVIDENCE_DIR/requests.jsonl"
 READY="$EVIDENCE_DIR/fixture.ready"
 cat >"$XDG_CONFIG_HOME/lectrice/config.toml" <<'TOML'
@@ -74,7 +100,7 @@ toolchain_exec '
   export WEBKIT_DISABLE_COMPOSITING_MODE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1 LIBGL_ALWAYS_SOFTWARE=1
   export GDK_BACKEND=x11
   DISPNUM_FILE=$(mktemp)
-  Xvfb -displayfd 3 -screen 0 1280x1024x24 3>$DISPNUM_FILE >"'$EVIDENCE_DIR'/xvfb.log" 2>&1 &
+  Xvfb -displayfd 3 -screen 0 1920x1080x24 3>$DISPNUM_FILE >"'$EVIDENCE_DIR'/xvfb.log" 2>&1 &
   XVFB_PID=$!
   trap "kill $XVFB_PID 2>/dev/null || true" EXIT
   for _ in $(seq 1 100); do [ -s $DISPNUM_FILE ] && break; sleep 0.1; done
@@ -84,6 +110,7 @@ toolchain_exec '
   E2E_SPEC=./e2e/local-tts.e2e.mjs pnpm test:e2e
 ' 2>&1 | tee "$EVIDENCE_DIR/lane.log"
 
+test -s "$OBSERVED"
 # The raw fixture ledger needs the idempotency value only during the live
 # contract assertion above. It is not a credential, but a random-looking
 # 64-hex value is indistinguishable from one to secret scanners and adds no
@@ -93,10 +120,10 @@ jq -c '{body, idempotencyKeyValid: (.idempotencyKey | test("^[0-9a-f]{64}$"))}' 
   "$REQUEST_LOG" >"$sanitized"
 mv "$sanitized" "$REQUEST_LOG"
 
-BUILD_REVISION=$(git rev-parse HEAD)
 BINARY_SHA256=$(sha256sum "$E2E_APP_PATH" | cut -d' ' -f1)
 FIXTURE_SHA256=$(sha256sum public/e2e-prosody-fixture.pdf | cut -d' ' -f1)
 jq -s \
+  --slurpfile observed "$OBSERVED" \
   --arg buildRevision "$BUILD_REVISION" \
   --arg binarySha256 "$BINARY_SHA256" \
   --arg fixtureSha256 "$FIXTURE_SHA256" \
@@ -107,21 +134,8 @@ jq -s \
     binarySha256: $binarySha256,
     fixtureSha256: $fixtureSha256,
     observedAt: $observedAt,
-    journey: "Settings -> Performance -> Continuous -> public Play -> bounded heading/context -> exact source highlight -> public Stop -> measured RTF",
-    assertions: {
-      performanceModel: "Magpie TTS Multilingual 357M",
-      performanceBackend: "Vulkan/RADV fixture",
-      performanceDevice: "Fixture GPU",
-      performanceProfile: "continuous",
-      uncachedRtfVisible: true,
-      sourceText: "What This Book Is About / This book aims to fill a gap. It connects the dots. Readers benefit.",
-      spokenFirstRun: "What This Book Is About.",
-      highlightedSourceRange: "What",
-      secondRun: "This book aims to fill a gap. It connects the dots. Readers benefit.",
-      provider: "local",
-      credentialPresent: false,
-      finalPlaybackState: "idle"
-    },
+    journey: "all Narration tabs -> Continuous + English normalization -> public Play -> Pause -> excerpt Read from here -> Stop -> paragraph margin action -> Stop -> manual next page -> immediate fresh Play -> Stop -> measured RTF",
+    assertions: $observed[0],
     requests: .
   }' "$REQUEST_LOG" >"$EVIDENCE_DIR/receipt.json"
 jq -e '
@@ -129,10 +143,26 @@ jq -e '
   .assertions.highlightedSourceRange == "What" and
   .assertions.performanceProfile == "continuous" and
   .assertions.uncachedRtfVisible == true and
-  (.requests | map(.body.input)) == [
-    "What This Book Is About.",
-    "This book aims to fill a gap. It connects the dots. Readers benefit."
-  ] and
+  .assertions.readFromHereReplacedPausedQueue == true and
+  .assertions.paragraphActionStartedAtChosenParagraph == true and
+  .assertions.paragraphActionNonOverlapping == true and
+  .assertions.paragraphActionFocusVisible == true and
+  .assertions.paragraphActionPaperMarker == true and
+  .assertions.manualPageFreshPlay == "Second page ready." and
+  .assertions.provider == "local" and
+  .assertions.credentialPresent == false and
+  .assertions.finalPlaybackState == "idle" and
+  .assertions.reducedMotion.mediaMatches == true and
+  .assertions.reducedMotion.maxDurationSeconds <= 0.00001 and
+  (.assertions.cockpitGeometry | length) == 4 and
+  (.assertions.cockpitGeometry | all(.[];
+    .retainedPageRatio >= 0.6 and
+    (.controls | all(.[]; .width >= 44 and .height >= 44)))) and
+  (.requests | length) >= 4 and
+  .requests[0].body.input == "What This Book Is About." and
+  .requests[1].body.input == "This book aims to fill a gap. It connects the dots. Readers benefit." and
+  (.requests[2].body.input | startswith("This book aims")) and
+  (.requests | any(.[]; .body.input | startswith("Second page ready."))) and
   (.requests | all(.[];
     (.body.voice == "F1-pt") and
     .idempotencyKeyValid))

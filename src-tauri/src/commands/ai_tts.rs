@@ -489,10 +489,10 @@ pub async fn ai_tts_stop(
 ) -> Result<StopResponse, String> {
     let engine = state.0.read().await;
 
-    engine.stop().await?;
+    let generation = engine.stop_with_generation().await?;
 
-    let _ = app.emit("ai-tts:stopped", ());
-    tracing::debug!("Emitted ai-tts:stopped event");
+    let _ = app.emit("ai-tts:stopped", generation);
+    tracing::debug!(generation, "Emitted ai-tts:stopped event");
 
     Ok(StopResponse { success: true })
 }

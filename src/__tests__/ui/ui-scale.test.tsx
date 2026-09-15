@@ -6,12 +6,23 @@ import {
   UI_SCALE_DEFAULT,
   useSettingsStore,
 } from "../../stores/settings-store";
+import { mockInvoke } from "../../../tests/setup";
 
 vi.mock("../../components/reader/ReaderView", () => ({
   ReaderView: () => <main>Reader</main>,
 }));
 
 beforeEach(() => {
+  mockInvoke.mockImplementation(async (command) =>
+    command === "get_render_settings"
+      ? {
+          qualityMode: "balanced",
+          maxMegapixels: 24,
+          hwAccelerationEnabled: true,
+          debugOverlayEnabled: false,
+        }
+      : undefined,
+  );
   document.documentElement.style.removeProperty("font-size");
   act(() => {
     useSettingsStore.setState({ uiScale: UI_SCALE_DEFAULT, theme: "system" });

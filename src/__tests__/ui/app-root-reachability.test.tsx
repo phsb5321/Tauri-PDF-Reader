@@ -67,6 +67,13 @@ describe("App-root reachability", () => {
 
     mockInvoke.mockImplementation((command: string) => {
       switch (command) {
+        case "get_render_settings":
+          return Promise.resolve({
+            qualityMode: "balanced",
+            maxMegapixels: 24,
+            hwAccelerationEnabled: true,
+            debugOverlayEnabled: false,
+          });
         case "library_list_documents":
           return Promise.resolve([IN_FLIGHT]);
         case "collections_list":

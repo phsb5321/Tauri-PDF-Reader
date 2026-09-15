@@ -141,26 +141,41 @@ export function ReaderView() {
   // session-only by design (#73). Bumping a token rather than a boolean lets
   // a second resume-and-play (a different book) fire again even if the
   // previous one never actually started.
+  const nextPlaybackTokenRef = useRef(0);
   const [autoPlayToken, setAutoPlayToken] = useState(0);
-  const pendingNarrationRef = useRef<{
+  const [selectionPlayRequest, setSelectionPlayRequest] = useState<{
+    token: number;
     text: string;
     baseOffset: number;
   } | null>(null);
-  const activeNarrationOffsetRef = useRef(0);
   const handleReadFromHere = useCallback((text: string, baseOffset: number) => {
-    pendingNarrationRef.current = { text, baseOffset };
-    setAutoPlayToken((token) => token + 1);
+    nextPlaybackTokenRef.current += 1;
+    setSelectionPlayRequest({
+      token: nextPlaybackTokenRef.current,
+      text,
+      baseOffset,
+    });
   }, []);
 
   const handleResumeAndPlay = useCallback(
     async (document: Document) => {
       if (await resumeDocument(document)) {
         setShowLibrary(false);
-        setAutoPlayToken((token) => token + 1);
+        nextPlaybackTokenRef.current += 1;
+        setAutoPlayToken(nextPlaybackTokenRef.current);
       }
     },
     [resumeDocument],
   );
+
+  const handleAutoPlayConsumed = useCallback((token: number) => {
+    setAutoPlayToken((pending) => (pending === token ? 0 : pending));
+  }, []);
+  const handleSelectionPlayConsumed = useCallback((token: number) => {
+    setSelectionPlayRequest((pending) =>
+      pending?.token === token ? null : pending,
+    );
+  }, []);
 
   // Restore a reading session: open the document the reader was last on (the
   // SessionDocument with the highest `position` — the backend returns them
@@ -312,17 +327,12 @@ export function ReaderView() {
     debounceMs: 1000, // Wait 1s after page change before buffering
   });
 
-  // Get text content from current page for TTS
+  // Get text content from current page for ordinary Play. Selection narration
+  // is carried as one immutable request so rapid selections cannot steal each
+  // other's source text or UTF-16 base offset while cancellation is in flight.
   const getCurrentPageText = useCallback(async (): Promise<
     string | BuiltPdfText | null
   > => {
-    const selectedTail = pendingNarrationRef.current;
-    if (selectedTail) {
-      pendingNarrationRef.current = null;
-      activeNarrationOffsetRef.current = selectedTail.baseOffset;
-      return selectedTail.text;
-    }
-    activeNarrationOffsetRef.current = 0;
     if (!pdfDocument) return null;
 
     try {
@@ -336,12 +346,6 @@ export function ReaderView() {
       return null;
     }
   }, [pdfDocument, currentPage]);
-
-  const consumeNarrationBaseOffset = useCallback(() => {
-    const offset = activeNarrationOffsetRef.current;
-    activeNarrationOffsetRef.current = 0;
-    return offset;
-  }, []);
 
   // Nothing loaded means nothing to read, so the home wins regardless of the
   // toggle. The playback bar is deliberately NOT tied to this: audio started in
@@ -370,8 +374,10 @@ export function ReaderView() {
         (!libraryShowing || playbackState !== "idle") && (
           <AiPlaybackBar
             getText={getCurrentPageText}
-            getTextBaseOffset={consumeNarrationBaseOffset}
             autoPlayToken={autoPlayToken}
+            selectionPlayRequest={selectionPlayRequest}
+            onAutoPlayConsumed={handleAutoPlayConsumed}
+            onSelectionPlayConsumed={handleSelectionPlayConsumed}
           />
         )
       }

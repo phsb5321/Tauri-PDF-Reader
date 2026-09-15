@@ -32,7 +32,7 @@ use std::time::Instant;
 use tokio::sync::{watch, Mutex, RwLock};
 
 /// Cache contract shared with `src/lib/prosody-plan.ts`.
-const SOURCE_PROSODY_REVISION: &str = "source-aligned-v2";
+const SOURCE_PROSODY_REVISION: &str = "source-aligned-v4";
 
 /// Supported TTS providers
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Type, Default)]
@@ -915,25 +915,26 @@ impl AiTtsEngine {
             .await
     }
 
-    fn cancel_synthesis(&self) {
+    fn cancel_synthesis(&self) -> u64 {
         let next = self.cancel_tx.borrow().wrapping_add(1);
-        let _ = self.cancel_tx.send(next);
+        self.cancel_tx.send_replace(next);
+        next
     }
 
-    /// Stop playback
-    pub async fn stop(&self) -> Result<(), String> {
+    /// Stop playback and return the cancellation generation carried by the
+    /// stopped event. A replacement may legitimately start at this generation,
+    /// which lets the frontend reject a delayed event from the older run.
+    pub async fn stop_with_generation(&self) -> Result<u64, String> {
         let _gate = self.playback_gate.lock().await;
-        self.cancel_synthesis();
-        let result = self.player.stop();
-        if result.is_ok() {
-            let mut state = self.state.write().await;
-            state.is_playing = false;
-            state.is_paused = false;
-            state.current_text = None;
-            state.current_voice_id = None;
-            tracing::debug!("TTS state: stop -> is_playing=false, is_paused=false");
-        }
-        result
+        let generation = self.cancel_synthesis();
+        self.player.stop()?;
+        let mut state = self.state.write().await;
+        state.is_playing = false;
+        state.is_paused = false;
+        state.current_text = None;
+        state.current_voice_id = None;
+        tracing::debug!("TTS state: stop -> is_playing=false, is_paused=false");
+        Ok(generation)
     }
 
     /// Pause playback
@@ -1273,6 +1274,13 @@ mod tests {
             )
             .await
             .unwrap();
+    }
+
+    #[tokio::test]
+    async fn stop_publishes_monotonic_cancellation_generations() {
+        let engine = AiTtsEngine::for_test();
+        assert_eq!(engine.stop_with_generation().await.unwrap(), 1);
+        assert_eq!(engine.stop_with_generation().await.unwrap(), 2);
     }
 
     #[tokio::test]
