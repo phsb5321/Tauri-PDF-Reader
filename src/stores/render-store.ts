@@ -5,19 +5,26 @@
  * Settings are persisted via Tauri IPC to SQLite.
  */
 
-import { create } from 'zustand';
-import type { RenderSettings, RenderPlan, DisplayInfo } from '../domain/rendering';
-import { DEFAULT_RENDER_SETTINGS, PLATFORM_DEFAULTS } from '../domain/rendering';
+import { create } from "zustand";
+import type {
+  RenderSettings,
+  RenderPlan,
+  DisplayInfo,
+} from "../domain/rendering";
+import {
+  DEFAULT_RENDER_SETTINGS,
+  PLATFORM_DEFAULTS,
+} from "../domain/rendering";
 
 /**
  * Detect current platform for default settings
  */
 function detectPlatform(): string {
   const userAgent = navigator.userAgent.toLowerCase();
-  if (userAgent.includes('win')) return 'windows';
-  if (userAgent.includes('mac')) return 'macos';
-  if (userAgent.includes('linux')) return 'linux';
-  return 'unknown';
+  if (userAgent.includes("win")) return "windows";
+  if (userAgent.includes("mac")) return "macos";
+  if (userAgent.includes("linux")) return "linux";
+  return "unknown";
 }
 
 /**
@@ -36,6 +43,7 @@ interface RenderStore {
   // Settings state
   settings: RenderSettings;
   isLoading: boolean;
+  settingsInitialized: boolean;
   error: string | null;
   hasUnsavedChanges: boolean;
   pendingRestart: boolean;
@@ -51,6 +59,7 @@ interface RenderStore {
   updateSettings: (updates: Partial<RenderSettings>) => void;
   resetSettings: () => void;
   setLoading: (loading: boolean) => void;
+  setSettingsInitialized: (initialized: boolean) => void;
   setError: (error: string | null) => void;
   setHasUnsavedChanges: (hasChanges: boolean) => void;
   setPendingRestart: (pending: boolean) => void;
@@ -64,15 +73,16 @@ interface RenderStore {
 }
 
 const initialDisplayInfo: DisplayInfo = {
-  devicePixelRatio: typeof window !== 'undefined' ? window.devicePixelRatio : 1,
-  viewportWidth: typeof window !== 'undefined' ? window.innerWidth : 1200,
-  viewportHeight: typeof window !== 'undefined' ? window.innerHeight : 800,
+  devicePixelRatio: typeof window !== "undefined" ? window.devicePixelRatio : 1,
+  viewportWidth: typeof window !== "undefined" ? window.innerWidth : 1200,
+  viewportHeight: typeof window !== "undefined" ? window.innerHeight : 800,
 };
 
 export const useRenderStore = create<RenderStore>((set, get) => ({
   // Initial state
   settings: getPlatformDefaultSettings(),
   isLoading: false,
+  settingsInitialized: false,
   error: null,
   hasUnsavedChanges: false,
   pendingRestart: false,
@@ -114,6 +124,8 @@ export const useRenderStore = create<RenderStore>((set, get) => ({
 
   setLoading: (isLoading) => set({ isLoading }),
 
+  setSettingsInitialized: (settingsInitialized) => set({ settingsInitialized }),
+
   setError: (error) => set({ error }),
 
   setHasUnsavedChanges: (hasUnsavedChanges) => set({ hasUnsavedChanges }),
@@ -145,13 +157,15 @@ export const selectDisplayInfo = (state: RenderStore) => state.displayInfo;
 /**
  * Selector for current render plan
  */
-export const selectCurrentRenderPlan = (state: RenderStore) => state.currentRenderPlan;
+export const selectCurrentRenderPlan = (state: RenderStore) =>
+  state.currentRenderPlan;
 
 /**
  * Selector for loading/error state
  */
 export const selectRenderStoreStatus = (state: RenderStore) => ({
   isLoading: state.isLoading,
+  settingsInitialized: state.settingsInitialized,
   error: state.error,
   hasUnsavedChanges: state.hasUnsavedChanges,
   pendingRestart: state.pendingRestart,

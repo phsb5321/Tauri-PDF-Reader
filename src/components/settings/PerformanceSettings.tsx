@@ -1,30 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { commands, type TtsPerformanceSnapshot } from "../../lib/bindings";
-import {
-  NARRATION_PERFORMANCE_POLICIES,
-  narrationPerformancePolicy,
-  type NarrationPerformanceProfile,
-} from "../../lib/narration-performance";
-import { useAiTtsStore } from "../../stores/ai-tts-store";
 import "./PerformanceSettings.css";
-
-const PROFILE_COPY: Record<
-  NarrationPerformanceProfile,
-  { label: string; description: string }
-> = {
-  responsive: {
-    label: "Responsive",
-    description: "180-byte context · one unit ahead · least speculative work",
-  },
-  balanced: {
-    label: "Balanced",
-    description: "300-byte context · one unit ahead · source-aligned default",
-  },
-  continuous: {
-    label: "Continuous",
-    description: "300-byte context · two units generated sequentially",
-  },
-};
 
 function valueOrUnavailable(value: string | null): string {
   return value?.trim() || "Unavailable";
@@ -37,9 +13,6 @@ function formatDuration(milliseconds: number): string {
 }
 
 export function PerformanceSettings() {
-  const profile = useAiTtsStore((state) => state.performanceProfile);
-  const setProfile = useAiTtsStore((state) => state.setPerformanceProfile);
-  const playbackState = useAiTtsStore((state) => state.playbackState);
   const [snapshot, setSnapshot] = useState<TtsPerformanceSnapshot | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "unavailable">(
     "loading",
@@ -70,7 +43,6 @@ export function PerformanceSettings() {
   const runtime = snapshot?.runtime;
   const latest = snapshot?.latestUncached;
   const standardRtf = latest?.standardRtf ?? null;
-  const profileLocked = playbackState !== "idle" && playbackState !== "error";
 
   return (
     <div className="settings-section performance-settings">
@@ -174,43 +146,10 @@ export function PerformanceSettings() {
         )}
       </section>
 
-      <fieldset className="performance-profiles" disabled={profileLocked}>
-        <legend>Playback policy</legend>
-        {(Object.keys(PROFILE_COPY) as NarrationPerformanceProfile[]).map(
-          (candidate) => {
-            const copy = PROFILE_COPY[candidate];
-            const policy = narrationPerformancePolicy(
-              candidate,
-              snapshot?.maxTextUtf8Bytes ??
-                NARRATION_PERFORMANCE_POLICIES[candidate].contextMaxUtf8Bytes,
-            );
-            return (
-              <label key={candidate} className="performance-profile">
-                <input
-                  type="radio"
-                  name="narration-performance-profile"
-                  value={candidate}
-                  checked={profile === candidate}
-                  onChange={() => setProfile(candidate)}
-                />
-                <span>
-                  <strong>{copy.label}</strong>
-                  <small>{copy.description}</small>
-                  <small>
-                    Effective policy: {policy.contextMaxUtf8Bytes} bytes,{" "}
-                    {policy.lookaheadUnits} ahead
-                  </small>
-                </span>
-              </label>
-            );
-          },
-        )}
-      </fieldset>
-      {profileLocked && (
-        <p className="setting-hint" role="status">
-          Stop narration before changing its queue policy.
-        </p>
-      )}
+      <p className="performance-policy-location">
+        Delivery profiles live in the Delivery tab so this view reports only
+        measured engine facts.
+      </p>
     </div>
   );
 }
