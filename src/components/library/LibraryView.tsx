@@ -1,5 +1,8 @@
 import { useEffect, useCallback, useMemo } from "react";
-import { useLibraryStore } from "../../stores/library-store";
+import {
+  useLibraryStore,
+  selectFilteredDocuments,
+} from "../../stores/library-store";
 import { ResumeSection } from "./ResumeSection";
 import { useCollectionsStore } from "../../stores/collections-store";
 import { DocumentCard } from "./DocumentCard";
@@ -41,7 +44,6 @@ export function LibraryView({
     setSearchQuery,
     setSortOrder,
     setViewMode,
-    getFilteredDocuments,
     removeDocument,
     healDocument,
     selectedDocumentId,
@@ -61,7 +63,9 @@ export function LibraryView({
     selectShelf,
   } = useCollectionsStore();
 
-  const searched = getFilteredDocuments();
+  // Memoized selector (spec 248): stable identity across selection/viewMode
+  // changes, recomputed only when documents/query/sort actually change.
+  const searched = useLibraryStore(selectFilteredDocuments);
   const documents = useMemo(
     () => documentsOnShelf(searched, memberships, selectedShelfId),
     [searched, memberships, selectedShelfId],
