@@ -1,15 +1,6 @@
 # Lectrice — Agent Backlog State
 
-> Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
-
-## Delivery 251 — 15/09/2026 (frozen performance qualification)
-
-- Canonical increment evidence and remaining gates: `reports/DELIVERY.md`; actual Astra/xhigh route/root/time: `reports/seat-start.md`. Integration base is main `047cc4f`, which already includes PRs #194 and #205; historical draft/dependency claims below are not current delivery blockers.
-- Existing 245–248 candidates are Chinese-frontier-authored source drafts, not accepted product. All 173 frozen hashes match. First248 replay executed45pass/3fixture-fail; correction1 failed suite collection; final2/2 passed53/53 plus scoped lint/tsc/harness. Original failures retained; latest unchanged225 restoration/window153 after18.095s. 248 budget2/2 exhausted,247 already1/2, other old caps unchanged.
-- Only248 library-owned hunks/test were integrated into251 at14:55:32 against main047cc4f, with no inherited reader/Settings overlay. External plan evaluation is ALLOW; exact-main integrated/code/native/CI/merge gates remain open. Canonical source-hash receipt: `reports/evidence/integration-source.json`.
-- Shared test-slot custody transferred from portfolio after its249-only checkpoint. 251 serializes later checks, including252's independent offline foundation; workers never execute while live225 holds the lock. No live source/profile/provider changes or new agents.
-- New direct playback outcomes retained: live rate changes require native effective-rate plus continuous highlight clock; Follow must use the actual CSS-highlight Range; buffering work must reuse main's landed prosody/lookahead and measure remaining gaps. 251 is the one playback-surface writer, with old232/236/prosody retry dispositions preserved. Private screenshots/book content stay outside this slice.
-- Native public library sort/search/select journey is not yet available/executed; no feature-completion, measured speedup, release or activation claim. Reversal before publication affects only251's imported patch; eventual library-only squash is reversible by one revert PR.
+> Durable handoff for the `/loop` / lectrice-forward workflow. Latest first. Delivery251's current queue and measured gates: [canonical delivery report](../reports/DELIVERY.md).
 
 ## Iteration #82 — 28/08/2026 (Magpie GPU page pipeline + Performance tab)
 
