@@ -163,7 +163,7 @@ describe("resume and play", () => {
 
     render(<ReaderView />);
     const row = await within(await shelf()).findByRole("button", {
-      name: /Resume Moby-Dick and start reading aloud/,
+      name: /Resume Moby-Dick and read aloud/,
     });
     fireEvent.click(row);
 
@@ -195,7 +195,7 @@ describe("resume and play", () => {
 
     render(<ReaderView />);
     const row = await within(await shelf()).findByRole("button", {
-      name: /Resume Moby-Dick and start reading aloud/,
+      name: /Resume Moby-Dick and read aloud/,
     });
     fireEvent.click(row);
 
@@ -595,7 +595,7 @@ describe("resume and play", () => {
     // Fresh launch — no key (session-only, #73).
     render(<ReaderView />);
     const row = await within(await shelf()).findByRole("button", {
-      name: /Resume Moby-Dick and start reading aloud/,
+      name: /Resume Moby-Dick and read aloud/,
     });
     fireEvent.click(row);
 
