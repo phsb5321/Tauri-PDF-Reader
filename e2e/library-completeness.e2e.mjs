@@ -282,6 +282,14 @@ async function cardByTitle(title) {
   return null;
 }
 
+async function libraryTitles() {
+  return Promise.all(
+    (await $$(".library-grid .document-card-title")).map(
+      async (title) => (await title.getAttribute("textContent"))?.trim() ?? "",
+    ),
+  );
+}
+
 async function coverReceipt(card) {
   const cover = await card.$(".document-cover");
   const cardAction = await card.$(".document-card-open");
@@ -730,6 +738,48 @@ describe("packaged legacy library completeness", () => {
     expect(realCover.cardAccessibleName).toContain(REAL_TITLE);
     expect(missingCover.state).toBe("fallback");
     expect(missingCover.cardAccessibleName).toContain(MISSING_TITLE);
+
+    // Public controls only; distinct fixture dates make sort a real oracle.
+    const sort = await $("#sort-select");
+    const sortOrders = {};
+    for (const [value, expected] of [
+      ["created", [MISSING_TITLE, REAL_TITLE]],
+      ["title", [REAL_TITLE, MISSING_TITLE]],
+      ["recent", [REAL_TITLE, MISSING_TITLE]],
+    ]) {
+      await sort.selectByAttribute("value", value);
+      await browser.waitUntil(
+        async () => JSON.stringify(await libraryTitles()) === JSON.stringify(expected),
+        { timeout: 10000, timeoutMsg: `${value} sort did not produce the expected order` },
+      );
+      sortOrders[value] = await libraryTitles();
+      expect(sortOrders[value]).toEqual(expected);
+    }
+
+    await $('input[aria-label="Search library"]').setValue("Legacy");
+    await browser.waitUntil(
+      async () => JSON.stringify(await libraryTitles()) === JSON.stringify([REAL_TITLE]),
+      { timeout: 10000, timeoutMsg: "public search did not filter the library" },
+    );
+    const filteredTitles = await libraryTitles();
+    await (await cardByTitle(REAL_TITLE)).$(".document-card-open").click();
+    await expect(await cardByTitle(REAL_TITLE)).toHaveElementClass("selected");
+    await $('button[aria-label="Clear search"]').click();
+    await browser.waitUntil(async () => (await libraryTitles()).length === 2, {
+      timeout: 10000,
+      timeoutMsg: "public clear did not restore both library cards",
+    });
+    await sort.selectByAttribute("value", "created");
+    await browser.waitUntil(
+      async () => JSON.stringify(await libraryTitles()) === JSON.stringify([MISSING_TITLE, REAL_TITLE]),
+      { timeout: 10000, timeoutMsg: "sort after selection did not reorder both cards" },
+    );
+    await expect(await cardByTitle(REAL_TITLE)).toHaveElementClass("selected");
+    const selectedTitle = (await $(".library-grid .document-card.selected .document-card-title")
+      .getAttribute("textContent"))?.trim();
+    expect(selectedTitle).toBe(REAL_TITLE);
+    receipt.libraryDerivedData = { sortOrders, filteredTitles, selectedTitle };
+    fs.writeFileSync(OUT, `${JSON.stringify(receipt, null, 2)}\n`);
 
     const settings = await $('button[aria-label="Settings"]');
     await settings.waitForClickable({
