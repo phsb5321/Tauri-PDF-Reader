@@ -252,6 +252,49 @@ describe("restoring a reading session", () => {
       await screen.findByRole("heading", { name: "Library" }),
     ).toBeInTheDocument();
   });
+
+  it("fails closed on success=false: explicit error, no document opened (issue #185)", async () => {
+    // The backend reports a failed restore as a valid `success=false`
+    // response. The shell must never treat it as success: no
+    // `onSessionRestored` follow-up, no document opened, and the failure is
+    // visible in the session menu instead of a silent no-op.
+    mockInvoke.mockImplementation((command: string) => {
+      if (command === "session_restore")
+        return Promise.resolve({
+          success: false,
+          session: SESSION,
+          missingDocuments: [],
+        });
+      if (command === "session_list") return Promise.resolve([SUMMARY]);
+      if (command === "library_list_documents")
+        return Promise.resolve([LIBRARY_ROW]);
+      if (
+        command === "collections_list" ||
+        command === "collections_list_memberships"
+      )
+        return Promise.resolve([]);
+      return Promise.resolve(null);
+    });
+
+    render(<ReaderView />);
+    await screen.findByRole("heading", { name: "Library" });
+
+    fireEvent.click(await openSessionMenu());
+    fireEvent.click(screen.getByRole("button", { name: /Research Papers/ }));
+
+    // The failure is explicit and public: the menu's error surface names it.
+    const errorLine = await screen.findByText(/SESSION_RESTORE_FAILED/);
+    expect(errorLine.closest(".session-menu__error")).not.toBeNull();
+
+    // The restore authority rejected before committing: no active session,
+    // and the shell never opened the session's document.
+    expect(useSessionStore.getState().activeSession).toBeNull();
+    expect(loadDocument).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("pdf-viewer")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Library" }),
+    ).toBeInTheDocument();
+  });
 });
 
 /**

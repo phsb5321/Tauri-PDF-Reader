@@ -186,6 +186,15 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set({ isRestoring: true, error: null });
     try {
       const response = await sessionRestore(sessionId);
+      // Issue #185: the backend reports a failed restore as a VALID
+      // response (`success=false`), not a rejected command. This store is
+      // the single restore-success authority: fail closed BEFORE any state
+      // is committed, so no caller can treat a dead restore as success.
+      if (!response.success) {
+        throw new Error(
+          "SESSION_RESTORE_FAILED: The reading session could not be restored — the reader stayed on the current document. Try again.",
+        );
+      }
       set({
         activeSession: response.session,
         activeSessionId: sessionId,

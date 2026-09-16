@@ -1,11 +1,11 @@
-import { create } from 'zustand';
-import type { Document, Highlight } from '../lib/schemas';
-import type { PDFDocumentProxy } from 'pdfjs-dist';
+import { create } from "zustand";
+import type { Document, Highlight } from "../lib/schemas";
+import type { PDFDocumentProxy } from "pdfjs-dist";
 
 /**
  * Fit mode for automatic zoom calculation
  */
-export type FitMode = 'none' | 'fit-width' | 'fit-page';
+export type FitMode = "none" | "fit-width" | "fit-page";
 
 interface DocumentState {
   // Current document
@@ -63,7 +63,7 @@ const initialState = {
   totalPages: 0,
   scrollPosition: 0,
   zoomLevel: 1.5, // Default to 150% for better readability
-  fitMode: 'none' as FitMode, // No automatic fit by default
+  fitMode: "none" as FitMode, // No automatic fit by default
   isLoading: false,
   error: null as string | null,
   hasTextLayer: null as boolean | null,
@@ -72,6 +72,41 @@ const initialState = {
   highlightsForPage: new Map<number, Highlight[]>(),
   selectedHighlightId: null as string | null,
 };
+
+/**
+ * The shared open mutex (issue #185).
+ *
+ * Every public way a document reaches the reader — dialog open, native-drop
+ * import, library/session resume, and the drop-to-session transaction that
+ * continues past the import — must hold one lease for its whole body, so a
+ * rapid second action cannot interleave and show another document under an
+ * in-flight transaction. Fail-fast (no queue): a second action gets the
+ * existing OPEN_BUSY error and can retry. `isLoading` mirrors the lease so
+ * the busy UI state and the guard cannot disagree.
+ */
+let openTransactions = 0;
+let openGeneration = 0;
+
+export function beginOpenTransaction(): (() => void) | null {
+  if (openTransactions > 0 || useDocumentStore.getState().isLoading) {
+    return null;
+  }
+  openTransactions += 1;
+  useDocumentStore.setState({ isLoading: true });
+  const generation = openGeneration;
+  let released = false;
+  return () => {
+    if (released || generation !== openGeneration) {
+      released = true;
+      return;
+    }
+    released = true;
+    openTransactions -= 1;
+    if (openTransactions === 0) {
+      useDocumentStore.setState({ isLoading: false });
+    }
+  };
+}
 
 export const useDocumentStore = create<DocumentState>((set, get) => ({
   ...initialState,
@@ -113,7 +148,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   setZoomLevel: (zoom) => {
     const clampedZoom = Math.max(0.25, Math.min(4.0, zoom));
     // Setting zoom manually clears fit mode
-    set({ zoomLevel: clampedZoom, fitMode: 'none' });
+    set({ zoomLevel: clampedZoom, fitMode: "none" });
   },
 
   setFitMode: (mode) => set({ fitMode: mode }),
@@ -122,7 +157,8 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
   setError: (error) => set({ error }),
 
-  setHasTextLayer: (hasText) => set({ hasTextLayer: hasText, textLayerChecked: true }),
+  setHasTextLayer: (hasText) =>
+    set({ hasTextLayer: hasText, textLayerChecked: true }),
 
   setHighlights: (highlights) => {
     // Group highlights by page for efficient lookup
@@ -142,7 +178,10 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     // Update page-grouped highlights
     const newHighlightsForPage = new Map(highlightsForPage);
     const pageHighlights = newHighlightsForPage.get(highlight.pageNumber) ?? [];
-    newHighlightsForPage.set(highlight.pageNumber, [...pageHighlights, highlight]);
+    newHighlightsForPage.set(highlight.pageNumber, [
+      ...pageHighlights,
+      highlight,
+    ]);
 
     set({ highlights: newHighlights, highlightsForPage: newHighlightsForPage });
   },
@@ -159,27 +198,29 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     const pageHighlights = newHighlightsForPage.get(highlight.pageNumber) ?? [];
     newHighlightsForPage.set(
       highlight.pageNumber,
-      pageHighlights.filter((h) => h.id !== id)
+      pageHighlights.filter((h) => h.id !== id),
     );
 
     set({
       highlights: newHighlights,
       highlightsForPage: newHighlightsForPage,
       // Clear selection if deleted highlight was selected
-      selectedHighlightId: selectedHighlightId === id ? null : selectedHighlightId,
+      selectedHighlightId:
+        selectedHighlightId === id ? null : selectedHighlightId,
     });
   },
 
   updateHighlight: (id, updates) => {
     const { highlights } = get();
     const newHighlights = highlights.map((h) =>
-      h.id === id ? { ...h, ...updates } : h
+      h.id === id ? { ...h, ...updates } : h,
     );
 
     // Rebuild page-grouped highlights
     const newHighlightsForPage = new Map<number, Highlight[]>();
     for (const highlight of newHighlights) {
-      const pageHighlights = newHighlightsForPage.get(highlight.pageNumber) ?? [];
+      const pageHighlights =
+        newHighlightsForPage.get(highlight.pageNumber) ?? [];
       pageHighlights.push(highlight);
       newHighlightsForPage.set(highlight.pageNumber, pageHighlights);
     }
@@ -194,5 +235,11 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     return highlightsForPage.get(page) ?? [];
   },
 
-  reset: () => set(initialState),
+  reset: () => {
+    // Release any lease leaked by a test or hot reload; stale release
+    // thunks become no-ops through the generation token.
+    openTransactions = 0;
+    openGeneration += 1;
+    set(initialState);
+  },
 }));
