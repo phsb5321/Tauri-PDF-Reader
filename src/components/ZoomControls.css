@@ -74,6 +74,24 @@
   background-position: right 8px center;
 }
 
+/* Spec 256 — make the NATIVE option popup follow the application theme.
+ * WebKitGTK paints the popup from color-scheme; without a declaration it
+ * defaults to light chrome inside the dark reader (the sanitized-screenshot
+ * finding). Scoped to this leaf — no global token/theme edit. */
+.zoom-select {
+  color-scheme: light;
+}
+
+[data-theme="dark"] .zoom-select {
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .zoom-select {
+    color-scheme: dark;
+  }
+}
+
 .zoom-select:hover {
   background-color: var(--color-button-bg-hover);
   border-color: var(--color-border-hover);
