@@ -3,9 +3,35 @@ import { useAnnounce, ANNOUNCEMENTS } from "../hooks/useAnnounce";
 import { ZOOM_LEVELS, ZOOM_MIN, ZOOM_MAX, ZOOM_STEP } from "../lib/constants";
 import "./ZoomControls.css";
 
+/** Keys the zoom select owns while focused — contained so they never reach
+ * the document-level PdfViewer Home/End and AiPlaybackBar Escape handlers
+ * (spec 256 / p16 corrective acceptance). */
+const SELECT_OWNED_KEYS = new Set([
+  "Home",
+  "End",
+  "Escape",
+  "ArrowUp",
+  "ArrowDown",
+  "ArrowLeft",
+  "ArrowRight",
+  "PageUp",
+  "PageDown",
+]);
+
 export function ZoomControls() {
   const { zoomLevel, fitMode, setZoomLevel, setFitMode } = useDocumentStore();
   const { announce } = useAnnounce();
+
+  // While the zoom select owns focus, its navigation/escape keys belong to
+  // the native popup/selection. Document-level handlers (PdfViewer Home/End
+  // page navigation, AiPlaybackBar Escape-to-stop) ignore defaultPrevented,
+  // so containment here is stopPropagation — native option movement stays
+  // untouched (no preventDefault). Spec 256 / p16 corrective acceptance.
+  const handleSelectKeyDown = (
+    event: React.KeyboardEvent<HTMLSelectElement>,
+  ) => {
+    if (SELECT_OWNED_KEYS.has(event.key)) event.stopPropagation();
+  };
 
   const handleZoomIn = () => {
     // Use larger step for bigger zoom levels
@@ -56,7 +82,7 @@ export function ZoomControls() {
         className="zoom-button"
         onClick={handleZoomOut}
         disabled={zoomLevel <= ZOOM_MIN}
-        title="Zoom out (Ctrl+-)"
+        title="Zoom out"
         aria-label="Zoom out"
       >
         <svg viewBox="0 0 24 24" className="zoom-icon" aria-hidden="true">
@@ -69,6 +95,7 @@ export function ZoomControls() {
         className="zoom-select"
         value={selectedValue}
         onChange={handleZoomSelect}
+        onKeyDown={handleSelectKeyDown}
         aria-label="Zoom level"
       >
         <option value="fit-width">
@@ -98,7 +125,7 @@ export function ZoomControls() {
         className="zoom-button"
         onClick={handleZoomIn}
         disabled={zoomLevel >= ZOOM_MAX}
-        title="Zoom in (Ctrl++)"
+        title="Zoom in"
         aria-label="Zoom in"
       >
         <svg viewBox="0 0 24 24" className="zoom-icon" aria-hidden="true">
