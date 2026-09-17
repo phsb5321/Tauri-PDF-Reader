@@ -23,6 +23,12 @@ const NATIVE_SEMANTIC_SURFACES = [
   // meant to fix.
   ["../../components/library/DocumentCard.tsx", /<legend\b/],
   ["../../components/pdf-viewer/HighlightOverlay.tsx", /<button\b/],
+  ["../../components/pdf-viewer/ParagraphActionOverlay.tsx", /<fieldset\b/],
+  // The <legend> is listed separately because the fieldset is only an
+  // improvement while it has one: drop the legend and the group goes
+  // unlabelled, which is the WCAG 1.3.1 failure the role="group" swap was
+  // meant to fix.
+  ["../../components/pdf-viewer/ParagraphActionOverlay.tsx", /<legend\b/],
 ] as const;
 
 // `group` joins the list because <fieldset> is its native element: the shelf

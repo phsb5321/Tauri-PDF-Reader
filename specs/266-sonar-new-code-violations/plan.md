@@ -1,5 +1,24 @@
 # Plan — 266-sonar-new-code-violations
 
+## Technical Context (completed)
+
+- Stack: TypeScript 5.6 + React 18.3 + Vitest (frontend slice only; no Rust changes).
+- Branch `266-sonar-new-code-violations` off `182b136`; single quality PR; husky hooks
+  enforce lint-staged/prettier/tsc on every commit.
+- Sonar rules are enforced by the scanner, not eslint; no `sonar.issue.ignore.*`,
+  quality-gate, or workflow edits are permitted (honest fixes only).
+- `<output>` has the implicit `status` role, so `getByRole("status")` queries keep working;
+  static contract test `native-html-semantics.test.ts` gains the ParagraphActionOverlay
+  fieldset/legend rows.
+- Complexity refactors are pure-equivalence closure/helper extractions; decision order is
+  preserved exactly (verified per function during the edit).
+
+## Execution Constitution
+
+- Spec-kit governance: mandatory (15-file product-adjacent slice).
+- Implementation: pB (this seat); validators: vitest/fuzz/lint/typecheck/harness/CI/Sonar.
+- Resource-conscious: single-fork vitest, bounded timeouts, sequential heavy commands.
+
 Approach: single quality slice on top of `182b136`. One branch, one PR, verified by the
 existing CI lanes plus the live Sonar gate after merge.
 

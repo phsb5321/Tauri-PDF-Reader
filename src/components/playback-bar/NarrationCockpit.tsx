@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AiTtsSettings } from "./AiTtsSettings";
 import { AiVoiceSelector } from "./AiVoiceSelector";
 import { NarrationDeliverySettings } from "./NarrationDeliverySettings";
@@ -57,18 +57,25 @@ export function NarrationCockpit({
     [activateTab],
   );
 
+  // Escape-to-close belongs to the window while the cockpit is mounted: a
+  // keydown on a non-interactive <section> violates S6847, and the window
+  // listener also catches events dispatched at any focused descendant.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
   return (
     <section
       id="narration-cockpit"
       className="narration-cockpit"
       aria-labelledby="narration-cockpit-title"
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          event.stopPropagation();
-          onClose();
-        }
-      }}
     >
       <header className="narration-cockpit-header">
         <div>

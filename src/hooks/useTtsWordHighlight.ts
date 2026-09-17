@@ -279,6 +279,32 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
     };
   }, []);
 
+  type SpeakGuard =
+    | { ok: true }
+    | { ok: false; reason: string; debug: boolean };
+
+  function evaluateSpeakGuard(
+    initialized: boolean,
+    alreadySpeaking: boolean,
+  ): SpeakGuard {
+    if (!initialized) {
+      return {
+        ok: false,
+        reason: "[TtsWordHighlight] TTS not initialized",
+        debug: false,
+      };
+    }
+    if (alreadySpeaking) {
+      return {
+        ok: false,
+        reason:
+          "[TtsWordHighlight] Already speaking, ignoring duplicate request",
+        debug: true,
+      };
+    }
+    return { ok: true };
+  }
+
   // Speak text with word highlighting
   const speakWithHighlight = useCallback(
     async (
@@ -289,16 +315,16 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
       alignment?: readonly AlignmentSegment[],
       boundaryAfter?: ProsodyBoundary,
     ) => {
-      if (!ttsStore.initialized) {
-        console.warn("[TtsWordHighlight] TTS not initialized");
-        return false;
-      }
-
-      // Guard against double-calls from React StrictMode
-      if (speakingRef.current) {
-        console.debug(
-          "[TtsWordHighlight] Already speaking, ignoring duplicate request",
-        );
+      const guard = evaluateSpeakGuard(
+        ttsStore.initialized,
+        speakingRef.current,
+      );
+      if (!guard.ok) {
+        if (guard.debug) {
+          console.debug(guard.reason);
+        } else {
+          console.warn(guard.reason);
+        }
         return false;
       }
 

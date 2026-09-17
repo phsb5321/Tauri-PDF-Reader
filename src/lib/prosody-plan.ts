@@ -22,7 +22,7 @@ export function resolveProsodyLanguage(
   const idSuffix = voiceId?.match(
     /(?:^|[-_])(pt(?:[-_]br)?|en(?:[-_](?:us|gb))?)$/iu,
   )?.[1];
-  const language = (declared ?? idSuffix)?.toLowerCase().replace(/_/gu, "-");
+  const language = (declared ?? idSuffix)?.toLowerCase().replaceAll(/_/gu, "-");
   if (language === "pt" || language === "pt-br") return "pt-BR";
   if (language === "en" || language === "en-us" || language === "en-gb") {
     return "en";
@@ -128,7 +128,7 @@ function discourseInsertions(source: ProsodySource): number[] {
   if (starters.length === 0) return [];
 
   const escaped = starters.map((word) =>
-    word.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"),
+    word.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`),
   );
   const pattern = new RegExp(
     `(\\p{Ll}{3,})(\\s+)(${escaped.join("|")})\\b`,
@@ -185,7 +185,7 @@ function hasAttachedRaisedBodyNeighbor(
   return segments.some((neighbor) => {
     if (
       neighbor === marker ||
-      !/[\p{L}]/u.test(neighbor.text) ||
+      !/\p{L}/u.test(neighbor.text) ||
       neighbor.x === null ||
       neighbor.y === null ||
       neighbor.width === null ||
@@ -432,8 +432,6 @@ function mergeRuns(
             ? null
             : segment.sourceEnd - left.sourceStart,
       })),
-  );
-  alignment.push(
     ...right.alignment.map((segment) => ({
       ...segment,
       spokenStart: segment.spokenStart + rightSpokenOffset,
@@ -473,6 +471,48 @@ function mergeRuns(
  */
 const MIN_SPOKEN_RUN_UTF8_BYTES = 12;
 
+function tryMergeIntoNext(
+  context: PlanningContext,
+  encoder: TextEncoder,
+  run: SpokenRun,
+  next: SpokenRun | undefined,
+  coalesced: SpokenRun[],
+  contextLimit: number,
+): boolean {
+  if (
+    !next ||
+    run.boundaryAfter === "paragraph" ||
+    run.boundaryAfter === "section"
+  ) {
+    return false;
+  }
+  const candidate = mergeRuns(context, run, next);
+  if (encoder.encode(candidate.spokenText).length > contextLimit) return false;
+  coalesced.push(candidate);
+  return true;
+}
+
+function tryMergeIntoPrevious(
+  context: PlanningContext,
+  encoder: TextEncoder,
+  run: SpokenRun,
+  coalesced: SpokenRun[],
+  contextLimit: number,
+): boolean {
+  const previous = coalesced[coalesced.length - 1];
+  if (
+    !previous ||
+    previous.boundaryAfter === "paragraph" ||
+    previous.boundaryAfter === "section"
+  ) {
+    return false;
+  }
+  const candidate = mergeRuns(context, previous, run);
+  if (encoder.encode(candidate.spokenText).length > contextLimit) return false;
+  coalesced[coalesced.length - 1] = candidate;
+  return true;
+}
+
 function coalesceMicroRuns(
   context: PlanningContext,
   runs: SpokenRun[],
@@ -480,37 +520,32 @@ function coalesceMicroRuns(
 ): SpokenRun[] {
   const encoder = new TextEncoder();
   const coalesced: SpokenRun[] = [];
-  for (let index = 0; index < runs.length; index += 1) {
+  let index = 0;
+  while (index < runs.length) {
     const run = runs[index];
     if (encoder.encode(run.spokenText).length < MIN_SPOKEN_RUN_UTF8_BYTES) {
-      const next = runs[index + 1];
       if (
-        next &&
-        run.boundaryAfter !== "paragraph" &&
-        run.boundaryAfter !== "section"
+        tryMergeIntoNext(
+          context,
+          encoder,
+          run,
+          runs[index + 1],
+          coalesced,
+          contextLimit,
+        )
       ) {
-        const candidate = mergeRuns(context, run, next);
-        if (encoder.encode(candidate.spokenText).length <= contextLimit) {
-          coalesced.push(candidate);
-          index += 1;
-          continue;
-        }
+        index += 2;
+        continue;
       }
-
-      const previous = coalesced[coalesced.length - 1];
       if (
-        previous &&
-        previous.boundaryAfter !== "paragraph" &&
-        previous.boundaryAfter !== "section"
+        tryMergeIntoPrevious(context, encoder, run, coalesced, contextLimit)
       ) {
-        const candidate = mergeRuns(context, previous, run);
-        if (encoder.encode(candidate.spokenText).length <= contextLimit) {
-          coalesced[coalesced.length - 1] = candidate;
-          continue;
-        }
+        index += 1;
+        continue;
       }
     }
     coalesced.push(run);
+    index += 1;
   }
   return coalesced;
 }

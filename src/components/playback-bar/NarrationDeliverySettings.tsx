@@ -60,7 +60,7 @@ export function NarrationDeliverySettings({
         <AiSpeedSlider disabled={disabled} />
       </div>
 
-      <label className="narration-toggle-row">
+      <label className="narration-toggle-row" aria-label="Follow read-along">
         <span>
           <strong>Follow read-along</strong>
           <small>Keep the active source range inside the reading band.</small>
@@ -73,7 +73,10 @@ export function NarrationDeliverySettings({
         />
       </label>
 
-      <label className="narration-toggle-row">
+      <label
+        className="narration-toggle-row"
+        aria-label="Continue to next page"
+      >
         <span>
           <strong>Continue to next page</strong>
           <small>Resume only after the next page text is ready.</small>
@@ -86,7 +89,10 @@ export function NarrationDeliverySettings({
         />
       </label>
 
-      <label className="narration-toggle-row">
+      <label
+        className="narration-toggle-row"
+        aria-label="Speak written numbers"
+      >
         <span>
           <strong>Speak written numbers</strong>
           <small>
@@ -136,7 +142,11 @@ export function NarrationDeliverySettings({
                 NARRATION_PERFORMANCE_POLICIES[candidate].contextMaxUtf8Bytes,
             );
             return (
-              <label key={candidate} className="narration-profile-option">
+              <label
+                key={candidate}
+                className="narration-profile-option"
+                aria-label={copy.label}
+              >
                 <input
                   type="radio"
                   name="narration-performance-profile"
@@ -158,9 +168,9 @@ export function NarrationDeliverySettings({
         )}
       </fieldset>
       {disabled && (
-        <p className="narration-control-note" role="status">
+        <output className="narration-control-note">
           Stop narration before changing delivery settings.
-        </p>
+        </output>
       )}
     </div>
   );

@@ -43,6 +43,19 @@ export function PerformanceSettings() {
   const runtime = snapshot?.runtime;
   const latest = snapshot?.latestUncached;
   const standardRtf = latest?.standardRtf ?? null;
+  const queueCapacity = runtime?.queueCapacity;
+  const queueCapacityLabel =
+    queueCapacity == null
+      ? null
+      : `${queueCapacity} synthesis slot${queueCapacity === 1 ? "" : "s"}`;
+  let standardRtfVerdict: string;
+  if (standardRtf === null) {
+    standardRtfVerdict = "Generated-audio duration was unavailable";
+  } else if (standardRtf <= 0.8) {
+    standardRtfVerdict = "Sustains continuous playback on this sample";
+  } else {
+    standardRtfVerdict = "This sample may outrun the playback buffer";
+  }
 
   return (
     <div className="settings-section performance-settings">
@@ -83,11 +96,11 @@ export function PerformanceSettings() {
         </div>
       </div>
 
-      {status === "loading" && <p role="status">Reading engine status…</p>}
+      {status === "loading" && <output>Reading engine status…</output>}
       {status === "unavailable" && (
-        <p role="status" className="performance-unavailable">
+        <output className="performance-unavailable">
           Connect a narration provider to inspect its runtime.
-        </p>
+        </output>
       )}
 
       {snapshot && (
@@ -106,11 +119,7 @@ export function PerformanceSettings() {
           </div>
           <div>
             <dt>Engine queue</dt>
-            <dd>
-              {runtime?.queueCapacity == null
-                ? "Unavailable"
-                : `${runtime.queueCapacity} synthesis slot${runtime.queueCapacity === 1 ? "" : "s"}`}
-            </dd>
+            <dd>{queueCapacityLabel ?? "Unavailable"}</dd>
           </div>
         </dl>
       )}
@@ -130,13 +139,7 @@ export function PerformanceSettings() {
               {" for "}
               {latest.audioDuration.toFixed(2)} s audio
             </span>
-            <span>
-              {standardRtf === null
-                ? "Generated-audio duration was unavailable"
-                : standardRtf <= 0.8
-                  ? "Sustains continuous playback on this sample"
-                  : "This sample may outrun the playback buffer"}
-            </span>
+            <span>{standardRtfVerdict}</span>
           </div>
         ) : (
           <p className="performance-empty">

@@ -48,6 +48,31 @@ export function consumeNaturalCompletion(
 
 const PAGE_READY_TIMEOUT_MS = 8_000;
 
+const CONNECTED_PROVIDER_LABELS: Record<string, string> = {
+  local: "Local TTS",
+  groq: "Groq",
+};
+
+function deriveNarrationFlags(args: {
+  usesWordHighlighting: boolean;
+  hasActiveSentenceQueue: boolean;
+  isHighlightPaused: boolean;
+  isHighlightActive: boolean;
+  playbackState: string;
+}): { isPlaying: boolean; isPaused: boolean } {
+  if (!args.usesWordHighlighting) {
+    return {
+      isPlaying: args.playbackState === "playing",
+      isPaused: args.playbackState === "paused",
+    };
+  }
+  const highlightLive = args.hasActiveSentenceQueue || args.isHighlightActive;
+  return {
+    isPlaying: highlightLive && !args.isHighlightPaused,
+    isPaused: args.isHighlightPaused && highlightLive,
+  };
+}
+
 type NarrationSource = string | BuiltPdfText;
 
 function sourceText(source: NarrationSource): string {
@@ -386,12 +411,21 @@ export function AiPlaybackBar({
   const handlePlaybackComplete = useCallback(async () => {
     const queue = sentenceQueueRef.current;
     if (queue && queue.generation !== playbackGenerationRef.current) return;
-    if (
-      queue &&
-      queue.generation === playbackGenerationRef.current &&
-      queue.index + 1 < queue.sentences.length &&
-      playingRef.current
-    ) {
+
+    // Phase 1: advance within the current sentence queue. Returns
+    // "not-handled" when the queue is finished so page continuation may run;
+    // "halted" when a stale-generation check must abort the whole callback.
+    const advanceQueue = async (): Promise<
+      "handled" | "halted" | "not-handled"
+    > => {
+      if (
+        !queue ||
+        queue.generation !== playbackGenerationRef.current ||
+        queue.index + 1 >= queue.sentences.length ||
+        !playingRef.current
+      ) {
+        return "not-handled";
+      }
       const completed = queue.sentences[queue.index];
       const nextIndex = queue.index + 1;
       const prefetched = queue.prefetches.get(nextIndex);
@@ -402,7 +436,9 @@ export function AiPlaybackBar({
         ]);
         queue.prefetches.delete(nextIndex);
       }
-      if (queue.generation !== playbackGenerationRef.current) return;
+      if (queue.generation !== playbackGenerationRef.current) {
+        return "halted";
+      }
 
       queue.index = nextIndex;
       setSentenceProgress((progress) =>
@@ -429,34 +465,78 @@ export function AiPlaybackBar({
         queue.generation !== playbackGenerationRef.current ||
         sentenceQueueRef.current !== queue
       ) {
-        return;
+        return "halted";
       }
       if (!started) {
         playingRef.current = false;
         sentenceQueueRef.current = null;
         setSentenceProgress(null);
-        return;
+        return "halted";
       }
       prefetchSentences(queue, nextIndex + 1);
-      return;
-    }
+      return "handled";
+    };
 
-    if (queue && sentenceQueueRef.current !== queue) return;
-    sentenceQueueRef.current = null;
-    setSentenceProgress(null);
-    console.debug("[AiPlaybackBar] Playback complete, checking for next page");
+    // Wait for the next page render; classifies the outcome so the caller can
+    // stop, abort, or proceed to text extraction.
+    const awaitReadyPage = async (
+      nextPage: number,
+      previousReadyEpoch: number,
+      generation: number,
+      controller: AbortController,
+      releaseContinuation: () => void,
+    ): Promise<"abort" | "stop" | "ready"> => {
+      const ready = await waitForPdfPageReady(nextPage, previousReadyEpoch, {
+        signal: controller.signal,
+        timeoutMs: PAGE_READY_TIMEOUT_MS,
+      });
+      if (
+        ready.status === "aborted" ||
+        controller.signal.aborted ||
+        !playingRef.current ||
+        generation !== playbackGenerationRef.current
+      ) {
+        releaseContinuation();
+        return "abort";
+      }
+      if (ready.status === "timeout") {
+        releaseContinuation();
+        playingRef.current = false;
+        playbackGenerationRef.current += 1;
+        useAiTtsStore
+          .getState()
+          .setError(
+            `TTS_PAGE_NOT_READY: Page ${nextPage} did not finish rendering`,
+          );
+        return "stop";
+      }
+      return "ready";
+    };
 
-    if (!autoPageEnabled || !playingRef.current) {
-      playingRef.current = false;
-      return;
-    }
+    // Phase 2: the queue finished — continue on the next page when enabled.
+    const continueToNextPage = async (): Promise<void> => {
+      sentenceQueueRef.current = null;
+      setSentenceProgress(null);
+      console.debug(
+        "[AiPlaybackBar] Playback complete, checking for next page",
+      );
 
-    // Use refs for current state to avoid stale closures (T029, T035)
-    const page = currentPageRef.current;
-    const total = totalPagesRef.current;
+      if (!autoPageEnabled || !playingRef.current) {
+        playingRef.current = false;
+        return;
+      }
 
-    // Check if there's a next page
-    if (page < total) {
+      // Use refs for current state to avoid stale closures (T029, T035)
+      const page = currentPageRef.current;
+      const total = totalPagesRef.current;
+
+      // Check if there's a next page
+      if (page >= total) {
+        console.debug("[AiPlaybackBar] Reached last page, stopping");
+        playingRef.current = false;
+        return;
+      }
+
       const nextPage = page + 1;
       console.debug("[AiPlaybackBar] Moving to next page:", nextPage);
 
@@ -478,30 +558,14 @@ export function AiPlaybackBar({
           setContinuationPending(false);
         }
       };
-      const ready = await waitForPdfPageReady(nextPage, previousReadyEpoch, {
-        signal: controller.signal,
-        timeoutMs: PAGE_READY_TIMEOUT_MS,
-      });
-      if (
-        ready.status === "aborted" ||
-        controller.signal.aborted ||
-        !playingRef.current ||
-        generation !== playbackGenerationRef.current
-      ) {
-        releaseContinuation();
-        return;
-      }
-      if (ready.status === "timeout") {
-        releaseContinuation();
-        playingRef.current = false;
-        playbackGenerationRef.current += 1;
-        useAiTtsStore
-          .getState()
-          .setError(
-            `TTS_PAGE_NOT_READY: Page ${nextPage} did not finish rendering`,
-          );
-        return;
-      }
+      const readiness = await awaitReadyPage(
+        nextPage,
+        previousReadyEpoch,
+        generation,
+        controller,
+        releaseContinuation,
+      );
+      if (readiness !== "ready") return;
 
       // Keep the same ticket alive through text extraction. A public page
       // change or Stop after render-readiness aborts this controller, so the
@@ -529,10 +593,12 @@ export function AiPlaybackBar({
       } else {
         await speak(sourceText(nextText));
       }
-    } else {
-      console.debug("[AiPlaybackBar] Reached last page, stopping");
-      playingRef.current = false;
-    }
+    };
+
+    const outcome = await advanceQueue();
+    if (outcome !== "not-handled") return;
+    if (queue && sentenceQueueRef.current !== queue) return;
+    await continueToNextPage();
   }, [
     autoPageEnabled,
     setCurrentPage,
@@ -584,14 +650,13 @@ export function AiPlaybackBar({
 
   const hasActiveSentenceQueue =
     sentenceProgress !== null && playingRef.current;
-  const isPlaying = usesWordHighlighting
-    ? hasActiveSentenceQueue
-      ? !isHighlightPaused
-      : isHighlightActive && !isHighlightPaused
-    : playbackState === "playing";
-  const isPaused = usesWordHighlighting
-    ? isHighlightPaused && (hasActiveSentenceQueue || isHighlightActive)
-    : playbackState === "paused";
+  const { isPlaying, isPaused } = deriveNarrationFlags({
+    usesWordHighlighting,
+    hasActiveSentenceQueue,
+    isHighlightPaused,
+    isHighlightActive,
+    playbackState,
+  });
   const isLoading = playbackState === "loading";
   const canPlay = initialized && !error && !switchingProvider;
   const progressTotal = sentenceProgress?.totalWords ?? wordTimings.length;
@@ -965,11 +1030,7 @@ export function AiPlaybackBar({
           >
             {connectedProviders.map((connectedProvider) => (
               <option key={connectedProvider} value={connectedProvider}>
-                {connectedProvider === "local"
-                  ? "Local TTS"
-                  : connectedProvider === "groq"
-                    ? "Groq"
-                    : "ElevenLabs"}
+                {CONNECTED_PROVIDER_LABELS[connectedProvider] ?? "ElevenLabs"}
               </option>
             ))}
           </select>

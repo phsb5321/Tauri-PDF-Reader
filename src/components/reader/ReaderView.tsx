@@ -391,16 +391,12 @@ export function ReaderView() {
         </div>
       )}
       {dropStatus && (
-        <div
-          className="library-drop-status"
-          role="status"
-          aria-label={dropStatus.message}
-        >
+        <output className="library-drop-status" aria-label={dropStatus.message}>
           <span>{dropStatus.message}</span>
           <button type="button" onClick={dismissDropStatus}>
             Dismiss
           </button>
-        </div>
+        </output>
       )}
       {/* The reading surface and the highlights panel are SIBLINGS IN A ROW.
           `.app-layout-main` is a flex COLUMN, so mounting the 300px panel
@@ -410,9 +406,8 @@ export function ReaderView() {
           the panel's own width is meaningless without it. */}
       <div className="reader-surface">
         {(isDragActive || isDropImporting) && (
-          <div
+          <output
             className="pdf-drop-overlay"
-            role="status"
             aria-label={
               isDropImporting
                 ? "Creating reading session from dropped PDF"
@@ -428,7 +423,7 @@ export function ReaderView() {
               </strong>
               {!isDropImporting && <span>One PDF at a time</span>}
             </div>
-          </div>
+          </output>
         )}
         {libraryShowing ? (
           <div className="library-surface">

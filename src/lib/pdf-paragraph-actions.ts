@@ -22,6 +22,11 @@ export interface ParagraphActionPosition {
 
 export const PARAGRAPH_ACTION_TARGET_PX = 45;
 
+const DEFAULT_PARAGRAPH_ACTION_METRICS: ParagraphActionMetrics = {
+  targetSize: PARAGRAPH_ACTION_TARGET_PX,
+  viewerGutter: 40,
+};
+
 export interface ParagraphActionMetrics {
   targetSize: number;
   viewerGutter: number;
@@ -36,10 +41,7 @@ export interface ParagraphActionMetrics {
 export function paragraphActionPosition(
   rects: readonly ParagraphClientRect[],
   container: Pick<ParagraphClientRect, "left" | "top">,
-  metrics: ParagraphActionMetrics = {
-    targetSize: PARAGRAPH_ACTION_TARGET_PX,
-    viewerGutter: 40,
-  },
+  metrics: ParagraphActionMetrics = DEFAULT_PARAGRAPH_ACTION_METRICS,
 ): ParagraphActionPosition | null {
   const first = rects.find((rect) => rect.width > 0 && rect.height > 0);
   if (!first) return null;
@@ -71,7 +73,8 @@ export function nonOverlappingParagraphActionPositions<
     }
 
     const insertionIndex = overlaps[0];
-    for (const index of overlaps.reverse()) kept.splice(index, 1);
+    const descendingOverlaps = [...overlaps].reverse();
+    for (const index of descendingOverlaps) kept.splice(index, 1);
     kept.splice(insertionIndex, 0, action);
   }
   return kept;

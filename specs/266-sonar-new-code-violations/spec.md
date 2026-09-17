@@ -1,5 +1,15 @@
 # Spec 266 — Sonar new-code violations: gate to green
 
+## User Scenarios & Testing (completed)
+
+**Primary story:** as an operator of the Lectrice delivery pipeline, after this slice
+merges, the next post-merge Sonar analysis on `main` reports `new_violations = 0` and the
+quality gate reads OK, with no exclusions, thresholds, or rule ignores touched.
+
+**Verification:** touched vitest suites green; seeded fuzz (FC_SEED=20260915) green;
+`pnpm lint` 0 errors; `pnpm typecheck` 0; `make harness-check` PASS; required CI green;
+post-merge Sonar gate OK.
+
 ## Context
 
 The self-hosted SonarQube gate (`phsb5321_lectrice`, post-merge alarm on `main`) fails on

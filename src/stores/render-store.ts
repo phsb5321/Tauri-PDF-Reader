@@ -73,9 +73,9 @@ interface RenderStore {
 }
 
 const initialDisplayInfo: DisplayInfo = {
-  devicePixelRatio: typeof window !== "undefined" ? window.devicePixelRatio : 1,
-  viewportWidth: typeof window !== "undefined" ? window.innerWidth : 1200,
-  viewportHeight: typeof window !== "undefined" ? window.innerHeight : 800,
+  devicePixelRatio: typeof window === "undefined" ? 1 : window.devicePixelRatio,
+  viewportWidth: typeof window === "undefined" ? 1200 : window.innerWidth,
+  viewportHeight: typeof window === "undefined" ? 800 : window.innerHeight,
 };
 
 export const useRenderStore = create<RenderStore>((set, get) => ({

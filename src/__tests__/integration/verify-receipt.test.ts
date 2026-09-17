@@ -50,7 +50,7 @@ function runVerify(env: Record<string, string>): { status: number } {
 
 describe("the verify receipt (M2.4)", () => {
   it("keeps strict coverage failures blocking", () => {
-    execFileSync(
+    const stdout = execFileSync(
       process.execPath,
       [
         "--test",
@@ -62,8 +62,13 @@ describe("the verify receipt (M2.4)", () => {
         env: { ...process.env, ANALYSIS_SUBJECT_ROOT: REPO_ROOT },
         stdio: "pipe",
         timeout: 5000,
+        encoding: "utf8",
       },
     );
+    // The subject tree under the repo root must pass the full synthetic
+    // contract: three ordered cases, zero failures (S2699: explicit oracle).
+    expect(stdout).toContain("# pass 3");
+    expect(stdout).toContain("# fail 0");
   });
 
   it("records the failing gate when a gate fails", () => {
