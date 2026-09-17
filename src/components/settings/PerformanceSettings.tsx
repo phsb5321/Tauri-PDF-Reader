@@ -2,6 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { commands, type TtsPerformanceSnapshot } from "../../lib/bindings";
 import "./PerformanceSettings.css";
 
+function formatSynthesisSlots(count: number): string {
+  const suffix = count === 1 ? "" : "s";
+  return `${count} synthesis slot${suffix}`;
+}
+
 function valueOrUnavailable(value: string | null): string {
   return value?.trim() || "Unavailable";
 }
@@ -45,9 +50,7 @@ export function PerformanceSettings() {
   const standardRtf = latest?.standardRtf ?? null;
   const queueCapacity = runtime?.queueCapacity;
   const queueCapacityLabel =
-    queueCapacity == null
-      ? null
-      : `${queueCapacity} synthesis slot${queueCapacity === 1 ? "" : "s"}`;
+    queueCapacity == null ? null : formatSynthesisSlots(queueCapacity);
   let standardRtfVerdict: string;
   if (standardRtf === null) {
     standardRtfVerdict = "Generated-audio duration was unavailable";
