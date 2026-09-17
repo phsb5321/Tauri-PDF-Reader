@@ -8,7 +8,7 @@ First frozen source on8e383fe:98/98tests across16suites, seed20260915, lint/type
 
 Current execution/review/PR receipts are maintained in durable coordination `lectrice-reader-experience-20260914/reports/sonar-quality-249.md` and `evidence/sonar-249-*`. This source checkpoint does not assert native acceptance, different-family approval, merge or incident resolution. Remaining original13findings plus3new findings stay separate from this ten-finding slice. REST issue lookup resolved the earlier GraphQL duplicate-lookup limitation; no exact incident duplicate was established.
 
-> Durable handoff for the `/loop` / lectrice-forward workflow. Latest first.
+> Durable handoff for the `/loop` / lectrice-forward workflow. Latest first. Delivery251's current queue and measured gates: [canonical delivery report](../reports/DELIVERY.md).
 
 ## Iteration #84 — 31/08/2026 (exact-head adversarial repairs + executable geometry)
 
