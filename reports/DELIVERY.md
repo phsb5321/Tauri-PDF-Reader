@@ -1,6 +1,24 @@
 # 255 — Static-analysis integration and perfect-score requirement
 
-**15/09/2026 — native CodeQL policy active; subprocess3/3, ordinary wrapper4/4/lint0/tsc0; Spec Kit documentation corrected after harness refusal, actual recheck0/PASS. NOT merged/perfect.**
+**15/09/2026 — PR210 DRAFT/RED atd27cc357; one import-only CI correction authored locally, UNVERIFIED. Original2/2 exhausted; one explicit additional exception consumed, not a reset. NOT merged/perfect.**
+
+## Current delivery boundary
+
+Normal hooks committed8f5422aa with exit0; post-hook9/9 source identities were captured. Formatting changed the wrapper: its current SHA at8f/d27 is `1b0cb4ed223dcfbb54d2acbb731438619885ab32464d35fe629782aec26dd27c`, not historical `d0d1bf83…`. Three isolated fullGLM source ALLOWs at8f and one bounded source-context rebind atd27 are retained externally in `lectrice-all-seats-20260915/qa-255.md` and `qa-210-d27.md`. They are not CI, whole-ledger,207-core or perfect-score verdicts.
+
+pB published PR210 and synchronized its remote feature branch ontoa7dc312; all9 owned blobs remained unchanged. Home subsequently fast-forwarded the clean local worktree tod27, without a commit or product hook, to prepare the correction below. pB retains publication custody;251 alone owns local execution/normal hooks. The225 popup exception was consumed without dismissal; no further GUI input, close, force or restart is authorized.
+
+Actual CI run35021373371/job104557586831 failed repository ESLint: unimported `process` at10:3 and `URL` at11:21 in `tools/test/analysis-enforcement.test.mjs`,2 errors/108 warnings. Authenticated job API readback confirms TypeScript step7 succeeded, ESLint step8 failed; tests, type-coverage ratchet and coverage were skipped. The earlier typecheck-unreached summary was incorrect. Prior scoped TS lint and normal hooks did not establish repository-wide `.mjs` lint cleanliness.
+
+Home explicitly admitted ONE additional import-only CI correction: import `process` from `node:process` and `URL` from the existing `node:url` module. That correction is authored but unrun/uncommitted; assertions, subprocess behavior, thresholds, ESLint configuration and dependencies are unchanged. Original failures and exhausted2/2 remain; this separate exception has no further repair loop. Ordinary251 validation/commit is authorized only after a safe execution slot is genuinely available: CI-equivalent `pnpm lint` (including the MJS helper), standalone3 cases, wrapper4 cases, typecheck, actual harness, normal hooks and final-byte binding. No remote source-edit API or hook bypass. Corrected-source/current-head independent review and fresh protected CI remain required; prior ALLOWs do not approve changed bytes.
+
+Security scope remains trusted maintainer environment/repository selector: the Node wrapper and initial Bash lookup inherit environment, and lookup has no own timeout. Only the synthetic analyzer gets the replacement environment. No global credential isolation, malicious-source sandbox or process-group-cleanup guarantee is claimed.
+
+`reports/source-review.md` and `reports/source-manifest.json` preserve pre-hook history, not current-head authority. Old3/3,4/4 and8/8 are dated execution receipts—not enumerated tests on formatted or import-corrected bytes. The newer retained Sonar readback is a7dc312/analysis0cd0cc15: ERROR42 new violations/167 smells/73.7% coverage,1 unreviewed hotspot; all10 original249 keys explicitly CLOSED/FIXED. The older baseline below is retained, not relabelled current.
+
+## Historical qualification timeline (before normal hooks/publication)
+
+**Pre-hook snapshot:** subprocess3/3, ordinary wrapper4/4/scoped TS lint0/tsc0; Spec Kit documentation corrected after harness refusal, actual recheck0/PASS.
 Owner: home:w26:pK; generatorOpenAI. Locked worktree255, originally base5e710cf. **15:39 reconciliation:** PR206/249 independently confirmed merged15:36:39 at35801daa8657a8c0b72c3b06a04c994b6a46bc8c; retained premerge receipt has9/9required contexts SUCCESS.255 fast-forwarded to35801daa with zero incoming/tracked-WIP overlap and all three reviewed code hashes unchanged. Incoming249helpers retained, not overwritten. No product execution in this reconciliation.
 
 At15:39, natural post-merge Sonar run35008551212 at35801daa was **queued**; previous35003005700 at5e710cf failed. Earlier metrics below belong to that older analysis, not post249 acceptance. Native CodeQL rule23477091 is still effective. Corrected attribution retained: successful trust-anchor610ffdd belonged toPR207(import), not209.251 keeps sole slot/209/playback custody;255's ordinary qualifications below reused that serialized custody, not a parallel execution lane. Source/merge ownership of255 remains here. Evidence: `base-35801da-reconciliation.json` plus canonical `sonar-249-pr/premerge-proof.json`/`merged-pr.json`.
@@ -11,7 +29,7 @@ Pedro explicitly requires analysis integrations enforced and perfect scores, not
 
 Integrate the applicable stack INTO the existing deterministic verify/CI gates; no parallel bureaucratic pipeline. Every gate needs a deliberate failing-input proof, exact revision/scope/tool identity, and a missing/error/stale-report refusal. Maximum ratings alone do not mean zero findings. Static, security, dependency, secrets, coverage, duplication, mutation and performance evidence are separate dimensions, not a made-up single score.
 
-## Live baseline (read-only API/source/CI; no scanner started)
+## Historical5e710cf baseline (read-only API/source/CI; no scanner started)
 
 Sonar latest observed analysis `b24b94de-e885-4cc0-9172-7d13b195b613`, revision5e710cf, dated15/09/2026 14:57 BRT. Current metric query around15:01, not an atomic snapshot; exact-analysis binding is a follow-up gate requirement.
 
@@ -57,7 +75,7 @@ Evidence: `~/.local/state/fleet-coordination/lectrice-analysis-enforcement-20260
 - `make harness-check` exited2: script reported spec.md and plan.md not completed Spec Kit artifacts (`changed=9`, `product=1`, threshold3). Directly read harness.log: required user-scenario/testing and technical-context sections were missing from the earlier terse documents. This was an authoring omission, not a false-positive validator.
 - Documentation-only completion now fills actual stories/acceptance/edge cases, functional and measurable requirements, technical context, constitution mapping, file structure and evidence/remaining gates; tasks synchronized. The validator and all three code files are untouched. Ordinary2-docs through251 at16:03:56–16:04:00 (4.018s): actual `make harness-check`0/PASS, exact8-file manifest before/after; unchanged225 restored/window162/restore0. Directly read slot.json and harness.log under `delivery-251-255-ordinary2-docs`. No hydration/tests/type/lint/hooks/commit/native rerun; reuse ordinary1 evidence, no2/2 source-budget reset. Normal hooks/commit/CI/merge still pending.
 
-Proposed slot command: `node --test --test-concurrency=1 tools/test/analysis-enforcement.test.mjs` (expected seconds, aggregate30s cap). Replay the same checker against frozen base package using `ANALYSIS_SUBJECT_ROOT=<baseline-dir>`: it must fail; candidate must pass. Source hashes in `reports/source-manifest.json` bind the packet. This proves command exit propagation only, not actual100% coverage.
+Historical final2 slot command (not a new execution grant): `node --test --test-concurrency=1 tools/test/analysis-enforcement.test.mjs` (expected seconds, aggregate30s cap). Replay the same checker against frozen base package using `ANALYSIS_SUBJECT_ROOT=<baseline-dir>`: it must fail; candidate must pass. Source hashes in `reports/source-manifest.json` bind the packet. This proves command exit propagation only, not actual100% coverage.
 
 ## Ordered continuation (not completed by slice1)
 
