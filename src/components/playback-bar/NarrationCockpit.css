@@ -253,6 +253,7 @@
 }
 
 .narration-control-note {
+  display: block;
   color: var(--color-warning-text) !important;
 }
 

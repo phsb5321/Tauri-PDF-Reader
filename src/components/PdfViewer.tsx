@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { TextLayer as PdfJsTextLayer } from "pdfjs-dist";
-import type { PDFPageProxy } from "pdfjs-dist";
+import type { PDFPageProxy, PageViewport } from "pdfjs-dist";
 import { useDocumentStore } from "../stores/document-store";
 import { useRenderStore } from "../stores/render-store";
 import { useToastStore } from "../stores/toast-store";
@@ -10,6 +10,7 @@ import {
   calculateFitWidthZoom,
   calculateFitPageZoom,
 } from "../domain/rendering";
+import type { RenderPlan } from "../domain/rendering";
 import { ScannedPdfWarning, MemoryCapWarning } from "./common";
 import { DebugOverlay } from "./settings/DebugOverlay";
 import { EmptyState } from "../ui/components/EmptyState/EmptyState";
@@ -37,6 +38,7 @@ import { zoomPreview, type ZoomPreview } from "../lib/pdf-zoom-preview";
 import {
   annotatePdfTextLayer,
   rangeFromAnnotatedPdfText,
+  type BuiltPdfText,
 } from "../lib/pdf-text";
 import {
   nonOverlappingParagraphActionPositions,
@@ -326,57 +328,34 @@ export function PdfViewer({ onReadFromHere }: Readonly<PdfViewerProps>) {
       }
       const pageNumber = currentPage;
 
-      // Cancel any previous render
-      if (renderTaskRef.current) {
-        try {
-          renderTaskRef.current.cancel();
-        } catch {
-          // Ignore cancellation errors
+      // Cancellation and per-phase helpers keep each concern's branching
+      // isolated; renderPage stays the sequential orchestrator.
+      const cancelInFlight = () => {
+        // Cancel any previous render
+        if (renderTaskRef.current) {
+          try {
+            renderTaskRef.current.cancel();
+          } catch {
+            // Ignore cancellation errors
+          }
         }
-      }
 
-      // Cancel previous text layer
-      if (textLayerInstanceRef.current) {
-        textLayerInstanceRef.current.cancel();
-        textLayerInstanceRef.current = null;
-      }
+        // Cancel previous text layer
+        if (textLayerInstanceRef.current) {
+          textLayerInstanceRef.current.cancel();
+          textLayerInstanceRef.current = null;
+        }
+      };
+      cancelInFlight();
 
       // Clear text layer safely
       clearContainer(textLayerRef.current);
 
-      try {
-        // Get the page
-        const page = await pdfService.getPage(pdfDocument, pageNumber);
-        if (generation !== renderGenerationRef.current) return;
-        pageRef.current = page;
-
-        const canvas = canvasRef.current;
-        const textLayerDiv = textLayerRef.current;
-
-        // Get base viewport (scale=1) for RenderPolicy calculation
-        const baseViewport = page.getViewport({ scale: 1 });
-
-        // Calculate render plan using RenderPolicy
-        const renderPlan = calculateRenderPlan({
-          pageWidth: baseViewport.width,
-          pageHeight: baseViewport.height,
-          zoomLevel,
-          settings,
-          displayInfo,
-        });
-
-        // Store current render plan for debug overlay
-        setCurrentRenderPlan(renderPlan);
-
-        // Get viewport at the desired zoom level
-        const viewport = page.getViewport({ scale: zoomLevel });
-
-        // Update viewport dimensions for highlight overlay
-        setViewportDimensions({
-          width: Math.floor(viewport.width),
-          height: Math.floor(viewport.height),
-        });
-
+      const renderSharpPixels = async (
+        page: PDFPageProxy,
+        renderPlan: RenderPlan,
+        viewport: PageViewport,
+      ): Promise<HTMLCanvasElement> => {
         // Rasterize off-screen so the visible page keeps showing its previous
         // (CSS-scaled) pixels until sharp ones exist. Resizing the live canvas
         // here would blank it for the whole render, which is the flash the
@@ -413,13 +392,157 @@ export function PdfViewer({ onReadFromHere }: Readonly<PdfViewerProps>) {
             : undefined;
 
         // Render canvas
-        renderTaskRef.current = page.render({
+        const task = page.render({
           canvasContext: context,
           transform: transform,
           viewport: viewport,
         });
+        renderTaskRef.current = task;
 
-        await renderTaskRef.current.promise;
+        await task.promise;
+        return target;
+      };
+
+      const restoreAnchorIfApplicable = (pageContainer: HTMLDivElement) => {
+        const anchor = zoomAnchorRef.current;
+        const viewer = containerRef.current;
+        if (
+          viewer &&
+          anchor?.pageNumber === pageNumber &&
+          Math.abs(anchor.targetZoom - zoomLevel) < 0.0001
+        ) {
+          const target = restorePdfZoomAnchor(
+            anchor,
+            pageContainer.getBoundingClientRect(),
+            viewer.getBoundingClientRect(),
+            {
+              left: viewer.scrollLeft,
+              top: viewer.scrollTop,
+              maxLeft: Math.max(0, viewer.scrollWidth - viewer.clientWidth),
+              maxTop: Math.max(0, viewer.scrollHeight - viewer.clientHeight),
+            },
+          );
+          viewer.scrollLeft = target.left;
+          viewer.scrollTop = target.top;
+          zoomAnchorRef.current = null;
+        }
+      };
+
+      const layoutPageExtras = (
+        builtText: BuiltPdfText,
+        textLayerDiv: HTMLDivElement,
+      ) => {
+        const pageContainer = pageContainerRef.current;
+        if (!pageContainer) return;
+        const containerRect = pageContainer.getBoundingClientRect();
+        const rootFontSize =
+          Number.parseFloat(
+            getComputedStyle(document.documentElement).fontSize,
+          ) || 16;
+        const actionMetrics = {
+          targetSize: Math.max(45, rootFontSize * 2.2),
+          viewerGutter: rootFontSize * 2,
+        };
+        const projectedActions = pdfParagraphActions(builtText).flatMap(
+          (action) => {
+            const range = rangeFromAnnotatedPdfText(
+              textLayerDiv,
+              action.sourceStart,
+              action.sourceEnd,
+            );
+            const rects = range ? Array.from(range.getClientRects()) : [];
+            const position = paragraphActionPosition(
+              rects,
+              containerRect,
+              actionMetrics,
+            );
+            if (!position) return [];
+            return [
+              {
+                index: action.index,
+                sourceStart: action.sourceStart,
+                narrationText: action.narrationText,
+                previewText: action.previewText,
+                ...position,
+              },
+            ];
+          },
+        );
+        setParagraphActions(
+          nonOverlappingParagraphActionPositions(
+            projectedActions,
+            actionMetrics.targetSize,
+          ),
+        );
+        restoreAnchorIfApplicable(pageContainer);
+        pageContainer.dataset.renderPage = String(pageNumber);
+        pageContainer.dataset.renderZoom = String(zoomLevel);
+        pageContainer.dataset.renderReady = "true";
+        delete pageContainer.dataset.renderError;
+        pageContainer.setAttribute("aria-busy", "false");
+      };
+
+      const buildTextLayer = async (
+        page: PDFPageProxy,
+        viewport: PageViewport,
+        textLayerDiv: HTMLDivElement,
+      ): Promise<boolean> => {
+        // Render text layer for selectable text
+        const textContent = await page.getTextContent();
+        if (generation !== renderGenerationRef.current) return false;
+
+        textLayerInstanceRef.current = new PdfJsTextLayer({
+          container: textLayerDiv,
+          textContentSource: textContent,
+          viewport: viewport,
+        });
+
+        await textLayerInstanceRef.current.render();
+        if (generation !== renderGenerationRef.current) return false;
+        const builtText = annotatePdfTextLayer(textLayerDiv, textContent.items);
+        renderedZoomRef.current = zoomLevel;
+        renderedPageRef.current = pageNumber;
+        layoutPageExtras(builtText, textLayerDiv);
+        // Kept contiguous with the dataset writes above: a microtask gap here
+        // could mark a stale page ready after a generation change.
+        markPdfPageReady(pageNumber);
+        return true;
+      };
+
+      try {
+        // Get the page
+        const page = await pdfService.getPage(pdfDocument, pageNumber);
+        if (generation !== renderGenerationRef.current) return;
+        pageRef.current = page;
+
+        const canvas = canvasRef.current;
+        const textLayerDiv = textLayerRef.current;
+
+        // Get base viewport (scale=1) for RenderPolicy calculation
+        const baseViewport = page.getViewport({ scale: 1 });
+
+        // Calculate render plan using RenderPolicy
+        const renderPlan = calculateRenderPlan({
+          pageWidth: baseViewport.width,
+          pageHeight: baseViewport.height,
+          zoomLevel,
+          settings,
+          displayInfo,
+        });
+
+        // Store current render plan for debug overlay
+        setCurrentRenderPlan(renderPlan);
+
+        // Get viewport at the desired zoom level
+        const viewport = page.getViewport({ scale: zoomLevel });
+
+        // Update viewport dimensions for highlight overlay
+        setViewportDimensions({
+          width: Math.floor(viewport.width),
+          height: Math.floor(viewport.height),
+        });
+
+        const target = await renderSharpPixels(page, renderPlan, viewport);
         if (generation !== renderGenerationRef.current) return;
 
         // Commit: size the visible canvas, blit the sharp pixels, and drop the
@@ -436,93 +559,7 @@ export function PdfViewer({ onReadFromHere }: Readonly<PdfViewerProps>) {
 
         applyZoomPreview(canvas, textLayerDiv, null);
 
-        // Render text layer for selectable text
-        const textContent = await page.getTextContent();
-        if (generation !== renderGenerationRef.current) return;
-
-        textLayerInstanceRef.current = new PdfJsTextLayer({
-          container: textLayerDiv,
-          textContentSource: textContent,
-          viewport: viewport,
-        });
-
-        await textLayerInstanceRef.current.render();
-        if (generation !== renderGenerationRef.current) return;
-        const builtText = annotatePdfTextLayer(textLayerDiv, textContent.items);
-        renderedZoomRef.current = zoomLevel;
-        renderedPageRef.current = pageNumber;
-
-        const pageContainer = pageContainerRef.current;
-        if (pageContainer) {
-          const containerRect = pageContainer.getBoundingClientRect();
-          const rootFontSize =
-            Number.parseFloat(
-              getComputedStyle(document.documentElement).fontSize,
-            ) || 16;
-          const actionMetrics = {
-            targetSize: Math.max(45, rootFontSize * 2.2),
-            viewerGutter: rootFontSize * 2,
-          };
-          const projectedActions = pdfParagraphActions(builtText).flatMap(
-            (action) => {
-              const range = rangeFromAnnotatedPdfText(
-                textLayerDiv,
-                action.sourceStart,
-                action.sourceEnd,
-              );
-              const rects = range ? Array.from(range.getClientRects()) : [];
-              const position = paragraphActionPosition(
-                rects,
-                containerRect,
-                actionMetrics,
-              );
-              if (!position) return [];
-              return [
-                {
-                  index: action.index,
-                  sourceStart: action.sourceStart,
-                  narrationText: action.narrationText,
-                  previewText: action.previewText,
-                  ...position,
-                },
-              ];
-            },
-          );
-          setParagraphActions(
-            nonOverlappingParagraphActionPositions(
-              projectedActions,
-              actionMetrics.targetSize,
-            ),
-          );
-          const anchor = zoomAnchorRef.current;
-          const viewer = containerRef.current;
-          if (
-            viewer &&
-            anchor?.pageNumber === pageNumber &&
-            Math.abs(anchor.targetZoom - zoomLevel) < 0.0001
-          ) {
-            const target = restorePdfZoomAnchor(
-              anchor,
-              pageContainer.getBoundingClientRect(),
-              viewer.getBoundingClientRect(),
-              {
-                left: viewer.scrollLeft,
-                top: viewer.scrollTop,
-                maxLeft: Math.max(0, viewer.scrollWidth - viewer.clientWidth),
-                maxTop: Math.max(0, viewer.scrollHeight - viewer.clientHeight),
-              },
-            );
-            viewer.scrollLeft = target.left;
-            viewer.scrollTop = target.top;
-            zoomAnchorRef.current = null;
-          }
-          pageContainer.dataset.renderPage = String(pageNumber);
-          pageContainer.dataset.renderZoom = String(zoomLevel);
-          pageContainer.dataset.renderReady = "true";
-          delete pageContainer.dataset.renderError;
-          pageContainer.setAttribute("aria-busy", "false");
-        }
-        markPdfPageReady(pageNumber);
+        if (!(await buildTextLayer(page, viewport, textLayerDiv))) return;
 
         console.log(
           "[PdfViewer] Rendered page",

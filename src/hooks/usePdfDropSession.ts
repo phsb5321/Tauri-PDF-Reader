@@ -63,6 +63,37 @@ export function droppedSessionName(document: Document): string {
   return result || "Reading session";
 }
 
+function dropGuardError(
+  paths: readonly string[],
+  inFlight: boolean,
+): string | null {
+  if (inFlight) {
+    return "DROP_BUSY: Wait for the current PDF session to finish.";
+  }
+  if (paths.length !== 1 || !/\.pdf$/i.test(paths[0] ?? "")) {
+    return "DROP_INVALID: Drop exactly one PDF to create a reading session.";
+  }
+  return null;
+}
+
+/** Best-effort rollback of a session created before activation failed. */
+async function rollbackCreatedSession(
+  deleteSession: (id: string) => Promise<void>,
+  createdSession: ReadingSession | null,
+): Promise<string> {
+  if (!createdSession) return "";
+  try {
+    await deleteSession(createdSession.id);
+  } catch (cleanupError: unknown) {
+    const cleanupMessage =
+      cleanupError instanceof Error
+        ? cleanupError.message
+        : String(cleanupError);
+    return ` Session cleanup also failed: ${cleanupMessage}`;
+  }
+  return "";
+}
+
 export function usePdfDropSession({
   openDroppedPdf,
   createSession,
@@ -79,15 +110,9 @@ export function usePdfDropSession({
   const handleDrop = useCallback(
     async (paths: string[]) => {
       setIsDragActive(false);
-      if (inFlightRef.current) {
-        onError("DROP_BUSY: Wait for the current PDF session to finish.");
-        return;
-      }
-
-      if (paths.length !== 1 || !/\.pdf$/i.test(paths[0] ?? "")) {
-        onError(
-          "DROP_INVALID: Drop exactly one PDF to create a reading session.",
-        );
+      const guardError = dropGuardError(paths, inFlightRef.current);
+      if (guardError) {
+        onError(guardError);
         return;
       }
 
@@ -136,18 +161,11 @@ export function usePdfDropSession({
         });
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
-        let rollback = "";
-        if (createdSession) {
-          try {
-            await deleteSession(createdSession.id);
-          } catch (cleanupError: unknown) {
-            const cleanupMessage =
-              cleanupError instanceof Error
-                ? cleanupError.message
-                : String(cleanupError);
-            rollback = ` Session cleanup also failed: ${cleanupMessage}`;
-          }
-        }
+        // Synchronous null path: no added microtask before onError fires.
+        const rollback =
+          createdSession === null
+            ? ""
+            : await rollbackCreatedSession(deleteSession, createdSession);
         onError(`DROP_FAILED: ${message}${rollback}`);
       } finally {
         releaseLease();

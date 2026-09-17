@@ -338,7 +338,7 @@ function parseGroupedInteger(
 
 function parseInteger(text: string, locale: SpeechNumberLocale): number | null {
   const plain = parsePlainInteger(text);
-  return plain !== null ? plain : parseGroupedInteger(text, locale);
+  return plain ?? parseGroupedInteger(text, locale);
 }
 
 interface DecimalParts {
@@ -377,8 +377,15 @@ function timeWords(text: string, locale: SpeechNumberLocale): string | null {
     return `${enInteger(hour)} ${enBelowHundred(minute)}`;
   }
   // Portuguese counts hours in the feminine.
-  const hourWords =
-    hour === 1 ? "uma hora" : `${hour === 2 ? "duas" : ptInteger(hour)} horas`;
+  let hourWord: string;
+  if (hour === 1) {
+    hourWord = "uma hora";
+  } else if (hour === 2) {
+    hourWord = "duas horas";
+  } else {
+    hourWord = `${ptInteger(hour)} horas`;
+  }
+  const hourWords = hourWord;
   if (minute === 0) return hourWords;
   const minuteWords =
     minute === 1 ? "um minuto" : `${ptInteger(minute)} minutos`;
@@ -401,7 +408,7 @@ function currencyWords(
 
   const decimal = parseDecimal(amount, locale);
   // A currency minor unit is exactly two digits; anything else is ambiguous.
-  if (!decimal || decimal.fraction.length !== 2) return null;
+  if (decimal?.fraction.length !== 2) return null;
   const unit = decimal.integer === 1 ? words.singular : words.plural;
   const major = `${integerWords(decimal.integer, locale)} ${unit}`;
   const minor = Number(decimal.fraction);
@@ -431,6 +438,49 @@ function isBlocked(source: string, index: number): boolean {
   return character !== undefined && BLOCKING_NEIGHBOR.test(character);
 }
 
+type SpokenReplacementPayload = {
+  spokenText: string;
+  rule: SpeechNumberReplacement["rule"];
+};
+
+function spokenReplacementForMatch(
+  match: RegExpMatchArray,
+  locale: SpeechNumberLocale,
+): SpokenReplacementPayload | null {
+  const currency = match.groups?.currency;
+  const core = match.groups?.core ?? "";
+  const percent = match.groups?.percent !== undefined;
+
+  if (currency && percent) return null;
+
+  if (currency) {
+    const symbol = currency.replace(/[\u0020\u00A0]$/u, "");
+    const spokenText = currencyWords(symbol, core, locale);
+    return spokenText ? { spokenText, rule: "currency" } : null;
+  }
+
+  if (percent) {
+    const value = numberWords(core, locale);
+    return value
+      ? {
+          spokenText: `${value} ${GRAMMARS[locale].percentWords}`,
+          rule: "percent",
+        }
+      : null;
+  }
+
+  const time = timeWords(core, locale);
+  if (time) return { spokenText: time, rule: "time" };
+
+  const integer = parseInteger(core, locale);
+  if (integer !== null) {
+    return { spokenText: integerWords(integer, locale), rule: "integer" };
+  }
+
+  const decimal = numberWords(core, locale);
+  return decimal ? { spokenText: decimal, rule: "decimal" } : null;
+}
+
 /**
  * Find every number the locale grammar can prove, as ordered, non-overlapping
  * replacements over the unchanged source.
@@ -447,70 +497,9 @@ export function findSpeechNumberReplacements(
     const end = start + match[0].length;
     if (isBlocked(source, start - 1) || isBlocked(source, end)) continue;
 
-    const currency = match.groups?.currency;
-    const core = match.groups?.core ?? "";
-    const percent = match.groups?.percent !== undefined;
-
-    if (currency && percent) continue;
-
-    if (currency) {
-      const symbol = currency.replace(/[\u0020\u00A0]$/u, "");
-      const spokenText = currencyWords(symbol, core, locale);
-      if (spokenText) {
-        replacements.push({
-          sourceStart: start,
-          sourceEnd: end,
-          spokenText,
-          rule: "currency",
-        });
-      }
-      continue;
-    }
-
-    if (percent) {
-      const value = numberWords(core, locale);
-      if (value) {
-        replacements.push({
-          sourceStart: start,
-          sourceEnd: end,
-          spokenText: `${value} ${GRAMMARS[locale].percentWords}`,
-          rule: "percent",
-        });
-      }
-      continue;
-    }
-
-    const time = timeWords(core, locale);
-    if (time) {
-      replacements.push({
-        sourceStart: start,
-        sourceEnd: end,
-        spokenText: time,
-        rule: "time",
-      });
-      continue;
-    }
-
-    const integer = parseInteger(core, locale);
-    if (integer !== null) {
-      replacements.push({
-        sourceStart: start,
-        sourceEnd: end,
-        spokenText: integerWords(integer, locale),
-        rule: "integer",
-      });
-      continue;
-    }
-
-    const decimal = numberWords(core, locale);
-    if (decimal) {
-      replacements.push({
-        sourceStart: start,
-        sourceEnd: end,
-        spokenText: decimal,
-        rule: "decimal",
-      });
-    }
+    const replacement = spokenReplacementForMatch(match, locale);
+    if (!replacement) continue;
+    replacements.push({ sourceStart: start, sourceEnd: end, ...replacement });
   }
 
   return replacements;

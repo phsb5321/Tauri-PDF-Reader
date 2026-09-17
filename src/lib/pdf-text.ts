@@ -42,7 +42,7 @@ function parseItem(item: unknown): ParsedPdfItem | null {
   if (!item || typeof item !== "object" || !("str" in item)) return null;
   const value = item as Record<string, unknown>;
   const raw = String(value.str);
-  const text = raw.replace(/\s+/gu, " ").trim();
+  const text = raw.replaceAll(/\s+/gu, " ").trim();
   if (!text) return null;
   const transform = Array.isArray(value.transform) ? value.transform : [];
   return {
@@ -131,7 +131,7 @@ export function annotatePdfTextLayer(
   let searchStart = 0;
 
   for (const span of spans) {
-    const normalized = (span.textContent ?? "").replace(/\s+/gu, " ").trim();
+    const normalized = (span.textContent ?? "").replaceAll(/\s+/gu, " ").trim();
     if (!normalized) continue;
     const start = text.indexOf(normalized, searchStart);
     if (start < 0) continue;

@@ -3,6 +3,12 @@
   inset: 0;
   z-index: var(--z-floating);
   pointer-events: none;
+  /* fieldset defaults undone: groove border, inline margin and the
+     min-inline-size of min-content break the absolute overlay layout. */
+  margin: 0;
+  min-inline-size: 0;
+  padding: 0;
+  border: none;
 }
 
 .paragraph-action-button {

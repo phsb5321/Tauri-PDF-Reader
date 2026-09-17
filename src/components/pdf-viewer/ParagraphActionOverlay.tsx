@@ -15,7 +15,7 @@ interface ParagraphActionOverlayProps {
 }
 
 export function paragraphActionName(index: number, text: string): string {
-  const normalized = text.trim().replace(/\s+/gu, " ");
+  const normalized = text.trim().replaceAll(/\s+/gu, " ");
   const points = Array.from(normalized);
   let preview = normalized;
   if (points.length > 48) {
@@ -33,11 +33,8 @@ export function ParagraphActionOverlay({
   if (actions.length === 0) return null;
 
   return (
-    <div
-      className="paragraph-action-overlay"
-      role="group"
-      aria-label="Paragraph narration"
-    >
+    <fieldset className="paragraph-action-overlay">
+      <legend className="sr-only">Paragraph narration</legend>
       {actions.map((action) => (
         <button
           key={`${action.sourceStart}-${action.index}`}
@@ -55,6 +52,6 @@ export function ParagraphActionOverlay({
           </svg>
         </button>
       ))}
-    </div>
+    </fieldset>
   );
 }
