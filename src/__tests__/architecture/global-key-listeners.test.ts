@@ -48,6 +48,8 @@ const OWNERS: Record<string, string> = {
     "Escape dismisses this menu specifically; 'close the innermost thing' is not expressible from window",
   "components/pdf-viewer/HighlightToolbar.tsx":
     "Escape cancels this toolbar while a selection is pending; same reason as the context menu",
+  "components/playback-bar/NarrationCockpit.tsx":
+    "Escape closes this cockpit while it is open; S6847 forbids the keydown on the non-interactive <section>, and 'close the innermost panel' is component-local state",
 };
 
 /**
