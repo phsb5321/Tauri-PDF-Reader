@@ -99,8 +99,6 @@ GitHub workflow API and fetches the selected immutable flake only when
 install/update is invoked. Contract and file:line receipts:
 `SECURITY.md`.
 
-> > > > > > > theirs
-
 ## Platform-scoped runtime
 
 The packaged E2E lanes pin X11 + software rendering (the vimeflow#65
