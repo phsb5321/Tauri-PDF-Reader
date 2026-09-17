@@ -1,10 +1,10 @@
 /**
  * Spec 256 — zoom controller containment + native-popup theme gates
- * (authored, NOT run: live 225 owns all execution; this is the
- * READY-FOR-CHECK payload).
+ * (authored by the p11 worker seat at freeze; executed and green at
+ * landing on 17/09/2026).
  *
  * p16 corrective acceptance coverage:
- *  - the advertised Ctrl+-/Ctrl++ chords are NOT implemented anywhere → the
+ *  - the advertised Ctrl+-/Ctrl++ chords exist nowhere in lib sources → the
  *    titles must no longer advertise them (aria labels retained);
  *  - the native select's Home/End/Escape (and arrow) keys must NOT leak to
  *    document-level handlers (PdfViewer Home/End page navigation,
@@ -50,7 +50,7 @@ const containedKeys = [
 ];
 
 describe("spec 256: no unsupported chord advertising", () => {
-  it("titles name the actions without advertising unimplemented chords", () => {
+  it("titles name the actions without advertising unsupported chords", () => {
     render(<ZoomControls />);
     expect(screen.getByTitle("Zoom out")).toHaveAttribute(
       "aria-label",
