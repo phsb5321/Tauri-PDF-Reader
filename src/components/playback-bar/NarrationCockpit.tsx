@@ -51,7 +51,11 @@ export function NarrationCockpit({
     (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
       const nextIndex = nextNarrationTabIndex(index, event.key);
       if (nextIndex === null) return;
+      // Consumed keys are isolated: preventDefault keeps the button from
+      // scrolling, and stopPropagation keeps document-level handlers (the
+      // reader's Home/End page jumps) from acting on tab navigation.
       event.preventDefault();
+      event.stopPropagation();
       activateTab(nextIndex, true);
     },
     [activateTab],
@@ -123,6 +127,12 @@ export function NarrationCockpit({
           </button>
         ))}
       </div>
+
+      {controlsDisabled && (
+        <p className="narration-cockpit-lock" role="note">
+          These controls are temporarily locked.
+        </p>
+      )}
 
       <div
         id={`narration-panel-${activeTab}`}
