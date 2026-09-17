@@ -412,20 +412,11 @@ export function AiPlaybackBar({
     const queue = sentenceQueueRef.current;
     if (queue && queue.generation !== playbackGenerationRef.current) return;
 
-    // Phase 1: advance within the current sentence queue. Returns
-    // "not-handled" when the queue is finished so page continuation may run;
-    // "halted" when a stale-generation check must abort the whole callback.
-    const advanceQueue = async (): Promise<
-      "handled" | "halted" | "not-handled"
-    > => {
-      if (
-        !queue ||
-        queue.generation !== playbackGenerationRef.current ||
-        queue.index + 1 >= queue.sentences.length ||
-        !playingRef.current
-      ) {
-        return "not-handled";
-      }
+    // Phase 1: advance within the current sentence queue. Runs only when the
+    // caller has already proven canAdvance; false means a stale-generation
+    // abort (the whole callback must stop, skipping page continuation).
+    const advanceQueue = async (): Promise<boolean> => {
+      if (queue === null) return false; // unreachable: canAdvance implies queue
       const completed = queue.sentences[queue.index];
       const nextIndex = queue.index + 1;
       const prefetched = queue.prefetches.get(nextIndex);
@@ -437,7 +428,7 @@ export function AiPlaybackBar({
         queue.prefetches.delete(nextIndex);
       }
       if (queue.generation !== playbackGenerationRef.current) {
-        return "halted";
+        return false;
       }
 
       queue.index = nextIndex;
@@ -465,16 +456,16 @@ export function AiPlaybackBar({
         queue.generation !== playbackGenerationRef.current ||
         sentenceQueueRef.current !== queue
       ) {
-        return "halted";
+        return false;
       }
       if (!started) {
         playingRef.current = false;
         sentenceQueueRef.current = null;
         setSentenceProgress(null);
-        return "halted";
+        return false;
       }
       prefetchSentences(queue, nextIndex + 1);
-      return "handled";
+      return true;
     };
 
     // Wait for the next page render; classifies the outcome so the caller can
@@ -595,10 +586,20 @@ export function AiPlaybackBar({
       }
     };
 
-    const outcome = await advanceQueue();
-    if (outcome !== "not-handled") return;
-    if (queue && sentenceQueueRef.current !== queue) return;
-    await continueToNextPage();
+    // Synchronous advance guard: preserves the original no-microtask fall-
+    // through into the identity check + page continuation when the queue is
+    // finished or absent (an await here would open an interleaving window).
+    const canAdvance =
+      queue !== null &&
+      queue.generation === playbackGenerationRef.current &&
+      queue.index + 1 < queue.sentences.length &&
+      playingRef.current;
+    if (!canAdvance) {
+      if (queue && sentenceQueueRef.current !== queue) return;
+      await continueToNextPage();
+      return;
+    }
+    if (!(await advanceQueue())) return;
   }, [
     autoPageEnabled,
     setCurrentPage,

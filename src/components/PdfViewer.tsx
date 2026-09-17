@@ -503,6 +503,9 @@ export function PdfViewer({ onReadFromHere }: Readonly<PdfViewerProps>) {
         renderedZoomRef.current = zoomLevel;
         renderedPageRef.current = pageNumber;
         layoutPageExtras(builtText, textLayerDiv);
+        // Kept contiguous with the dataset writes above: a microtask gap here
+        // could mark a stale page ready after a generation change.
+        markPdfPageReady(pageNumber);
         return true;
       };
 
@@ -557,8 +560,6 @@ export function PdfViewer({ onReadFromHere }: Readonly<PdfViewerProps>) {
         applyZoomPreview(canvas, textLayerDiv, null);
 
         if (!(await buildTextLayer(page, viewport, textLayerDiv))) return;
-
-        markPdfPageReady(pageNumber);
 
         console.log(
           "[PdfViewer] Rendered page",

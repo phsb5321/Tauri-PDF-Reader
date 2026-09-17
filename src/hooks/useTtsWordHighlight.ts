@@ -41,6 +41,29 @@ export interface UseTtsWordHighlightOptions {
   onScrollNeeded?: (wordIndex: number, word: string) => void;
 }
 
+type SpeakGuard = { ok: true } | { ok: false; reason: string; debug: boolean };
+
+function evaluateSpeakGuard(
+  initialized: boolean,
+  alreadySpeaking: boolean,
+): SpeakGuard {
+  if (!initialized) {
+    return {
+      ok: false,
+      reason: "[TtsWordHighlight] TTS not initialized",
+      debug: false,
+    };
+  }
+  if (alreadySpeaking) {
+    return {
+      ok: false,
+      reason: "[TtsWordHighlight] Already speaking, ignoring duplicate request",
+      debug: true,
+    };
+  }
+  return { ok: true };
+}
+
 export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
   const highlightStore = useTtsHighlightStore();
   const ttsStore = useAiTtsStore();
@@ -278,32 +301,6 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
       }
     };
   }, []);
-
-  type SpeakGuard =
-    | { ok: true }
-    | { ok: false; reason: string; debug: boolean };
-
-  function evaluateSpeakGuard(
-    initialized: boolean,
-    alreadySpeaking: boolean,
-  ): SpeakGuard {
-    if (!initialized) {
-      return {
-        ok: false,
-        reason: "[TtsWordHighlight] TTS not initialized",
-        debug: false,
-      };
-    }
-    if (alreadySpeaking) {
-      return {
-        ok: false,
-        reason:
-          "[TtsWordHighlight] Already speaking, ignoring duplicate request",
-        debug: true,
-      };
-    }
-    return { ok: true };
-  }
 
   // Speak text with word highlighting
   const speakWithHighlight = useCallback(

@@ -161,10 +161,11 @@ export function usePdfDropSession({
         });
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
-        const rollback = await rollbackCreatedSession(
-          deleteSession,
-          createdSession,
-        );
+        // Synchronous null path: no added microtask before onError fires.
+        const rollback =
+          createdSession === null
+            ? ""
+            : await rollbackCreatedSession(deleteSession, createdSession);
         onError(`DROP_FAILED: ${message}${rollback}`);
       } finally {
         releaseLease();
