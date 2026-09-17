@@ -64,6 +64,14 @@ function evaluateSpeakGuard(
   return { ok: true };
 }
 
+function logSpeakGuardRejection(guard: SpeakGuard & { ok: false }): void {
+  if (guard.debug) {
+    console.debug(guard.reason);
+  } else {
+    console.warn(guard.reason);
+  }
+}
+
 export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
   const highlightStore = useTtsHighlightStore();
   const ttsStore = useAiTtsStore();
@@ -317,15 +325,13 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
         speakingRef.current,
       );
       if (!guard.ok) {
-        if (guard.debug) {
-          console.debug(guard.reason);
-        } else {
-          console.warn(guard.reason);
-        }
+        logSpeakGuardRejection(guard);
         return false;
       }
 
-      // Stop any existing playback
+      // Stop any existing playback. Inlined deliberately: awaiting an async
+      // helper here would yield a microtask even when nothing is playing and
+      // shift speakingRef past concurrent stop/start interleavings.
       if (highlightStore.isActive) {
         await aiTtsStop();
         highlightStore.stopHighlighting();
@@ -359,7 +365,10 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
           return false;
         }
 
-        if (result.success) {
+        // Sync closure: the success path in its own complexity bucket with
+        // zero added suspension (an async helper would shift microtask
+        // ordering around concurrent stop/start calls).
+        const startHighlightTimeline = (): boolean => {
           console.debug("[TtsWordHighlight] TTS response received", {
             wordCount: result.wordTimings.length,
             duration: result.totalDuration,
@@ -423,6 +432,10 @@ export function useTtsWordHighlight(options: UseTtsWordHighlightOptions = {}) {
           }
 
           return true;
+        };
+
+        if (result.success) {
+          return startHighlightTimeline();
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

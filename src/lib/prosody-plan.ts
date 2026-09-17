@@ -22,7 +22,7 @@ export function resolveProsodyLanguage(
   const idSuffix = voiceId?.match(
     /(?:^|[-_])(pt(?:[-_]br)?|en(?:[-_](?:us|gb))?)$/iu,
   )?.[1];
-  const language = (declared ?? idSuffix)?.toLowerCase().replaceAll(/_/gu, "-");
+  const language = (declared ?? idSuffix)?.toLowerCase().replaceAll("_", "-");
   if (language === "pt" || language === "pt-br") return "pt-BR";
   if (language === "en" || language === "en-us" || language === "en-gb") {
     return "en";
@@ -131,7 +131,7 @@ function discourseInsertions(source: ProsodySource): number[] {
     word.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`),
   );
   const pattern = new RegExp(
-    `(\\p{Ll}{3,})(\\s+)(${escaped.join("|")})\\b`,
+    String.raw`(\p{Ll}{3,})(\s+)(${escaped.join("|")})\b`,
     "gu",
   );
   const insertions: number[] = [];
