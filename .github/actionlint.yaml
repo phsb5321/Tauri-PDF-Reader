@@ -1,7 +1,7 @@
 # actionlint config. Registers this repo's self-hosted runner labels so
-# actionlint does not flag `vm103` (and friends) as unknown runner labels.
-# The CI + Release workflows run on the self-hosted vm103 runner
-# (GitHub-hosted runners are billing-locked for this account).
+# actionlint does not flag `vm103` and the repo-scoped M5 as unknown labels.
+# Hosted runners are billing-locked; untrusted PR code never reaches the Mac.
 self-hosted-runner:
   labels:
     - vm103
+    - lectrice-mac

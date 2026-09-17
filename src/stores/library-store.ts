@@ -148,50 +148,104 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   setSearchQuery: (query) => set({ searchQuery: query }),
 
   setSortOrder: (order) => {
+    // Spec 248: the local list is already complete — sorting is derived
+    // client-side (see deriveFilteredDocuments), so changing the order must
+    // NOT refetch the whole library over IPC.
     set({ sortOrder: order });
-    // Reload to get properly sorted results
-    get().loadDocuments();
   },
 
   setViewMode: (mode) => set({ viewMode: mode }),
 
   setSelectedDocument: (id) => set({ selectedDocumentId: id }),
 
-  getFilteredDocuments: () => {
-    const { documents, searchQuery, sortOrder } = get();
-
-    let filtered = documents;
-
-    // Filter by search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
-      filtered = documents.filter(
-        (d) =>
-          d.title?.toLowerCase().includes(query) ||
-          d.filePath.toLowerCase().includes(query),
-      );
-    }
-
-    // Sort
-    return [...filtered].sort((a, b) => {
-      switch (sortOrder) {
-        case "title":
-          return (a.title || "").localeCompare(b.title || "");
-        case "created":
-          return (b.createdAt || "").localeCompare(a.createdAt || "");
-        case "recent":
-        default:
-          return (b.lastOpenedAt || b.createdAt || "").localeCompare(
-            a.lastOpenedAt || a.createdAt || "",
-          );
-      }
-    });
-  },
+  getFilteredDocuments: () =>
+    deriveFilteredDocuments(
+      get().documents,
+      get().searchQuery,
+      get().sortOrder,
+    ),
 
   reset: () => set(initialState),
 }));
 
 // Selectors
+
+/**
+ * Pure derive (spec 248): exactly the previous filter+sort behavior, as a
+ * function of the actual inputs. Array.prototype.sort is stable in the
+ * runtime, so equal sort keys retain document order (tie behavior kept).
+ * Inputs are never mutated — the sort works on a copy.
+ */
+export function deriveFilteredDocuments(
+  documents: readonly Document[],
+  searchQuery: string,
+  sortOrder: SortOrder,
+): Document[] {
+  let filtered = documents as Document[];
+
+  if (searchQuery.trim()) {
+    const query = searchQuery.toLowerCase().trim();
+    filtered = filtered.filter(
+      (d) =>
+        d.title?.toLowerCase().includes(query) ||
+        d.filePath.toLowerCase().includes(query),
+    );
+  }
+
+  return [...filtered].sort((a, b) => {
+    switch (sortOrder) {
+      case "title":
+        return (a.title || "").localeCompare(b.title || "");
+      case "created":
+        return (b.createdAt || "").localeCompare(a.createdAt || "");
+      case "recent":
+      default:
+        return (b.lastOpenedAt || b.createdAt || "").localeCompare(
+          a.lastOpenedAt || a.createdAt || "",
+        );
+    }
+  });
+}
+
+/** Single-entry memo keyed by the ACTUAL derive inputs (array identity). */
+let filteredDocumentsMemo: {
+  documents: Document[];
+  searchQuery: string;
+  sortOrder: SortOrder;
+  result: Document[];
+} | null = null;
+
+/**
+ * Memoized derived-documents selector (spec 248). Stable across selection,
+ * view-mode and unrelated state changes: re-derivation happens only when a
+ * real input (documents identity, query, sort order) changes. Pair with
+ * `useLibraryStore(selectFilteredDocuments)` in the view so the derived
+ * array identity is stable for downstream memos.
+ */
+export const selectFilteredDocuments = (state: LibraryState): Document[] => {
+  const memo = filteredDocumentsMemo;
+  if (
+    memo !== null &&
+    memo.documents === state.documents &&
+    memo.searchQuery === state.searchQuery &&
+    memo.sortOrder === state.sortOrder
+  ) {
+    return memo.result;
+  }
+  const result = deriveFilteredDocuments(
+    state.documents,
+    state.searchQuery,
+    state.sortOrder,
+  );
+  filteredDocumentsMemo = {
+    documents: state.documents,
+    searchQuery: state.searchQuery,
+    sortOrder: state.sortOrder,
+    result,
+  };
+  return result;
+};
+
 export const selectDocumentCount = (state: LibraryState) =>
   state.documents.length;
 export const selectHasDocuments = (state: LibraryState) =>

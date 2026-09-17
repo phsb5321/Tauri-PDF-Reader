@@ -1,0 +1,21 @@
+{
+  "at": "2026-09-15T14:55:32.509982-03:00",
+  "base": "047cc4f2e4d6deba6f65c2d37755235fe1f47f05",
+  "source": "248/coordinator-correction2",
+  "qualification": "53/53 targeted, lint/typecheck/harness0; native/review/CI open",
+  "files": [
+    {
+      "path": "src/components/library/LibraryView.tsx",
+      "sha256": "dba62abd1df1571e02d170d9017eebd990e075ffb07bb93c80b785f021804083"
+    },
+    {
+      "path": "src/stores/library-store.ts",
+      "sha256": "80b590b4b96438142867d7749d3f77d3e11f65123b2022c68b7a1c3ddeba24f2"
+    },
+    {
+      "path": "src/components/library/library-derived-data-248.test.tsx",
+      "sha256": "1cacdc736a2783c8cf536939b19ae46ef9b7cb402a275419217ab7b003b9ffc0"
+    }
+  ],
+  "excluded": "all36 seed paths; inherited Settings UI; 245\u2013247; live225"
+}

@@ -142,11 +142,11 @@ describe("Packaged home journey (catch-up epic #89 #91 #92)", () => {
       // audio it cannot keep).
       await browser.keys(["Control", "l"]);
       const play = await $(
-        'button[aria-label="Resume E2E Resume Fixture A and start reading aloud"]',
+        'button[aria-label="Resume E2E Resume Fixture A and read aloud"]',
       );
       await play.waitForClickable({ timeout: 15000 });
       await domClick(
-        'button[aria-label="Resume E2E Resume Fixture A and start reading aloud"]',
+        'button[aria-label="Resume E2E Resume Fixture A and read aloud"]',
       );
       await browser.waitUntil(
         async () => (await $('input[aria-label="Current page"]').getValue()) === "2",
@@ -181,18 +181,18 @@ describe("Packaged home journey (catch-up epic #89 #91 #92)", () => {
       expect(alsoText).toContain("E2E Resume Fixture B");
       expect(alsoText).toContain("Page 2 of 3");
       await $(
-        'button[aria-label="Resume E2E Resume Fixture B and start reading aloud"]',
+        'button[aria-label="Resume E2E Resume Fixture B and read aloud"]',
       ).waitForExist({ timeout: 5000 });
 
       // ITEM 2b: resume-and-play lands on the stored page AND starts
       // narration. Oracle: the TTS store reaching "playing" (the fixture
       // backend is real IPC with real marks; no human listens).
       const play = await $(
-        'button[aria-label="Resume E2E Resume Fixture A and start reading aloud"]',
+        'button[aria-label="Resume E2E Resume Fixture A and read aloud"]',
       );
       await play.waitForClickable({ timeout: 15000 });
       await domClick(
-        'button[aria-label="Resume E2E Resume Fixture A and start reading aloud"]',
+        'button[aria-label="Resume E2E Resume Fixture A and read aloud"]',
       );
       await browser.waitUntil(
         async () => (await $('input[aria-label="Current page"]').getValue()) === "2",

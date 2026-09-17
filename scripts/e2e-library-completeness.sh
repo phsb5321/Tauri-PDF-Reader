@@ -84,6 +84,7 @@ toolchain_exec '
 .parameter set @missing "$MISSING"
 .parameter set @missing_title "Missing book control"
 .parameter set @missing_stamp "2026-08-24T17:00:00Z"
+.parameter set @missing_created_stamp "2026-08-24T19:00:00Z"
 INSERT INTO documents (
   id, file_path, title, page_count, current_page, scroll_position,
   last_tts_chunk_id, last_opened_at, file_hash, created_at
@@ -96,7 +97,7 @@ INSERT INTO documents (
   last_tts_chunk_id, last_opened_at, file_hash, created_at
 ) VALUES (
   @missing_id, @missing, @missing_title, 1, 1, 0,
-  NULL, @missing_stamp, @missing_id, @missing_stamp
+  NULL, @missing_stamp, @missing_id, @missing_created_stamp
 );
 SQL
   [ ! -e "$SCOPE" ] || { echo "ERROR: persisted scope existed before legacy recovery" >&2; exit 1; }
