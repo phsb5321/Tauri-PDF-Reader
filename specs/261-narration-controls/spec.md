@@ -20,8 +20,10 @@ controls silently disable with no explanation.
    real registered window handler).
 2. **Unconsumed keys flow:** keys the cockpit does not consume (e.g. `b`)
    still propagate to the document-level seam with the tab as target.
-3. **Escape preserved:** Escape closes the cockpit (parent return-focus path
-   in AiPlaybackBar, unchanged) and stays isolated from the seam.
+3. **Escape preserved:** Escape closes the cockpit (window-level owner
+   since #211 per the OWNERS registry, S6847 rationale) with the parent
+   return-focus path in AiPlaybackBar unchanged; consumed-tab isolation
+   is asserted at the React handler level, where it actually holds.
 4. **Truthful lock note:** with `controlsDisabled` the cockpit shows a
    neutral lock note (`role="note"`); the single bool cannot name the
    reason (transport, setup, or provider switching all pass it), so the

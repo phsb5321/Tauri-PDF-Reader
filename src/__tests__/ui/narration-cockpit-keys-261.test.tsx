@@ -61,13 +61,19 @@ describe("NarrationCockpit tab-key isolation (261)", () => {
     expect(globalSeam.mock.calls[0][0].target).toBe(voice);
   });
 
-  it("keeps Escape closing the cockpit and isolated from the seam", () => {
+  it("keeps Escape closing the cockpit (window-level owner since #211)", () => {
     render(<NarrationCockpit onClose={onClose} controlsDisabled={false} />);
     const voice = tab("Voice & route");
     voice.focus();
-    fireEvent.keyDown(voice, { key: "Escape" });
+    const notPrevented = fireEvent.keyDown(voice, { key: "Escape" });
     expect(onClose).toHaveBeenCalledTimes(1);
-    expect(globalSeam).not.toHaveBeenCalled();
+    expect(notPrevented).toBe(false);
+    // Escape isolation is NOT claimed here: since #211 the cockpit owns
+    // Escape at WINDOW level (OWNERS registry, S6847 rationale), and
+    // stopPropagation cannot isolate same-node listeners — document-level
+    // consumers precede window handlers by DOM order and are coordinated
+    // through useCommandKeys/OWNERS, not by this component. The consumed
+    // tab keys above (React-level handlers) carry the isolation contract.
   });
 
   it("explains the lock instead of showing silent disabled controls", () => {
