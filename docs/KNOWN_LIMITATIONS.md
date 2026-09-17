@@ -98,7 +98,6 @@ update-check egress). The external Nix profile manager queries the public
 GitHub workflow API and fetches the selected immutable flake only when
 install/update is invoked. Contract and file:line receipts:
 `SECURITY.md`.
->>>>>>> theirs
 
 ## Platform-scoped runtime
 

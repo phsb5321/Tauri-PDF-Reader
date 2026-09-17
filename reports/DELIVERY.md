@@ -1,3 +1,9 @@
+# Delivery report — 251 queue + 255 analysis integration
+
+**Status 16/09/2026 (composition of the two delivery reports; both preserved verbatim below):** PR209 (library) **MERGED** as `ddeda5e` 16/09 with 9/9 required CI green. PR210 (255 analysis enforcement) import-only CI correction committed at `8a7b0da` on the synchronized current base; qualification in progress. 225STOP/G0 remain closed.
+
+---
+
 # Delivery 251 — qualification queue
 
 Actual start: `reports/seat-start.md`. Durable goal set; parent home:w26:pK and portfolio side-projects:w1:pB ACK delivery confirmed by `herdr-prompt` (box consumed).
@@ -80,3 +86,102 @@ Portfolio's sanitized14:36+ intake names live speed changes, actual-Range Follow
 - External plan review completed before first slot; exact RPC wait duration was not instrumented. Exact-head Sol review launched after14:59:16 and returned before15:03:51 (bounded wall bracket<4m35s, not pure queue-wait measurement), ALLOW. No invented active-minute/p95 metric.
 
 Next: retain operator STOP; complete source-only frozen intake/review coordination. After explicit runtime admission, qualify209 on the properly synchronized base, then the prioritized controls/privacy candidates through existing executors.252 awaits independent review/privacy qualification, not another invented repair. Product integration+source review+normal-hook commit+PR are real; native/CI/merge/activation remain unclaimed. Playback speed/Range Follow/gap priorities remain next independent product slice, not mixed into the library PR. No broad audit, new workers, inference, tracker replay, cap reset or release activation.
+
+---
+
+# 255 — Static-analysis integration and perfect-score requirement
+
+**15/09/2026 — PR210 DRAFT/RED atd27cc357; one import-only CI correction authored locally, UNVERIFIED. Original2/2 exhausted; one explicit additional exception consumed, not a reset. NOT merged/perfect.**
+
+## Current delivery boundary
+
+Normal hooks committed8f5422aa with exit0; post-hook9/9 source identities were captured. Formatting changed the wrapper: its current SHA at8f/d27 is `1b0cb4ed223dcfbb54d2acbb731438619885ab32464d35fe629782aec26dd27c`, not historical `d0d1bf83…`. Three isolated fullGLM source ALLOWs at8f and one bounded source-context rebind atd27 are retained externally in `lectrice-all-seats-20260915/qa-255.md` and `qa-210-d27.md`. They are not CI, whole-ledger,207-core or perfect-score verdicts.
+
+pB published PR210 and synchronized its remote feature branch ontoa7dc312; all9 owned blobs remained unchanged. Home subsequently fast-forwarded the clean local worktree tod27, without a commit or product hook, to prepare the correction below. pB retains publication custody;251 alone owns local execution/normal hooks. The225 popup exception was consumed without dismissal; no further GUI input, close, force or restart is authorized.
+
+Actual CI run35021373371/job104557586831 failed repository ESLint: unimported `process` at10:3 and `URL` at11:21 in `tools/test/analysis-enforcement.test.mjs`,2 errors/108 warnings. Authenticated job API readback confirms TypeScript step7 succeeded, ESLint step8 failed; tests, type-coverage ratchet and coverage were skipped. The earlier typecheck-unreached summary was incorrect. Prior scoped TS lint and normal hooks did not establish repository-wide `.mjs` lint cleanliness.
+
+Home explicitly admitted ONE additional import-only CI correction: import `process` from `node:process` and `URL` from the existing `node:url` module. That correction is authored but unrun/uncommitted; assertions, subprocess behavior, thresholds, ESLint configuration and dependencies are unchanged. Original failures and exhausted2/2 remain; this separate exception has no further repair loop. Ordinary251 validation/commit is authorized only after a safe execution slot is genuinely available: CI-equivalent `pnpm lint` (including the MJS helper), standalone3 cases, wrapper4 cases, typecheck, actual harness, normal hooks and final-byte binding. No remote source-edit API or hook bypass. Corrected-source/current-head independent review and fresh protected CI remain required; prior ALLOWs do not approve changed bytes.
+
+Security scope remains trusted maintainer environment/repository selector: the Node wrapper and initial Bash lookup inherit environment, and lookup has no own timeout. Only the synthetic analyzer gets the replacement environment. No global credential isolation, malicious-source sandbox or process-group-cleanup guarantee is claimed.
+
+`reports/source-review.md` and `reports/source-manifest.json` preserve pre-hook history, not current-head authority. Old3/3,4/4 and8/8 are dated execution receipts—not enumerated tests on formatted or import-corrected bytes. The newer retained Sonar readback is a7dc312/analysis0cd0cc15: ERROR42 new violations/167 smells/73.7% coverage,1 unreviewed hotspot; all10 original249 keys explicitly CLOSED/FIXED. The older baseline below is retained, not relabelled current.
+
+## Historical qualification timeline (before normal hooks/publication)
+
+**Pre-hook snapshot:** subprocess3/3, ordinary wrapper4/4/scoped TS lint0/tsc0; Spec Kit documentation corrected after harness refusal, actual recheck0/PASS.
+Owner: home:w26:pK; generatorOpenAI. Locked worktree255, originally base5e710cf. **15:39 reconciliation:** PR206/249 independently confirmed merged15:36:39 at35801daa8657a8c0b72c3b06a04c994b6a46bc8c; retained premerge receipt has9/9required contexts SUCCESS.255 fast-forwarded to35801daa with zero incoming/tracked-WIP overlap and all three reviewed code hashes unchanged. Incoming249helpers retained, not overwritten. No product execution in this reconciliation.
+
+At15:39, natural post-merge Sonar run35008551212 at35801daa was **queued**; previous35003005700 at5e710cf failed. Earlier metrics below belong to that older analysis, not post249 acceptance. Native CodeQL rule23477091 is still effective. Corrected attribution retained: successful trust-anchor610ffdd belonged toPR207(import), not209.251 keeps sole slot/209/playback custody;255's ordinary qualifications below reused that serialized custody, not a parallel execution lane. Source/merge ownership of255 remains here. Evidence: `base-35801da-reconciliation.json` plus canonical `sonar-249-pr/premerge-proof.json`/`merged-pr.json`.
+
+## User requirement and canonical sources
+
+Pedro explicitly requires analysis integrations enforced and perfect scores, not advisory badges. Read the vault's `Code-Analysis & Delivery Stack — Consolidated Canon`, `Code-Analysis Stack — Verified Forks + Workflow Integration`, `sonar-integration-runbook`, and `Decision — Quality-Gate Source Topology`.
+
+Integrate the applicable stack INTO the existing deterministic verify/CI gates; no parallel bureaucratic pipeline. Every gate needs a deliberate failing-input proof, exact revision/scope/tool identity, and a missing/error/stale-report refusal. Maximum ratings alone do not mean zero findings. Static, security, dependency, secrets, coverage, duplication, mutation and performance evidence are separate dimensions, not a made-up single score.
+
+## Historical5e710cf baseline (read-only API/source/CI; no scanner started)
+
+Sonar latest observed analysis `b24b94de-e885-4cc0-9172-7d13b195b613`, revision5e710cf, dated15/09/2026 14:57 BRT. Current metric query around15:01, not an atomic snapshot; exact-analysis binding is a follow-up gate requirement.
+
+| Dimension                         | Observed                                                                                                                                        | Required destination / gap                                                                                                              |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Sonar gate                        | ERROR;51 new-period violations                                                                                                                  | 0 unresolved actionable findings; preserve issue identities/new-code period, never reset the baseline to erase debt                     |
+| Global Sonar findings             | 176 code smells;0 bugs;0 vulnerabilities                                                                                                        | 0 real findings, not merely A ratings                                                                                                   |
+| Sonar ratings                     | Reliability/security/maintainability all1.0(A)                                                                                                  | Already maximum ratings, but NOT perfect overall                                                                                        |
+| Global Sonar coverage             | 73.4%; line71.3%; branch84.6%                                                                                                                   | 100% maintained executable source; actual instrumented scope/denominator, no first-party exclusion to inflate                           |
+| Global duplication                | 0.8%                                                                                                                                            | 0% unintended clones; any genuinely intentional independent-test duplication needs explicit review, not silent waiver                   |
+| Hotspots                          | 1; reviewed0%                                                                                                                                   | 100% individually reviewed with source-backed disposition; never mark Safe en masse                                                     |
+| New-code Sonar conditions         | coverage87.9%>=80; duplication0.13012%<=3; issues51>0                                                                                           | Current gate is NOT a perfect-score gate; do not confuse new-code and overall metrics                                                   |
+| CodeQL                            | Public repo, licensed public lane present; alert9 OPEN (`js/http-to-file-access`, e2e/local-tts.e2e.mjs:820, main5e710cf)                       | Trace source/sink and fix or independently justify; successful SARIF upload/Analyze check is not zero findings                          |
+| TypeScript/lint                   | tsc, ESLint/boundaries wired; lint command has no --max-warnings0; type-coverage floor99.9                                                      | 0 errors AND warnings; current actual count unmeasured here; target100 where this metric remains applicable, strict typing retained     |
+| Knip                              | CI `--no-exit-code`; config disables exports/types etc., ignores alias unresolved reports                                                       | Resolve graph/scope and actual findings, then hard-block; no blanket new ignores to force green                                         |
+| Rust                              | Fresh main5e710cf already requires cargo-clippy/cargo-fmt; CI Clippy default-target scope                                                       | Cover maintained supported targets/features explicitly; clippy is not a substitute for Rust taint/SCA/coverage                          |
+| Coverage CI                       | Vitest floors76 lines/76 statements/72 functions/90 branches                                                                                    | Floors are current regression checks, not claimed100; ratchet via added real tests. Strict separate entrypoint must not swallow failure |
+| Secrets                           | Gitleaks repo script/canary exists; required GitGuardian check exists                                                                           | Verify CI invocation/history scope and planted secret detection; a configured script alone is not an integration                        |
+| SAST/SCA/workflow/dead-code depth | CodeQL present; remaining canonical Semgrep/OpenGrep, OSV/Cargo/Trivy, jscpd/diff-cover, actionlint/zizmor, cargo-machete wiring not yet proven | Inventory exact applicable tools/licenses/targets and reuse existing gates; missing is BLOCKED/UNKNOWN, not0 findings                   |
+| Test-depth/performance            | Existing test/PBT/native lanes; mutation/performance numerical ceilings not established                                                         | Separate measured acceptance; do not claim static scores prove playback/acoustics or invent100% performance score                       |
+
+Existing main ruleset21615185 requires9 contexts: Alignment Gate, Frontend Checks, Backend Checks, Contract Tests, Packaged PR-fast lane, Trust anchor, Analyze(javascript-typescript), CodeQL, GitGuardian. All its rules/conditions/bypasses/enforcement were re-read and remain unchanged.
+
+**Native integration applied:** added repo-only ruleset23477091, `analysis — CodeQL all severities`, active on refs/heads/main, no bypass actors. Required CodeQL tool with `alerts_threshold=all` and `security_alerts_threshold=all`. FullGLM5.3 different-family public review ALLOW on the exact POST body; GET by ID and effective `/rules/branches/main` both match. Uses GitHub's native feature, no new wrapper/workflow/scanner. Receipt/request/before-state at `codeql-enforcement-receipt.json`, `codeql-ruleset-request.json`, `rulesets-before.json` in the evidence directory. Reversal: `gh api --method DELETE repos/phsb5321/Tauri-PDF-Reader/rulesets/23477091`.
+
+Limits from current [GitHub documentation](https://docs.github.com/en/code-security/concepts/code-scanning/merge-protection): diff-line bounded; no merge-queue-group enforcement; Dependabot/default-setup exception (this repo uses advanced setup). It refuses required-tool absence/in-progress and configured alerts, separately from upload status checks. Active policy/readback is verified; planted-violation CI proof and global-zero-alert acceptance are NOT claimed. Alert9/legacy findings still require remediation. No alert dismissal or status/quality bypass authorized.
+
+Sonar workflow remains main-only and is not a required PR context; that is NOT pre-merge Sonar enforcement. Community Build must not upload a PR as main. No Sonar server/profile, workflow, application or service mutation was made.
+
+Evidence: `~/.local/state/fleet-coordination/lectrice-analysis-enforcement-20260915/` (Sonar GET receipts); GitHub sonar run34995435572 failed quality-gate wait, not dependency setup. Current run35003005700 was queued on first query; no completion claim from that earlier status. API values can advance while249/current-main scans run.
+
+## First code slice — stop lying about strict coverage failures
+
+- `package.json`: remove `|| echo 'Coverage below threshold!'` from actual `test:coverage:check`; preserve `vitest run --coverage --coverage.thresholds.100`.
+- `tools/test/analysis-enforcement.test.mjs`: stdlib-only, executes that real script in a disposable minimal environment with fake Vitest; status0,17 and missing binary. Checks unchanged analyzer flags. Never executes actual tests/install/cargo/app.
+- Fresh-base check found that5e710cf ALREADY fixed optional Clippy. A stale exact edit refused; `scripts/verify.sh` is untouched. No duplicate fix or regression to cargo/rustup wrappers.
+- Preliminary plan reviewed by fullGLM5.3; source-corrected/narrowed plan and rejected reviewer hallucinations recorded in `specs/255-analysis-enforcement/plan.md`. Final source reviewed by fullGLM5.3 (avoidFamily=openai): correctness, anti-gaming and security axes all ALLOW at the three exact source hashes in `reports/source-review.md`. Not a full-verification verdict.
+- Authorized251 slot candidate1 ran15:10:50–15:10:54 (4.509s): baseline exit1/0of3; candidate exit1/1of3. Present fake-tool scenarios unexpectedly returned127, missing-tool case passed. Original logs retained under `delivery-251-255-candidate1/checks/255-analysis-enforcement/`; source/baseline7/7 unchanged and225 restored/window155/restore0. This is NOT product green. Specific fake-exit17 discrimination is not yet established because fixture execution failed.
+- Diagnostic1/2 ran15:18:00–15:18:04 (4.517s), still1/3; stderr proves `vitest: command not found`, not a bad-interpreter diagnosis. Source7/7 stable;225 restored/window157. Original diagnostic logs retained. Exact host reason for failed filesystem lookup is not established.
+- Final correction2/2 removes that unnecessary filesystem shim dependency: define fake Vitest as a Bash function before executing the UNCHANGED actual package command. Empty PATH explicitly before invocation; absent-function case cannot reach real tools. Same exit0/17/127, flags and failure assertions remain. No production change beyond removing echo; no lowered expectation. Final replay pending; cap is not reset.
+- FINAL2/2 slot15:23:37–15:23:42 (4.267s): baseline exit1/0of3, candidate exit0/**3of3 PASS**, actual0/17/127 and flags preserved. Source+baseline8of8 match before/after; unchanged225 restored/window158/restore0. Directly read candidate.log/exit files/slot.json from `delivery-251-255-correction2`. Budget exhausted; original failures stay retained. Earlier references to final replay pending describe the pre-run state only.
+- Ordinary1 authorized251 slot15:54:51–15:55:09 (18.350s): offline frozen hydration0/no downloads, existing Vitest wrapper **4/4 PASS**, scoped TS ESLint0, tsc0; fresh8-file manifest on35801daa matched before/after, three reviewed code hashes unchanged.225 restored/window161/restore0. No commit/precommit/native/provider/real coverage/CI push.
+- `make harness-check` exited2: script reported spec.md and plan.md not completed Spec Kit artifacts (`changed=9`, `product=1`, threshold3). Directly read harness.log: required user-scenario/testing and technical-context sections were missing from the earlier terse documents. This was an authoring omission, not a false-positive validator.
+- Documentation-only completion now fills actual stories/acceptance/edge cases, functional and measurable requirements, technical context, constitution mapping, file structure and evidence/remaining gates; tasks synchronized. The validator and all three code files are untouched. Ordinary2-docs through251 at16:03:56–16:04:00 (4.018s): actual `make harness-check`0/PASS, exact8-file manifest before/after; unchanged225 restored/window162/restore0. Directly read slot.json and harness.log under `delivery-251-255-ordinary2-docs`. No hydration/tests/type/lint/hooks/commit/native rerun; reuse ordinary1 evidence, no2/2 source-budget reset. Normal hooks/commit/CI/merge still pending.
+
+Historical final2 slot command (not a new execution grant): `node --test --test-concurrency=1 tools/test/analysis-enforcement.test.mjs` (expected seconds, aggregate30s cap). Replay the same checker against frozen base package using `ANALYSIS_SUBJECT_ROOT=<baseline-dir>`: it must fail; candidate must pass. Source hashes in `reports/source-manifest.json` bind the packet. This proves command exit propagation only, not actual100% coverage.
+
+## Ordered continuation (not completed by slice1)
+
+1. Execute/red-green/review/land the truthful existing strict-coverage entrypoint under normal hooks/CI; no workflow touch in slice1.
+2. Close advisory integrations in smallest scoped slices: Knip graph+blocking, warning ceiling, supported Rust targets, existing secrets canary invocation; exact base-owned CI contract/negative-control pattern reused. Workflow changes remain explicitly gated, not silently self-merged.
+3. Wire the missing applicable SAST/SCA/duplication/coverage checks with pinned dependencies, explicit licenses and failure-on-missing reports. Bind remote results to the same analysis/revision; do not poll latest alone as an exact-head PR verdict.
+   4.249 remediates actual Sonar findings without widened suppression. Add separate test/coverage/hotspot/CodeQL remediation slices against frozen findings; maximum-score completion waits for all targets across the real scope.
+4. Project-only enforcement may require a new scoped Sonar gate; never edit shared Sonar way/global profiles or deploy a branch plugin under this request. Exact design/review before server/ruleset mutations.
+
+252 status received15:15 remains separate: correction1 slot15:12:44–15:12:49, range12/12/cache24/24/composition8groups PASS, synthetic restart/providerRequests0; worker repair1/2, no Sol verdict, native logging edge unwired. No extra review-provider hopping or native cache enablement.
+
+## Adjacent documentation debt
+
+Ordinary hydration under pnpm11 warned that deprecated `package.json` `pnpm.onlyBuiltDependencies` is ignored. Preserve the warning as toolchain/configuration debt; no dependency-policy mutation or claim about its replacement behavior in this slice.
+
+Runbook's trailing password colon failed401 with curl; standard HTTP Basic succeeded200. Python urllib returned403 on the same service; do not diagnose that as missing credentials or ask Pedro to log in. Credentials were read via rbw and passed only via curl stdin; none retained in reports. Vault correction logged here, no vault-main edit.
+
+Code reversal: one future revert PR of the eventual255 squash; no application runtime change. Native-rule rollback is the one DELETE above (existing protections retained). Full campaign is OPEN; active CodeQL policy does not make the unmerged coverage slice or full stack perfect.
