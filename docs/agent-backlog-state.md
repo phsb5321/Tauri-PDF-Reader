@@ -10,6 +10,21 @@ Current execution/review/PR receipts are maintained in durable coordination `lec
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first. Delivery251's current queue and measured gates: [canonical delivery report](../reports/DELIVERY.md).
 
+## Zoom controls + css:S4666 — 17/09/2026
+
+Spec 256 (frozen p11 worker slice) landed as **#214** (`7d51ce1`): unimplemented `Ctrl+-`/`Ctrl++`
+chord titles removed, key-scoped `stopPropagation` containment on the zoom select (Home/End/Escape/
+arrows/PageUp/PageDown no longer reach document-level page-nav or Escape-to-stop handlers), leaf-scoped
+`color-scheme` so the WebKitGTK native popup follows the app theme. The worker-authored 10-gate suite
+passed on first execution (14/14 with the existing ZoomControls suite); alignment-gate "not-implemented"
+marker prose in the test header reworded at CI (freeze-time claims, not missing work). Post-merge Sonar
+then counted exactly one new-code violation — css:S4666 duplicate `.zoom-select` selector — cleared by
+**#215** (`64e5372`, spec 267): `color-scheme: light` folded into the base block. Post-merge gate REST-verified
+`new_violations = 0` (coverage 87.8, duplication 0.12). No exclusions/ignores/threshold edits. Reverts:
+`git revert 7d51ce1` / `git revert 64e5372`. Worker delivery report retained at
+`~/.local/state/fleet-coordination/lectrice-256-zoom-worker-delivery-20260915.md`. Native WebKitGTK popup
+painting remains a 251-owned packaged check. Next in the operative order: 261/262 controls, then 263 privacy.
+
 ## Iteration #84 — 31/08/2026 (exact-head adversarial repairs + executable geometry)
 
 - **The capable different-family gate blocked rather than rubber-stamped.** Anthropic Opus reviewed exact pushed head `21bc472` against `origin/182-gpu-performance` and returned **BLOCK — 1 BLOCKER, 8 MAJOR** in `~/.local/state/fleet-coordination/lectrice-196-overlay-zoom-20260830/final-opus-review.md`. The blocker was real: context/micro-run merging rebuilt inter-run gaps from raw PDF source and could re-speak a superscript marker already deleted by geometry. The majors correctly exposed stale receipts, inert Stop during page readiness, an `outputScale >= 1` canvas-ceiling hole, an absolute/blurred cockpit that retained ~14% rather than ≥60%, sub-44px controls, incomplete five-state zoom evidence, literal rather than observed receipt claims, and insufficient marker isolation.
