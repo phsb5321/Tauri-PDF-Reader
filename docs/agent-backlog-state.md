@@ -10,6 +10,26 @@ Current execution/review/PR receipts are maintained in durable coordination `lec
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first. Delivery251's current queue and measured gates: [canonical delivery report](../reports/DELIVERY.md).
 
+## Narration controls + Linux flake package — 17/09/2026
+
+Spec 261 (frozen worker slice) landed as **#217** (`14320b1`): consumed cockpit tab keys
+(Arrow/Home/End) now `stopPropagation` at the React handler so tabbing never reaches the reader's
+document-level page jumps; `controlsDisabled` renders a neutral `role="note"` lock line (the one bool
+cannot name a reason, so the note claims none); the worker's Escape seam model was corrected to the
+post-#211 window-level owner contract (OWNERS registry, S6847). Authored 4-gate suite executed green
+at landing; Sonar gate stayed OK post-merge.
+
+Spec 216 (frozen 13/09, "build blocked at serial cap") landed as **#218** (`6c2a755`):
+`packages.x86_64-linux.lectrice` + `apps.default` + `checks.package-contract` (positive +
+malformed-fixture negative control). Execution found and fixed three real bugs the freeze never
+could: verifier path at repo root instead of `nix/`, illegal `chmod` on a read-only store path,
+and the check attr `pkg` clobbered by stdenv hook-loop variable leakage (renamed `packageDir`).
+Local build proven (`nklr7x7cy…-lectrice-0.2.0`), contract check green both directions; the desktop
+profile `~/.local/state/nix/profiles/lectrice` now serves it (`~/.local/bin/lectrice`). NOTE: nix
+auto-GC (min-free 25G) garbage-collected two mid-session build outputs under transient disk
+pressure — rebuilds are safe, just slow. Reverts: `git revert 14320b1` / `git revert 6c2a755`.
+Next in the operative order: 262 (keyboard-controls), then 263 (settings-log-privacy).
+
 ## Zoom controls + css:S4666 — 17/09/2026
 
 Spec 256 (frozen p11 worker slice) landed as **#214** (`7d51ce1`): unimplemented `Ctrl+-`/`Ctrl++`
