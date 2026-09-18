@@ -187,7 +187,6 @@
           }
           ''
             set -eu
-            chmod +x "$verifier"
 
             # Positive: real package passes.
             "$verifier" "$pkg" "$version"
