@@ -1,77 +1,161 @@
+import type { MenuAction } from "../../lib/api/menu";
 import { COMMAND_CHORDS, COMPONENT_CHORDS } from "../../hooks/useCommandKeys";
+import "./KeyboardShortcuts.css";
 
 /**
- * Keyboard shortcuts reference — DERIVED from the real chord sources
- * (slice 111): COMMAND_CHORDS is the same table `useCommandKeys` matches
- * against, and COMPONENT_CHORDS lists the component-owned bindings with
- * their code locations in `useCommandKeys.ts`. A hand-maintained second
- * list is how chords that never existed (Ctrl+F, Ctrl+,, Ctrl+H, Ctrl+B,
- * F11, zoom, chunks) and the Space-as-play/pause lie (Space is next-page)
- * got advertised. Nothing is shown here unless the binding exists.
+ * Keyboard shortcuts reference — the discoverability layer over the real
+ * chord sources. Everything shown is DERIVED from `COMMAND_CHORDS` (the same
+ * table `resolveChord` matches against) and `COMPONENT_CHORDS` (the
+ * component-owned bindings kept beside it): the panel cannot advertise a
+ * chord it cannot point at, and a chord that exists cannot disappear behind a
+ * hand-restated second list (the slice-111 drift mechanism — see the pinned
+ * consistency test).
+ *
+ * Platform accuracy (p16 correction): `resolveChord` matches
+ * `event.ctrlKey || event.metaKey`, so the GLOBAL table genuinely accepts Cmd
+ * on macOS and its keycaps are relabelled there. Component-owned handlers
+ * check `ctrlKey` literally (`AiPlaybackBar` play/pause is `" " + ctrlKey`),
+ * so COMPONENT keys are never relabelled — advertising Cmd+Space would be a
+ * lie. Bare Space stays next-page; no Find or zoom chord exists and none is
+ * shown.
  */
-// COMMAND_CHORDS carries {key, label}; the panel renders the human label as
-// the key chip. COMPONENT_CHORDS already carries a keys array.
-const FILE_CHORDS = COMMAND_CHORDS.filter((c) =>
-  ["open", "toggle-library"].includes(c.action),
-).map((c) => ({ action: c.action, keys: [c.label] }));
-const NAV_CHORDS = COMMAND_CHORDS.filter((c) =>
-  ["prev-page", "next-page"].includes(c.action),
-).map((c) => ({ action: c.action, keys: [c.label] }));
 
-/**
- * Keyboard shortcuts reference — DERIVED from the real chord sources
- * (slice 111): COMMAND_CHORDS is the same table `useCommandKeys` matches
- * against, and COMPONENT_CHORDS lists the component-owned bindings with
- * their code locations. A hand-maintained second list is how Ctrl+F, F11,
- * zoom and chunk chords (which never existed) and the Space-as-play/pause
- * lie (Space is next-page) got advertised. Nothing here exists unless the
- * binding does.
- */
-export function KeyboardShortcuts() {
+/** True when the app runs on macOS (keycaps follow the platform convention). */
+export function isMacPlatform(): boolean {
+  if (typeof navigator === "undefined") return false;
   return (
-    <div className="settings-section">
-      <h3 className="settings-section-title">Keyboard Shortcuts</h3>
-      <p className="settings-section-description">
-        Quick reference for keyboard shortcuts in the reader.
-      </p>
-
-      <div className="shortcut-list">
-        <ShortcutGroup title="File" chords={FILE_CHORDS} />
-        <ShortcutGroup title="Document" chords={NAV_CHORDS} />
-        <ShortcutGroup
-          title="Reader (component-owned)"
-          chords={COMPONENT_CHORDS}
-        />
-      </div>
-    </div>
+    /mac/i.test(navigator.platform ?? "") || /mac/i.test(navigator.userAgent ?? "")
   );
 }
 
-function ShortcutGroup({
-  title,
-  chords,
-}: Readonly<{
+/**
+ * Display label for a GLOBAL chord under a platform. Honest only for
+ * `COMMAND_CHORDS` — see the module note on why component-owned keys are
+ * exempt.
+ */
+export function displayChordLabel(label: string, mac: boolean): string {
+  return mac ? label.replace(/^Ctrl\+/, "⌘") : label;
+}
+
+/** Human names for the commands the global table actually binds. */
+const COMMAND_ACTION_LABELS: Partial<Record<MenuAction, string>> = {
+  open: "Open a document",
+  "toggle-library": "Show or hide the library",
+  "prev-page": "Previous page",
+  "next-page": "Next page",
+};
+
+/**
+ * Display-only taxonomy: which section each entry renders under. Binding
+ * data (keys, modifiers) always comes from the chord sources — this map only
+ * decides grouping, so an unknown future entry lands in "Other" instead of
+ * silently disappearing.
+ */
+const COMMAND_GROUP_BY_ACTION: Partial<Record<MenuAction, string>> = {
+  open: "Files & library",
+  "toggle-library": "Files & library",
+  "prev-page": "Navigation",
+  "next-page": "Navigation",
+};
+
+const COMPONENT_GROUP_BY_ACTION: Record<string, string> = {
+  "Play / Pause TTS": "Playback",
+  "Close / stop the innermost open thing": "Reading actions",
+  "Highlight the pending selection": "Reading actions",
+  "Go to the first page": "Navigation",
+  "Go to the last page": "Navigation",
+};
+
+const GROUP_ORDER = [
+  "Files & library",
+  "Navigation",
+  "Playback",
+  "Reading actions",
+  "Other",
+] as const;
+
+export interface ShortcutRow {
+  label: string;
+  keys: string[];
+}
+
+export interface ShortcutGroup {
   title: string;
-  chords: readonly { action: string; keys: string[] }[];
-}>) {
+  rows: ShortcutRow[];
+}
+
+/**
+ * Derive the full displayed chord set for a platform context from the two
+ * sources. Same-action global chords merge into one row (Page Up | ←), so a
+ * navigation action reads as one line, not three.
+ */
+export function buildShortcutGroups(mac: boolean): ShortcutGroup[] {
+  const rowsByGroup = new Map<string, ShortcutRow[]>();
+  const push = (title: string, row: ShortcutRow) => {
+    const rows = rowsByGroup.get(title);
+    if (!rows) {
+      rowsByGroup.set(title, [row]);
+      return;
+    }
+    // Same action in the same group = ONE row carrying its alternative
+    // keycaps (Previous page: Page Up | ←; Next page: Page Down | → | Space).
+    // Row labels stay unique per group, so `key={row.label}` is a unique,
+    // stable React key.
+    const existing = rows.find((candidate) => candidate.label === row.label);
+    if (existing) existing.keys.push(...row.keys);
+    else rows.push(row);
+  };
+  for (const chord of COMMAND_CHORDS) {
+    push(COMMAND_GROUP_BY_ACTION[chord.action] ?? "Other", {
+      label: COMMAND_ACTION_LABELS[chord.action] ?? chord.action,
+      keys: [displayChordLabel(chord.label, mac)],
+    });
+  }
+  // Component-owned keys stay LITERAL in every platform context: their
+  // handlers bind `ctrlKey`, not metaKey (p16 correction).
+  for (const chord of COMPONENT_CHORDS) {
+    push(COMPONENT_GROUP_BY_ACTION[chord.action] ?? "Other", {
+      label: chord.action,
+      keys: [...chord.keys],
+    });
+  }
+  return GROUP_ORDER.filter((title) => rowsByGroup.has(title)).map((title) => ({
+    title,
+    rows: rowsByGroup.get(title) as ShortcutRow[],
+  }));
+}
+
+export function KeyboardShortcuts() {
+  const mac = isMacPlatform();
+  const groups = buildShortcutGroups(mac);
   return (
-    <>
-      <div className="shortcut-group-title">{title}</div>
-      {chords.map((chord) => (
-        <div key={chord.action} className="shortcut-row">
-          <span className="shortcut-action">{chord.action}</span>
-          <div className="shortcut-keys">
-            {chord.keys.map((key, index) => (
-              <span key={index}>
-                <span className="shortcut-key">{key}</span>
-                {index < chord.keys.length - 1 && (
-                  <span className="shortcut-separator">+</span>
-                )}
-              </span>
+    <div className="settings-section keyboard-shortcuts">
+      <h3 className="settings-section-title">Keyboard Shortcuts</h3>
+      <p className="settings-section-description">
+        Every binding the reader actually has, grouped by what it does.
+        {mac
+          ? " Global shortcuts accept ⌘ on this Mac; component bindings stay as implemented."
+          : " On macOS, global shortcuts also accept ⌘."}
+      </p>
+      <div className="shortcut-list">
+        {groups.map((group) => (
+          <section key={group.title} className="shortcut-group">
+            <h4 className="shortcut-group-title">{group.title}</h4>
+            {group.rows.map((row) => (
+              <div key={row.label} className="shortcut-row" data-shortcut-row="">
+                <span className="shortcut-action">{row.label}</span>
+                <div className="shortcut-keys">
+                  {row.keys.map((key) => (
+                    <span key={key} className="shortcut-key">
+                      {key}
+                    </span>
+                  ))}
+                </div>
+              </div>
             ))}
-          </div>
-        </div>
-      ))}
-    </>
+          </section>
+        ))}
+      </div>
+    </div>
   );
 }
