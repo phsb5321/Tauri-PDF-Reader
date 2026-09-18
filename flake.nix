@@ -183,7 +183,7 @@
             nativeBuildInputs = [pkgs.file];
             pkg = lectrice;
             inherit (lectrice) version;
-            verifier = ./package-contract.sh;
+            verifier = ./nix/package-contract.sh;
           }
           ''
             set -eu
