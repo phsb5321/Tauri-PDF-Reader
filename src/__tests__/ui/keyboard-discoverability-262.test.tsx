@@ -7,15 +7,12 @@
  * actual handlers: `resolveChord` matches ctrlKey OR metaKey, so global
  * chords may relabel to ⌘ on macOS; component-owned handlers bind `ctrlKey`
  * literally (AiPlaybackBar), so their keys are never relabelled — no invented
- * Cmd+Space. Bare Space stays next-page; unimplemented Find and zoom chords
+ * Cmd+Space. Bare Space stays next-page; unbound Find and zoom chords
  * never appear.
  */
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  COMMAND_CHORDS,
-  COMPONENT_CHORDS,
-} from "../../hooks/useCommandKeys";
+import { COMMAND_CHORDS, COMPONENT_CHORDS } from "../../hooks/useCommandKeys";
 import {
   KeyboardShortcuts,
   buildShortcutGroups,
@@ -102,15 +99,19 @@ describe("keyboard reference (262)", () => {
     };
     // Alternatives derive from the sources, in source order — really merged.
     expect(rowKeys("Previous page")).toEqual(
-      COMMAND_CHORDS.filter((c) => c.action === "prev-page").map((c) => c.label),
+      COMMAND_CHORDS.filter((c) => c.action === "prev-page").map(
+        (c) => c.label,
+      ),
     );
     expect(rowKeys("Next page")).toEqual(
-      COMMAND_CHORDS.filter((c) => c.action === "next-page").map((c) => c.label),
+      COMMAND_CHORDS.filter((c) => c.action === "next-page").map(
+        (c) => c.label,
+      ),
     );
     expect(rowKeys("Next page")).toContain("Space");
   });
 
-  it("never advertises unimplemented Find or zoom chords, nor Cmd+Space", () => {
+  it("never advertises Find or zoom chords the app does not bind, nor Cmd+Space", () => {
     const { container } = render(<KeyboardShortcuts />);
     const text = container.textContent ?? "";
     expect(text).not.toMatch(/\bfind\b/i);
@@ -131,7 +132,9 @@ describe("keyboard reference (262)", () => {
     expect(macSet).toContain("Space");
     expect(macSet).not.toContain("⌘Space");
     // DOM context: a mac platform renders ⌘O and drops the Ctrl variant.
-    const platformSpy = vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
+    const platformSpy = vi
+      .spyOn(navigator, "platform", "get")
+      .mockReturnValue("MacIntel");
     const { container } = render(<KeyboardShortcuts />);
     expect(container.textContent).toContain("⌘O");
     expect(container.textContent).not.toContain("Ctrl+O");
