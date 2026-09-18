@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useDocumentStore } from "../stores/document-store";
 import { useOpenPdf } from "../hooks/useOpenPdf";
 import { useRovingTabindex } from "../hooks/useRovingTabindex";
@@ -46,6 +46,44 @@ export function Toolbar({
   const { openPdf } = useOpenPdf();
   const toolbarRef = useRef<HTMLDivElement>(null);
 
+  // Spec 260 focus recovery (correction 1 semantics): the roving buttons
+  // REMOUNT on the library <-> reader transition. Recover ONLY focus the
+  // toolbar actually LOST: remember the last toolbar-owned focused item;
+  // on the flip, if focus now sits on a live element anywhere else
+  // (deliberately moved outside), leave it exactly where the user put it.
+  // Recover when the owned item was unmounted away (activeElement fell back
+  // to <body>) — refocusing that same item if it survived, else the first
+  // enabled roving item. No timers; no first-mount steal (no owned focus).
+  const lastOwnedFocusRef = useRef<HTMLElement | null>(null);
+  const handleToolbarFocusCapture = useCallback((event: React.FocusEvent) => {
+    const target = event.target;
+    if (target instanceof HTMLElement) lastOwnedFocusRef.current = target;
+  }, []);
+  const wasLibraryShowingRef = useRef(isLibraryShowing);
+  useEffect(() => {
+    if (wasLibraryShowingRef.current === isLibraryShowing) return;
+    wasLibraryShowingRef.current = isLibraryShowing;
+    const owned = lastOwnedFocusRef.current;
+    if (!owned) return; // focus never lived in the toolbar: do not steal
+    const active = document.activeElement;
+    const focusLostByRemount =
+      active === document.body || active === document.documentElement;
+    if (!focusLostByRemount) return; // deliberate outside focus: leave it
+    if (
+      owned.isConnected &&
+      owned.matches(
+        'button.toolbar-roving-item:not(:disabled):not([aria-disabled="true"])',
+      )
+    ) {
+      owned.focus();
+      return;
+    }
+    const first = toolbarRef.current?.querySelector<HTMLElement>(
+      'button.toolbar-roving-item:not(:disabled):not([aria-disabled="true"])',
+    );
+    first?.focus();
+  }, [isLibraryShowing]);
+
   // Roving tabindex for keyboard navigation within the toolbar
   const { getItemProps } = useRovingTabindex({
     containerRef: toolbarRef,
@@ -79,6 +117,7 @@ export function Toolbar({
         ref={toolbarRef}
         role="toolbar"
         aria-label="Document toolbar"
+        onFocusCapture={handleToolbarFocusCapture}
       >
         <div className="toolbar-section toolbar-left">
           {!isLibraryShowing && (
@@ -122,6 +161,10 @@ export function Toolbar({
               </svg>
               <span className="button-text">Chapters</span>
             </button>
+          )}
+
+          {isLibraryShowing ? null : (
+            <span className="toolbar-divider" aria-hidden="true" />
           )}
 
           <button
