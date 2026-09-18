@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Lectrice
+GenericName=PDF Reader
+Comment=Local-first PDF reader with synchronized narration
+Exec=@LECTRICE@ %f
+Icon=lectrice
+Terminal=false
+Categories=Office;Viewer;Literature;
+MimeType=application/pdf;
+StartupWMClass=tauri-pdf-reader
+Keywords=pdf;reader;narration;tts;
+Version=@VERSION@
