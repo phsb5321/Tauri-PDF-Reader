@@ -6,7 +6,7 @@
 
 The current native v2 and registered legacy generic settings write paths must persist and return unchanged JSON without copying stored content into application logs. Success and validation failure must retain their existing behavior.
 
-## Scenarios
+## User Scenarios & Testing
 
 1. Write a synthetic document-like JSON value through the shared settings service/repository; read back the exact value. TRACE-enabled capture must not contain the synthetic content.
 2. Batch-create and overwrite synthetic values; both persisted results must match and neither value may appear in captured logs.
