@@ -181,7 +181,10 @@
         checks.package-contract = pkgs.runCommand "lectrice-package-contract"
           {
             nativeBuildInputs = [pkgs.file];
-            pkg = lectrice;
+            # NOT `pkg`: stdenv hook loops leak their `pkg` loop variable
+            # into the environment, clobbering this value before the
+            # builder runs (observed: env became a strip.sh hook path).
+            packageDir = lectrice;
             inherit (lectrice) version;
             verifier = ./nix/package-contract.sh;
           }
@@ -189,23 +192,23 @@
             set -eu
 
             # Positive: real package passes.
-            "$verifier" "$pkg" "$version"
+            bash "$verifier" "$packageDir" "$version"
 
             # Negative control: break the Exec line + drop the binary in a
             # copy; the SAME verifier must exit nonzero.
             bad="$TMPDIR/malformed-fixture"
-            cp -r "$pkg" "$bad"
+            cp -r "$packageDir" "$bad"
             chmod -R u+w "$bad"
             sed -i "s|^Exec=.*|Exec=/nonexistent/lectrice|" "$bad/share/applications/lectrice.desktop"
             rm "$bad/bin/tauri-pdf-reader"
-            if "$verifier" "$bad" "$version" >/dev/null 2>&1; then
+            if bash "$verifier" "$bad" "$version" >/dev/null 2>&1; then
               echo "FAIL: negative control PASSED the verifier on a malformed fixture"
               exit 1
             fi
             echo "negative control OK: malformed fixture correctly rejected"
 
             # Cross-platform hygiene (ordinary assertion, not the control).
-            if [ -e "$pkg/Applications/Lectrice.app" ]; then
+            if [ -e "$packageDir/Applications/Lectrice.app" ]; then
               echo "FAIL: Darwin .app layout leaked into Linux package"; exit 1
             fi
             touch "$out"
