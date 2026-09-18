@@ -8,7 +8,6 @@
 import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { AiSpeedSlider } from "./AiSpeedSlider";
-import { useAiTts } from "../../hooks/useAiTts";
 
 vi.mock("../../hooks/useAiTts", () => ({
   useAiTts: (selector?: (s: unknown) => unknown) => {
@@ -47,10 +46,7 @@ describe("AiSpeedSlider — spec 259", () => {
   it("announces the exact multiplier via aria-valuetext and visible value", () => {
     useAiTtsState.speed = 1.25;
     render(<AiSpeedSlider />);
-    expect(slider()).toHaveAttribute(
-      "aria-valuetext",
-      "1.25× playback speed",
-    );
+    expect(slider()).toHaveAttribute("aria-valuetext", "1.25× playback speed");
     expect(screen.getByText("1.25x")).toBeTruthy();
   });
 
@@ -93,7 +89,9 @@ describe("AiSpeedSlider — spec 259", () => {
       "aria-describedby",
       "ai-speed-slider-hint",
     );
-    expect(screen.getByText(/can't change while a clip is active or loading/i)).toBeTruthy();
+    expect(
+      screen.getByText(/can't change while a clip is active or loading/i),
+    ).toBeTruthy();
     expect(screen.queryByText(/connect an ai provider/i)).toBeNull();
   });
 
@@ -102,7 +100,9 @@ describe("AiSpeedSlider — spec 259", () => {
     render(<AiSpeedSlider disabled />);
     expect(slider()).toBeDisabled();
     expect(screen.getByText(/connect an ai provider/i)).toBeTruthy();
-    expect(screen.queryByText(/can't change while a clip is active or loading/i)).toBeNull();
+    expect(
+      screen.queryByText(/can't change while a clip is active or loading/i),
+    ).toBeNull();
   });
 
   it("uninitialized provider: connection reason, not the playback reason", () => {
@@ -110,7 +110,9 @@ describe("AiSpeedSlider — spec 259", () => {
     render(<AiSpeedSlider />);
     expect(slider()).toBeDisabled();
     expect(screen.getByText(/connect an ai provider/i)).toBeTruthy();
-    expect(screen.queryByText(/can't change while a clip is active or loading/i)).toBeNull();
+    expect(
+      screen.queryByText(/can't change while a clip is active or loading/i),
+    ).toBeNull();
   });
 
   it("enabled control exposes no disabled hint and dispatches setSpeed", async () => {
