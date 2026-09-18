@@ -83,7 +83,10 @@ async fn settings_values_are_not_traced() {
         "synthetic updated page 263",
         "synthetic rejected page 263",
     ] {
-        assert!(!captured.contains(sentinel), "settings value reached tracing");
+        assert!(
+            !captured.contains(sentinel),
+            "settings value reached tracing"
+        );
     }
 
     // The thin v2 handler cannot be invoked without app state. Its source guard
@@ -101,7 +104,13 @@ async fn settings_values_are_not_traced() {
         legacy,
     ] {
         for logging in [
-            "tracing", "log::", "println!", "eprintln!", "print!", "eprint!", "dbg!",
+            "tracing",
+            "log::",
+            "println!",
+            "eprintln!",
+            "print!",
+            "eprint!",
+            "dbg!",
         ] {
             assert!(
                 !source.contains(logging),
