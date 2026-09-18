@@ -2,6 +2,10 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  /* Spec 259: no clipping at narrow desktop widths — the group wraps as a
+   * last resort instead of truncating the label/value. */
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .ai-speed-slider-label {
@@ -18,6 +22,14 @@
   cursor: pointer;
   appearance: none;
   background: transparent;
+}
+
+.ai-speed-slider-input:focus-visible {
+  /* Shared focus feedback (existing token): visible keyboard focus ring on
+   * the slider surface, not only on the thumb. */
+  outline: none;
+  border-radius: 4px;
+  box-shadow: var(--shadow-focus, 0 0 0 2px var(--accent-color, #7c3aed));
 }
 
 .ai-speed-slider-input::-webkit-slider-runnable-track,
@@ -41,6 +53,10 @@
   transform: scale(1.1);
 }
 
+.ai-speed-slider-input:active::-webkit-slider-thumb {
+  transform: scale(1.2); /* pressed feedback */
+}
+
 .ai-speed-slider-input::-moz-range-thumb {
   width: 14px;
   height: 14px;
@@ -48,6 +64,19 @@
   border: none;
   border-radius: 50%;
   cursor: pointer;
+}
+
+/* Spec 259: reduced-motion support — no thumb scale animation. */
+@media (prefers-reduced-motion: reduce) {
+  .ai-speed-slider-input::-webkit-slider-thumb {
+    transition: none;
+  }
+  .ai-speed-slider-input::-webkit-slider-thumb:hover {
+    transform: none;
+  }
+  .ai-speed-slider-input:active::-webkit-slider-thumb {
+    transform: none;
+  }
 }
 
 .ai-speed-slider-input:disabled {
@@ -65,4 +94,19 @@
   color: var(--text-primary, #fff);
   min-width: 32px;
   text-align: right;
+  font-variant-numeric: tabular-nums; /* stable width while dragging */
+}
+
+.ai-speed-slider-value--disabled {
+  color: var(--text-secondary, #888);
+}
+
+/* Honest disabled explanation: visible hint tied to the control via
+ * aria-describedby, using existing text tokens. */
+.ai-speed-slider-hint {
+  flex-basis: 100%;
+  font-size: var(--text-xs);
+  color: var(--text-secondary, #888);
+  white-space: normal;
+  line-height: 1.3;
 }
