@@ -15,7 +15,7 @@ Only `src/components/PageNavigation.tsx` + `PageNavigation.css`, one scoped
 test, this spec set. Baseline `35801daa`. No hook/store/IPC rewrite: the frozen
 `usePageNavigation` hook and store clamp semantics are reused, not modified.
 
-## Scenarios (tested)
+## User Scenarios & Testing (tested)
 
 1. Enter commits once; a blur arriving before the stop-audio await lands
    dispatches nothing more (1 TTS stop, 1 progress write).
@@ -24,7 +24,7 @@ test, this spec set. Baseline `35801daa`. No hook/store/IPC rewrite: the frozen
    restored.
 4. Invalid drafts ("12junk", "1.5", "9007199254740993", 300 nines) reset with
    zero calls — full-string safe-integer policy on trimmed input.
-4b. MARKED POLICY DIVERGENCE (p16 readback 16:50): the parseInt era accepted
+   4b. MARKED POLICY DIVERGENCE (p16 readback 16:50): the parseInt era accepted
    "-1" and clamped it. N1's out-of-range clamping is preserved for unsigned
    integers only; signed input ("-1", "+2") is deliberately invalid under the
    digits-only contract. Pinned by a dedicated test so the divergence cannot

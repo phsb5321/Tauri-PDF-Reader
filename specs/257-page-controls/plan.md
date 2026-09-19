@@ -1,6 +1,11 @@
 # Plan — 257 page controls
 
+## Technical Context
+
 Baseline `35801daa`, root `tauri-pdf-reader-257-page-controls`.
+React 18 + zustand; the frozen `usePageNavigation` hook and store clamp
+semantics are reused unchanged. Only `PageNavigation.tsx` and its scoped CSS
+plus one test file are touched; no hook, store, IPC or dependency change.
 
 1. Trace `usePageNavigation.ts` (frozen semantics: stop-then-read-then-write,
    store clamp) and the existing `PageNavigation` draft flow; identify the
