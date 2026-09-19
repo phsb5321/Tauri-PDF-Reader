@@ -87,6 +87,26 @@ describe("useAnnounce", () => {
     vi.useRealTimers();
   });
 
+  it("cancels its pending animation frame on unmount (no update after teardown)", async () => {
+    const cancelSpy = vi.spyOn(globalThis, "cancelAnimationFrame");
+    const { unmount } = render(<TestComponent />);
+
+    // Schedule an announcement but do NOT flush the frame: the update is still
+    // pending when the tree goes away.
+    await act(async () => {
+      screen.getByTestId("announce-btn").click();
+    });
+    unmount();
+
+    expect(cancelSpy).toHaveBeenCalled();
+    // Nothing may run afterwards — a frame that fires post-teardown setStates an
+    // unmounted tree and throws from react-dom's getCurrentEventPriority.
+    await act(async () => {
+      vi.advanceTimersByTime(5000);
+    });
+    expect(screen.queryByTestId("current-message")).toBeNull();
+  });
+
   describe("announce function", () => {
     it.each([
       [{}, "announce-btn", "Test message", "polite"],

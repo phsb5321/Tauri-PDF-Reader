@@ -113,12 +113,23 @@ export function useAnnounce(
 
   const [current, setCurrent] = useState<Announcement | null>(null);
   const clearTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const frameRef = useRef<number | null>(null);
 
-  // Clear any existing timeout when unmounting or when current changes
+  // Clear any pending frame and timeout on unmount. Both are scheduled by
+  // `announce` and must not outlive the component: a frame or timeout that
+  // lands after teardown calls setState on an unmounted tree (React then reads
+  // `window` from a torn-down environment and throws). The coverage lane
+  // reproduced this as "ReferenceError: window is not defined" from
+  // react-dom's getCurrentEventPriority.
   useEffect(() => {
     return () => {
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
       if (clearTimeoutRef.current) {
         clearTimeout(clearTimeoutRef.current);
+        clearTimeoutRef.current = null;
       }
     };
   }, []);
@@ -144,7 +155,8 @@ export function useAnnounce(
       // To trigger re-announcement of the same message, briefly clear then set
       // Using requestAnimationFrame ensures the DOM updates between clear and set
       setCurrent(null);
-      requestAnimationFrame(() => {
+      frameRef.current = requestAnimationFrame(() => {
+        frameRef.current = null;
         setCurrent({
           message,
           priority: finalPriority,

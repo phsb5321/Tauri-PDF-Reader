@@ -68,8 +68,6 @@ pub async fn settings_set(
     .await
     .map_err(|e| format!("DATABASE_ERROR: Failed to set setting: {}", e))?;
 
-    tracing::debug!("Setting {} = {}", key, value_str);
-
     Ok(SettingResponse { key, value })
 }
 
@@ -131,8 +129,6 @@ pub async fn settings_set_batch(
         .execute(&pool)
         .await
         .map_err(|e| format!("DATABASE_ERROR: Failed to set setting {}: {}", key, e))?;
-
-        tracing::debug!("Setting {} = {}", key, value_str);
     }
 
     Ok(SettingsMap { settings })
