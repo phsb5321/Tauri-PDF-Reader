@@ -100,7 +100,6 @@ pub async fn settings_set_v2(
     let service = create_service(&db).await?;
     service.set(&key, &value_str).await.map_err(map_error)?;
 
-    tracing::debug!("Setting {} = {}", key, value_str);
     Ok(SettingResponse { key, value })
 }
 
