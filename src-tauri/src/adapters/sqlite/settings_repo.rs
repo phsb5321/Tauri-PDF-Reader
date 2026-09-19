@@ -45,8 +45,6 @@ impl SettingsRepository for SqliteSettingsRepo {
         .execute(&self.pool)
         .await
         .map_err(|e| DomainError::storage(format!("Failed to set setting '{}': {}", key, e)))?;
-
-        tracing::debug!("Setting {} = {}", key, value);
         Ok(())
     }
 
@@ -89,8 +87,6 @@ impl SettingsRepository for SqliteSettingsRepo {
             .execute(&mut *tx)
             .await
             .map_err(|e| DomainError::storage(format!("Failed to set setting '{}': {}", key, e)))?;
-
-            tracing::debug!("Setting {} = {}", key, value);
         }
 
         tx.commit()

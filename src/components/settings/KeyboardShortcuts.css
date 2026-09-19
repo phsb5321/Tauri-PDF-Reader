@@ -1,0 +1,30 @@
+/* Scoped styles for the keyboard shortcuts reference (262). Base
+ * .shortcut-list/.shortcut-row/.shortcut-action/.shortcut-keys/.shortcut-key
+ * rules live in SettingsPanel.css; this file adds only the grouping and
+ * wrap behaviour that file never had. Tokens only — dark/light surfaces come
+ * from the shared theme, and nothing here animates (reduced-motion is
+ * inherently honored). */
+
+.keyboard-shortcuts .shortcut-group {
+  margin: 0 0 var(--space-4);
+}
+
+.keyboard-shortcuts .shortcut-group-title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold, 600);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary, #6b7280);
+}
+
+/* Narrow desktop widths: the action label and its keycaps wrap instead of
+ * clipping or pushing the keys off the panel. */
+.keyboard-shortcuts .shortcut-row {
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+}
+
+.keyboard-shortcuts .shortcut-keys {
+  flex-wrap: wrap;
+}
