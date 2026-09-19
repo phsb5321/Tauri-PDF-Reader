@@ -1,5 +1,12 @@
 # 258 — Plan
 
+## Technical Context
+
+TypeScript 5.6 + React 18 + vitest/jsdom. The touched surface is
+`AiVoiceSelector.tsx` and its scoped CSS plus one synthetic test; no new
+dependency or primitive, and no hook/store/IPC change. Native
+`<select>`/`<optgroup>` is the rendering contract (the zoom-menu precedent).
+
 - Research (read-only): existing AiVoiceSelector.tsx/.css, useAiTts hook
   surface, AiVoiceInfo contract, dual-mount usage in AiPlaybackBar +
   NarrationCockpit, token vocabulary (colors/typography/spacing/motion).

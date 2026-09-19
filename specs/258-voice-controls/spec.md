@@ -12,7 +12,7 @@
   initialized, initError, error, connections). `AiVoiceInfo` carries
   `provider: elevenlabs|local|groq` — grouping needs no new data.
 
-## Scenarios
+## User Scenarios & Testing
 
 1. Voices render grouped by provider via native `<optgroup>` (ElevenLabs /
    Local / Groq), first-seen order, labels preserved as `Name (labels)`.
