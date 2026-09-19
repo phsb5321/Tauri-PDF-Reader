@@ -10,6 +10,70 @@ Current execution/review/PR receipts are maintained in durable coordination `lec
 
 > Durable handoff for the `/loop` / lectrice-forward workflow. Latest first. Delivery251's current queue and measured gates: [canonical delivery report](../reports/DELIVERY.md).
 
+## DeepSeek-Flash tab switch + wave 262/263 landings — 18/09/2026
+
+**Pedro's dispatch:** "put all the tabs to use deepseek flash max effort and lets
+complete all the roadmap."
+
+**Model lane.** `meta/pi-deepseek-recovery.md` (landed today, `9f3c58bb` #2256)
+restored *native* DeepSeek V4.1 Flash and verified it (`pi --model
+deepseek/deepseek-flash:max`, tools/tasks + compaction + resume). On that basis
+the delivery seat moved every **public-class** pane of Pedro's own herdr client
+(`side-projects`) onto `deepseek/deepseek-flash:max` with the fleet's verified
+handoff helper (`herdr-prompt … "/model deepseek/deepseek-flash"`; the effort
+level rides along as ⚡max). 19 live panes ended on the lane, two were already
+there (dokku-orch, statusline-orch) — receipt
+`~/.local/state/fleet-coordination/deepseek-switch-20260918/RECEIPT.md`.
+**Not switched, deliberately:** privacy/personal-class seats (work/OLX, job
+funnel, interview copilot, DeliCasa client, home-light, vault/WhatsApp notes,
+fleet-coordination notes) stay on their Western lanes per the recovery doc's own
+exclusions, and this orchestrator seat stays on GPT-6 Astra because a
+Chinese-frontier author must not gate its own family. Balance at switch time:
+USD 9.09 pay-go; the provider has **no row in the fleet lane report**, so nothing
+throttles or health-checks it. The declarative `agentModels` table was NOT
+touched (`deepseekDefaultCount == 0` still holds; today's recovery doc says
+"no fleet-wide model migration").
+
+**Landed.** Spec **262** (#220, squash `c97a7cb`): the Settings → Shortcuts
+reference derives from `COMMAND_CHORDS`/`COMPONENT_CHORDS`, groups by real
+purpose, merges same-action alternatives into one row, and keeps platform
+keycaps honest (global ⌘ relabel, component-owned keys literal). The frozen
+worker slice was executed for the first time at landing: 8/8 authored +
+consistency tests, fuzz 8/8 (seed 20260801), lint 0 errors, typecheck clean,
+harness policy PASS, alignment gate PASS after rewording marker prose the gate
+reads as a stub claim; **four negative controls** fire (merge reverted 1F/4P,
+⌘ lie 1F/4P, dropped chord 4F, invented chord 3F). A fresh-process
+different-family review (GPT-6 Astra, read-only tools) returned **NO FINDINGS**;
+the Codex *delegation* lane was capped (7d 84%, zero credits) so it could not
+serve — the receipt records that substitution honestly. Packaged journey for the
+panel itself: **BLOCKED, reported not waived** (no black-box spec reaches
+Settings → Shortcuts). Revert: `git revert c97a7cb`.
+
+Spec **263** (#221): the five `tracing::debug!("Setting {} = {}", key, value)`
+sites that copied stored settings into logs are gone, plus a synthetic native
+falsifier with a TRACE capture, a control event, and a source guard. The
+never-run gate found the authored test unformatted (`cargo-fmt --check` red) and
+the branch policy found the spec heading missing — both fixed at landing
+(`f6ec576`, `3b12f85`). Local gates: falsifier 1/1, clippy clean, full backend
+tests green, and the spec's own negative control fires (`settings value reached
+tracing`, 0/1) when a value log is reintroduced.
+
+**Post-merge Sonar caught the 262 slice:** gate RED with `new_violations = 2`
+on `KeyboardShortcuts.tsx` (typescript:S1874 deprecated `navigator.platform`,
+typescript:S2301 boolean-switching parameter). Fixed by a follow-up slice
+(`268-shortcuts-sonar`: platform signal reads the user agent, and the boolean
+becomes a `"mac" | "other"` value) — the same pattern as #215/spec 267.
+
+**Wave slices staged but not yet landed** (branches pushed, local gates green,
+each awaiting its own CI cycle on the single-slot runner — never push two,
+because the packaged-gate concurrency group cancels the older run): **257**
+page-controls (13/13; red-before control 9F/4P, including the double-dispatch
+spy firing twice; its deliberate digits-only policy divergence is disclosed),
+**258** voice-controls (10/10; red-before 10F/10), **259** speed-control-ux
+(8/8; an eslint error the first lint found is fixed), **260** toolbar-controls
+(9/9 after the authored harness's missing `useState` import was fixed). Each was
+re-verified as a real oracle: reverted to its base, its suite goes red.
+
 ## Narration controls + Linux flake package — 17/09/2026
 
 Spec 261 (frozen worker slice) landed as **#217** (`14320b1`): consumed cockpit tab keys
