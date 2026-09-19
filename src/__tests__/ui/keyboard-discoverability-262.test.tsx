@@ -17,12 +17,13 @@ import {
   KeyboardShortcuts,
   buildShortcutGroups,
   displayChordLabel,
+  type Platform,
 } from "../../components/settings/KeyboardShortcuts";
 
 /** The exact displayed keycap multiset the sources imply for a context. */
-function expectedKeycaps(mac: boolean): string[] {
+function expectedKeycaps(platform: Platform): string[] {
   return [
-    ...COMMAND_CHORDS.map((chord) => displayChordLabel(chord.label, mac)),
+    ...COMMAND_CHORDS.map((chord) => displayChordLabel(chord.label, platform)),
     ...COMPONENT_CHORDS.flatMap((chord) => chord.keys),
   ].sort();
 }
@@ -41,7 +42,9 @@ afterEach(() => {
 describe("keyboard reference (262)", () => {
   it("shows exactly the union of both chord sources — nothing invented, nothing missing", () => {
     const { container } = render(<KeyboardShortcuts />);
-    expect(displayedKeycaps(container).sort()).toEqual(expectedKeycaps(false));
+    expect(displayedKeycaps(container).sort()).toEqual(
+      expectedKeycaps("other"),
+    );
     // Every displayed binding sits on a real row; the count follows the sources.
     const rows = container.querySelectorAll("[data-shortcut-row]");
     expect(rows.length).toBeGreaterThan(0);
@@ -121,20 +124,22 @@ describe("keyboard reference (262)", () => {
 
   it("mac context relabels ONLY global chords (⌘O) and keeps component keys literal", () => {
     // Pure context: the displayed set under mac vs non-mac.
-    expect(displayChordLabel("Ctrl+O", true)).toBe("⌘O");
-    expect(displayChordLabel("Ctrl+O", false)).toBe("Ctrl+O");
-    const macSet = buildShortcutGroups(true)
+    expect(displayChordLabel("Ctrl+O", "mac")).toBe("⌘O");
+    expect(displayChordLabel("Ctrl+O", "other")).toBe("Ctrl+O");
+    const macSet = buildShortcutGroups("mac")
       .flatMap((group) => group.rows.flatMap((row) => row.keys))
       .sort();
-    expect(macSet).toEqual(expectedKeycaps(true));
+    expect(macSet).toEqual(expectedKeycaps("mac"));
     // The play/pause component binding is NOT relabelled on mac.
     expect(macSet).toContain("Ctrl");
     expect(macSet).toContain("Space");
     expect(macSet).not.toContain("⌘Space");
     // DOM context: a mac platform renders ⌘O and drops the Ctrl variant.
+    // The signal is the user agent — `navigator.platform` is deprecated and
+    // deliberately not read (typescript:S1874); stubbing it would prove nothing.
     const platformSpy = vi
-      .spyOn(navigator, "platform", "get")
-      .mockReturnValue("MacIntel");
+      .spyOn(navigator, "userAgent", "get")
+      .mockReturnValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)");
     const { container } = render(<KeyboardShortcuts />);
     expect(container.textContent).toContain("⌘O");
     expect(container.textContent).not.toContain("Ctrl+O");

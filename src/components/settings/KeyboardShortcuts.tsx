@@ -20,12 +20,17 @@ import "./KeyboardShortcuts.css";
  * shown.
  */
 
-/** True when the app runs on macOS (keycaps follow the platform convention). */
-export function isMacPlatform(): boolean {
-  if (typeof navigator === "undefined") return false;
-  return (
-    /mac/i.test(navigator.platform ?? "") || /mac/i.test(navigator.userAgent ?? "")
-  );
+/** Which platform convention the keycaps follow. */
+export type Platform = "mac" | "other";
+
+/**
+ * Platform signal for the reference. `navigator.platform` is deprecated and
+ * is NOT read here (typescript:S1874); the user agent is the supported one. A
+ * false negative only prints Ctrl where ⌘ is idiomatic — the chord still
+ * works, because `resolveChord` matches `ctrlKey || metaKey`.
+ */
+export function detectPlatform(userAgent: string | undefined): Platform {
+  return /mac/i.test(userAgent ?? "") ? "mac" : "other";
 }
 
 /**
@@ -33,8 +38,8 @@ export function isMacPlatform(): boolean {
  * `COMMAND_CHORDS` — see the module note on why component-owned keys are
  * exempt.
  */
-export function displayChordLabel(label: string, mac: boolean): string {
-  return mac ? label.replace(/^Ctrl\+/, "⌘") : label;
+export function displayChordLabel(label: string, platform: Platform): string {
+  return platform === "mac" ? label.replace(/^Ctrl\+/, "⌘") : label;
 }
 
 /** Human names for the commands the global table actually binds. */
@@ -89,7 +94,7 @@ export interface ShortcutGroup {
  * sources. Same-action global chords merge into one row (Page Up | ←), so a
  * navigation action reads as one line, not three.
  */
-export function buildShortcutGroups(mac: boolean): ShortcutGroup[] {
+export function buildShortcutGroups(platform: Platform): ShortcutGroup[] {
   const rowsByGroup = new Map<string, ShortcutRow[]>();
   const push = (title: string, row: ShortcutRow) => {
     const rows = rowsByGroup.get(title);
@@ -108,7 +113,7 @@ export function buildShortcutGroups(mac: boolean): ShortcutGroup[] {
   for (const chord of COMMAND_CHORDS) {
     push(COMMAND_GROUP_BY_ACTION[chord.action] ?? "Other", {
       label: COMMAND_ACTION_LABELS[chord.action] ?? chord.action,
-      keys: [displayChordLabel(chord.label, mac)],
+      keys: [displayChordLabel(chord.label, platform)],
     });
   }
   // Component-owned keys stay LITERAL in every platform context: their
@@ -126,14 +131,16 @@ export function buildShortcutGroups(mac: boolean): ShortcutGroup[] {
 }
 
 export function KeyboardShortcuts() {
-  const mac = isMacPlatform();
-  const groups = buildShortcutGroups(mac);
+  const platform = detectPlatform(
+    typeof navigator === "undefined" ? undefined : navigator.userAgent,
+  );
+  const groups = buildShortcutGroups(platform);
   return (
     <div className="settings-section keyboard-shortcuts">
       <h3 className="settings-section-title">Keyboard Shortcuts</h3>
       <p className="settings-section-description">
         Every binding the reader actually has, grouped by what it does.
-        {mac
+        {platform === "mac"
           ? " Global shortcuts accept ⌘ on this Mac; component bindings stay as implemented."
           : " On macOS, global shortcuts also accept ⌘."}
       </p>
@@ -142,7 +149,11 @@ export function KeyboardShortcuts() {
           <section key={group.title} className="shortcut-group">
             <h4 className="shortcut-group-title">{group.title}</h4>
             {group.rows.map((row) => (
-              <div key={row.label} className="shortcut-row" data-shortcut-row="">
+              <div
+                key={row.label}
+                className="shortcut-row"
+                data-shortcut-row=""
+              >
                 <span className="shortcut-action">{row.label}</span>
                 <div className="shortcut-keys">
                   {row.keys.map((key) => (
