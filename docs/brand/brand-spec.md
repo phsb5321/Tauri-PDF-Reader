@@ -56,6 +56,20 @@ mark in ink `#14110D` on paper, or paper `#F4EFE4` on the ink tile · never reco
 off-palette, never rounded, stretched, recoloured per-part, or shadowed.
 **The mark is a trace — edit the path, never re-draw it freehand.**
 
+#### Two cuts — optical sizing for the mark
+
+The mark ships in two optical sizes, the same way a variable family ships several cuts. They were
+compared as rasters at 16/24/32/48px, not chosen by eye at poster size:
+
+| Cut | File | Use at | Why |
+|---|---|---|---|
+| **detail** | [`lectrice-mark.svg`](./lectrice-mark.svg) · [`../../public/lectrice-mark.svg`](../../public/lectrice-mark.svg) | **≥ 32px** | the perch, legs and finer tail read again at these sizes; the fuller drawing |
+| **favicon** | [`lectrice-mark-small.svg`](./lectrice-mark-small.svg) · [`../../public/lectrice-mark-small.svg`](../../public/lectrice-mark-small.svg) | **≤ 24px** | perch, legs and eye removed and the open beak exaggerated, so the silhouette survives the pixel grid |
+
+The open singing beak is the **invariant** across both cuts — it is what identifies the mark at any size.
+Below 32px the detail cut loses the beak to anti-aliasing; above 24px the favicon cut reads as coarse.
+Use the favicon cut for `favicon.ico`-scale UI and the detail cut for everything larger.
+
 ### Wordmark
 
 **Lectrice** in **Space Grotesk 700**, tracking −0.02em. Monochrome (`--text`); the mark
