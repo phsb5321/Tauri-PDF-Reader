@@ -1,0 +1,9 @@
+02fa3272283e6126defc0366669a89750f338a1dacc4033d69b991f69c1b7069  src-tauri/target/debug/tauri-pdf-reader
+30ac67fda9535c2cc3535b5d43bea304d333bdfe
+Linux 6.12.108 #1-NixOS SMP PREEMPT_DYNAMIC Wed Sep  2 12:31:02 UTC 2026 x86_64
+
+Journey inputs (native fixture; no network/audio device)
+9a1e6cbe93b6ad796b36846a39d073c3def64f56d4dc92f4297540a5f65aaa4c  e2e/native-play.e2e.mjs
+2f58115928d39ef16feffb7a78e4ddf71c0fa26faab5aeb81ec5301a5f77de0e  scripts/e2e-native.sh
+41854aa6fb2287fe393b31745b85811667eaea13908263b45cd40db3dad62786  scripts/e2e-profile.sh
+2d1ffccb190f524275435af8b33785b0661c5c4a5986d46aa9f00bcccc812031  src/e2e-native-bootstrap.ts

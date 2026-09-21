@@ -96,5 +96,12 @@ These checks detect broken scale/polarity; visual inspection judges recognisabil
   Replay: `FC_SEED=20260921 FC_NUM_RUNS=100 pnpm test:fuzz`.
 - Frontend build: passed; unchanged bundle-size warning retained in log.
 - Harness: complete branch-bound Spec Kit chain; passed.
-- Packaged native gate and independent review: recorded in the PR/handoff;
-  do not infer a pass from these frontend and asset checks.
+- Packaged native gate: **1 spec passed**, `NATIVE_EXIT=0`; binary SHA-256 in
+  `native-build-identity.txt`. It proves the existing 24px play control reaches
+  backend marks/karaoke, not that unwired small cuts or new states are visible
+  in the app. GStreamer appsink warning retained, not suppressed.
+- Full verification: frontend suites, architecture, Rust format and Clippy
+  passed; the warmed retry timed out at the Rust test stage after 1800 seconds.
+  **Not a full pass**; backend/contract completion remains unverified.
+- Independent GLM review: **blocked before spawn by a full queue**, no approval.
+  [Exact release status](./vector-evidence/review-status.md); PR #234 stays draft.
