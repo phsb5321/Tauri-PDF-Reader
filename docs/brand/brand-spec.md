@@ -37,19 +37,41 @@ unclaimed, more-elegant form.
 
 ## 🎯 Core assets
 
-### Logo — **Mark A · Voice Channels** (chosen)
+### Logo — **the nightingale** (chosen)
 
-Three nested chevrons — a voice radiating / soundwave, abstract not a letter (Zed's mark
-isn't a literal "Z" either). **Monoline, strictly angular** (45°/90°), no curves.
+A songbird in side profile, head raised, beak open mid-song, gripping a line. The product
+*speaks*, so the mark is the thing that sings — **figurative**, not another abstract sound
+glyph. Figurativeness is what carries logo recall (de Lencastre et al., 2023), and it is the
+one register nobody in this category occupies.
 
-- Reusable source: [`lectrice-mark.svg`](./lectrice-mark.svg) (uses `currentColor`)
-- App icon / favicon (crust tile + blue mark): [`../../public/lectrice-mark.svg`](../../public/lectrice-mark.svg)
-- Two alternates explored on the board: **B · Spoken Page** (document → waveform) and
-  **C · Aperture Tile** (negative-space V on an accent tile, used for the OS icon shape).
+Drawn with GPT through the browser fleet (identity `chatgpt-c`, ChatGPT Pro) and traced to a
+single-colour vector path. **Design record:**
+`1. Projects/Lectrice — Tauri PDF Reader/Brand v2 — research & three directions (2026-09-20).md`.
 
-**Mark rules:** clearspace ≥ one chevron stroke · min 16px (use the tile below that) ·
-mark in `--accent` (blue) or `--text`, never recolored off-palette · never rounded,
-stretched, or shadowed.
+- Reusable source: [`lectrice-mark.svg`](./lectrice-mark.svg) (one path, inherits `currentColor`)
+- App icon / favicon (ink tile + paper bird): [`../../public/lectrice-mark.svg`](../../public/lectrice-mark.svg)
+
+**Mark rules:** clearspace ≥ the bird's tail width · min 16px (use the favicon cut below that) ·
+**the mark is vermilion `#C8462C` on paper `#F4EFE4`** — the bird and the line it sings into are one
+continuous gesture, and the accent stops being decoration and becomes the identity · ink `#14110D` is
+reserved for **type** (wordmark, tagline, body) · a paper bird on an ink tile remains valid where a
+dark surface is required (store tiles, dark docs), but it is the exception, not the default · never
+recolored off-palette, never rounded, stretched, recoloured per-part, or shadowed.
+**The mark is a trace — edit the path, never re-draw it freehand.**
+
+#### Two cuts — optical sizing for the mark
+
+The mark ships in two optical sizes, the same way a variable family ships several cuts. They were
+compared as rasters at 16/24/32/48px, not chosen by eye at poster size:
+
+| Cut | File | Use at | Why |
+|---|---|---|---|
+| **detail** | [`lectrice-mark.svg`](./lectrice-mark.svg) · [`../../public/lectrice-mark.svg`](../../public/lectrice-mark.svg) | **≥ 32px** | the perch, legs and finer tail read again at these sizes; the fuller drawing |
+| **favicon** | [`lectrice-mark-small.svg`](./lectrice-mark-small.svg) · [`../../public/lectrice-mark-small.svg`](../../public/lectrice-mark-small.svg) | **≤ 24px** | perch, legs and eye removed and the open beak exaggerated, so the silhouette survives the pixel grid |
+
+The open singing beak is the **invariant** across both cuts — it is what identifies the mark at any size.
+Below 32px the detail cut loses the beak to anti-aliasing; above 24px the favicon cut reads as coarse.
+Use the favicon cut for `favicon.ico`-scale UI and the detail cut for everything larger.
 
 ### Wordmark
 
@@ -119,7 +141,7 @@ no raw hex in components (tokens only).
 
 - [x] Name **Lectrice** (collision-vetted) → `productName`, window title, `index.html`, README, `package.json`
 - [x] Identifier `com.voxpage.pdf-reader` → `com.lectrice.reader`
-- [x] Logo Mark A + app icons regenerated via `tauri icon` (desktop/Win/iOS/Android)
+- [x] Logo **the nightingale** + app icons regenerated via `tauri icon` (desktop/Win/iOS/Android)
 - [x] `colors.css` → Catppuccin (Latte/Mocha) + `--color-speak`
 - [x] `typography.css` + `@fontsource` self-hosted fonts
 - [x] `motion.css` bounce retired · `App.css` body font tokenized

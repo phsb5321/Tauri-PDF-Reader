@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/brand/lectrice-banner.png" alt="Lectrice — a nightingale singing into a line" width="100%">
+</p>
+
 # Lectrice
 
 > Every page, read aloud.
