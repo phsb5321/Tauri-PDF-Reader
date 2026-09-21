@@ -228,7 +228,7 @@ h1 {
   gap: 5rem;
 }
 .reading-steps {
-  margin-block: 2rem 1.5rem;
+  margin-block: 0 1.5rem;
   padding-left: 1.4rem;
 }
 .reading-steps li {
@@ -240,6 +240,11 @@ h1 {
 }
 .product-hero {
   margin-top: 2.5rem;
+}
+.product-secondary {
+  grid-column: 1 / -1;
+  width: min(100%, 54rem);
+  margin-inline: auto;
 }
 .product-shot {
   min-width: 0;
@@ -260,9 +265,6 @@ h1 {
   justify-content: space-between;
   gap: 0.5rem 1rem;
   margin-top: 1rem;
-}
-.reading-shot {
-  align-self: center;
 }
 .local-section {
   background: var(--ink);

@@ -14,7 +14,7 @@
 - Mark-led opening and voice-line gesture; what (three sentences), how, local-first, install, footer.
 - Exactly one finite speaking-line animation, disabled for reduced motion.
 - Real traced geometry; real type, never an image-model wordmark. No app source/UI changes.
-- Operator escalation, 21/09/2026: real running-app screenshots are the hero imagery, supplied by `lectrice-shots` with a reproduction manifest. Plain frames and honest captions; remove the typographic illustration. No generated/composited UI or device mockups. Screenshot assets and their full-size links must decode and match the source bytes.
+- Operator escalation, 21/09/2026: real running-app screenshots are the hero imagery, supplied by `lectrice-shots` with a reproduction manifest. Plain frames and honest captions; remove the typographic illustration. No generated/composited UI or device mockups. Screenshot assets and their full-size links must decode and match the source bytes. Final orchestrator decision selects **Dark as dominant hero and Light as supporting second figure**, both approved Alice reader-at-rest captures (1440×900, page 4/111, saved Yellow highlight, main `8e8a6b1`). Dark is the raw approved attempt-7 restored after a failed replay; preserve its bytes. Speaking, obsolete fixture, clipped dark 960 and rejected dark repaint attempts remain excluded.
 - Vision-capable seat must open every shipped asset in rendered proof, plus desktop/mobile screenshots; preserve evidence and report paths/omissions/PR to orchestrator.
 
 ## Scope

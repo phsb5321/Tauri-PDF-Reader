@@ -1,5 +1,5 @@
 {
-  "commit": "8e8a6b1c39914be69aa0c55c5a36a4d0842a9f5a",
+  "commit": "edca3db7ef88e789a5b85ec7bd14b6a12c82b23f",
   "screenshots": [
     "voice-start.png",
     "voice-middle.png",
@@ -12,6 +12,8 @@
     "keyboard-focus.png",
     "install-expanded.png",
     "reduced-motion.png",
+    "product-hero.png",
+    "product-light.png",
     "assets.png"
   ],
   "viewports": [
@@ -68,6 +70,54 @@
       "iterations": 1
     }
   },
+  "productCaptures": {
+    "sourceCommit": "8e8a6b1c39914be69aa0c55c5a36a4d0842a9f5a",
+    "binarySha256": "21f6195d1a01cb63f2dea4cabe7c97734a04f15c8866e1832a2a398043e023a1",
+    "captureMethod": "Real Linux/X11 Tauri application, default Cargo features, built frontend embedded; native WebKitWebDriver screenshot endpoint, not browser preview or generated UI",
+    "captureOwner": "lectrice-shots",
+    "sourceManifest": "brand-v2-2026-09-20/product-shots/MANIFEST.md in the Lectrice project vault folder",
+    "reproduction": [
+      "Build exact source with the repository-pinned scripts/e2e-toolchain.sh: CI=true pnpm build; cd src-tauri && cargo build -j 1",
+      "Capture-owner artifacts: product-shots/reproduce.sh and capture.e2e.mjs; isolated Xvfb/Openbox session and native WebdriverIO controls",
+      "Open Alice in Wonderland.pdf through the real file picker, navigate to page 4, save a Yellow highlight, select Light appearance, wait for the toast to clear and the canvas to finish, capture at 1440x900",
+      "For the approved Dark attempt-7 recapture: select Dark through real Settings, resize the native window to 960 then back to 1440, settle the complete canvas repaint and capture. Replay is not assumed deterministic: the later blank-canvas attempt-8 is rejected and the approved raw attempt-7 was restored unchanged."
+    ],
+    "approval": "Explicit orchestrator decision on 21/09/2026 after visually opening both: Dark as dominant hero, Light as supporting second figure. Website author also opened both originals with vision. The capture owner subsequently confirmed the restored Dark attempt-7 bytes; cmp against the restored source passed.",
+    "exclusions": "No speaking-state, obsolete fixture, clipped dark 960, incomplete-repaint attempt-6 or blank-canvas attempt-8 image is included. No image has been cropped, tinted, re-encoded or downscaled as a file.",
+    "shots": [
+      {
+        "file": "reader.png",
+        "sourceFile": "reader-hero-alice-dark-1440x900.png",
+        "sourceRun": "approved raw attempt-7, restored by capture owner after rejecting attempt-8",
+        "sha256": "66220d66488af8eee2ea60fc53a81a964f4bf318a5a4ec2adcd177a8829209c5",
+        "width": 1440,
+        "height": 900,
+        "theme": "Dark / Catppuccin Mocha, unmodified",
+        "placement": "dominant hero",
+        "state": "reader-at-rest",
+        "speaking": false,
+        "page": 4,
+        "pageCount": 111,
+        "document": "Alice in Wonderland \u2014 public-domain Lewis Carroll text, Planet eBook PDF",
+        "observation": "Complete real paragraphs on a white document page, neutral title, saved Yellow highlight, no toast; original screenshot bytes copied unchanged"
+      },
+      {
+        "file": "reader-light.png",
+        "sourceFile": "reader-hero-alice-light-1440x900.png",
+        "sha256": "1e43196552cd037278d58c05e8ab53187c7cdeaa08dd227f466191e27273085e",
+        "width": 1440,
+        "height": 900,
+        "theme": "Light / Catppuccin Latte, unmodified",
+        "placement": "supporting second figure",
+        "state": "reader-at-rest",
+        "speaking": false,
+        "page": 4,
+        "pageCount": 111,
+        "document": "Alice in Wonderland \u2014 public-domain Lewis Carroll text, Planet eBook PDF",
+        "observation": "Real paragraphs, neutral title, saved Yellow highlight, no toast; original screenshot bytes copied unchanged"
+      }
+    ]
+  },
   "status": "PASS",
   "consoleErrors": [],
   "externalRequests": [],
@@ -76,13 +126,15 @@
   "keyboardAndAnchors": "PASS",
   "reducedMotion": "PASS",
   "sha256": {
-    "index.html": "02587897d34ee62dca956fb91ed5d2ed3ee6993f18a6b0dec3b3f4872b48fe24",
-    "style.css": "b2341d1f8d31d9981b4bb4a40119f4f0685149385f8d9ae2b0044e0497880d2c",
+    "index.html": "d0e28a97f5d9f852591322a30401fe7a4870b852f9bfcc3d6151abbbd21a7055",
+    "style.css": "62ce3121fc7c66d5bfbda9aced5b6b80e4e3da99e7c0ec82e003d3baf503ebb6",
     "assets/Fraunces-OFL.txt": "6732d6cc72c5d09292ff754dc1f39d9ea14918f74e87a17afa3f00a5120c3d48",
     "assets/Newsreader-OFL.txt": "afdae9053282ba66bbacbc4cb20ad20b12ef46379ac587fd464fe3ff8ce1cd4a",
     "assets/favicon.svg": "1d296c4487c3ce2fb8f8c1d9f46f09be987a55dc9b11be68145155fca0758dd4",
     "assets/fraunces.woff2": "0ba1008873f826013ab37ac75f2f6bccf953334f6645ee0b4606356f4253d274",
     "assets/newsreader.woff2": "cb4df5f0ca72db256468c5a25f9eb4ab780a724676464aa58d0f14d3769b16ab",
-    "assets/nightingale.svg": "1e30970302618b964188a98de92201256d761afe919a11cf097894c87352d50f"
+    "assets/nightingale.svg": "1e30970302618b964188a98de92201256d761afe919a11cf097894c87352d50f",
+    "assets/reader-light.png": "1e43196552cd037278d58c05e8ab53187c7cdeaa08dd227f466191e27273085e",
+    "assets/reader.png": "66220d66488af8eee2ea60fc53a81a964f4bf318a5a4ec2adcd177a8829209c5"
   }
 }

@@ -34,8 +34,10 @@ def main():
     assert "<script" not in html and "@import" not in css
     assert "pending from the capture seat" not in html, "Real product captures are required"
     captures = json.loads((SITE / "product-shots.json").read_text())
-    assert {shot["file"] for shot in captures["shots"]} == {"reader.png", "library.png"}
+    # The approved composition is Dark hero + Light supporting figure, both at rest.
+    assert {shot["file"] for shot in captures["shots"]} == {"reader.png", "reader-light.png"}
     for shot in captures["shots"]:
+        assert shot["speaking"] is False and shot["state"] == "reader-at-rest"
         assert hashlib.sha256((SITE / "assets" / shot["file"]).read_bytes()).hexdigest() == shot["sha256"], "Product capture bytes changed"
     colors = set(re.findall(r"#[0-9a-fA-F]{6}\b", html + css + "".join(p.read_text() for p in (SITE / "assets").glob("*.svg"))))
     assert {c.lower() for c in colors} == {"#f4efe4", "#14110d", "#c8462c"}, colors
@@ -85,6 +87,7 @@ def main():
                 assert image.locator("..").get_attribute("href") == image.get_attribute("src")
                 shot = next(s for s in captures["shots"] if image.get_attribute("src") == "assets/" + s["file"])
                 assert image.evaluate("el => [el.naturalWidth, el.naturalHeight]") == [shot["width"], shot["height"]]
+                assert image.evaluate("el => getComputedStyle(el).filter") == "none"
             for code in page.locator("pre code").all_text_contents():
                 assert code in readme, f"Command drift: {code}"
             for link in page.locator('a[href^="#"]').all():
@@ -165,6 +168,8 @@ def main():
             page.goto(base)
             page.evaluate("document.fonts.ready")
             shot("reduced-motion.png")
+            shot("product-hero.png", page.locator(".product-hero"))
+            shot("product-light.png", page.locator(".product-secondary"))
             assert not errors and not external and not failures, (errors, external, failures)
             # file:// is a supported delivery path too; all assets are relative.
             local = browser.new_page()
@@ -186,8 +191,10 @@ body{{margin:40px;background:#F4EFE4;color:#14110D;font:24px Newsreader}}h1{{fon
 <div><p>Small cut · native sizes</p>{''.join(f'<img src="{asset}/favicon.svg" width="{s}" height="{s}"> {s} ' for s in [16,24])}
 <p>Detail cut · native sizes</p>{''.join(f'<img src="{asset}/nightingale.svg" width="{s}" height="{s}"> {s} ' for s in [32,64])}
 <p>Favicon · 128 px inspection</p><img src="{asset}/favicon.svg" width="128" height="128"></div></div>
-<p>Unmodified running-app captures (full-size originals in assets/)</p>
-<div class="row"><img src="{asset}/reader.png" width="440"><img src="{asset}/library.png" width="440"></div></html>'''
+<p>Unmodified Dark hero (full-size original in assets/reader.png)</p>
+<img src="{asset}/reader.png" width="960">
+<p>Unmodified Light supporting figure (assets/reader-light.png)</p>
+<img src="{asset}/reader-light.png" width="960"></html>'''
             proof_page = browser.new_page(viewport={"width": 1040, "height": 650})
             proof_page.goto(base)
             proof_page.set_content(proof)
