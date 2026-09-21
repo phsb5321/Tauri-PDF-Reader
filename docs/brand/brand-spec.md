@@ -90,8 +90,14 @@ Use the favicon cut for `favicon.ico`-scale UI and the detail cut for everything
 
 ### Wordmark
 
-**Lectrice** in **Space Grotesk 700**, tracking −0.02em. Monochrome (`--text`); the mark
-carries the colour (Zed-style). Mark sits left of the wordmark, clearspace = mark height.
+**Brand wordmark:** **Lectrice** in **Fraunces 600**, optical size **144**, **WONK enabled**.
+Use real type, never traced or generated lettering. Ink type accompanies the vermilion mark;
+align the wordmark optically to the bird's chest, with the singing head rising above the cap line.
+
+**Current app display font:** **Space Grotesk** remains in `src/ui/tokens/typography.css`.
+This is an intentional distinction between the brand assets and the shipped app, not a claim
+that Fraunces is already installed in the UI. **Pending separate slice:** app-side typography
+migration and its UI verification. Vector finishing does not change the font tokens.
 
 ---
 
@@ -119,11 +125,11 @@ Hover/alpha are derived with `color-mix()` so no off-palette hex is ever invente
 
 ## ✍️ Typography — self-hosted (`@fontsource`, local-first, no CDN)
 
-| Role               | Family                                                   | Token                   |
-| ------------------ | -------------------------------------------------------- | ----------------------- |
-| Display / wordmark | **Space Grotesk** (500/700)                              | `--font-family-display` |
-| Body / UI          | **IBM Plex Sans** (400/500/600) — Zed's actual body face | `--font-family`         |
-| Mono / data        | **IBM Plex Mono** (400/500)                              | `--font-family-mono`    |
+| Role                                     | Family                                                   | Token                   |
+| ---------------------------------------- | -------------------------------------------------------- | ----------------------- |
+| Current app display (not brand wordmark) | **Space Grotesk** (500/700)                              | `--font-family-display` |
+| Body / UI                                | **IBM Plex Sans** (400/500/600) — Zed's actual body face | `--font-family`         |
+| Mono / data                              | **IBM Plex Mono** (400/500)                              | `--font-family-mono`    |
 
 Imported in `src/ui/tokens/index.css`. Replaced the `-apple-system` / `SF Mono` stacks
 (incl. a hardcoded `body` font in `src/styles/App.css`).
@@ -144,6 +150,20 @@ Imported in `src/ui/tokens/index.css`. Replaced the `-apple-system` / `SF Mono` 
 2. **The voice is the feature** — blue is the app, mauve is the voice; speaking state always visible.
 3. **Developer-grade restraint** — mono for data, one accent, sharp geometry.
 4. **Honest surfaces** — real page, real waveform, real progress; no skeuomorphic book.
+
+## Vector states, illustrations, and UI optical cuts
+
+- States: [`public/brand/states/`](../../public/brand/states/) — `idle`, `singing`,
+  `paused`, `asleep`, `working`; 24-unit square grid, common bird scale and baseline.
+  Use at 24/48px. Ink birds; the moon and voice line are vermilion. These are state
+  assets, not replacements for the vermilion brand mark. State-machine wiring is separate.
+- Illustration: [`empty-library.svg`](../../public/brand/illustrations/empty-library.svg)
+  — traced bird on two books; designed for illustration sizes, not a 16px control.
+- Branded UI icons: `src/ui/icons/lectrice-icons.tsx` retains `IconProps` and selects
+  the simplified cut for **size < 24**, detail for **size >= 24** (default 24).
+  This UI cutoff is distinct from the logo's <=24 / >=32 rule. General icons are unchanged.
+  All UI cuts inherit `currentColor`; controls retain responsibility for their accessible name.
+- Provenance, reproducible commands and visual limitations: [vector-finishing.md](./vector-finishing.md).
 
 ## ⛔ Don't
 
