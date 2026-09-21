@@ -10,10 +10,11 @@
 ## Acceptance
 
 - One standalone page, one stylesheet, copied local brand assets; no runtime script, framework, CDN or build.
-- Fraunces display, Newsreader body; paper #F4EFE4, ink #14110D, vermilion #C8462C only.
+- Fraunces display, Newsreader body; website chrome uses paper #F4EFE4, ink #14110D, vermilion #C8462C only. Real product captures retain their original colours.
 - Mark-led opening and voice-line gesture; what (three sentences), how, local-first, install, footer.
 - Exactly one finite speaking-line animation, disabled for reduced motion.
 - Real traced geometry; real type, never an image-model wordmark. No app source/UI changes.
+- Operator escalation, 21/09/2026: real running-app screenshots are the hero imagery, supplied by `lectrice-shots` with a reproduction manifest. Plain frames and honest captions; remove the typographic illustration. No generated/composited UI or device mockups. Screenshot assets and their full-size links must decode and match the source bytes.
 - Vision-capable seat must open every shipped asset in rendered proof, plus desktop/mobile screenshots; preserve evidence and report paths/omissions/PR to orchestrator.
 
 ## Scope

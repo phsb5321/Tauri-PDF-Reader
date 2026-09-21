@@ -7,10 +7,10 @@
   - docs/site/ is standalone marketing, not the Tauri UI or a new build target.
   - Offline means viewing/highlighting; current narration is a cloud round-trip.
     This distinction and conversion of the supplied TTFs were operator-approved.
-  - The read-along below is a labelled illustration, not an app screenshot or
-    an audio player. No pretend controls, testimonials, stats or placeholder art.
+  - Product imagery must be real, unmodified running-app captures supplied by
+    the capture seat, with reproducible provenance. No fake UI/device mockups.
+  - Product screenshots retain the real app theme, not a recoloured reskin.
   - One voice-line reveal, under five seconds; reduced motion stays still.
-  - No product screenshot: app palette is still different; no invented reskin.
 -->
 <html lang="en">
   <head>
@@ -86,6 +86,24 @@
             <p class="small">Read offline. Narrate with a cloud voice.</p>
           </div>
         </div>
+        <figure class="product-shot product-hero">
+          <!-- Capture seat supplies the original PNG; never synthesize this UI. -->
+          <a
+            href="assets/reader.png"
+            aria-label="Open the full-size Lectrice reader screenshot"
+          >
+            <img
+              src="assets/reader.png"
+              alt="Real Lectrice reader capture pending from the capture seat"
+            />
+          </a>
+          <figcaption>
+            <span>Lectrice, running on Linux. Original app capture.</span>
+            <a href="assets/reader.png"
+              >Open full size <span aria-hidden="true">↗</span></a
+            >
+          </figcaption>
+        </figure>
       </section>
 
       <section
@@ -115,17 +133,22 @@
             connection.
           </p>
         </div>
-        <figure class="reading-sample">
-          <p class="eyebrow">A passage, in voice</p>
-          <blockquote>
-            A page is a place to begin.<br />
-            <mark>Give the words a voice,</mark><br />
-            and follow the thought<br />
-            a little further.
-          </blockquote>
+        <figure class="product-shot reading-shot">
+          <!-- Replace only with a supplied, visually verified app capture. -->
+          <a
+            href="assets/library.png"
+            aria-label="Open the full-size Lectrice library screenshot"
+          >
+            <img
+              src="assets/library.png"
+              alt="Real Lectrice library capture pending from the capture seat"
+            />
+          </a>
           <figcaption>
-            Read-along, illustrated — the highlight moves with the voice. Not an
-            app screenshot or an audio demo.
+            <span>The reading library, in the real app.</span>
+            <a href="assets/library.png"
+              >Open full size <span aria-hidden="true">↗</span></a
+            >
           </figcaption>
         </figure>
       </section>

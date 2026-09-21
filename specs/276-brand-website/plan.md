@@ -6,9 +6,9 @@ One plain HTML page and CSS file under `docs/site/`, separate from Vite's root a
 
 ## Design and sources
 
-Use the approved README banner as the optical lockup reference, keeping a real HTML Fraunces wordmark and separate traced SVG. Convert the provided variable TTFs losslessly to WOFF2 with FontTools (no subsetting); retain OFL notices. Copy the small-cut favicon. Draw only the simple voice-line curve, not a replacement bird. Use Newsreader body and three colour tokens. Editorial rules/space, no cards, shadows or invented product screenshots.
+Use the approved README banner as the optical lockup reference, keeping a real HTML Fraunces wordmark and separate traced SVG. Convert the provided variable TTFs losslessly to WOFF2 with FontTools (no subsetting); retain OFL notices. Copy the small-cut favicon. Draw only the simple voice-line curve, not a replacement bird. Use Newsreader body and three colour tokens. Editorial rules/space, no cards, shadows or invented product screenshots. After the operator's escalation on 21/09/2026, actual running-app PNGs from the independent capture seat take the hero and supporting image positions, with unaltered bytes/colours, plain borders and full-size links.
 
-README is the capability and command source. Offline viewing/highlighting/local persistence are separate from ElevenLabs narration (API key + text egress). The operator confirmed this split and font conversion on 21/09/2026. Omit raster seal/states and new product imagery; the read-along is explicitly a typographic illustration, not an app screenshot or working player.
+README is the capability and command source. Offline viewing/highlighting/local persistence are separate from ElevenLabs narration (API key + text egress). The operator confirmed this split and font conversion on 21/09/2026. Omit raster seal/states. The first typographic illustration is removed in favour of real product imagery from `lectrice-shots`; no interface is generated or composited. Capture manifest controls truthful state/build captions. Missing screenshots block completion, not silently downgraded placeholders.
 
 ## Verification
 

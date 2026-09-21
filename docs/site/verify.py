@@ -32,6 +32,11 @@ def main():
     css = (SITE / "style.css").read_text()
     readme = (ROOT / "README.md").read_text()
     assert "<script" not in html and "@import" not in css
+    assert "pending from the capture seat" not in html, "Real product captures are required"
+    captures = json.loads((SITE / "product-shots.json").read_text())
+    assert {shot["file"] for shot in captures["shots"]} == {"reader.png", "library.png"}
+    for shot in captures["shots"]:
+        assert hashlib.sha256((SITE / "assets" / shot["file"]).read_bytes()).hexdigest() == shot["sha256"], "Product capture bytes changed"
     colors = set(re.findall(r"#[0-9a-fA-F]{6}\b", html + css + "".join(p.read_text() for p in (SITE / "assets").glob("*.svg"))))
     assert {c.lower() for c in colors} == {"#f4efe4", "#14110d", "#c8462c"}, colors
     ns = {"s": "http://www.w3.org/2000/svg"}
@@ -75,6 +80,11 @@ def main():
             assert page.locator('link[rel="stylesheet"]').count() == 1
             assert page.locator("h1").inner_text() == "Lectrice"
             assert page.locator(".tagline").inner_text() == "Every page, read aloud."
+            assert page.locator(".product-shot img").count() == 2
+            for image in page.locator(".product-shot img").all():
+                assert image.locator("..").get_attribute("href") == image.get_attribute("src")
+                shot = next(s for s in captures["shots"] if image.get_attribute("src") == "assets/" + s["file"])
+                assert image.evaluate("el => [el.naturalWidth, el.naturalHeight]") == [shot["width"], shot["height"]]
             for code in page.locator("pre code").all_text_contents():
                 assert code in readme, f"Command drift: {code}"
             for link in page.locator('a[href^="#"]').all():
@@ -175,7 +185,9 @@ body{{margin:40px;background:#F4EFE4;color:#14110D;font:24px Newsreader}}h1{{fon
 <div class="row"><div><img src="{asset}/nightingale.svg" width="230" height="260"><p>Detail cut · 230 px</p></div>
 <div><p>Small cut · native sizes</p>{''.join(f'<img src="{asset}/favicon.svg" width="{s}" height="{s}"> {s} ' for s in [16,24])}
 <p>Detail cut · native sizes</p>{''.join(f'<img src="{asset}/nightingale.svg" width="{s}" height="{s}"> {s} ' for s in [32,64])}
-<p>Favicon · 128 px inspection</p><img src="{asset}/favicon.svg" width="128" height="128"></div></div></html>'''
+<p>Favicon · 128 px inspection</p><img src="{asset}/favicon.svg" width="128" height="128"></div></div>
+<p>Unmodified running-app captures (full-size originals in assets/)</p>
+<div class="row"><img src="{asset}/reader.png" width="440"><img src="{asset}/library.png" width="440"></div></html>'''
             proof_page = browser.new_page(viewport={"width": 1040, "height": 650})
             proof_page.goto(base)
             proof_page.set_content(proof)
@@ -184,6 +196,7 @@ body{{margin:40px;background:#F4EFE4;color:#14110D;font:24px Newsreader}}h1{{fon
             proof_page.screenshot(path=str(out / "assets.png"), full_page=True)
             receipt["screenshots"].append("assets.png")
             browser.close()
+        receipt["productCaptures"] = captures
         receipt.update({"status": "PASS", "consoleErrors": errors, "externalRequests": external, "failedRequests": failures, "fileMode": "PASS", "keyboardAndAnchors": "PASS", "reducedMotion": "PASS"})
         receipt["sha256"] = {str(p.relative_to(SITE)): hashlib.sha256(p.read_bytes()).hexdigest() for p in [SITE / "index.html", SITE / "style.css", *sorted((SITE / "assets").iterdir())]}
         (out / "verification.json").write_text(json.dumps(receipt, indent=2) + "\n")
