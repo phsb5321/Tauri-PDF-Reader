@@ -40,7 +40,7 @@ unclaimed, more-elegant form.
 ### Logo — **the nightingale** (chosen)
 
 A songbird in side profile, head raised, beak open mid-song, gripping a line. The product
-*speaks*, so the mark is the thing that sings — **figurative**, not another abstract sound
+_speaks_, so the mark is the thing that sings — **figurative**, not another abstract sound
 glyph. Figurativeness is what carries logo recall (de Lencastre et al., 2023), and it is the
 one register nobody in this category occupies.
 
@@ -64,10 +64,25 @@ recolored off-palette, never rounded, stretched, recoloured per-part, or shadowe
 The mark ships in two optical sizes, the same way a variable family ships several cuts. They were
 compared as rasters at 16/24/32/48px, not chosen by eye at poster size:
 
-| Cut | File | Use at | Why |
-|---|---|---|---|
-| **detail** | [`lectrice-mark.svg`](./lectrice-mark.svg) · [`../../public/lectrice-mark.svg`](../../public/lectrice-mark.svg) | **≥ 32px** | the perch, legs and finer tail read again at these sizes; the fuller drawing |
+| Cut         | File                                                                                                                                    | Use at     | Why                                                                                                  |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------- |
+| **detail**  | [`lectrice-mark.svg`](./lectrice-mark.svg) · [`../../public/lectrice-mark.svg`](../../public/lectrice-mark.svg)                         | **≥ 32px** | the perch, legs and finer tail read again at these sizes; the fuller drawing                         |
 | **favicon** | [`lectrice-mark-small.svg`](./lectrice-mark-small.svg) · [`../../public/lectrice-mark-small.svg`](../../public/lectrice-mark-small.svg) | **≤ 24px** | perch, legs and eye removed and the open beak exaggerated, so the silhouette survives the pixel grid |
+
+#### Icons — general and branded
+
+The icon set ships as pairs (`src/ui/icons/lectrice-icons.tsx`), and the rule is what keeps it a system
+rather than a mascot parade:
+
+| Layer                      | Use for                                     | Example                                                         |
+| -------------------------- | ------------------------------------------- | --------------------------------------------------------------- |
+| **general**                | chrome — pure utility with no brand meaning | pause, gear, search, close, zoom                                |
+| **branded** (bird-carried) | meaning — voice, reading, rest, direction   | play/read-aloud, library, bookmark, night mode, narration, next |
+
+**The bird goes where the meaning is.** Birding a gear would cost legibility and buy nothing. Branded
+icons reuse the logo's own traced geometry, so they stay on-brand by construction rather than by
+convention. Both layers share the 24px box; the branded ones are the first candidates for a simplified
+small-size variant below 24px (same two-cut logic as the mark).
 
 The open singing beak is the **invariant** across both cuts — it is what identifies the mark at any size.
 Below 32px the detail cut loses the beak to anti-aliasing; above 24px the favicon cut reads as coarse.
