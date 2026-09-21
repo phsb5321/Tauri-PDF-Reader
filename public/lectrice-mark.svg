@@ -1,9 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="Lectrice">
-  <!-- App icon / favicon - the nightingale on the ink tile. -->
-  <rect width="96" height="96" rx="20" fill="#14110D"/>
-  <g transform="translate(48 47) scale(0.06837) translate(-384.5 -431.5)">
+  <rect width="96" height="96" rx="20" fill="#F4EFE4"/>
+  <g transform="translate(48 48) scale(0.06952) translate(-384.5 -431.5)">
     <g transform="translate(0.000000,863.000000) scale(0.100000,-0.100000)"
-fill="#F4EFE4" stroke="none">
+fill="#C8462C" stroke="none">
 <path d="M6975 8166 c-90 -31 -234 -92 -518 -218 -228 -102 -228 -102 -320
 -84 -378 74 -713 -24 -985 -288 -187 -181 -279 -376 -337 -718 -66 -383 -209
 -633 -485 -847 -383 -296 -710 -627 -935 -946 -135 -191 -312 -475 -527 -845

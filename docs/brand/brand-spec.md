@@ -51,9 +51,12 @@ single-colour vector path. **Design record:**
 - Reusable source: [`lectrice-mark.svg`](./lectrice-mark.svg) (one path, inherits `currentColor`)
 - App icon / favicon (ink tile + paper bird): [`../../public/lectrice-mark.svg`](../../public/lectrice-mark.svg)
 
-**Mark rules:** clearspace ≥ the bird's tail width · min 16px (use the tile below that) ·
-mark in ink `#14110D` on paper, or paper `#F4EFE4` on the ink tile · never recolored
-off-palette, never rounded, stretched, recoloured per-part, or shadowed.
+**Mark rules:** clearspace ≥ the bird's tail width · min 16px (use the favicon cut below that) ·
+**the mark is vermilion `#C8462C` on paper `#F4EFE4`** — the bird and the line it sings into are one
+continuous gesture, and the accent stops being decoration and becomes the identity · ink `#14110D` is
+reserved for **type** (wordmark, tagline, body) · a paper bird on an ink tile remains valid where a
+dark surface is required (store tiles, dark docs), but it is the exception, not the default · never
+recolored off-palette, never rounded, stretched, recoloured per-part, or shadowed.
 **The mark is a trace — edit the path, never re-draw it freehand.**
 
 #### Two cuts — optical sizing for the mark
