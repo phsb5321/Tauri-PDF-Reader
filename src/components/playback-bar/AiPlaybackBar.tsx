@@ -29,6 +29,8 @@ import { NarrationCockpit } from "./NarrationCockpit";
 import { AudioCacheProgress } from "../audio-progress/AudioCacheProgress";
 import { AudioExportDialog } from "../export-dialog/AudioExportDialog";
 import "./AiPlaybackBar.css";
+// brand icons: the play control is the nightingale (voice), pause stays neutral chrome
+import { IconSing, IconPause } from "../../ui/icons/lectrice-icons";
 
 export function consumeNaturalCompletion(
   observed: number,
@@ -942,10 +944,7 @@ export function AiPlaybackBar({
             onClick={handlePause}
             title="Pause (Ctrl+Space)"
           >
-            <svg viewBox="0 0 24 24" className="ai-playback-icon">
-              <rect x="6" y="4" width="4" height="16" fill="currentColor" />
-              <rect x="14" y="4" width="4" height="16" fill="currentColor" />
-            </svg>
+            <IconPause size={24} className="ai-playback-icon" />
           </button>
         ) : (
           <button
@@ -971,9 +970,7 @@ export function AiPlaybackBar({
                 />
               </svg>
             ) : (
-              <svg viewBox="0 0 24 24" className="ai-playback-icon">
-                <polygon points="5,3 19,12 5,21" fill="currentColor" />
-              </svg>
+              <IconSing size={24} className="ai-playback-icon" />
             )}
           </button>
         )}
