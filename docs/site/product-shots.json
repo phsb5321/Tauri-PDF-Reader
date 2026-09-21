@@ -1,0 +1,48 @@
+{
+  "sourceCommit": "8e8a6b1c39914be69aa0c55c5a36a4d0842a9f5a",
+  "binarySha256": "21f6195d1a01cb63f2dea4cabe7c97734a04f15c8866e1832a2a398043e023a1",
+  "captureMethod": "Real Linux/X11 Tauri application, default Cargo features, built frontend embedded; native WebKitWebDriver screenshot endpoint, not browser preview or generated UI",
+  "captureOwner": "lectrice-shots",
+  "sourceManifest": "brand-v2-2026-09-20/product-shots/MANIFEST.md in the Lectrice project vault folder",
+  "reproduction": [
+    "Build exact source with the repository-pinned scripts/e2e-toolchain.sh: CI=true pnpm build; cd src-tauri && cargo build -j 1",
+    "Capture-owner artifacts: product-shots/reproduce.sh and capture.e2e.mjs; isolated Xvfb/Openbox session and native WebdriverIO controls",
+    "Open Alice in Wonderland.pdf through the real file picker, navigate to page 4, save a Yellow highlight, select Light appearance, wait for the toast to clear and the canvas to finish, capture at 1440x900",
+    "For the approved Dark attempt-7 recapture: select Dark through real Settings, resize the native window to 960 then back to 1440, settle the complete canvas repaint and capture. Replay is not assumed deterministic: the later blank-canvas attempt-8 is rejected and the approved raw attempt-7 was restored unchanged."
+  ],
+  "approval": "Explicit orchestrator decision on 21/09/2026 after visually opening both: Dark as dominant hero, Light as supporting second figure. Website author also opened both originals with vision. The capture owner subsequently confirmed the restored Dark attempt-7 bytes; cmp against the restored source passed.",
+  "exclusions": "No speaking-state, obsolete fixture, clipped dark 960, incomplete-repaint attempt-6 or blank-canvas attempt-8 image is included. No image has been cropped, tinted, re-encoded or downscaled as a file.",
+  "shots": [
+    {
+      "file": "reader.png",
+      "sourceFile": "reader-hero-alice-dark-1440x900.png",
+      "sourceRun": "approved raw attempt-7, restored by capture owner after rejecting attempt-8",
+      "sha256": "66220d66488af8eee2ea60fc53a81a964f4bf318a5a4ec2adcd177a8829209c5",
+      "width": 1440,
+      "height": 900,
+      "theme": "Dark / Catppuccin Mocha, unmodified",
+      "placement": "dominant hero",
+      "state": "reader-at-rest",
+      "speaking": false,
+      "page": 4,
+      "pageCount": 111,
+      "document": "Alice in Wonderland — public-domain Lewis Carroll text, Planet eBook PDF",
+      "observation": "Complete real paragraphs on a white document page, neutral title, saved Yellow highlight, no toast; original screenshot bytes copied unchanged"
+    },
+    {
+      "file": "reader-light.png",
+      "sourceFile": "reader-hero-alice-light-1440x900.png",
+      "sha256": "1e43196552cd037278d58c05e8ab53187c7cdeaa08dd227f466191e27273085e",
+      "width": 1440,
+      "height": 900,
+      "theme": "Light / Catppuccin Latte, unmodified",
+      "placement": "supporting second figure",
+      "state": "reader-at-rest",
+      "speaking": false,
+      "page": 4,
+      "pageCount": 111,
+      "document": "Alice in Wonderland — public-domain Lewis Carroll text, Planet eBook PDF",
+      "observation": "Real paragraphs, neutral title, saved Yellow highlight, no toast; original screenshot bytes copied unchanged"
+    }
+  ]
+}
