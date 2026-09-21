@@ -1,0 +1,253 @@
+<!doctype html>
+<!--
+  Assumptions / reasoning (Huashu junior-designer pass):
+  - Audience: desktop readers; primary action: find a supported installation.
+  - One approved editorial direction: vermilion nightingale on paper, real
+    Fraunces + Newsreader. The README banner anchors the optical lockup.
+  - docs/site/ is standalone marketing, not the Tauri UI or a new build target.
+  - Offline means viewing/highlighting; current narration is a cloud round-trip.
+    This distinction and conversion of the supplied TTFs were operator-approved.
+  - The read-along below is a labelled illustration, not an app screenshot or
+    an audio player. No pretend controls, testimonials, stats or placeholder art.
+  - One voice-line reveal, under five seconds; reduced motion stays still.
+  - No product screenshot: app palette is still different; no invented reskin.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Lectrice is a local-first desktop PDF reader. Read and highlight offline; follow your words aloud with cloud narration."
+    />
+    <meta name="theme-color" content="#F4EFE4" />
+    <title>Lectrice — Every page, read aloud.</title>
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+    <link
+      rel="preload"
+      href="assets/fraunces.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="assets/newsreader.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="masthead page-width">
+      <p class="eyebrow">A desktop PDF reader</p>
+      <nav aria-label="Main navigation">
+        <a href="#read-along">Read along</a>
+        <a href="#local-first">Local-first</a>
+        <a href="#install">Install <span aria-hidden="true">↗</span></a>
+      </nav>
+    </header>
+
+    <main id="main" tabindex="-1">
+      <section class="hero page-width" aria-labelledby="wordmark">
+        <div class="signature">
+          <img
+            class="nightingale"
+            src="assets/nightingale.svg"
+            width="769"
+            height="863"
+            alt="A vermilion nightingale, its beak open in song"
+          />
+          <svg
+            class="voice-line"
+            viewBox="0 0 900 80"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            <path pathLength="1" d="M0 42 C110 5 195 5 320 23 S660 45 900 34" />
+          </svg>
+          <div class="identity">
+            <h1 id="wordmark">Lectrice</h1>
+            <p class="tagline">Every page, read aloud.</p>
+          </div>
+        </div>
+        <div class="hero-detail">
+          <p class="introduction">
+            A local-first PDF reader for your desktop. Highlight a passage and
+            hear it read aloud. Keep your highlights and reading place between
+            visits.
+          </p>
+          <div class="hero-action">
+            <a class="button" href="#install"
+              >Find your installation <span aria-hidden="true">↓</span></a
+            >
+            <p class="small">Read offline. Narrate with a cloud voice.</p>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="read-along"
+        class="reading-section page-width"
+        aria-labelledby="reading-title"
+      >
+        <div>
+          <p class="eyebrow section-label">01 / The reading voice</p>
+          <h2 id="reading-title">
+            Follow the words.<br />Stay with the thought.
+          </h2>
+          <ol class="reading-steps">
+            <li>
+              <span>Select a passage.</span> Start with the words you want to
+              hear.
+            </li>
+            <li>
+              <span>Press play.</span> The highlight follows the spoken words.
+            </li>
+            <li>
+              <span>Keep reading.</span> Let narration continue across pages.
+            </li>
+          </ol>
+          <p class="small">
+            Read-aloud currently requires an ElevenLabs API key and an internet
+            connection.
+          </p>
+        </div>
+        <figure class="reading-sample">
+          <p class="eyebrow">A passage, in voice</p>
+          <blockquote>
+            A page is a place to begin.<br />
+            <mark>Give the words a voice,</mark><br />
+            and follow the thought<br />
+            a little further.
+          </blockquote>
+          <figcaption>
+            Read-along, illustrated — the highlight moves with the voice. Not an
+            app screenshot or an audio demo.
+          </figcaption>
+        </figure>
+      </section>
+
+      <section
+        id="local-first"
+        class="local-section"
+        aria-labelledby="local-title"
+      >
+        <div class="page-width local-layout">
+          <div>
+            <p class="eyebrow section-label">02 / Local comes first</p>
+            <h2 id="local-title">Your reading.<br />Your own space.</h2>
+          </div>
+          <div class="local-copy">
+            <p class="lead">
+              Open, view and highlight PDFs fully offline. No Lectrice account
+              required.
+            </p>
+            <p>
+              Your library, highlights and reading position are saved locally,
+              ready when you return.
+            </p>
+            <div class="speech-note">
+              <h3>A clear line around cloud speech</h3>
+              <p>
+                Narration today makes a cloud round-trip: the page text you ask
+                to hear is sent to ElevenLabs. It needs your API key, held only
+                for the session. An offline voice is on the roadmap, not in the
+                shipped build.
+              </p>
+              <a
+                href="https://github.com/phsb5321/Tauri-PDF-Reader/blob/main/SECURITY.md"
+                >Read the data &amp; privacy contract
+                <span aria-hidden="true">↗</span></a
+              >
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="install"
+        class="install-section page-width"
+        aria-labelledby="install-title"
+      >
+        <div class="install-heading">
+          <p class="eyebrow section-label">03 / Make room for a voice</p>
+          <h2 id="install-title">Start with a page.</h2>
+          <p>Choose the distribution for your desktop.</p>
+        </div>
+        <div class="install-grid">
+          <article aria-labelledby="linux-title">
+            <h3 id="linux-title">Linux</h3>
+            <p class="eyebrow platform-note">AppImage / deb</p>
+            <p>
+              Download a package from a tagged release. Release notes and assets
+              live together on GitHub.
+            </p>
+            <a
+              class="button"
+              href="https://github.com/phsb5321/Tauri-PDF-Reader/releases"
+              >Browse Linux releases <span aria-hidden="true">↗</span></a
+            >
+          </article>
+          <article aria-labelledby="mac-title">
+            <h3 id="mac-title">macOS</h3>
+            <p class="eyebrow platform-note">Apple silicon / Nix</p>
+            <p>
+              A personal Nix flake channel. Ad-hoc signed, not Apple notarized;
+              not a public Mac installer.
+            </p>
+            <p class="command-label" id="install-command-label">
+              With Nix installed, run:
+            </p>
+            <pre
+              tabindex="0"
+              aria-labelledby="install-command-label"
+            ><code>nix run github:phsb5321/Tauri-PDF-Reader/main#manage -- install</code></pre>
+            <details>
+              <summary>Update or roll back</summary>
+              <p id="manage-command-label">
+                Use the dedicated profile to update, or restore the previous
+                generation:
+              </p>
+              <pre
+                tabindex="0"
+                aria-labelledby="manage-command-label"
+              ><code>PROFILE="$HOME/.local/state/nix/profiles/lectrice"
+"$PROFILE/bin/manage-macos-flake.sh" update
+"$PROFILE/bin/manage-macos-flake.sh" rollback</code></pre>
+            </details>
+            <a
+              href="https://github.com/phsb5321/Tauri-PDF-Reader/blob/main/docs/macos-nix.md"
+              >Full macOS installation guide
+              <span aria-hidden="true">↗</span></a
+            >
+          </article>
+        </div>
+        <p class="availability small">
+          No Windows package is currently produced.
+          <a
+            href="https://github.com/phsb5321/Tauri-PDF-Reader/blob/main/docs/KNOWN_LIMITATIONS.md"
+            >Read the known limitations.</a
+          >
+        </p>
+      </section>
+    </main>
+
+    <footer class="page-width">
+      <div>
+        <p class="footer-name">Lectrice</p>
+        <p class="small">French for a person employed to read aloud.</p>
+      </div>
+      <nav aria-label="Project links">
+        <a href="https://github.com/phsb5321/Tauri-PDF-Reader">Repository</a>
+        <a
+          href="https://github.com/phsb5321/Tauri-PDF-Reader/blob/main/CHANGELOG.md"
+          >Changelog</a
+        >
+        <a href="#wordmark">Back to top <span aria-hidden="true">↑</span></a>
+      </nav>
+    </footer>
+  </body>
+</html>
