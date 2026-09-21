@@ -73,8 +73,8 @@ fails, check [known limitations](docs/KNOWN_LIMITATIONS.md) and
 version, OS, and a non-private reproduction. Do not attach API keys or personal PDFs.
 
 For web articles in Firefox rather than PDFs, try
-[Proso](https://github.com/phsb5321/Proso). Both projects are featured alongside
-[Yolo Labz's desktop tools](https://github.com/yolo-labz).
+[Proso](https://github.com/phsb5321/Proso). Explore related desktop tools at
+[Yolo Labz](https://github.com/yolo-labz).
 
 ## Features
 
