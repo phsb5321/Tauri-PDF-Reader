@@ -1,0 +1,53 @@
+{
+  "browser": "152.0.7977.82",
+  "errors": [],
+  "fonts": {
+    "h1": [
+      {
+        "familyName": "Fraunces",
+        "postScriptName": "Fraunces-9ptBlack",
+        "isCustomFont": true,
+        "glyphCount": 8
+      }
+    ],
+    ".tagline": [
+      {
+        "familyName": "Newsreader 16pt",
+        "postScriptName": "Newsreader16pt-Regular",
+        "isCustomFont": true,
+        "glyphCount": 23
+      }
+    ],
+    ".category": [
+      {
+        "familyName": "Newsreader 16pt",
+        "postScriptName": "Newsreader16pt-Regular",
+        "isCustomFont": true,
+        "glyphCount": 22
+      }
+    ]
+  },
+  "wordmark_axes": "\"SOFT\" 0, \"WONK\" 1, \"opsz\" 144, \"wght\" 600",
+  "contrast": {
+    "ink_on_paper": 16.414,
+    "vermilion_on_paper": 4.192
+  },
+  "sha256": {
+    ".github/assets/lectrice-avatar.png": "c3b1244be46556866ddcaf72326a1c1528fd7ec519408f9595df536a740ec8a3",
+    ".github/assets/lectrice-social-preview.png": "5a355aa2e8aca75c4d3f645af0c797d5e2a93d91a36dd9b9376b6cc461f93c7e",
+    "docs/brand/github-identity/avatar-64-nearest.png": "a9e0c19ccd90dfd6515c530fba06f20f69cb03a055c1d7ccd851313276072550",
+    "docs/brand/github-identity/avatar-64.png": "5d7bd7fedf00a08e12cde0ad1d111636eea3c9b326e8b12f893f9200053c4289",
+    "docs/brand/github-identity/avatar-circle-460.png": "95dd93db349aae718cc5a503d23343983da6214eb5babde2b7077dca9ad1d117",
+    "docs/brand/github-identity/avatar-circle-64.png": "7698e61311ed9a3a8c9d4b5fc85d25391a0618d3b85bd0028f8af80a2cbe7c7c",
+    "docs/brand/github-identity/proof.png": "49bed209bdfd0172e0c728e81d84ecfa82a459bfe6b347fed491c98ce60080aa",
+    "docs/brand/github-identity/social-640.png": "0a8f878e54325610ac9e4b72e8ff779f06fc814ad19e918261bffad9501b6071"
+  },
+  "source_sha256": {
+    ".github/assets/lectrice-social-preview.html": "76d3358faa35b9900a8427500e5d1b17ec8397ebb4dcd1515fa418c8f7277534",
+    ".github/assets/lectrice-avatar.svg": "94d6e1b0949bad580a353e2568b3d5e71a8e4b400d774f04ac8230bece6c37d4",
+    "docs/brand/lectrice-mark.svg": "db922b47b8dc62b5f3f62bb79dedf06bdf017a3cad4051e3ba01bbdb7dab7eee",
+    "docs/brand/fonts/Fraunces.ttf": "177ff6c0f14e5550a3c624247cd1189611d4eb65d000b14944c63d967958abbb",
+    "docs/brand/fonts/Newsreader.ttf": "8a08d13f8a6c0d51be379a60af84f945f65369a67e509ee3c3bdcc421254d7c1",
+    "docs/brand/render-github.py": "87bb2bb6e5ee5bd2c6df8523bd33a1c2d4e0a8934a630d39523e509cfafade0b"
+  }
+}
