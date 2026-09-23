@@ -1,7 +1,9 @@
 # Lectrice · Brand Spec
 
-> Captured: 2026-05-29 · Status: **shipped** (applied to tokens, fonts, icons, config)
-> Visual board: [`lectrice-brand.html`](./lectrice-brand.html) (open in a browser)
+> Identity updated: 21/09/2026 · Vermilion nightingale on paper, Fraunces wordmark.
+> [Current assets and GitHub application steps](./README.md).
+> Product tokens/fonts below still describe the separately shipped UI.
+> Historical board: [`lectrice-brand.html`](./lectrice-brand.html) (pre-v2, not current identity guidance).
 
 ---
 
@@ -48,8 +50,8 @@ Drawn with GPT through the browser fleet (identity `chatgpt-c`, ChatGPT Pro) and
 single-colour vector path. **Design record:**
 `1. Projects/Lectrice — Tauri PDF Reader/Brand v2 — research & three directions (2026-09-20).md`.
 
-- Reusable source: [`lectrice-mark.svg`](./lectrice-mark.svg) (one path, inherits `currentColor`)
-- App icon / favicon (ink tile + paper bird): [`../../public/lectrice-mark.svg`](../../public/lectrice-mark.svg)
+- Reusable source: [`lectrice-mark.svg`](./lectrice-mark.svg) (one path, neutral black source; explicitly paint it vermilion in compositions)
+- App icon / favicon (paper tile + vermilion bird): [`../../public/lectrice-mark.svg`](../../public/lectrice-mark.svg)
 
 **Mark rules:** clearspace ≥ the bird's tail width · min 16px (use the favicon cut below that) ·
 **the mark is vermilion `#C8462C` on paper `#F4EFE4`** — the bird and the line it sings into are one
@@ -90,12 +92,21 @@ Use the favicon cut for `favicon.ico`-scale UI and the detail cut for everything
 
 ### Wordmark
 
-**Lectrice** in **Space Grotesk 700**, tracking −0.02em. Monochrome (`--text`); the mark
-carries the colour (Zed-style). Mark sits left of the wordmark, clearspace = mark height.
+**Lectrice** in **Fraunces 600**, optical size **144**, **WONK on**, SOFT 0,
+tracking −0.035em. Ink `#14110D` on paper `#F4EFE4`; the bird carries vermilion
+`#C8462C`. Use the real local font, never image-model lettering. Align the wordmark
+optically with the bird's body, not its full bounding box; the singing head rises
+above the cap line. The [GitHub composition](../../.github/assets/lectrice-social-preview.html)
+is a reproducible example. Space Grotesk below remains a product UI implementation
+detail, not the identity wordmark.
 
 ---
 
-## 🎨 Palette — Catppuccin Mocha (dark) / Latte (light)
+## 🎨 Shipped product UI palette — Catppuccin Mocha / Latte
+
+This section describes existing app tokens, **not marketing/identity artwork**.
+Identity surfaces use paper `#F4EFE4`, ink `#14110D` type and vermilion `#C8462C`
+bird/voice. Migrating product tokens is a separate slice.
 
 Zed's _discipline_ (dark-first, one accent, restraint) in the house palette. Applied to
 `src/ui/tokens/colors.css` — token names unchanged, values swapped.
@@ -117,7 +128,11 @@ Hover/alpha are derived with `color-mix()` so no off-palette hex is ever invente
 
 ---
 
-## ✍️ Typography — self-hosted (`@fontsource`, local-first, no CDN)
+## ✍️ Shipped product UI typography — self-hosted (`@fontsource`)
+
+For identity artwork use Fraunces/Newsreader from [the asset index](./README.md).
+The following table records the existing product implementation; it does not
+supersede the wordmark specification above.
 
 | Role               | Family                                                   | Token                   |
 | ------------------ | -------------------------------------------------------- | ----------------------- |
