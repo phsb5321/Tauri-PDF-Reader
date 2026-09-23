@@ -1,22 +1,28 @@
 /**
- * Seeded command model for the drop-to-session transaction (issue #185).
+ * Seeded command model for the drop-to-session transaction — latest-wins
+ * (issue #294, replacing the #185 fail-fast model).
  *
  * The model drives the real `usePdfDropSession` hook (real document store,
  * mocked IPC leaves) through a generated sequence of guarded operations and
  * asserts the transaction invariants after every executed operation:
  *
- * 1. at most one transaction in flight — probes (second drop, resume) are
- *    refused with the shared-store busy errors and mutate nothing;
+ * 1. at most one transaction COMMITS — probes (second drop, resume) no
+ *    longer get refused with busy errors: they SUPERSEDE the in-flight
+ *    transaction, which rolls its session back silently and mutates nothing
+ *    visible;
  * 2. the open lease spans the whole transaction — `isLoading` is true from
- *    import start until the session activates or rolls back, then false;
- * 3. a `success=false` rejection from the restore authority never activates:
+ *    import start until the LIVE transaction settles, then false;
+ * 3. no busy code ever reaches a user-visible string — the store error and
+ *    every `onError` argument are free of `OPEN_BUSY`/`DROP_BUSY`, and no
+ *    user-visible message starts with an internal `CODE: ` prefix;
+ * 4. a `success=false` rejection from the restore authority never activates:
  *    the created session is deleted, `onSessionCreated` never fires;
- * 4. invalid drops mutate nothing at any time.
+ * 5. invalid drops mutate nothing at any time.
  *
  * Operations whose precondition does not hold are skipped (guarded command
  * model); invariants are asserted after every executed operation.
  *
- * Seeded: 20260908 (recorded in evidence; deterministic replay).
+ * Seeded: 20260923 (new model seed; deterministic replay).
  */
 
 import fc from "fast-check";
@@ -85,21 +91,38 @@ const RESTORE_FAILED = new Error(
   "SESSION_RESTORE_FAILED: The reading session could not be restored — the reader stayed on the current document. Try again.",
 );
 
+type RestoreGate = {
+  resolve: (value: {
+    success: boolean;
+    session: typeof session;
+    missingDocuments: string[];
+  }) => void;
+  reject: (error: Error) => void;
+};
+
 const flush = async () => {
   for (let i = 0; i < 4; i += 1) {
     await new Promise((resolve) => setTimeout(resolve, 0));
   }
 };
 
-describe("drop transaction command model (seed 20260908)", () => {
-  it("keeps the transaction exclusive, leased, and fail-closed", async () => {
+/** A user-visible string never carries a leading internal code. */
+const noRawCode = expect.not.stringMatching(/^[A-Z_]+: /);
+
+describe("drop transaction command model (latest-wins seed 20260923)", () => {
+  it("supersedes instead of refusing, commits at most once, and never leaks busy codes", async () => {
     await fc.assert(
       fc.asyncProperty(fc.array(opArb, { maxLength: 12 }), async (ops) => {
         // Fresh world per run.
         useDocumentStore.getState().reset();
         loadDocument.mockReset();
         mockInvoke.mockReset();
-        mockInvoke.mockResolvedValue(null);
+        // The resume probe needs a resolvable document read and library row.
+        loadDocument.mockResolvedValue({ numPages: 9 });
+        mockInvoke.mockImplementation((command: string) => {
+          if (command === "library_open_document") return Promise.resolve(row);
+          return Promise.resolve(null);
+        });
 
         const subscribeMock = vi.mocked(subscribe);
         subscribeMock.mockReset();
@@ -109,16 +132,8 @@ describe("drop transaction command model (seed 20260908)", () => {
           return vi.fn();
         });
 
-        let inFlight = false;
-        let failNextRestore = false;
-        let restoreGate: {
-          resolve: (value: {
-            success: boolean;
-            session: typeof session;
-            missingDocuments: string[];
-          }) => void;
-          reject: (error: Error) => void;
-        } | null = null;
+        let liveGate: (RestoreGate & { failNextRestore: boolean }) | null =
+          null;
         const counts = {
           imports: 0,
           creates: 0,
@@ -142,7 +157,7 @@ describe("drop transaction command model (seed 20260908)", () => {
                 session: typeof session;
                 missingDocuments: string[];
               }>((resolve, reject) => {
-                restoreGate = { resolve, reject };
+                liveGate = { resolve, reject, failNextRestore: false };
               }),
           ),
           deleteSession: vi.fn(async () => {
@@ -160,74 +175,108 @@ describe("drop transaction command model (seed 20260908)", () => {
         }));
         await flush();
 
+        const errorsBefore = () => deps.onError.mock.calls.length;
+
         for (const op of ops) {
           switch (op) {
             case "startDrop":
-            case "startDropFail": {
-              if (inFlight) break; // guarded
-              failNextRestore = op === "startDropFail";
-              inFlight = true;
+            case "startDropFail":
+            case "probeSecondDrop": {
+              // Latest wins: starting a second drop while one is in flight
+              // SUPERSEDES it. The new transaction starts FIRST (its lease
+              // bumps the generation), and only then does the superseded
+              // predecessor's restore settle — it must roll its session back
+              // silently instead of activating.
+              const stale = liveGate;
+              liveGate = null;
+              const failNextRestore = op === "startDropFail";
               const before = { ...counts };
+              const errors = errorsBefore();
               await act(async () => {
                 emit({ type: "drop", paths: ["/books/Model Book.pdf"] });
               });
               await flush();
-              // The lease is held and exactly one new transaction started.
+              // Exactly one new transaction started, holding the lease.
               expect(useDocumentStore.getState().isLoading).toBe(true);
               expect(counts.imports).toBe(before.imports + 1);
               expect(counts.creates).toBe(before.creates + 1);
+              if (stale) {
+                await act(async () => {
+                  stale.resolve({
+                    success: true,
+                    session,
+                    missingDocuments: [],
+                  });
+                });
+                await flush();
+                // The superseded predecessor rolled back silently.
+                expect(counts.deletions).toBe(before.deletions + 1);
+                expect(counts.activations).toBe(before.activations);
+                expect(errorsBefore()).toBe(errors); // silent — no busy error
+              }
+              liveGate = { ...liveGate!, failNextRestore };
               break;
             }
             case "probeResume": {
-              if (!inFlight) break; // guarded
+              // A resume SUPERSEDES whatever is in flight and wins.
               let resumed: boolean | undefined;
               await act(async () => {
                 resumed = await result.current.open.resumeDocument(row);
               });
-              expect(resumed).toBe(false);
-              expect(loadDocument).not.toHaveBeenCalled();
-              expect(useDocumentStore.getState().error).toContain("OPEN_BUSY");
-              break; // probe mutated nothing (asserted by later deltas)
-            }
-            case "probeSecondDrop": {
-              if (!inFlight) break; // guarded
-              await act(async () => {
-                emit({ type: "drop", paths: ["/books/Second.pdf"] });
-              });
-              await flush();
-              expect(deps.onError).toHaveBeenCalledWith(
-                "DROP_BUSY: Wait for the current PDF session to finish.",
+              expect(resumed).toBe(true);
+              expect(useDocumentStore.getState().currentDocument?.id).toBe(
+                row.id,
               );
-              break; // no second transaction (asserted by later deltas)
+              if (liveGate) {
+                const stale = liveGate;
+                liveGate = null;
+                const deletions = counts.deletions;
+                const errors = errorsBefore();
+                await act(async () => {
+                  stale.resolve({
+                    success: true,
+                    session,
+                    missingDocuments: [],
+                  });
+                });
+                await flush();
+                // The superseded drop rolled back silently, never activated.
+                expect(counts.deletions).toBe(deletions + 1);
+                expect(errorsBefore()).toBe(errors);
+              }
+              // No busy error was set anywhere; the resume owns the reader.
+              expect(useDocumentStore.getState().error).toBeNull();
+              expect(useDocumentStore.getState().isLoading).toBe(false);
+              break;
             }
             case "settle": {
-              if (!inFlight) break; // guarded
-              inFlight = false;
-              const errorCallsBefore = deps.onError.mock.calls.length;
-              const settleBefore = { ...counts };
+              if (!liveGate) break; // guarded: no live drop transaction
+              const gate = liveGate;
+              liveGate = null;
+              const before = { ...counts };
+              const errors = errorsBefore();
               await act(async () => {
-                if (failNextRestore) restoreGate!.reject(RESTORE_FAILED);
+                if (gate.failNextRestore) gate.reject(RESTORE_FAILED);
                 else
-                  restoreGate!.resolve({
+                  gate.resolve({
                     success: true,
                     session,
                     missingDocuments: [],
                   });
               });
               await flush();
-              if (failNextRestore) {
-                expect(counts.deletions).toBe(settleBefore.deletions + 1);
-                expect(counts.activations).toBe(settleBefore.activations);
+              if (gate.failNextRestore) {
+                expect(counts.deletions).toBe(before.deletions + 1);
+                expect(counts.activations).toBe(before.activations);
                 expect(deps.onError).toHaveBeenCalledWith(
                   expect.stringContaining(
-                    "DROP_FAILED: SESSION_RESTORE_FAILED",
+                    "The reading session could not be restored",
                   ),
                 );
+                expect(deps.onError).toHaveBeenLastCalledWith(noRawCode);
               } else {
-                expect(counts.activations).toBe(settleBefore.activations + 1);
-                // Probes may have reported busy errors; the transaction's own
-                // success adds none.
-                expect(deps.onError.mock.calls.length).toBe(errorCallsBefore);
+                expect(counts.activations).toBe(before.activations + 1);
+                expect(errorsBefore()).toBe(errors); // success adds none
               }
               // The lease always outlives the transaction, never longer.
               expect(useDocumentStore.getState().isLoading).toBe(false);
@@ -239,24 +288,30 @@ describe("drop transaction command model (seed 20260908)", () => {
                 emit({ type: "drop", paths: ["/books/notes.txt"] });
               });
               await flush();
-              // Idle: refused before any mutation. In flight: the single-
-              // transaction guard refuses it first — either way, no change.
-              expect(deps.onError).toHaveBeenCalledWith(
-                expect.stringMatching(/^DROP_(INVALID|BUSY)/),
+              // Idle or in flight: refused before any mutation, friendly copy.
+              expect(deps.onError).toHaveBeenLastCalledWith(
+                "Drop exactly one PDF to create a reading session.",
               );
               expect(counts).toEqual(before); // mutated nothing
               break;
             }
           }
+          // Invariant after every executed operation: no busy code has ever
+          // reached a user-visible string, and no message carries a code.
+          expect(useDocumentStore.getState().error ?? "").not.toMatch(
+            /OPEN_BUSY|DROP_BUSY/,
+          );
+          for (const call of deps.onError.mock.calls) {
+            expect(String(call[0])).not.toMatch(/^[A-Z_]+: /);
+          }
         }
 
         // Whatever the sequence, the world ends settled and clean.
-        if (!inFlight) {
+        if (!liveGate) {
           expect(useDocumentStore.getState().isLoading).toBe(false);
         }
       }),
-      { seed: 20260908, numRuns: 80 },
+      { seed: 20260923, numRuns: 80 },
     );
-  }, // 80 rendered model runs take longer than vitest's 5s default.
-  30000);
+  }, 30000); // 80 rendered model runs take longer than vitest's 5s default.
 });

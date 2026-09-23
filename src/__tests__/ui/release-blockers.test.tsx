@@ -193,7 +193,8 @@ describe("release blockers (109)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open PDF" }));
 
     const banner = await screen.findByRole("alert");
-    expect(banner).toHaveTextContent(/PDF_INVALID/);
+    expect(banner).toHaveTextContent(/The file is not a valid PDF/);
+    expect(banner.textContent?.trim()).not.toMatch(/^[A-Z_]+: /);
     // Still on the library — never stranded on a blank reader.
     expect(
       screen.getByRole("heading", { name: "Library" }),

@@ -74,37 +74,48 @@ const initialState = {
 };
 
 /**
- * The shared open mutex (issue #185).
+ * One lease of the shared open mutex (issue #185), supersede-able (issue #294).
  *
  * Every public way a document reaches the reader — dialog open, native-drop
  * import, library/session resume, and the drop-to-session transaction that
- * continues past the import — must hold one lease for its whole body, so a
- * rapid second action cannot interleave and show another document under an
- * in-flight transaction. Fail-fast (no queue): a second action gets the
- * existing OPEN_BUSY error and can retry. `isLoading` mirrors the lease so
- * the busy UI state and the guard cannot disagree.
+ * continues past the import — holds one lease for its whole body. Acquiring
+ * a lease while one is held SUPERSEDES the older transaction: the older
+ * lease goes stale, its visible commit must be dropped (`isSuperseded`), and
+ * its release becomes a no-op. The newest open therefore always wins — no
+ * request is ever refused with a busy error, and `isLoading` mirrors the
+ * LIVE lease so the busy UI state cannot disagree with the guard.
  */
+export interface OpenLease {
+  generation: number;
+  /** True once a newer open transaction superseded this one. */
+  isSuperseded: () => boolean;
+  /** Releases the lease; a no-op for a superseded (stale) lease. */
+  release: () => void;
+}
+
 let openTransactions = 0;
 let openGeneration = 0;
 
-export function beginOpenTransaction(): (() => void) | null {
-  if (openTransactions > 0 || useDocumentStore.getState().isLoading) {
-    return null;
-  }
+export function beginOpenTransaction(): OpenLease {
+  openGeneration += 1;
   openTransactions += 1;
   useDocumentStore.setState({ isLoading: true });
   const generation = openGeneration;
   let released = false;
-  return () => {
-    if (released || generation !== openGeneration) {
+  return {
+    generation,
+    isSuperseded: () => !released && generation !== openGeneration,
+    release: () => {
+      if (released) return;
       released = true;
-      return;
-    }
-    released = true;
-    openTransactions -= 1;
-    if (openTransactions === 0) {
-      useDocumentStore.setState({ isLoading: false });
-    }
+      // Every lease — stale or live — releases its slot when its transaction
+      // ends; only the LAST release clears the busy flag, so a superseded
+      // transaction can never clear `isLoading` while a successor holds it.
+      openTransactions = Math.max(0, openTransactions - 1);
+      if (openTransactions === 0) {
+        useDocumentStore.setState({ isLoading: false });
+      }
+    },
   };
 }
 

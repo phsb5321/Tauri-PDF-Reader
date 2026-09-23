@@ -154,40 +154,95 @@ describe("resumeDocument", () => {
     expect(state.error).toBe("No such file");
   });
 
-  it("refuses a resume while another open holds the shared store (issue #185)", async () => {
-    // The library/session resume is a public open like any other: while a
-    // drop import (or any open) is in flight, a resume must be refused
-    // instead of racing it onto the reader surface.
-    useDocumentStore.setState({ isLoading: true });
+  it("a resume supersedes an in-flight open — latest wins, no busy error (issue #294)", async () => {
+    // First: a drop import held in flight on its bound read.
+    let resolveFirstImport: (value: {
+      pdf: PDFDocumentProxy;
+      sha256: string;
+    }) => void = () => {};
+    loadDocumentBound.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveFirstImport = resolve;
+      }),
+    );
+    library({ known: null });
     const { result } = renderHook(() => useOpenPdf());
+    await act(async () => {
+      void result.current.openDroppedPdf("/drop/first.pdf");
+    });
+    expect(useDocumentStore.getState().isLoading).toBe(true);
 
+    // The resume SUPERSEDES the in-flight import instead of being refused.
+    const stored = doc({ currentPage: 142 });
+    loadDocument.mockResolvedValue(pdf(300));
+    mockInvoke.mockResolvedValue(stored);
     let resumed: boolean | undefined;
     await act(async () => {
-      resumed = await result.current.resumeDocument(doc({ currentPage: 12 }));
+      resumed = await result.current.resumeDocument(stored);
     });
 
-    expect(resumed).toBe(false);
-    expect(loadDocument).not.toHaveBeenCalled();
+    expect(resumed).toBe(true);
+    expect(useDocumentStore.getState().currentDocument?.id).toBe("doc-1");
+    expect(useDocumentStore.getState().currentPage).toBe(142);
+
+    // The superseded first import settles silently: no error, no visible
+    // commit over the winning document.
+    await act(async () => {
+      resolveFirstImport(bytesOf(pdf(99)));
+    });
     const state = useDocumentStore.getState();
-    expect(state.currentDocument).toBeNull();
-    expect(state.pdfDocument).toBeNull();
-    expect(state.error).toContain("OPEN_BUSY");
+    expect(state.error).toBeNull();
+    expect(state.currentDocument?.id).toBe("doc-1");
+    expect(state.currentPage).toBe(142);
+    expect(state.isLoading).toBe(false);
   });
 });
 
 describe("openDroppedPdf", () => {
-  it("does not race another open already using the shared document store", async () => {
-    useDocumentStore.setState({ isLoading: true });
+  it("a second open supersedes the one in flight — latest wins, no busy error", async () => {
+    // First transaction: a drop import held open on the bound read.
+    let resolveFirstImport: (value: {
+      pdf: PDFDocumentProxy;
+      sha256: string;
+    }) => void = () => {};
+    loadDocumentBound
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveFirstImport = resolve;
+        }),
+      )
+      .mockResolvedValue(bytesOf(pdf(30)));
+    loadDocument.mockResolvedValue(pdf(30));
+    library({ known: null });
     const { result } = renderHook(() => useOpenPdf());
-
-    let opened: Document | null | undefined;
+    let firstOpened: Document | null | undefined;
     await act(async () => {
-      opened = await result.current.openDroppedPdf("/drop/new.pdf");
+      void result.current.openDroppedPdf("/drop/first.pdf").then((opened) => {
+        firstOpened = opened as Document | null;
+      });
     });
+    expect(useDocumentStore.getState().isLoading).toBe(true);
 
-    expect(opened).toBeNull();
-    expect(loadDocumentBound).not.toHaveBeenCalled();
-    expect(useDocumentStore.getState().error).toContain("OPEN_BUSY");
+    // The second open supersedes the first and completes normally.
+    let secondOpened: Document | null = null;
+    await act(async () => {
+      secondOpened = (await result.current.openDroppedPdf(
+        "/drop/second.pdf",
+      )) as Document;
+    });
+    expect(secondOpened?.id).toBe("doc-1");
+    expect(useDocumentStore.getState().currentDocument?.id).toBe("doc-1");
+
+    // The superseded first import settles silently: no error, no visible
+    // commit over the winning document.
+    await act(async () => {
+      resolveFirstImport(bytesOf(pdf(99)));
+    });
+    expect(firstOpened).toBeNull();
+    const state = useDocumentStore.getState();
+    expect(state.error).toBeNull();
+    expect(state.currentDocument?.id).toBe("doc-1");
+    expect(state.isLoading).toBe(false);
   });
 
   it("uses the native-authorized path, runs the bound import, and returns its row", async () => {
@@ -233,73 +288,73 @@ describe("openDroppedPdf", () => {
     expect(opened).toBeNull();
     expect(loadDocumentBound).not.toHaveBeenCalled();
     expect(useDocumentStore.getState().currentDocument).toBeNull();
-    expect(useDocumentStore.getState().error).toContain("DROP_INVALID");
-  });
-});
-
-describe("openDroppedPdf", () => {
-  it("does not race another open already using the shared document store", async () => {
-    useDocumentStore.setState({ isLoading: true });
-    const { result } = renderHook(() => useOpenPdf());
-
-    let opened: Document | null | undefined;
-    await act(async () => {
-      opened = await result.current.openDroppedPdf("/drop/new.pdf");
-    });
-
-    expect(opened).toBeNull();
-    expect(loadDocumentBound).not.toHaveBeenCalled();
-    expect(useDocumentStore.getState().error).toContain("OPEN_BUSY");
-  });
-
-  it("uses the native-authorized path, runs the bound import, and returns its row", async () => {
-    loadDocumentBound.mockResolvedValue(bytesOf(pdf(30)));
-    loadDocument.mockResolvedValue(pdf(30));
-    library({ known: null });
-
-    const { result } = renderHook(() => useOpenPdf());
-    let opened: Document | null = null;
-    await act(async () => {
-      opened = await result.current.openDroppedPdf("/drop/new.pdf");
-    });
-
-    expect(loadDocumentBound).toHaveBeenCalledWith("/drop/new.pdf", undefined);
-    expect(opened?.id).toBe("doc-1");
-    expect(useDocumentStore.getState().currentDocument?.id).toBe("doc-1");
-  });
-
-  it("reuses a known row and its saved page instead of duplicating it", async () => {
-    const known = doc({ currentPage: 88 });
-    loadDocumentBound.mockResolvedValue(bytesOf(pdf(300)));
-    library({ known });
-
-    const { result } = renderHook(() => useOpenPdf());
-    await act(async () => {
-      await result.current.openDroppedPdf("/books/one.pdf");
-    });
-
-    expect(mockInvoke).not.toHaveBeenCalledWith(
-      "library_add_document",
-      expect.anything(),
+    expect(useDocumentStore.getState().error).toBe(
+      "Drop exactly one PDF to create a reading session.",
     );
-    expect(useDocumentStore.getState().currentPage).toBe(88);
-  });
-
-  it("returns null and creates no row for a non-PDF drop", async () => {
-    const { result } = renderHook(() => useOpenPdf());
-    let opened: Document | null | undefined;
-    await act(async () => {
-      opened = await result.current.openDroppedPdf("/drop/notes.txt");
-    });
-
-    expect(opened).toBeNull();
-    expect(loadDocumentBound).not.toHaveBeenCalled();
-    expect(useDocumentStore.getState().currentDocument).toBeNull();
-    expect(useDocumentStore.getState().error).toContain("DROP_INVALID");
   });
 });
 
 describe("openPdf", () => {
+  it("a superseded dialog pick is silently discarded — the newest open wins", async () => {
+    // First open: its dialog resolves only AFTER the second open superseded it.
+    let resolveFirstDialog: (
+      value: string | string[] | null,
+    ) => void = () => {};
+    openDialog
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveFirstDialog = resolve;
+        }),
+      )
+      .mockResolvedValueOnce("/books/second.pdf");
+    loadDocumentBound.mockResolvedValue(bytesOf(pdf(40), "doc-second"));
+    loadDocument.mockResolvedValue(pdf(40));
+    const second = doc({
+      id: "doc-second",
+      filePath: "/books/second.pdf",
+      currentPage: 1,
+    });
+    mockInvoke.mockImplementation((command: string) => {
+      switch (command) {
+        case "library_get_document_by_path":
+          return Promise.resolve(null);
+        case "library_add_document":
+        case "library_open_document":
+          return Promise.resolve(second);
+        default:
+          return Promise.resolve(null);
+      }
+    });
+
+    const { result } = renderHook(() => useOpenPdf());
+    let firstResult: boolean | undefined;
+    await act(async () => {
+      void result.current.openPdf().then((opened) => {
+        firstResult = opened;
+      });
+    });
+    expect(useDocumentStore.getState().isLoading).toBe(true);
+
+    let secondResult: boolean | undefined;
+    await act(async () => {
+      secondResult = await result.current.openPdf();
+    });
+    expect(secondResult).toBe(true);
+    expect(useDocumentStore.getState().currentDocument?.id).toBe("doc-second");
+
+    // The first dialog returns now: the pick is discarded silently — no
+    // error, no import, the winning document stays.
+    await act(async () => {
+      resolveFirstDialog("/books/first.pdf");
+    });
+    expect(firstResult).toBe(false);
+    const state = useDocumentStore.getState();
+    expect(state.error).toBeNull();
+    expect(state.currentDocument?.id).toBe("doc-second");
+    expect(state.isLoading).toBe(false);
+    expect(loadDocumentBound).toHaveBeenCalledTimes(1); // only the winner imported
+  });
+
   it("registers a file the library has never seen", async () => {
     openDialog.mockResolvedValue("/books/new.pdf");
     loadDocumentBound.mockResolvedValue(bytesOf(pdf(30)));
@@ -382,7 +437,10 @@ describe("openPdf", () => {
 
     expect(opened).toBe(false);
     const state = useDocumentStore.getState();
-    expect(state.error).toContain("PDF_HASH_MISMATCH");
+    expect(state.error).toContain(
+      "File content changed while the book was being added",
+    );
+    expect(state.error).not.toMatch(/^[A-Z_]+: /);
     expect(state.pdfDocument).toBeNull();
     expect(state.currentDocument).toBeNull();
   });
@@ -468,8 +526,9 @@ describe("resumeDocument reauthorization rung (issue #120)", () => {
 
     expect(resumed).toBe(false);
     const state = useDocumentStore.getState();
-    expect(state.error).toContain("WRONG_DOCUMENT");
+    expect(state.error).toContain("is not this book");
     expect(state.error).toContain("evil-impostor.pdf");
+    expect(state.error).not.toMatch(/^[A-Z_]+: /);
     expect(state.pdfDocument).toBeNull();
     // Verify the selected bytes BEFORE any row mutation. The impostor is read
     // only under the expected row hash and fails closed.
@@ -498,7 +557,10 @@ describe("resumeDocument reauthorization rung (issue #120)", () => {
 
     expect(resumed).toBe(false);
     const state = useDocumentStore.getState();
-    expect(state.error).toContain("OPEN_CANCELLED");
+    expect(state.error).toContain(
+      "Access reauthorization was cancelled — the book was not opened.",
+    );
+    expect(state.error).not.toMatch(/^[A-Z_]+: /);
     expect(mockInvoke).not.toHaveBeenCalledWith(
       "library_relocate_document",
       expect.anything(),
@@ -548,7 +610,8 @@ describe("every known-row open binds the bytes to the row hash (Codex exact-head
     await act(async () => {
       await result.current.resumeDocument(stored);
     });
-    expect(useDocumentStore.getState().error).toContain("WRONG_DOCUMENT");
+    expect(useDocumentStore.getState().error).toContain("is not this book");
+    expect(useDocumentStore.getState().error).not.toMatch(/^[A-Z_]+: /);
 
     // Second resume (e.g. the user retries after fixing the file): the read
     // must STILL carry the row-hash binding.

@@ -106,8 +106,12 @@ describe("usePdfDropSession", () => {
     expect(deps.openDroppedPdf).toHaveBeenCalledWith(
       "/books/Data Engineering.pdf",
       // The drop transaction holds the open lease itself and defers the
-      // visible-reader commit until activation (issue #185 B1 repair).
-      { leaseHeldByCaller: true, deferCommit: true },
+      // visible-reader commit until activation (issue #185 B1 repair); the
+      // lease rides along for the supersede checks (issue #294).
+      expect.objectContaining({
+        leaseHeldByCaller: true,
+        deferCommit: true,
+      }),
     );
     expect(deps.createSession).toHaveBeenCalledWith("Data Engineering", [
       document.id,
@@ -138,36 +142,60 @@ describe("usePdfDropSession", () => {
 
     expect(deps.onError).toHaveBeenNthCalledWith(
       1,
-      "DROP_INVALID: Drop exactly one PDF to create a reading session.",
+      "Drop exactly one PDF to create a reading session.",
     );
     expect(deps.onError).toHaveBeenNthCalledWith(
       2,
-      "DROP_INVALID: Drop exactly one PDF to create a reading session.",
+      "Drop exactly one PDF to create a reading session.",
     );
     expect(deps.openDroppedPdf).not.toHaveBeenCalled();
     expect(deps.createSession).not.toHaveBeenCalled();
   });
 
-  it("processes at most one native drop while an import is in flight", async () => {
-    let resolveImport: (value: Document) => void = () => {};
+  it("a second drop supersedes the one in flight — silent rollback, no busy error", async () => {
+    // The first drop transaction is held open on its session create.
+    let createCalls = 0;
+    let resolveFirstCreate: (value: typeof session) => void = () => {};
     const deps = dependencies();
-    deps.openDroppedPdf.mockReturnValue(
-      new Promise<Document>((resolve) => {
-        resolveImport = resolve;
-      }),
-    );
-    renderHook(() => usePdfDropSession(deps));
+    deps.createSession.mockImplementation(() => {
+      createCalls += 1;
+      if (createCalls === 1) {
+        return new Promise<typeof session>((resolve) => {
+          resolveFirstCreate = resolve;
+        });
+      }
+      return Promise.resolve(session);
+    });
+    const { result } = renderHook(() => usePdfDropSession(deps));
     await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
 
-    act(() => emit({ type: "drop", paths: ["/books/one.pdf"] }));
-    act(() => emit({ type: "drop", paths: ["/books/two.pdf"] }));
-    expect(deps.openDroppedPdf).toHaveBeenCalledTimes(1);
-    expect(deps.onError).toHaveBeenCalledWith(
-      "DROP_BUSY: Wait for the current PDF session to finish.",
-    );
-
-    await act(async () => resolveImport(document));
+    await act(async () => {
+      emit({ type: "drop", paths: ["/books/one.pdf"] });
+    });
     await waitFor(() => expect(deps.createSession).toHaveBeenCalledTimes(1));
+
+    // The second drop SUPERSEDES the first instead of being refused.
+    await act(async () => {
+      emit({ type: "drop", paths: ["/books/two.pdf"] });
+    });
+    await waitFor(() => expect(deps.createSession).toHaveBeenCalledTimes(2));
+
+    // The winning (second) transaction activates normally.
+    await waitFor(() => expect(deps.onSessionCreated).toHaveBeenCalledTimes(1));
+
+    // The superseded first transaction settles: its session is rolled back
+    // silently — no busy error, no failure noise, no activation.
+    await act(async () => {
+      resolveFirstCreate(session);
+    });
+    await waitFor(() => expect(deps.deleteSession).toHaveBeenCalledTimes(1));
+    expect(deps.onSessionCreated).toHaveBeenCalledTimes(1);
+    expect(deps.onError).not.toHaveBeenCalled();
+    expect(result.current.isImporting).toBe(false);
+    expect(result.current.status).toEqual({
+      kind: "success",
+      message: "Session “Data Engineering” created",
+    });
   });
 
   it("removes a newly-created session when activation fails", async () => {
@@ -182,7 +210,7 @@ describe("usePdfDropSession", () => {
     );
 
     expect(deps.onSessionCreated).not.toHaveBeenCalled();
-    expect(deps.onError).toHaveBeenCalledWith("DROP_FAILED: restore failed");
+    expect(deps.onError).toHaveBeenCalledWith("restore failed");
   });
 
   it("consumes the restore authority's success=false rejection (issue #185)", async () => {
@@ -207,15 +235,19 @@ describe("usePdfDropSession", () => {
 
     expect(deps.onSessionCreated).not.toHaveBeenCalled();
     expect(deps.onError).toHaveBeenCalledWith(
-      expect.stringContaining("DROP_FAILED: SESSION_RESTORE_FAILED"),
+      expect.stringContaining("The reading session could not be restored"),
+    );
+    expect(deps.onError).toHaveBeenCalledWith(
+      expect.not.stringMatching(/^[A-Z_]+: /),
     );
   });
 
-  it("holds one open lease from import start through session activation (issue #185)", async () => {
+  it("holds one open lease across the transaction; a competing open supersedes it (latest wins)", async () => {
     // Falsifier for the old release/re-acquire boundary: the first code that
     // used to run AFTER `openDroppedPdf` released the shared open mutex was
-    // `createSession`. The lease must already be held there — and a competing
-    // public open attempted in that window must be refused, not interleaved.
+    // `createSession`. The lease must already be held there. A competing
+    // public open in that window no longer gets refused — it SUPERSEDES the
+    // transaction, whose session is then rolled back silently.
     const deps = dependencies();
     let leaseHeldAtOldBoundary: boolean | null = null;
     let resolveCreate: (value: typeof session) => void = () => {};
@@ -224,6 +256,11 @@ describe("usePdfDropSession", () => {
       return new Promise<typeof session>((resolve) => {
         resolveCreate = resolve;
       });
+    });
+    loadDocument.mockResolvedValue({ numPages: 120 });
+    mockInvoke.mockImplementation((command: string) => {
+      if (command === "library_open_document") return Promise.resolve(document);
+      return Promise.resolve(null);
     });
 
     const { result } = renderHook(() => ({
@@ -238,24 +275,25 @@ describe("usePdfDropSession", () => {
     await waitFor(() => expect(deps.createSession).toHaveBeenCalled());
     expect(leaseHeldAtOldBoundary).toBe(true);
 
-    // A rapid second public action in the transaction window must be refused
-    // with the shared-store busy error — never loaded over the in-flight
-    // transaction's document.
+    // A rapid second public action in the transaction window SUPERSEDES the
+    // in-flight drop instead of loading over it or failing with a busy error.
     let resumed: boolean | undefined;
     await act(async () => {
       resumed = await result.current.open.resumeDocument(document);
     });
-    expect(resumed).toBe(false);
-    expect(loadDocument).not.toHaveBeenCalled();
-    expect(useDocumentStore.getState().error).toContain("OPEN_BUSY");
+    expect(resumed).toBe(true);
+    expect(loadDocument).toHaveBeenCalled();
+    expect(useDocumentStore.getState().currentDocument?.id).toBe(document.id);
+    // The superseded drop transaction is still in flight (its lease held) —
+    // the busy flag is internal and clears when its rollback settles.
+    expect(useDocumentStore.getState().isLoading).toBe(true);
 
-    // The transaction itself completes once its own steps resolve.
+    // The superseded drop transaction settles: silent session rollback.
     await act(async () => resolveCreate(session));
-    await waitFor(() => expect(deps.onSessionCreated).toHaveBeenCalled());
-    expect(useDocumentStore.getState().isLoading).toBe(false);
-    // The refused resume reported through the document store, not the drop
-    // flow's error channel; the transaction itself succeeded.
+    await waitFor(() => expect(deps.deleteSession).toHaveBeenCalledTimes(1));
+    expect(deps.onSessionCreated).not.toHaveBeenCalled();
     expect(deps.onError).not.toHaveBeenCalled();
+    expect(useDocumentStore.getState().isLoading).toBe(false);
   });
 
   it("unsubscribes on unmount, including a subscription that resolves late", async () => {
@@ -389,7 +427,7 @@ describe("failed drop preserves the prior document (issue #185 B1 repair)", () =
     // Rollback contract: session deleted, callback absent, error visible.
     expect(deps.onSessionCreated).not.toHaveBeenCalled();
     expect(deps.onError).toHaveBeenCalledWith(
-      expect.stringContaining("DROP_FAILED: SESSION_RESTORE_FAILED"),
+      expect.stringContaining("The reading session could not be restored"),
     );
 
     // The import itself succeeded independently: B stays in the library
@@ -466,10 +504,12 @@ describe("failed drop preserves the prior document (issue #185 B1 repair)", () =
         drop: usePdfDropSession({
           ...(deps as unknown as Parameters<typeof usePdfDropSession>[0]),
           openDroppedPdf: (filePath: string, options?) => {
-            expect(options).toEqual({
-              leaseHeldByCaller: true,
-              deferCommit: true,
-            });
+            expect(options).toEqual(
+              expect.objectContaining({
+                leaseHeldByCaller: true,
+                deferCommit: true,
+              }),
+            );
             return openRef.current!.openDroppedPdf(filePath, options);
           },
         }),
@@ -528,7 +568,7 @@ describe("failed drop preserves the prior document (issue #185 B1 repair)", () =
     });
     await waitFor(() =>
       expect(deps.onError).toHaveBeenCalledWith(
-        expect.stringContaining("DROP_FAILED: SESSION_CREATE_FAILED"),
+        expect.stringContaining("The session could not be created"),
       ),
     );
 
