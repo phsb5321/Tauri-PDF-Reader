@@ -440,7 +440,7 @@ describe("openPdf", () => {
     expect(state.error).toContain(
       "File content changed while the book was being added",
     );
-    expect(state.error).not.toMatch(/^[A-Z_]+: /);
+    expect(state.error).not.toMatch(/[A-Z][A-Z0-9_]*: /);
     expect(state.pdfDocument).toBeNull();
     expect(state.currentDocument).toBeNull();
   });
@@ -528,7 +528,7 @@ describe("resumeDocument reauthorization rung (issue #120)", () => {
     const state = useDocumentStore.getState();
     expect(state.error).toContain("is not this book");
     expect(state.error).toContain("evil-impostor.pdf");
-    expect(state.error).not.toMatch(/^[A-Z_]+: /);
+    expect(state.error).not.toMatch(/[A-Z][A-Z0-9_]*: /);
     expect(state.pdfDocument).toBeNull();
     // Verify the selected bytes BEFORE any row mutation. The impostor is read
     // only under the expected row hash and fails closed.
@@ -560,7 +560,7 @@ describe("resumeDocument reauthorization rung (issue #120)", () => {
     expect(state.error).toContain(
       "Access reauthorization was cancelled — the book was not opened.",
     );
-    expect(state.error).not.toMatch(/^[A-Z_]+: /);
+    expect(state.error).not.toMatch(/[A-Z][A-Z0-9_]*: /);
     expect(mockInvoke).not.toHaveBeenCalledWith(
       "library_relocate_document",
       expect.anything(),
@@ -611,7 +611,7 @@ describe("every known-row open binds the bytes to the row hash (Codex exact-head
       await result.current.resumeDocument(stored);
     });
     expect(useDocumentStore.getState().error).toContain("is not this book");
-    expect(useDocumentStore.getState().error).not.toMatch(/^[A-Z_]+: /);
+    expect(useDocumentStore.getState().error).not.toMatch(/[A-Z][A-Z0-9_]*: /);
 
     // Second resume (e.g. the user retries after fixing the file): the read
     // must STILL carry the row-hash binding.

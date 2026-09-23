@@ -238,7 +238,7 @@ describe("usePdfDropSession", () => {
       expect.stringContaining("The reading session could not be restored"),
     );
     expect(deps.onError).toHaveBeenCalledWith(
-      expect.not.stringMatching(/^[A-Z_]+: /),
+      expect.not.stringMatching(/[A-Z][A-Z0-9_]*: /),
     );
   });
 
@@ -530,6 +530,108 @@ describe("failed drop preserves the prior document (issue #185 B1 repair)", () =
     expect(state.totalPages).toBe(30);
     expect(deps.onSessionCreated).toHaveBeenCalledWith(rowB, session);
     expect(deps.onError).not.toHaveBeenCalled();
+  });
+  it("the real import seam keeps the drop lease alive: a competing open after import return supersedes the transaction (B-1 fix)", async () => {
+    // M-2: wires the REAL openDroppedPdf — no mock — so the production
+    // lease release ordering is what runs. The pre-fix code released the
+    // caller-held lease when the import returned: isLoading cleared
+    // mid-transaction AND isSuperseded() turned into a no-op, so a
+    // superseded drop committed B over the winner. On that code this test
+    // fails at the lease-alive assertion AND at the final no-clobber
+    // assertions; after the fix it passes: acquire -> import returns ->
+    // parent still active -> supersede check true -> silent rollback.
+    preparePriorDocument();
+    importMocks();
+    // The library answers by row id, so the winning resume lands on A while
+    // the drop's import keeps its own B row.
+    mockInvoke.mockImplementation((command: string, args?: { id?: string }) => {
+      if (command === "library_get_document_by_path") {
+        return Promise.resolve(null);
+      }
+      if (command === "library_add_document") {
+        return Promise.resolve(rowB);
+      }
+      if (command === "library_open_document") {
+        return Promise.resolve(args?.id === rowB.id ? rowB : rowA);
+      }
+      return Promise.resolve(null);
+    });
+
+    let resolveCreate: (value: typeof session) => void = () => {};
+    let leaseAliveAtCreate: boolean | null = null;
+    const deps = {
+      createSession: vi.fn(() => {
+        // The named invariant: the import returned, but the drop
+        // transaction's lease must STILL be held here.
+        leaseAliveAtCreate = useDocumentStore.getState().isLoading;
+        return new Promise<typeof session>((resolve) => {
+          resolveCreate = resolve;
+        });
+      }),
+      restoreSession: vi.fn().mockResolvedValue({
+        success: true,
+        session,
+        missingDocuments: [],
+      }),
+      deleteSession: vi.fn().mockResolvedValue(undefined),
+      onSessionCreated: vi.fn(),
+      onError: vi.fn(),
+    };
+
+    const openRef: { current: ReturnType<typeof useOpenPdf> | null } = {
+      current: null,
+    };
+    renderHook(() => {
+      const open = useOpenPdf();
+      openRef.current = open;
+      return usePdfDropSession({
+        ...(deps as unknown as Parameters<typeof usePdfDropSession>[0]),
+        openDroppedPdf: (filePath: string, options?) =>
+          openRef.current!.openDroppedPdf(filePath, options),
+      });
+    });
+    await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      emit({ type: "drop", paths: ["/books/Dropped Book.pdf"] });
+    });
+    await waitFor(() =>
+      expect(deps.createSession).toHaveBeenCalledWith("Dropped Book", [
+        "hash-of-b",
+      ]),
+    );
+
+    // The import returned WITHOUT releasing the caller-held lease: the
+    // transaction is still live at the old release/re-acquire boundary.
+    expect(leaseAliveAtCreate).toBe(true);
+    expect(useDocumentStore.getState().isLoading).toBe(true);
+
+    // A competing public open while createSession is pending SUPERSEDES
+    // the drop transaction and wins the reader.
+    let resumed: boolean | undefined;
+    await act(async () => {
+      resumed = await openRef.current!.resumeDocument(rowA);
+    });
+    expect(resumed).toBe(true);
+    expect(useDocumentStore.getState().currentDocument?.id).toBe(rowA.id);
+    // The winner released its own lease; the drop's is still outstanding.
+    expect(useDocumentStore.getState().isLoading).toBe(true);
+
+    // The superseded drop settles: silent rollback, never a commit.
+    await act(async () => {
+      resolveCreate(session);
+    });
+    await waitFor(() => expect(deps.deleteSession).toHaveBeenCalledTimes(1));
+    expect(deps.onSessionCreated).not.toHaveBeenCalled();
+    expect(deps.onError).not.toHaveBeenCalled();
+
+    // The winner A survived exactly — the losing drop never touched the
+    // screen (no canvas clobber, no wrong session pairing).
+    const state = useDocumentStore.getState();
+    expect(state.currentDocument?.id).toBe(rowA.id);
+    expect(state.currentPage).toBe(rowA.currentPage);
+    expect(state.error).toBeNull();
+    expect(state.isLoading).toBe(false);
   });
   it("createSession rejection also preserves A exactly (no session to delete)", async () => {
     const proxyA = preparePriorDocument();

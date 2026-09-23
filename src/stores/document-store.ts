@@ -82,14 +82,26 @@ const initialState = {
  * a lease while one is held SUPERSEDES the older transaction: the older
  * lease goes stale, its visible commit must be dropped (`isSuperseded`), and
  * its release becomes a no-op. The newest open therefore always wins — no
- * request is ever refused with a busy error, and `isLoading` mirrors the
- * LIVE lease so the busy UI state cannot disagree with the guard.
+ * request is ever refused with a busy error, and `isLoading` reflects the
+ * count of OUTSTANDING leases (every lease releases exactly one slot, only
+ * the last release clears the busy flag) so the busy UI state cannot
+ * disagree with the guard.
  */
 export interface OpenLease {
   generation: number;
-  /** True once a newer open transaction superseded this one. */
+  /**
+   * True once a newer open transaction superseded this one — monotonic:
+   * "was superseded" is a fact that survives release. A lease released by
+   * its OWNER before its logical transaction ends must still report
+   * superseded, or a superseded transaction would commit over the winner.
+   */
   isSuperseded: () => boolean;
-  /** Releases the lease; a no-op for a superseded (stale) lease. */
+  /**
+   * Releases this lease's slot exactly once; further calls are no-ops.
+   * Only the path that ACQUIRED a lease releases it — a caller-held lease
+   * is released by the caller when its transaction ends, not by the callee
+   * at import return.
+   */
   release: () => void;
 }
 
@@ -104,7 +116,7 @@ export function beginOpenTransaction(): OpenLease {
   let released = false;
   return {
     generation,
-    isSuperseded: () => !released && generation !== openGeneration,
+    isSuperseded: () => generation !== openGeneration,
     release: () => {
       if (released) return;
       released = true;

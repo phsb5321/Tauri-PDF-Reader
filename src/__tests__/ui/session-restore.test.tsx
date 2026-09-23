@@ -342,7 +342,7 @@ describe("reauthorization failure during restore is visible on the reader", () =
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/Access reauthorization was cancelled/);
-    expect(alert.textContent?.trim()).not.toMatch(/^[A-Z_]+: /);
+    expect(alert.textContent?.trim()).not.toMatch(/[A-Z][A-Z0-9_]*: /);
     // The reader surface stays — the old book is still shown, with the error.
     expect(screen.getByTestId("pdf-viewer")).toBeInTheDocument();
   });
@@ -393,7 +393,7 @@ describe("reauthorization failure during restore is visible on the reader", () =
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/is not this book/);
-    expect(alert.textContent?.trim()).not.toMatch(/^[A-Z_]+: /);
+    expect(alert.textContent?.trim()).not.toMatch(/[A-Z][A-Z0-9_]*: /);
     expect(screen.getByTestId("pdf-viewer")).toBeInTheDocument();
     // The impostor's path never replaced the stored row.
     const row = await import("../../lib/api/library").then((m) =>

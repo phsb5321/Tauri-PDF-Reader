@@ -82,7 +82,7 @@ function expectNoRawCodes(requireText: boolean) {
   );
   if (requireText) expect(withText.length).toBeGreaterThan(0);
   for (const element of withText) {
-    expect(element.textContent?.trim() ?? "").not.toMatch(/^[A-Z_]+: /);
+    expect(element.textContent?.trim() ?? "").not.toMatch(/[A-Z][A-Z0-9_]*: /);
   }
 }
 

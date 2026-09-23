@@ -10,3 +10,11 @@
 - [x] T294-008 Rework `usePdfDropSession.property.test.ts` command model to latest-wins (at most one commit; superseded transactions roll back silently; no-busy + no-raw-code invariants after every op).
 - [x] T294-009 New `src/__tests__/ui/pdf-viewer-error-gate.test.tsx`: full-screen error only without a document; loaded document survives a failed open; no rendered string matches `/^[A-Z_]+: /`.
 - [x] T294-010 Gates: `pnpm lint` (0 errors / 107 pre-existing warnings), `pnpm typecheck` (exit 0), `pnpm test:run` (151 files / 1437 tests) green; harness-policy PASS; PR opened with evidence; deliverable report with the perceived-delay audit table.
+- [x] T294-011 (B-1 fix) `document-store.ts`: monotonic `isSuperseded` — `() => generation !== openGeneration` (drop `!released &&`); doc comments truthfully state monotonic + owner-release semantics.
+- [x] T294-012 (B-1 fix) `useOpenPdf.ts` `openDroppedPdf`: owned-lease release — only the acquiring path releases; a caller-held lease survives import return; supersede checks read caller-or-owned lease.
+- [x] T294-013 (M-1) `useOpenPdf.ts` `openPdf` catch: supersede check before `setError` (silent — a newer open won), matching its three siblings.
+- [x] T294-014 (m-1) `user-message.ts`: `friendlyError` loops the code strip until stable (nested `HTTP_ERROR: API_ERROR: …` codes).
+- [x] T294-015 (M-2) `usePdfDropSession.test.ts`: real-seam integration test — real `openDroppedPdf` runs the production release ordering (acquire → import returns → parent lease still active → supersede check true → silent rollback, winner untouched). Fails on pre-fix code, passes after.
+- [x] T294-016 (m-2/m-3) Test gates digit-aware and unanchored (`/[A-Z][A-Z0-9_]*: /`) across all six suites; new `src/lib/user-message.test.ts` unit tests (nested codes, digit codes, empty remainder).
+- [x] T294-017 New `src/__tests__/stores/document-store.test.ts`: monotonic supersede-after-release + idempotent release.
+- [x] T294-018 Gates re-run: `pnpm lint`, `pnpm typecheck`, `pnpm test:run` — results in PR comment (vm103 CI down: local gates are the evidence).

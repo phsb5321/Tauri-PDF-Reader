@@ -107,7 +107,7 @@ const flush = async () => {
 };
 
 /** A user-visible string never carries a leading internal code. */
-const noRawCode = expect.not.stringMatching(/^[A-Z_]+: /);
+const noRawCode = expect.not.stringMatching(/[A-Z][A-Z0-9_]*: /);
 
 describe("drop transaction command model (latest-wins seed 20260923)", () => {
   it("supersedes instead of refusing, commits at most once, and never leaks busy codes", async () => {
@@ -302,7 +302,7 @@ describe("drop transaction command model (latest-wins seed 20260923)", () => {
             /OPEN_BUSY|DROP_BUSY/,
           );
           for (const call of deps.onError.mock.calls) {
-            expect(String(call[0])).not.toMatch(/^[A-Z_]+: /);
+            expect(String(call[0])).not.toMatch(/[A-Z][A-Z0-9_]*: /);
           }
         }
 

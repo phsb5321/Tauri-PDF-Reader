@@ -14,10 +14,15 @@
 const CODE_PREFIX = /^[A-Z][A-Z0-9_]*:\s*/;
 
 /**
- * Strip a leading internal code from a message and return the friendly
- * remainder. Already-friendly strings pass through unchanged.
+ * Strip every leading internal code from a message and return the friendly
+ * remainder. Codes nest — one coded error can wrap another
+ * (`HTTP_ERROR: API_ERROR: …`) — so the strip loops until stable.
+ * Already-friendly strings pass through unchanged.
  */
 export function friendlyError(message: string): string {
-  const stripped = message.replace(CODE_PREFIX, "").trim();
+  let stripped = message.trim();
+  while (CODE_PREFIX.test(stripped)) {
+    stripped = stripped.replace(CODE_PREFIX, "").trim();
+  }
   return stripped.length > 0 ? stripped : message.trim();
 }

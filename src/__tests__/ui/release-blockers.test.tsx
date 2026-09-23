@@ -194,7 +194,7 @@ describe("release blockers (109)", () => {
 
     const banner = await screen.findByRole("alert");
     expect(banner).toHaveTextContent(/The file is not a valid PDF/);
-    expect(banner.textContent?.trim()).not.toMatch(/^[A-Z_]+: /);
+    expect(banner.textContent?.trim()).not.toMatch(/[A-Z][A-Z0-9_]*: /);
     // Still on the library — never stranded on a blank reader.
     expect(
       screen.getByRole("heading", { name: "Library" }),

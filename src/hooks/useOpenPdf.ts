@@ -244,6 +244,7 @@ export function useOpenPdf() {
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : "Failed to open PDF";
+      if (lease.isSuperseded()) return false; // silent — a newer open won
       setError(friendlyError(message));
       console.error("Error opening PDF:", error);
       return false;
@@ -274,9 +275,25 @@ export function useOpenPdf() {
       // failing (issue #294). With `deferCommit` the import is prepared
       // but visible reader state is committed only via the returned `commit`
       // — after the caller's session create/restore succeeds (B1 repair).
+      //
+      // Owned-lease release (issue #294 fix round): only the path that
+      // ACQUIRES a lease releases it. A caller-held lease belongs to the
+      // caller's whole transaction — releasing it here, when the import
+      // returns, would clear `isLoading` mid-transaction and blind every
+      // later supersede check (the drop transaction would commit over a
+      // newer open).
       const leaseHeldByCaller = options?.leaseHeldByCaller === true;
-      const lease =
-        options?.lease ?? (leaseHeldByCaller ? null : beginOpenTransaction());
+      const callerLease = options?.lease ?? null;
+      // `ownedLease` is non-null ONLY when this import itself acquired the
+      // lease (direct callers); a caller-held lease is never released here.
+      const ownedLease = callerLease
+        ? null
+        : leaseHeldByCaller
+          ? null
+          : beginOpenTransaction();
+      // Supersede checks read whichever lease governs this import: the
+      // caller's when held, the freshly acquired one otherwise.
+      const lease = callerLease ?? ownedLease;
       try {
         setError(null);
         if (!/\.pdf$/i.test(filePath)) {
@@ -305,7 +322,7 @@ export function useOpenPdf() {
         console.error("Error opening dropped PDF:", error);
         return null;
       } finally {
-        lease?.release();
+        ownedLease?.release();
       }
     },
     [openAuthorizedPath, setError],
