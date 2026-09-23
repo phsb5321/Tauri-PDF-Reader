@@ -310,7 +310,15 @@ export function useOpenPdf() {
           return {
             pdf: opened.pdf,
             document: opened.document,
-            commit: () => showInReader(opened.pdf, opened.document),
+            // Self-guarded commit (issue #294 fix round, cross-review B1c):
+            // the closure re-checks supersession at call time, so even a
+            // caller that skips its own guard cannot commit a superseded
+            // import over the winner. `usePdfDropSession` keeps its outer
+            // guard as the belt; this is the suspenders.
+            commit: () => {
+              if (lease?.isSuperseded()) return; // silent — a newer open won
+              showInReader(opened.pdf, opened.document);
+            },
           };
         }
         return opened as Document;

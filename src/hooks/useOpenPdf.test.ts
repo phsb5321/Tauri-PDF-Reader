@@ -14,8 +14,11 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { mockInvoke } from "../../tests/setup";
-import { useOpenPdf } from "./useOpenPdf";
-import { useDocumentStore } from "../stores/document-store";
+import { useOpenPdf, type DroppedPreparation } from "./useOpenPdf";
+import {
+  useDocumentStore,
+  beginOpenTransaction,
+} from "../stores/document-store";
 import type { Document } from "../lib/schemas";
 
 vi.mock("../services/pdf-service", () => ({
@@ -291,6 +294,78 @@ describe("openDroppedPdf", () => {
     expect(useDocumentStore.getState().error).toBe(
       "Drop exactly one PDF to create a reading session.",
     );
+  });
+
+  it("a prepared import's commit is self-guarded — a superseded import cannot commit over the winner (B1c)", async () => {
+    // The deferred-commit closure re-checks the lease at CALL time, so even
+    // a caller that skips its own supersede guard cannot clobber the winner.
+    // Pre-fix the closure was an unconditional showInReader and this test
+    // fails on the final reader-state assertion.
+    const first = doc({
+      id: "doc-first",
+      filePath: "/drop/first.pdf",
+      currentPage: 3,
+    });
+    const second = doc({
+      id: "doc-second",
+      filePath: "/drop/second.pdf",
+      currentPage: 1,
+    });
+    loadDocumentBound.mockImplementation((path: string) =>
+      Promise.resolve(
+        bytesOf(pdf(30), String(path).includes("first") ? first.id : second.id),
+      ),
+    );
+    loadDocument.mockResolvedValue(pdf(30));
+    mockInvoke.mockImplementation((command: string, args?: object) => {
+      switch (command) {
+        case "library_get_document_by_path":
+          return Promise.resolve(null);
+        case "library_add_document": {
+          const filePath = (args as { filePath: string }).filePath;
+          return Promise.resolve(filePath.includes("first") ? first : second);
+        }
+        case "library_open_document": {
+          const id = (args as { id: string }).id;
+          return Promise.resolve(id === first.id ? first : second);
+        }
+        default:
+          return Promise.resolve(null);
+      }
+    });
+
+    const { result } = renderHook(() => useOpenPdf());
+    // The drop-to-session transaction holds its own lease and hands it to
+    // the import (leaseHeldByCaller) — exactly the production wiring.
+    const lease = beginOpenTransaction();
+    let prepared: DroppedPreparation | null = null;
+    await act(async () => {
+      prepared = (await result.current.openDroppedPdf("/drop/first.pdf", {
+        leaseHeldByCaller: true,
+        deferCommit: true,
+        lease,
+      })) as DroppedPreparation;
+    });
+    expect(prepared).not.toBeNull();
+
+    // A newer open supersedes the prepared import and owns the reader.
+    await act(async () => {
+      await result.current.openDroppedPdf("/drop/second.pdf");
+    });
+    expect(useDocumentStore.getState().currentDocument?.id).toBe("doc-second");
+
+    // A guard-skipping caller calls commit anyway: the closure must stay
+    // silent — the winner keeps the screen.
+    await act(async () => {
+      prepared!.commit();
+    });
+    const state = useDocumentStore.getState();
+    expect(state.currentDocument?.id).toBe("doc-second");
+    expect(state.currentPage).toBe(1);
+    expect(state.error).toBeNull();
+
+    act(() => lease.release());
+    expect(useDocumentStore.getState().isLoading).toBe(false);
   });
 });
 

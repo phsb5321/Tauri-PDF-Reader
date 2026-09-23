@@ -18,3 +18,4 @@
 - [x] T294-016 (m-2/m-3) Test gates digit-aware and unanchored (`/[A-Z][A-Z0-9_]*: /`) across all six suites; new `src/lib/user-message.test.ts` unit tests (nested codes, digit codes, empty remainder).
 - [x] T294-017 New `src/__tests__/stores/document-store.test.ts`: monotonic supersede-after-release + idempotent release.
 - [x] T294-018 Gates re-run: `pnpm lint`, `pnpm typecheck`, `pnpm test:run` — results in PR comment (vm103 CI down: local gates are the evidence).
+- [x] T294-019 (B1c, pr244-review ADDENDUM) Self-guarded deferred commit: the `DroppedPreparation.commit` closure re-checks supersession at call time (`useOpenPdf.ts`), so a guard-skipping caller cannot commit over the winner; falsifier test in `useOpenPdf.test.ts` fails on `4b33118` (`doc-first` clobber), passes here. M2 closed by construction (B1c chosen over reordering the defer-return).
