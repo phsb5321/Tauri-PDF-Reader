@@ -115,8 +115,22 @@ else {
 }
 
 // ── Concurrency / permissions / env / defaults (workflow level) ──────────────
-if (!wf.concurrency || wf.concurrency.group !== "packaged-user-gate")
-  fail("concurrency group is not the fixed runner-wide packaged-user-gate");
+// Two accepted group spellings (two-step contract change, 291 → 239): the fixed
+// runner-wide group and the per-ref form `${{ github.workflow }}-${{ github.ref }}`.
+// The invariant that matters — one gate at a time — is enforced by the single-slot
+// vm103 runner (the lane scripts' global /tmp evidence paths follow the slot, not
+// the key; the anchor's own group is a different key from this one, so the groups
+// never provided cross-family exclusion). The group only decides whose SUPERSEDED
+// run gets cancelled: the fixed key let one PR's push kill a sibling's required
+// checks (runs 35626690357, 35630818342 died that way); the per-ref form scopes
+// cancellation to the same PR. Per-ref must keep `cancel-in-progress: true`, which
+// deep-equality below still pins byte-for-byte.
+const GROUP_FIXED = "packaged-user-gate";
+const GROUP_PER_REF = "${{ github.workflow }}-${{ github.ref }}";
+if (!wf.concurrency || ![GROUP_FIXED, GROUP_PER_REF].includes(wf.concurrency.group))
+  fail(
+    "concurrency group is not the fixed runner-wide packaged-user-gate or the per-ref workflow+ref form",
+  );
 
 if (JSON.stringify(wf.permissions || null) !== JSON.stringify({ contents: "read" }))
   fail("permissions must be exactly contents: read");
@@ -291,6 +305,13 @@ for (const jobName of Object.keys(CANONICAL_IF)) {
 // candidate or workspace cwd). Extra steps, command suffixes, token-bearing
 // modifications, env overrides and any unknown nested key all fail here.
 const canonicalDoc = loadWorkflow(CANONICAL);
+// `concurrency.group` is validated semantically above (two accepted spellings);
+// normalize it on BOTH sides so every other key stays byte-strict.
+const normalizeGroup = (doc) => {
+  const d = structuredClone(doc);
+  if (d && d.concurrency && typeof d.concurrency === "object") d.concurrency.group = "<group>";
+  return d;
+};
 const deepEqual = (a, b) => {
   if (a === b) return true;
   if (a === null || b === null || typeof a !== typeof b) return false;
@@ -311,7 +332,7 @@ const deepEqual = (a, b) => {
   }
   return false;
 };
-if (!deepEqual(wf, canonicalDoc.toJS({ maxAliasCount: 100 })))
+if (!deepEqual(normalizeGroup(wf), normalizeGroup(canonicalDoc.toJS({ maxAliasCount: 100 }))))
   fail(
     "candidate workflow is not deep-structural-equal to the canonical execution fixture — extra steps, command suffixes, token-bearing modifications and unknown fields are rejected",
   );
