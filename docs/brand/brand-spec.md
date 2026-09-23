@@ -104,7 +104,7 @@ above the cap line. The [GitHub composition](../../.github/assets/lectrice-socia
 is a reproducible example. **Current app display font:** **Space Grotesk** remains
 in `src/ui/tokens/typography.css` — a product UI implementation detail, not the
 identity wordmark, and an intentional distinction between brand assets and the
-shipped app pending a separate typography-migration slice. Vector finishing does
+shipped app pending a separate typography-migration slice and its UI verification. Vector finishing does
 not change the font tokens.
 
 ---
