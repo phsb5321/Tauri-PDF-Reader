@@ -1,0 +1,448 @@
+@font-face {
+  font-family: Fraunces;
+  src: url("assets/fraunces.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Newsreader;
+  src: url("assets/newsreader.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+}
+
+:root {
+  --paper: #f4efe4;
+  --ink: #14110d;
+  --voice: #c8462c;
+  color: var(--ink);
+  background: var(--paper);
+  font-family: Newsreader, serif;
+  font-size: 100%;
+  font-synthesis: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font-size: 1.25rem;
+  line-height: 1.5;
+}
+h1,
+h2,
+h3,
+p,
+figure {
+  margin: 0;
+}
+p + p {
+  margin-top: 1rem;
+}
+a {
+  color: inherit;
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1px;
+}
+a:hover {
+  text-decoration-thickness: 2px;
+}
+a:focus-visible,
+summary:focus-visible,
+pre:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 6px;
+}
+::selection {
+  color: var(--paper);
+  background: var(--ink);
+}
+h1,
+h2,
+h3,
+.footer-name {
+  font-family: Fraunces, serif;
+  font-weight: 500;
+  font-variation-settings:
+    "SOFT" 0,
+    "WONK" 1;
+  line-height: 1.08;
+  text-wrap: balance;
+}
+h2 {
+  font-size: clamp(2.25rem, 4.2vw, 3.6rem);
+  letter-spacing: -0.045em;
+}
+h3 {
+  font-size: 2rem;
+  letter-spacing: -0.025em;
+}
+.page-width {
+  width: min(72rem, calc(100% - 6rem));
+  margin-inline: auto;
+}
+.eyebrow {
+  font-size: 0.875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.small,
+figcaption {
+  font-size: 1rem;
+  line-height: 1.5;
+}
+.section-label {
+  margin-bottom: 1.5rem;
+}
+.skip-link {
+  position: absolute;
+  top: -6rem;
+  left: 1rem;
+  padding: 0.75rem;
+  background: var(--paper);
+}
+.skip-link:focus {
+  top: 1rem;
+  z-index: 1;
+}
+.masthead {
+  padding-block: 1.5rem;
+  border-bottom: 1px solid var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.8rem;
+  font-size: 1rem;
+}
+nav a {
+  display: inline-block;
+  padding-block: 0.5rem;
+}
+.hero {
+  padding-block: 3rem 4rem;
+}
+.signature {
+  position: relative;
+  container-type: inline-size;
+  display: grid;
+  grid-template-columns: 17% 1fr;
+  gap: 4%;
+  align-items: start;
+}
+.identity {
+  padding-top: 3cqw;
+}
+.nightingale {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+/* Anchor to the bird's width, not text height, so zoom cannot detach its voice. */
+.voice-line {
+  position: absolute;
+  left: 15.4%;
+  top: -0.7cqw;
+  width: 84.6%;
+  height: 4.5cqw;
+  overflow: visible;
+}
+.voice-line path {
+  fill: none;
+  stroke: var(--voice);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  animation: speak 3.6s ease-out 1;
+}
+/* ponytail: a single finite reveal, not a player; real playback belongs in the app. */
+@keyframes speak {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+h1 {
+  font-size: clamp(4rem, 10vw, 7rem);
+  font-weight: 600;
+  font-variation-settings:
+    "opsz" 144,
+    "SOFT" 0,
+    "WONK" 1;
+  letter-spacing: -0.045em;
+}
+.tagline {
+  font-size: clamp(1.35rem, 2.8vw, 2.25rem);
+  margin-top: 0.8rem;
+}
+.hero-detail {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  align-items: start;
+  gap: 4rem;
+  margin-top: 2rem;
+}
+.introduction {
+  max-width: 35rem;
+  font-size: 1.5rem;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+.hero-action {
+  justify-self: end;
+}
+.hero-action .small {
+  margin-top: 0.9rem;
+}
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 0.85rem 1.25rem;
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+  text-decoration: none;
+  font-size: 1.125rem;
+}
+.button:hover {
+  text-decoration: underline;
+}
+.reading-section {
+  padding-block: 4rem 5rem;
+  border-top: 1px solid var(--ink);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5rem;
+}
+.reading-steps {
+  margin-block: 0 1.5rem;
+  padding-left: 1.4rem;
+}
+.reading-steps li {
+  padding-left: 0.5rem;
+  margin-bottom: 0.8rem;
+}
+.reading-steps span {
+  font-weight: 600;
+}
+.product-hero {
+  margin-top: 2.5rem;
+}
+.product-secondary {
+  grid-column: 1 / -1;
+  width: min(100%, 54rem);
+  margin-inline: auto;
+}
+.product-shot {
+  min-width: 0;
+}
+.product-shot > a {
+  display: block;
+  border: 1px solid var(--ink);
+  padding: 0.5rem;
+}
+.product-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.product-shot figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-top: 1rem;
+}
+.local-section {
+  background: var(--ink);
+  color: var(--paper);
+  padding-block: 4.5rem;
+}
+.local-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5rem;
+}
+.lead {
+  font-size: 1.75rem;
+  line-height: 1.35;
+  text-wrap: pretty;
+}
+.speech-note {
+  border-top: 1px solid var(--paper);
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+}
+.speech-note h3 {
+  font-family: Newsreader, serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0;
+  margin-bottom: 0.7rem;
+}
+.speech-note a {
+  display: inline-block;
+  margin-top: 1rem;
+}
+.local-section a:focus-visible {
+  outline-color: var(--paper);
+}
+.install-section {
+  padding-block: 4.5rem 3rem;
+}
+.install-heading > p:last-child {
+  margin-top: 1rem;
+}
+.install-grid {
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr;
+  gap: 5rem;
+  margin-top: 3rem;
+}
+.install-grid article {
+  min-width: 0;
+  border-top: 1px solid var(--ink);
+  padding-top: 1.5rem;
+}
+.platform-note {
+  margin-block: 0.75rem 1.5rem;
+}
+.install-grid .button {
+  margin-top: 1.5rem;
+}
+.command-label {
+  margin-top: 1.5rem;
+  font-size: 1rem;
+}
+pre {
+  border: 1px solid var(--ink);
+  padding: 1rem;
+  margin-block: 0.75rem 1rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+/* Commands remain selectable text. No script or clipboard permission needed. */
+code {
+  font-family: Newsreader, serif;
+  font-weight: 600;
+}
+details {
+  margin-bottom: 1.25rem;
+}
+summary {
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  padding-block: 0.5rem;
+}
+details p {
+  margin-top: 1rem;
+  font-size: 1rem;
+}
+.availability {
+  margin-top: 2.5rem;
+}
+footer {
+  border-top: 1px solid var(--ink);
+  padding-block: 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 2rem;
+}
+.footer-name {
+  font-size: 2rem;
+}
+footer .small {
+  margin-top: 0.6rem;
+}
+
+@media (max-width: 50rem) {
+  .page-width {
+    width: calc(100% - 3rem);
+  }
+  .masthead {
+    align-items: start;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  .hero {
+    padding-block: 3rem;
+  }
+  .hero-detail,
+  .reading-section,
+  .local-layout,
+  .install-grid {
+    grid-template-columns: 1fr;
+    gap: 2.5rem;
+  }
+  .hero-detail {
+    margin-top: 2rem;
+  }
+  .hero-action {
+    justify-self: start;
+  }
+  .reading-section,
+  .local-section,
+  .install-section {
+    padding-block: 3rem;
+  }
+  footer {
+    flex-direction: column;
+    align-items: start;
+  }
+}
+
+@media (max-width: 30rem) {
+  .page-width {
+    width: calc(100% - 2rem);
+  }
+  nav {
+    gap: 0.25rem 1.25rem;
+  }
+  .signature {
+    grid-template-columns: 21% 1fr;
+    gap: 4%;
+  }
+  h1 {
+    font-size: clamp(3rem, 13vw, 4rem);
+  }
+  .tagline {
+    font-size: 1.125rem;
+    margin-top: 0.5rem;
+  }
+  .voice-line {
+    left: 19%;
+    top: -1.1cqw;
+    width: 81%;
+    height: 6cqw;
+  }
+  .voice-line path {
+    stroke-width: 7;
+  }
+  .introduction {
+    font-size: 1.35rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-line path {
+    animation: none;
+  }
+}

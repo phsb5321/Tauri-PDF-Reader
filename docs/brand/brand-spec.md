@@ -1,7 +1,9 @@
 # Lectrice · Brand Spec
 
-> Captured: 2026-05-29 · Status: **shipped** (applied to tokens, fonts, icons, config)
-> Visual board: [`lectrice-brand.html`](./lectrice-brand.html) (open in a browser)
+> Identity updated: 21/09/2026 · Vermilion nightingale on paper, Fraunces wordmark.
+> [Current assets and GitHub application steps](./README.md).
+> Product tokens/fonts below still describe the separately shipped UI.
+> Historical board: [`lectrice-brand.html`](./lectrice-brand.html) (pre-v2, not current identity guidance).
 
 ---
 
@@ -40,7 +42,7 @@ unclaimed, more-elegant form.
 ### Logo — **the nightingale** (chosen)
 
 A songbird in side profile, head raised, beak open mid-song, gripping a line. The product
-*speaks*, so the mark is the thing that sings — **figurative**, not another abstract sound
+_speaks_, so the mark is the thing that sings — **figurative**, not another abstract sound
 glyph. Figurativeness is what carries logo recall (de Lencastre et al., 2023), and it is the
 one register nobody in this category occupies.
 
@@ -48,8 +50,8 @@ Drawn with GPT through the browser fleet (identity `chatgpt-c`, ChatGPT Pro) and
 single-colour vector path. **Design record:**
 `1. Projects/Lectrice — Tauri PDF Reader/Brand v2 — research & three directions (2026-09-20).md`.
 
-- Reusable source: [`lectrice-mark.svg`](./lectrice-mark.svg) (one path, inherits `currentColor`)
-- App icon / favicon (ink tile + paper bird): [`../../public/lectrice-mark.svg`](../../public/lectrice-mark.svg)
+- Reusable source: [`lectrice-mark.svg`](./lectrice-mark.svg) (one path, neutral black source; explicitly paint it vermilion in compositions)
+- App icon / favicon (paper tile + vermilion bird): [`../../public/lectrice-mark.svg`](../../public/lectrice-mark.svg)
 
 **Mark rules:** clearspace ≥ the bird's tail width · min 16px (use the favicon cut below that) ·
 **the mark is vermilion `#C8462C` on paper `#F4EFE4`** — the bird and the line it sings into are one
@@ -64,10 +66,25 @@ recolored off-palette, never rounded, stretched, recoloured per-part, or shadowe
 The mark ships in two optical sizes, the same way a variable family ships several cuts. They were
 compared as rasters at 16/24/32/48px, not chosen by eye at poster size:
 
-| Cut | File | Use at | Why |
-|---|---|---|---|
-| **detail** | [`lectrice-mark.svg`](./lectrice-mark.svg) · [`../../public/lectrice-mark.svg`](../../public/lectrice-mark.svg) | **≥ 32px** | the perch, legs and finer tail read again at these sizes; the fuller drawing |
+| Cut         | File                                                                                                                                    | Use at     | Why                                                                                                  |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------- |
+| **detail**  | [`lectrice-mark.svg`](./lectrice-mark.svg) · [`../../public/lectrice-mark.svg`](../../public/lectrice-mark.svg)                         | **≥ 32px** | the perch, legs and finer tail read again at these sizes; the fuller drawing                         |
 | **favicon** | [`lectrice-mark-small.svg`](./lectrice-mark-small.svg) · [`../../public/lectrice-mark-small.svg`](../../public/lectrice-mark-small.svg) | **≤ 24px** | perch, legs and eye removed and the open beak exaggerated, so the silhouette survives the pixel grid |
+
+#### Icons — general and branded
+
+The icon set ships as pairs (`src/ui/icons/lectrice-icons.tsx`), and the rule is what keeps it a system
+rather than a mascot parade:
+
+| Layer                      | Use for                                     | Example                                                         |
+| -------------------------- | ------------------------------------------- | --------------------------------------------------------------- |
+| **general**                | chrome — pure utility with no brand meaning | pause, gear, search, close, zoom                                |
+| **branded** (bird-carried) | meaning — voice, reading, rest, direction   | play/read-aloud, library, bookmark, night mode, narration, next |
+
+**The bird goes where the meaning is.** Birding a gear would cost legibility and buy nothing. Branded
+icons reuse the logo's own traced geometry, so they stay on-brand by construction rather than by
+convention. Both layers share the 24px box; the branded ones are the first candidates for a simplified
+small-size variant below 24px (same two-cut logic as the mark).
 
 The open singing beak is the **invariant** across both cuts — it is what identifies the mark at any size.
 Below 32px the detail cut loses the beak to anti-aliasing; above 24px the favicon cut reads as coarse.
@@ -75,12 +92,21 @@ Use the favicon cut for `favicon.ico`-scale UI and the detail cut for everything
 
 ### Wordmark
 
-**Lectrice** in **Space Grotesk 700**, tracking −0.02em. Monochrome (`--text`); the mark
-carries the colour (Zed-style). Mark sits left of the wordmark, clearspace = mark height.
+**Lectrice** in **Fraunces 600**, optical size **144**, **WONK on**, SOFT 0,
+tracking −0.035em. Ink `#14110D` on paper `#F4EFE4`; the bird carries vermilion
+`#C8462C`. Use the real local font, never image-model lettering. Align the wordmark
+optically with the bird's body, not its full bounding box; the singing head rises
+above the cap line. The [GitHub composition](../../.github/assets/lectrice-social-preview.html)
+is a reproducible example. Space Grotesk below remains a product UI implementation
+detail, not the identity wordmark.
 
 ---
 
-## 🎨 Palette — Catppuccin Mocha (dark) / Latte (light)
+## 🎨 Shipped product UI palette — Catppuccin Mocha / Latte
+
+This section describes existing app tokens, **not marketing/identity artwork**.
+Identity surfaces use paper `#F4EFE4`, ink `#14110D` type and vermilion `#C8462C`
+bird/voice. Migrating product tokens is a separate slice.
 
 Zed's _discipline_ (dark-first, one accent, restraint) in the house palette. Applied to
 `src/ui/tokens/colors.css` — token names unchanged, values swapped.
@@ -102,7 +128,11 @@ Hover/alpha are derived with `color-mix()` so no off-palette hex is ever invente
 
 ---
 
-## ✍️ Typography — self-hosted (`@fontsource`, local-first, no CDN)
+## ✍️ Shipped product UI typography — self-hosted (`@fontsource`)
+
+For identity artwork use Fraunces/Newsreader from [the asset index](./README.md).
+The following table records the existing product implementation; it does not
+supersede the wordmark specification above.
 
 | Role               | Family                                                   | Token                   |
 | ------------------ | -------------------------------------------------------- | ----------------------- |
