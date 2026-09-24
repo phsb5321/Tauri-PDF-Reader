@@ -50,6 +50,12 @@
   stroke-linejoin: round;
 }
 
+/* Icon-set glyphs are filled; the chevron stroke rules above must not
+   outline them (inherited stroke would thicken IconBack). */
+.nav-icon-solid {
+  stroke: none;
+}
+
 .page-input-container {
   display: flex;
   align-items: center;
@@ -57,6 +63,12 @@
   font-size: 0.875rem;
   /* Narrow desktop widths: the position read-out may shrink before it clips. */
   min-width: 0;
+  /* Native <fieldset> grouping (typescript:S6819): strip the UA border,
+     padding, margin and min-inline-size so the flex row is unchanged. */
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-inline-size: 0;
 }
 
 .page-input {
