@@ -8,6 +8,7 @@ import { ListRow } from "../../ui/components/ListRow/ListRow";
 import { DocumentCover } from "./DocumentCover";
 import { useAiTtsStore, selectNeedsApiKey } from "../../stores/ai-tts-store";
 import { AI_TTS_SETUP_MESSAGE } from "../../lib/constants";
+import { IconPlay } from "../../ui/icons/lectrice-icons";
 import type { Document } from "../../lib/schemas";
 import "./ResumeSection.css";
 
@@ -179,7 +180,7 @@ function ResumeLine({
             aria-label={`Resume ${label} and read aloud`}
             onClick={() => onResumeAndPlay(document)}
           >
-            <PlayIcon />
+            <IconPlay size={12} />
             Read aloud
           </Button>
         </div>
@@ -237,7 +238,7 @@ function AlsoInProgress({
                 aria-label={`Resume ${label} and read aloud`}
                 onClick={() => onResumeAndPlay(document)}
               >
-                <PlayIcon />
+                <IconPlay size={12} />
                 Read aloud
               </Button>
             </li>
@@ -245,14 +246,6 @@ function AlsoInProgress({
         })}
       </ul>
     </div>
-  );
-}
-
-function PlayIcon() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden="true">
-      <path d="M4 2.5v11l9-5.5-9-5.5z" fill="currentColor" />
-    </svg>
   );
 }
 
