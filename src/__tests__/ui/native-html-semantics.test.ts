@@ -3,6 +3,10 @@ import { describe, expect, it } from "vitest";
 
 const NATIVE_SEMANTIC_SURFACES = [
   ["../../components/audio-progress/CacheProgressBar.tsx", /<progress\b/],
+  // The voice selector's four feedback notes are live regions: <output> is the
+  // native status element, so role="status" on a <p> is the redundant form
+  // SonarQube S6819 flags.
+  ["../../components/playback-bar/AiVoiceSelector.tsx", /<output\b/],
   ["../../components/dialogs/ExportDialog.tsx", /<dialog\b/],
   ["../../components/export-dialog/AudioExportDialog.tsx", /<dialog\b/],
   ["../../components/export-dialog/ExportProgress.tsx", /<progress\b/],
@@ -33,9 +37,10 @@ const NATIVE_SEMANTIC_SURFACES = [
 
 // `group` joins the list because <fieldset> is its native element: the shelf
 // checkboxes carried role="group" on a plain <div> until SonarQube S6819
-// flagged it.
+// flagged it. `status` joins for the same reason — <output> is its native
+// element — so the voice selector's notes use the tag, not the role.
 const REDUNDANT_NATIVE_ROLE =
-  /\brole\s*=\s*(["'])(?:button|dialog|group|list|progressbar|presentation)\1/;
+  /\brole\s*=\s*(["'])(?:button|dialog|group|list|progressbar|presentation|status)\1/;
 
 const DIALOG_EVENT_SURFACES = [
   "../../components/session-menu/CreateSessionDialog.tsx",
