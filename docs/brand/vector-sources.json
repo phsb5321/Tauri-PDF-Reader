@@ -1,0 +1,25 @@
+{
+  "sources": [
+    {
+      "path": "ai/states/20260921T115658001-keep-this-exact-bird-silhouette-draw-the-same-nightingale-in.png",
+      "sha256": "eb8dd24cefe608a51b650586430a26859bd655c958b4050808acefeace28896d"
+    },
+    {
+      "path": "ai/icons/20260921T090820757-an-empty-state-illustration-for-a-reading-app-on-a-warm-off.png",
+      "sha256": "057138fd3301e25eedf985a07a51f020ad87a8e35189eb605c46fa298b34db51"
+    }
+  ],
+  "state_panels": {
+    "idle": "380x440+40+120",
+    "singing": "535x440+430+120",
+    "paused": "365x440+880+120",
+    "asleep": "355x440+1295+120",
+    "working": "395x440+1720+120"
+  },
+  "state_grid": "24x24; translate(1 0.8) scale(0.052), common y-origin 120",
+  "ink_threshold": "Gray 30%; no negate",
+  "accent_mask": "r>0.4 && r>g*1.4 && r>b*1.4",
+  "singing_voice": "horizontal 0.42 scale anchored at x=320; bird scale unchanged",
+  "empty_crop": "880x820+330+260; translate(1 1.75) scale(0.025)",
+  "potrace": "1.16; turdsize=4; opttolerance=0.3; complete SVG body retained"
+}

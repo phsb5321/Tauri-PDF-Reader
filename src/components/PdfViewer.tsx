@@ -928,13 +928,18 @@ export function PdfViewer({ onReadFromHere }: Readonly<PdfViewerProps>) {
     );
   }
 
-  // Loading state - show skeleton placeholder
-  if (isLoading) {
+  // Loading state - skeleton placeholder, and only while nothing is loaded
+  // yet (issue #294): an open attempt must never replace the canvas of a
+  // document that is already showing.
+  if (isLoading && !pdfDocument) {
     return <PdfSkeleton />;
   }
 
-  // Error state
-  if (error) {
+  // Error state — full-screen ONLY when no document is loaded (issue #294).
+  // With a document on screen, the error belongs to a failed open/import and
+  // surfaces through the shell's dismissible banner while the canvas keeps
+  // showing the current document.
+  if (error && !pdfDocument) {
     return (
       <div className="pdf-viewer-error">
         <svg viewBox="0 0 24 24" className="error-icon">

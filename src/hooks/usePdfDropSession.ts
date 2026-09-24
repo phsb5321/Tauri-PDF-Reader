@@ -7,7 +7,8 @@ import {
   onNativeFileDrop,
   type NativeFileDropEvent,
 } from "../lib/api/file-drop";
-import { beginOpenTransaction } from "../stores/document-store";
+import { beginOpenTransaction, type OpenLease } from "../stores/document-store";
+import { friendlyError } from "../lib/user-message";
 import type { Document } from "../lib/schemas";
 import type { DroppedPreparation } from "./useOpenPdf";
 
@@ -27,7 +28,11 @@ export interface PdfDropStatus {
 interface UsePdfDropSessionOptions {
   openDroppedPdf: (
     filePath: string,
-    options?: { leaseHeldByCaller?: boolean; deferCommit?: boolean },
+    options?: {
+      leaseHeldByCaller?: boolean;
+      deferCommit?: boolean;
+      lease?: OpenLease;
+    },
   ) => Promise<Document | DroppedPreparation | null>;
   createSession: (
     name: string,
@@ -63,15 +68,9 @@ export function droppedSessionName(document: Document): string {
   return result || "Reading session";
 }
 
-function dropGuardError(
-  paths: readonly string[],
-  inFlight: boolean,
-): string | null {
-  if (inFlight) {
-    return "DROP_BUSY: Wait for the current PDF session to finish.";
-  }
+function dropGuardError(paths: readonly string[]): string | null {
   if (paths.length !== 1 || !/\.pdf$/i.test(paths[0] ?? "")) {
-    return "DROP_INVALID: Drop exactly one PDF to create a reading session.";
+    return "Drop exactly one PDF to create a reading session.";
   }
   return null;
 }
@@ -105,28 +104,28 @@ export function usePdfDropSession({
   const [isDragActive, setIsDragActive] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [status, setStatus] = useState<PdfDropStatus | null>(null);
-  const inFlightRef = useRef(false);
+  // The overlay reflects the LATEST drop transaction: a superseded drop must
+  // not clear it while its successor is still importing (issue #294).
+  const dropSeqRef = useRef(0);
 
   const handleDrop = useCallback(
     async (paths: string[]) => {
       setIsDragActive(false);
-      const guardError = dropGuardError(paths, inFlightRef.current);
+      const guardError = dropGuardError(paths);
       if (guardError) {
         onError(guardError);
         return;
       }
 
-      // Issue #185: ONE lease held from import start through session
-      // activation. Releasing it between the import and the session steps
-      // let a rapid second public action interleave and reopen the wrong
-      // document under this transaction's session.
-      const releaseLease = beginOpenTransaction();
-      if (!releaseLease) {
-        onError("OPEN_BUSY: Wait for the current PDF to finish opening.");
-        return;
-      }
+      // Issue #185 + #294: ONE lease held from import start through session
+      // activation, so a rapid second public action cannot interleave and
+      // reopen the wrong document under this transaction's session.
+      // Acquiring it while another transaction is in flight SUPERSEDES that
+      // transaction (latest wins): the superseded one rolls back its session
+      // silently and never touches the screen — no busy error, no wait.
+      const lease = beginOpenTransaction();
+      const seq = ++dropSeqRef.current;
 
-      inFlightRef.current = true;
       setIsImporting(true);
       setStatus(null);
       let createdSession: ReadingSession | null = null;
@@ -140,8 +139,9 @@ export function usePdfDropSession({
         const prepared = await openDroppedPdf(paths[0], {
           leaseHeldByCaller: true,
           deferCommit: true,
+          lease,
         });
-        if (!prepared) return;
+        if (!prepared || lease.isSuperseded()) return; // silent — a newer open won
         const droppedDocument = isDroppedPreparation(prepared)
           ? prepared.document
           : prepared;
@@ -149,10 +149,20 @@ export function usePdfDropSession({
         const name = droppedSessionName(droppedDocument);
         const session = await createSession(name, [droppedDocument.id]);
         createdSession = session;
+        if (lease.isSuperseded()) {
+          // Superseded between import and activation: the session must not
+          // linger as a half-created artifact of a losing transaction.
+          await rollbackCreatedSession(deleteSession, createdSession);
+          return;
+        }
         // The store is the single restore-success authority: it rejects when
         // the backend resolves `success=false`, so a failed restore takes the
         // same rollback path as any other activation failure (#185).
         await restoreSession(session.id);
+        if (lease.isSuperseded()) {
+          await rollbackCreatedSession(deleteSession, createdSession);
+          return;
+        }
         if (isDroppedPreparation(prepared)) prepared.commit();
         onSessionCreated(droppedDocument, session);
         setStatus({
@@ -166,11 +176,13 @@ export function usePdfDropSession({
           createdSession === null
             ? ""
             : await rollbackCreatedSession(deleteSession, createdSession);
-        onError(`DROP_FAILED: ${message}${rollback}`);
+        // A superseded transaction is silent even when its own steps failed —
+        // the newest open owns the reader and this error would be stale noise.
+        if (lease.isSuperseded()) return;
+        onError(`${friendlyError(message)}${rollback}`);
       } finally {
-        releaseLease();
-        inFlightRef.current = false;
-        setIsImporting(false);
+        lease.release();
+        if (seq === dropSeqRef.current) setIsImporting(false);
       }
     },
     [
