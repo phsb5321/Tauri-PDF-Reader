@@ -5,6 +5,7 @@ import { useAnnounce, ANNOUNCEMENTS } from "../hooks/useAnnounce";
 import { aiTtsStop } from "../lib/tauri-invoke";
 import { commands } from "../lib/bindings";
 import { enqueueProgressWrite } from "../hooks/useAutoSave";
+import { IconBack, IconForwardBird } from "../ui/icons/lectrice-icons";
 import "./PageNavigation.css";
 
 /**
@@ -176,9 +177,7 @@ export function PageNavigation() {
         title="Previous page (Left Arrow)"
         aria-label="Previous page"
       >
-        <svg viewBox="0 0 24 24" className="nav-icon" aria-hidden="true">
-          <path d="M15 18l-6-6 6-6" />
-        </svg>
+        <IconBack size={18} className="nav-icon nav-icon-solid" />
       </button>
 
       {/* Native grouping: a <fieldset> carries the implicit "group" role and
@@ -214,9 +213,7 @@ export function PageNavigation() {
         title="Next page (Right Arrow)"
         aria-label="Next page"
       >
-        <svg viewBox="0 0 24 24" className="nav-icon" aria-hidden="true">
-          <path d="M9 18l6-6-6-6" />
-        </svg>
+        <IconForwardBird size={18} className="nav-icon nav-icon-solid" />
       </button>
     </div>
   );

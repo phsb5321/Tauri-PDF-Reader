@@ -1,7 +1,9 @@
 # Lectrice · Brand Spec
 
-> Captured: 2026-05-29 · Status: **shipped** (applied to tokens, fonts, icons, config)
-> Visual board: [`lectrice-brand.html`](./lectrice-brand.html) (open in a browser)
+> Identity updated: 21/09/2026 · Vermilion nightingale on paper, Fraunces wordmark.
+> [Current assets and GitHub application steps](./README.md).
+> Product tokens/fonts below still describe the separately shipped UI.
+> Historical board: [`lectrice-brand.html`](./lectrice-brand.html) (pre-v2, not current identity guidance).
 
 ---
 
@@ -37,28 +39,74 @@ unclaimed, more-elegant form.
 
 ## 🎯 Core assets
 
-### Logo — **Mark A · Voice Channels** (chosen)
+### Logo — **the nightingale** (chosen)
 
-Three nested chevrons — a voice radiating / soundwave, abstract not a letter (Zed's mark
-isn't a literal "Z" either). **Monoline, strictly angular** (45°/90°), no curves.
+A songbird in side profile, head raised, beak open mid-song, gripping a line. The product
+_speaks_, so the mark is the thing that sings — **figurative**, not another abstract sound
+glyph. Figurativeness is what carries logo recall (de Lencastre et al., 2023), and it is the
+one register nobody in this category occupies.
 
-- Reusable source: [`lectrice-mark.svg`](./lectrice-mark.svg) (uses `currentColor`)
-- App icon / favicon (crust tile + blue mark): [`../../public/lectrice-mark.svg`](../../public/lectrice-mark.svg)
-- Two alternates explored on the board: **B · Spoken Page** (document → waveform) and
-  **C · Aperture Tile** (negative-space V on an accent tile, used for the OS icon shape).
+Drawn with GPT through the browser fleet (identity `chatgpt-c`, ChatGPT Pro) and traced to a
+single-colour vector path. **Design record:**
+`1. Projects/Lectrice — Tauri PDF Reader/Brand v2 — research & three directions (2026-09-20).md`.
 
-**Mark rules:** clearspace ≥ one chevron stroke · min 16px (use the tile below that) ·
-mark in `--accent` (blue) or `--text`, never recolored off-palette · never rounded,
-stretched, or shadowed.
+- Reusable source: [`lectrice-mark.svg`](./lectrice-mark.svg) (one path, neutral black source; explicitly paint it vermilion in compositions)
+- App icon / favicon (paper tile + vermilion bird): [`../../public/lectrice-mark.svg`](../../public/lectrice-mark.svg)
+
+**Mark rules:** clearspace ≥ the bird's tail width · min 16px (use the favicon cut below that) ·
+**the mark is vermilion `#C8462C` on paper `#F4EFE4`** — the bird and the line it sings into are one
+continuous gesture, and the accent stops being decoration and becomes the identity · ink `#14110D` is
+reserved for **type** (wordmark, tagline, body) · a paper bird on an ink tile remains valid where a
+dark surface is required (store tiles, dark docs), but it is the exception, not the default · never
+recolored off-palette, never rounded, stretched, recoloured per-part, or shadowed.
+**The mark is a trace — edit the path, never re-draw it freehand.**
+
+#### Two cuts — optical sizing for the mark
+
+The mark ships in two optical sizes, the same way a variable family ships several cuts. They were
+compared as rasters at 16/24/32/48px, not chosen by eye at poster size:
+
+| Cut         | File                                                                                                                                    | Use at     | Why                                                                                                  |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------- |
+| **detail**  | [`lectrice-mark.svg`](./lectrice-mark.svg) · [`../../public/lectrice-mark.svg`](../../public/lectrice-mark.svg)                         | **≥ 32px** | the perch, legs and finer tail read again at these sizes; the fuller drawing                         |
+| **favicon** | [`lectrice-mark-small.svg`](./lectrice-mark-small.svg) · [`../../public/lectrice-mark-small.svg`](../../public/lectrice-mark-small.svg) | **≤ 24px** | perch, legs and eye removed and the open beak exaggerated, so the silhouette survives the pixel grid |
+
+#### Icons — general and branded
+
+The icon set ships as pairs (`src/ui/icons/lectrice-icons.tsx`), and the rule is what keeps it a system
+rather than a mascot parade:
+
+| Layer                      | Use for                                     | Example                                                         |
+| -------------------------- | ------------------------------------------- | --------------------------------------------------------------- |
+| **general**                | chrome — pure utility with no brand meaning | pause, gear, search, close, zoom                                |
+| **branded** (bird-carried) | meaning — voice, reading, rest, direction   | play/read-aloud, library, bookmark, night mode, narration, next |
+
+**The bird goes where the meaning is.** Birding a gear would cost legibility and buy nothing. Branded
+icons reuse the logo's own traced geometry, so they stay on-brand by construction rather than by
+convention. Both layers share the 24px box; the branded ones are the first candidates for a simplified
+small-size variant below 24px (same two-cut logic as the mark).
+
+The open singing beak is the **invariant** across both cuts — it is what identifies the mark at any size.
+Below 32px the detail cut loses the beak to anti-aliasing; above 24px the favicon cut reads as coarse.
+Use the favicon cut for `favicon.ico`-scale UI and the detail cut for everything larger.
 
 ### Wordmark
 
-**Lectrice** in **Space Grotesk 700**, tracking −0.02em. Monochrome (`--text`); the mark
-carries the colour (Zed-style). Mark sits left of the wordmark, clearspace = mark height.
+**Lectrice** in **Fraunces 600**, optical size **144**, **WONK on**, SOFT 0,
+tracking −0.035em. Ink `#14110D` on paper `#F4EFE4`; the bird carries vermilion
+`#C8462C`. Use the real local font, never image-model lettering. Align the wordmark
+optically with the bird's body, not its full bounding box; the singing head rises
+above the cap line. The [GitHub composition](../../.github/assets/lectrice-social-preview.html)
+is a reproducible example. Space Grotesk below remains a product UI implementation
+detail, not the identity wordmark.
 
 ---
 
-## 🎨 Palette — Catppuccin Mocha (dark) / Latte (light)
+## 🎨 Shipped product UI palette — Catppuccin Mocha / Latte
+
+This section describes existing app tokens, **not marketing/identity artwork**.
+Identity surfaces use paper `#F4EFE4`, ink `#14110D` type and vermilion `#C8462C`
+bird/voice. Migrating product tokens is a separate slice.
 
 Zed's _discipline_ (dark-first, one accent, restraint) in the house palette. Applied to
 `src/ui/tokens/colors.css` — token names unchanged, values swapped.
@@ -80,7 +128,11 @@ Hover/alpha are derived with `color-mix()` so no off-palette hex is ever invente
 
 ---
 
-## ✍️ Typography — self-hosted (`@fontsource`, local-first, no CDN)
+## ✍️ Shipped product UI typography — self-hosted (`@fontsource`)
+
+For identity artwork use Fraunces/Newsreader from [the asset index](./README.md).
+The following table records the existing product implementation; it does not
+supersede the wordmark specification above.
 
 | Role               | Family                                                   | Token                   |
 | ------------------ | -------------------------------------------------------- | ----------------------- |
@@ -115,11 +167,23 @@ no raw hex in components (tokens only).
 
 ---
 
+## 🔍 Design process — no critique, no "done"
+
+**Every design slice ends with `review.md`: a 5-dimension critique written against the render, at the
+sizes the product actually renders** — 1200×800 (window default) and 640×600 (window minimum),
+per `src-tauri/tauri.conf.json`. Slices start from a per-flow brief (`docs/design/flows/<flow>/brief.md`,
+created from `docs/design/BRIEF-TEMPLATE.md`) and the critique lands beside its artifacts. The rule,
+the rubric mapping, and the text-only-lane split live in **`docs/design/README.md`**; the critique's
+scoring template is `.claude/skills/huashu-design/references/critique-guide.md`. A design change
+without its critique is not done — however confidently it was reported.
+
+---
+
 ## Shipped (this PR)
 
 - [x] Name **Lectrice** (collision-vetted) → `productName`, window title, `index.html`, README, `package.json`
 - [x] Identifier `com.voxpage.pdf-reader` → `com.lectrice.reader`
-- [x] Logo Mark A + app icons regenerated via `tauri icon` (desktop/Win/iOS/Android)
+- [x] Logo **the nightingale** + app icons regenerated via `tauri icon` (desktop/Win/iOS/Android)
 - [x] `colors.css` → Catppuccin (Latte/Mocha) + `--color-speak`
 - [x] `typography.css` + `@fontsource` self-hosted fonts
 - [x] `motion.css` bounce retired · `App.css` body font tokenized

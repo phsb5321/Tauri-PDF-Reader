@@ -176,8 +176,25 @@ mod hw_accel {
             // cause of blank/garbled WebKitGTK windows on Wayland and with the
             // proprietary Nvidia driver; turning it off keeps acceleration while
             // avoiding that failure mode.
-            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
-            tracing::info!("Set WEBKIT_DISABLE_DMABUF_RENDERER=1 (GPU compositing, DMABUF off)");
+            //
+            // But never override an explicit user choice: some Mesa/Wayland
+            // stacks garble canvas content (PDF cover thumbnails) WITH the
+            // DMABUF renderer disabled, and the only fix there is to re-enable
+            // it. An externally-set variable (including =0) is respected as-is.
+            match std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER") {
+                Some(existing) => {
+                    tracing::info!(
+                        "WEBKIT_DISABLE_DMABUF_RENDERER respected from environment: {:?}",
+                        existing
+                    );
+                }
+                None => {
+                    std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+                    tracing::info!(
+                        "Set WEBKIT_DISABLE_DMABUF_RENDERER=1 (GPU compositing, DMABUF off)"
+                    );
+                }
+            }
         }
     }
 

@@ -82,22 +82,12 @@ macOS actor rather than frontmost-window synthetic keystrokes.
 
 ## Egress
 
-<<<<<<< ours
-The only outbound calls are the selected narration routes: ElevenLabs, Groq,
-or the exact configured Local TTS loopback service, and only after a public
-narration action ([#97] removed the jsDelivr CDN egress; there is no
-update-check egress). Contract and file:line receipts: `SECURITY.md`.
-||||||| base
-The **only** outbound network call in the app is to ElevenLabs when a speak
-action runs ([#97] removed the jsDelivr CDN egress; there is no update-check
-egress). Contract and file:line receipts: `SECURITY.md`.
-=======
-The **only** outbound network call in the app is to ElevenLabs when a speak
-action runs ([#97] removed the jsDelivr CDN egress; there is no in-app
-update-check egress). The external Nix profile manager queries the public
-GitHub workflow API and fetches the selected immutable flake only when
-install/update is invoked. Contract and file:line receipts:
-`SECURITY.md`.
+The only outbound calls from the app are the selected narration routes:
+ElevenLabs, Groq, or the exact configured Local TTS loopback service, and only
+after a public narration action ([#97] removed the jsDelivr CDN egress; there
+is no in-app update-check egress). The external Nix profile manager queries the
+public GitHub workflow API and fetches the selected immutable flake only when
+install/update is invoked. Contract and file:line receipts: `SECURITY.md`.
 
 ## Platform-scoped runtime
 
