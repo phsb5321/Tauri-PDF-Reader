@@ -21,8 +21,10 @@ import { useFileDialog, FILE_FILTERS } from "./useFileDialog";
 import {
   useDocumentStore,
   beginOpenTransaction,
+  type OpenLease,
 } from "../stores/document-store";
 import { isScopeDenial, pdfService } from "../services/pdf-service";
+import { friendlyError } from "../lib/user-message";
 import {
   libraryAddDocument,
   libraryGetDocumentByPath,
@@ -82,6 +84,7 @@ export function useOpenPdf() {
   const reauthorizeAccess = useCallback(
     async (
       document: Document,
+      lease?: OpenLease,
     ): Promise<{ pdf: PDFDocumentProxy; document: Document } | null> => {
       const picked = await openFile({
         multiple: false,
@@ -90,9 +93,14 @@ export function useOpenPdf() {
       });
 
       if (!picked) {
-        setError(
-          "OPEN_CANCELLED: Access reauthorization was cancelled — the book was not opened.",
-        );
+        // Latest-wins (issue #294): a superseded transaction stays silent —
+        // the newer open owns the reader and a stale cancel message would be
+        // noise over its document.
+        if (!lease?.isSuperseded()) {
+          setError(
+            "Access reauthorization was cancelled — the book was not opened.",
+          );
+        }
         return null;
       }
 
@@ -120,14 +128,15 @@ export function useOpenPdf() {
         return { pdf, document: relocated };
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
+        if (lease?.isSuperseded()) return null; // silent — a newer open won
         if (message.includes("HASH_MISMATCH")) {
           // Basename only: useful feedback + an observable retry transition,
           // without leaking a private absolute path into UI/log artifacts.
           setError(
-            `WRONG_DOCUMENT: “${pickedName}” is not this book — the library was not changed.`,
+            `“${pickedName}” is not this book — the library was not changed.`,
           );
         } else {
-          setError(`Reauthorization failed: ${message}`);
+          setError(`Reauthorization failed: ${friendlyError(message)}`);
         }
         return null;
       }
@@ -152,8 +161,16 @@ export function useOpenPdf() {
   const openAuthorizedPath = useCallback(
     async (
       filePath: string,
-      options?: { deferCommit?: boolean },
-    ): Promise<Document | { pdf: PDFDocumentProxy; document: Document }> => {
+      options?: {
+        deferCommit?: boolean;
+        lease?: OpenLease;
+      },
+    ): Promise<
+      Document | { pdf: PDFDocumentProxy; document: Document } | null
+    > => {
+      // Latest-wins (issue #294): a superseded transaction never starts its
+      // reads — the newest open owns the reader and the row stays untouched.
+      if (options?.lease?.isSuperseded()) return null;
       const known = await libraryGetDocumentByPath(filePath);
       // Every open of a KNOWN row binds the bytes to the row's content hash
       // (the id): a file replaced at the same path is a different book and
@@ -194,6 +211,10 @@ export function useOpenPdf() {
       if (options?.deferCommit) {
         return { pdf: displayPdf, document };
       }
+      // The single visible-commit point: a transaction superseded mid-import
+      // may have landed a durable row (valid on its own — a re-drop reuses
+      // it, per the B1 contract) but must never touch the screen.
+      if (options?.lease?.isSuperseded()) return null;
       showInReader(displayPdf, document);
       return document;
     },
@@ -202,12 +223,10 @@ export function useOpenPdf() {
 
   /** Pick a PDF through the native dialog and open it. */
   const openPdf = useCallback(async (): Promise<boolean> => {
-    // Issue #185: the open mutex is held for the whole dialog + import body.
-    const releaseLease = beginOpenTransaction();
-    if (!releaseLease) {
-      setError("OPEN_BUSY: Wait for the current PDF to finish opening.");
-      return false;
-    }
+    // Issue #294: the lease always succeeds — it SUPERSEDES any in-flight
+    // open instead of refusing with a busy error (issue #185 mutex kept, its
+    // semantics latest-wins).
+    const lease = beginOpenTransaction();
     try {
       setError(null);
       const selected = await openFile({
@@ -215,17 +234,22 @@ export function useOpenPdf() {
         filters: [FILE_FILTERS.PDF],
       });
       if (!selected) return false;
+      // A newer open superseded this one while the dialog was up: discard
+      // the pick silently (a modal native dialog cannot be cancelled from
+      // JS) and let the newest request own the reader.
+      if (lease.isSuperseded()) return false;
 
-      await openAuthorizedPath(selected as string);
-      return true;
+      const opened = await openAuthorizedPath(selected as string, { lease });
+      return opened !== null;
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : "Failed to open PDF";
-      setError(message);
+      if (lease.isSuperseded()) return false; // silent — a newer open won
+      setError(friendlyError(message));
       console.error("Error opening PDF:", error);
       return false;
     } finally {
-      releaseLease();
+      lease.release();
     }
   }, [openAuthorizedPath, openFile, setError]);
 
@@ -239,19 +263,37 @@ export function useOpenPdf() {
   const openDroppedPdf = useCallback(
     async (
       filePath: string,
-      options?: { leaseHeldByCaller?: boolean; deferCommit?: boolean },
+      options?: {
+        leaseHeldByCaller?: boolean;
+        deferCommit?: boolean;
+        lease?: OpenLease;
+      },
     ): Promise<Document | DroppedPreparation | null> => {
       // When the drop-to-session transaction already holds the open lease,
-      // this import runs inside it (issue #185). Direct callers get the
-      // fail-fast guard instead. With `deferCommit` the import is prepared
+      // this import runs inside it (issue #185). Direct callers acquire one
+      // of their own — which supersedes any in-flight transaction instead of
+      // failing (issue #294). With `deferCommit` the import is prepared
       // but visible reader state is committed only via the returned `commit`
       // — after the caller's session create/restore succeeds (B1 repair).
+      //
+      // Owned-lease release (issue #294 fix round): only the path that
+      // ACQUIRES a lease releases it. A caller-held lease belongs to the
+      // caller's whole transaction — releasing it here, when the import
+      // returns, would clear `isLoading` mid-transaction and blind every
+      // later supersede check (the drop transaction would commit over a
+      // newer open).
       const leaseHeldByCaller = options?.leaseHeldByCaller === true;
-      const releaseLease = leaseHeldByCaller ? null : beginOpenTransaction();
-      if (!leaseHeldByCaller && !releaseLease) {
-        setError("OPEN_BUSY: Wait for the current PDF to finish opening.");
-        return null;
-      }
+      const callerLease = options?.lease ?? null;
+      // `ownedLease` is non-null ONLY when this import itself acquired the
+      // lease (direct callers); a caller-held lease is never released here.
+      const ownedLease = callerLease
+        ? null
+        : leaseHeldByCaller
+          ? null
+          : beginOpenTransaction();
+      // Supersede checks read whichever lease governs this import: the
+      // caller's when held, the freshly acquired one otherwise.
+      const lease = callerLease ?? ownedLease;
       try {
         setError(null);
         if (!/\.pdf$/i.test(filePath)) {
@@ -261,23 +303,34 @@ export function useOpenPdf() {
         }
         const opened = await openAuthorizedPath(filePath, {
           deferCommit: options?.deferCommit === true,
+          lease: lease ?? undefined,
         });
+        if (opened === null) return null; // superseded — silent
         if (options?.deferCommit === true && "pdf" in opened) {
           return {
             pdf: opened.pdf,
             document: opened.document,
-            commit: () => showInReader(opened.pdf, opened.document),
+            // Self-guarded commit (issue #294 fix round, cross-review B1c):
+            // the closure re-checks supersession at call time, so even a
+            // caller that skips its own guard cannot commit a superseded
+            // import over the winner. `usePdfDropSession` keeps its outer
+            // guard as the belt; this is the suspenders.
+            commit: () => {
+              if (lease?.isSuperseded()) return; // silent — a newer open won
+              showInReader(opened.pdf, opened.document);
+            },
           };
         }
         return opened as Document;
       } catch (error: unknown) {
+        if (lease?.isSuperseded()) return null; // silent — a newer open won
         const message =
           error instanceof Error ? error.message : "Failed to open dropped PDF";
-        setError(message);
+        setError(friendlyError(message));
         console.error("Error opening dropped PDF:", error);
         return null;
       } finally {
-        releaseLease?.();
+        ownedLease?.release();
       }
     },
     [openAuthorizedPath, setError],
@@ -297,14 +350,11 @@ export function useOpenPdf() {
    */
   const resumeDocument = useCallback(
     async (document: Document): Promise<boolean> => {
-      // Issue #185: library/session resume is a public open like any other;
-      // hold the shared open mutex across the whole resume (reauthorization
-      // dialog included) instead of racing an in-flight transaction.
-      const releaseLease = beginOpenTransaction();
-      if (!releaseLease) {
-        setError("OPEN_BUSY: Wait for the current PDF to finish opening.");
-        return false;
-      }
+      // Issue #185 + #294: library/session resume is a public open like any
+      // other; it holds the shared open mutex across the whole resume
+      // (reauthorization dialog included). Acquiring it supersedes any
+      // in-flight transaction instead of racing it or being refused.
+      const lease = beginOpenTransaction();
       try {
         setError(null);
 
@@ -341,8 +391,8 @@ export function useOpenPdf() {
           // retry. Hash mismatch must be recoverable, not a permanently broken
           // row that can never reach the picker.
 
-          const reauthorized = await reauthorizeAccess(document);
-          if (!reauthorized) return false; // cancel/wrong file — error is set
+          const reauthorized = await reauthorizeAccess(document, lease);
+          if (!reauthorized) return false; // cancel/wrong file/superseded
           pdf = reauthorized.pdf;
           // Stamp the re-opened row like the ordinary path does; a failed
           // stamp must not strand a book that already reauthorized.
@@ -357,16 +407,19 @@ export function useOpenPdf() {
           );
         }
 
+        // The single visible-commit point: a superseded resume stays silent.
+        if (lease.isSuperseded()) return false;
         showInReader(pdf, opened);
         return true;
       } catch (error: unknown) {
+        if (lease.isSuperseded()) return false; // silent — a newer open won
         const message =
           error instanceof Error ? error.message : "Failed to open document";
-        setError(message);
+        setError(friendlyError(message));
         console.error("Error resuming document:", error);
         return false;
       } finally {
-        releaseLease();
+        lease.release();
       }
     },
     [setError, showInReader, reauthorizeAccess],

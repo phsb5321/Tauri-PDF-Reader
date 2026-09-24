@@ -210,6 +210,8 @@ export default tseslint.config(
       // like `browser`, `$`, `describe`, `process`), not the app build.
       "wdio.conf.mjs",
       "e2e/**",
+      // Vendored skill sources are third-party reference code, not app code.
+      ".claude/skills/**",
     ],
   },
 );

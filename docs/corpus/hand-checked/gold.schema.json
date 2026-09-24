@@ -1,0 +1,123 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Lectrice hand-checked fixture gold sidecar",
+  "description": "One sidecar per fixture PDF, stored beside it in $LECTRICE_REAL_PDF_CORPUS/gold/ (mode 0600, never in git).",
+  "type": "object",
+  "required": ["basename", "sha256", "lang", "pages"],
+  "additionalProperties": false,
+  "properties": {
+    "basename": {
+      "type": "string",
+      "description": "PDF basename in the external corpus root; must match .lectrice-manifest.json."
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "PDF digest; zero-filled only in the synthetic in-repo examples."
+    },
+    "lang": { "enum": ["en", "pt-BR"] },
+    "checked": {
+      "type": "object",
+      "description": "Two-pass hand-check sign-off (omit only in synthetic examples).",
+      "required": ["pass1", "pass2"],
+      "additionalProperties": false,
+      "properties": {
+        "pass1": {
+          "type": "string",
+          "description": "Transcriber (anonymized id)."
+        },
+        "pass2": {
+          "type": "string",
+          "description": "Verifier: must differ from pass1, or record a >=24 h delayed self-check."
+        },
+        "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+      }
+    },
+    "pages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "page",
+          "defectTags",
+          "goldText",
+          "readingOrder",
+          "blocks"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "page": { "type": "integer", "minimum": 1 },
+          "defectTags": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "two-column",
+                "header-footer",
+                "table",
+                "footnote",
+                "ligature",
+                "hyphen-broken",
+                "math",
+                "ocr-required",
+                "clean-control"
+              ]
+            }
+          },
+          "goldText": {
+            "type": "string",
+            "description": "Ideal narration text: true reading order, hyphen-broken words joined, tagged header/footer/page-number spans EXCLUDED. The extraction-WER target."
+          },
+          "readingOrder": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Block ids in reading order (order-inversion metric input)."
+          },
+          "blocks": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["id", "anchor"],
+              "additionalProperties": false,
+              "properties": {
+                "id": { "type": "string" },
+                "anchor": {
+                  "type": "string",
+                  "description": "Unique opening words of the block; must be locatable in goldText."
+                }
+              }
+            }
+          },
+          "excludedSpans": {
+            "type": "array",
+            "description": "Header/footer/page-number spans AS PRINTED (leak-counter input); excluded from goldText.",
+            "items": {
+              "type": "object",
+              "required": ["role", "text"],
+              "additionalProperties": false,
+              "properties": {
+                "role": { "enum": ["header", "footer", "page-number"] },
+                "text": { "type": "string" }
+              }
+            }
+          },
+          "spoken": {
+            "type": "array",
+            "description": "Source->spoken pairs where speech diverges from display (round-trip inputs).",
+            "items": {
+              "type": "object",
+              "required": ["source", "spoken"],
+              "additionalProperties": false,
+              "properties": {
+                "source": { "type": "string" },
+                "spoken": { "type": "string" },
+                "note": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
