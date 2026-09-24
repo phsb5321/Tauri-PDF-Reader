@@ -1,0 +1,10 @@
+
+ RUN  v2.1.9 /home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing
+
+ ✓ src/ui/icons/lectrice-icons.test.tsx (6 tests) 202ms
+
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Start at  13:33:05
+   Duration  5.20s (transform 646ms, setup 548ms, collect 720ms, tests 202ms, environment 2.35s, prepare 278ms)
+

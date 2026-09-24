@@ -1,0 +1,11 @@
+warning: Git tree '/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing' is dirty
+/nix/store/adkw5ly95l49zfxv9bmra34k16x82sn8-pnpm-10.34.5/bin/pnpm
+/nix/store/yvdi6ybzkgbzpsgfa6fm3x113vps619a-tauri-driver-2.0.6/bin/tauri-driver
+/nix/store/clhasr1lfayv6akwlbfz84g05v55yys9-webkitgtk-2.52.5+abi=4.1/bin/WebKitWebDriver
+/nix/store/qxwxwgi4ad40j49gglf4d5jl5xjybdmk-xvfb-21.1.23/bin/Xvfb
+/nix/store/l7v00m55rb130bhql2kr74pq8sdpl41c-cargo-1.97.0/bin/cargo
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/nvme0n1p1  938G  834G   95G  90% /
+               total        used        free      shared  buff/cache   available
+Mem:           125Gi        88Gi        19Gi       536Mi        25Gi        36Gi
+Swap:           47Gi        31Gi        16Gi

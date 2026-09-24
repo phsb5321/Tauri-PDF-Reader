@@ -83,3 +83,63 @@ describe("source-aligned speech number normalization", () => {
     }
   });
 });
+
+describe("figure/section reference verbalization (spec 293)", () => {
+  it("speaks English hyphenated reference composites as integer groups", () => {
+    expect(spoken("See Figure 3-1 for details.", "en")).toBe(
+      "See Figure three one for details.",
+    );
+    expect(spoken("Section 12-3", "en")).toBe("Section twelve three");
+    expect(spoken("FIGURE 3-1", "en")).toBe("FIGURE three one");
+    expect(spoken("fig. 3-1", "en")).toBe("fig. three one");
+  });
+
+  it("speaks pt-BR references with Portuguese integer words", () => {
+    expect(spoken("Figura 2-4", "pt-BR")).toBe("Figura dois quatro");
+    expect(spoken("Seção 10-2", "pt-BR")).toBe("Seção dez dois");
+    expect(spoken("seções 1-2 e seções 1-3", "pt-BR")).toBe(
+      "seções um dois e seções um três",
+    );
+    // A bare composite without a reference word stays untouched.
+    expect(spoken("seções 1-2 e 1-3", "pt-BR")).toBe("seções um dois e 1-3");
+  });
+
+  it("handles multiple references and multi-hyphen composites", () => {
+    expect(spoken("Figure 3-1 and Figure 3-2", "en")).toBe(
+      "Figure three one and Figure three two",
+    );
+    expect(spoken("Figure 3-1-2", "en")).toBe("Figure three one two");
+  });
+
+  it("preserves exact source ranges like the number grammar", () => {
+    expect(findSpeechNumberReplacements("Figure 3-1", "en")).toEqual([
+      {
+        sourceStart: 7,
+        sourceEnd: 10,
+        spokenText: "three one",
+        rule: "reference",
+      },
+    ]);
+  });
+
+  it("never touches bare composites, identifiers, letter suffixes, or dotted refs", () => {
+    expect(spoken("range 2026-09-15 changed", "en")).toBe(
+      "range 2026-09-15 changed",
+    );
+    expect(spoken("config 3-1 stays", "en")).toBe("config 3-1 stays");
+    expect(spoken("Figure 3-1a", "en")).toBe("Figure 3-1a");
+    expect(spoken("Figure 3.1", "en")).toBe("Figure three point one");
+  });
+
+  it("keeps reference-heavy pages fast (measured pathology guard, not a benchmark)", () => {
+    const source = Array.from(
+      { length: 2500 },
+      (_, i) => `Figure ${i % 9}-${i % 5} and ${i} counts`,
+    ).join(", ");
+    const started = performance.now();
+    const edits = findSpeechNumberReplacements(source, "en");
+    const elapsedMs = performance.now() - started;
+    expect(edits.length).toBeGreaterThan(2500);
+    expect(elapsedMs).toBeLessThan(500);
+  });
+});
