@@ -10,6 +10,16 @@
 highlight a passage, press play, and let it continue across pages. Built with
 Tauri 2.x (React/TypeScript + Rust).
 
+[**Download for Linux**](https://github.com/phsb5321/Tauri-PDF-Reader/releases/latest)
+· [First read](#your-first-read)
+· [Speech and privacy](#ai-text-to-speech)
+· [Known limitations](docs/KNOWN_LIMITATIONS.md)
+
+**Reading and highlighting work offline. Narration is a separate setup step.**
+The published v0.2.0 release uses your ElevenLabs API key for speech; provider
+charges may apply. It sends the text requested for narration to ElevenLabs, not
+just audio commands. Current source also has other provider paths; see below.
+
 The name is French for _a person employed to read aloud to someone_ — the app
 is your lectrice. See [`docs/brand/`](docs/brand/) for the full brand system.
 
@@ -20,6 +30,51 @@ is your lectrice. See [`docs/brand/`](docs/brand/) for the full brand system.
 > notarized distribution. See [CHANGELOG.md](CHANGELOG.md),
 > [docs/macos-nix.md](docs/macos-nix.md), and
 > [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
+
+## Your first read
+
+### 1. Install a published build
+
+For **Linux x86-64**, open [Releases](https://github.com/phsb5321/Tauri-PDF-Reader/releases/latest)
+and choose the `.AppImage` or `.deb` asset. For the published v0.2.0 AppImage,
+run these commands in the directory where you downloaded it:
+
+```bash
+chmod +x Lectrice_0.2.0_amd64.AppImage
+./Lectrice_0.2.0_amd64.AppImage
+```
+
+These commands are version-specific; use the matching filename for a later
+release. The `.deb` is the Debian/Ubuntu package alternative. NixOS users should
+use an appropriate AppImage compatibility environment or build from source;
+the AppImage is not a native NixOS package.
+
+For **Apple-silicon macOS**, use the separate [Nix installation guide](docs/macos-nix.md).
+There is no public notarized macOS installer or Windows download.
+
+### 2. Read without connecting a speech provider
+
+Open a local PDF with **Ctrl+O**, select a passage, and highlight it. Use a PDF
+with selectable text for this first try. You do not need an API key to view,
+highlight, or return to your reading position.
+
+### 3. Add narration when you want it
+
+In **v0.2.0**, open **TTS Settings** from the playback bar, enter your ElevenLabs
+API key, and choose **Connect**. Select a voice and use **Play**. The key lasts
+for the current app session; reconnect after restarting. Newer source calls
+this panel **Narration settings** and includes additional provider choices.
+See [Speech and privacy](#ai-text-to-speech) before connecting.
+
+The release is built from its tag, not today's `main`: new branding and features
+shown in current source are not automatically included in v0.2.0. If something
+fails, check [known limitations](docs/KNOWN_LIMITATIONS.md) and
+[file an issue](https://github.com/phsb5321/Tauri-PDF-Reader/issues) with your
+version, OS, and a non-private reproduction. Do not attach API keys or personal PDFs.
+
+For web articles in Firefox rather than PDFs, try
+[Proso](https://github.com/phsb5321/Proso). Explore related desktop tools at
+[Yolo Labz](https://github.com/yolo-labz).
 
 ## Features
 
@@ -56,29 +111,6 @@ It is not Apple notarized and cannot run the Linux `tauri-driver` reader
 matrix; those limits remain explicit in
 [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
 
-### All Platforms (upstream Tauri prerequisites)
-
-- **Node.js**: 18+ (LTS recommended)
-- **pnpm**: 8+
-- **Rust**: 1.75+
-
-### Linux (Ubuntu/Debian)
-
-```bash
-# System dependencies for Tauri
-sudo apt update
-sudo apt install -y \
-  libwebkit2gtk-4.1-dev \
-  build-essential \
-  curl \
-  wget \
-  file \
-  libxdo-dev \
-  libssl-dev \
-  libayatana-appindicator3-dev \
-  librsvg2-dev
-```
-
 ### macOS (Apple silicon, Nix)
 
 ```bash
@@ -95,17 +127,17 @@ Full installation, update receipt, verification, duplicate-app migration, and
 recovery procedure: [docs/macos-nix.md](docs/macos-nix.md). Building outside
 Nix still requires Xcode Command Line Tools.
 
-### Windows
-
-1. Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with "Desktop development with C++"
-2. WebView2 is typically pre-installed on Windows 10+
-
 ## AI text-to-speech
 
-Lectrice speaks through **ElevenLabs** (the `elevenlabs-tts` feature is the
-default build). The page text you ask to be read aloud is sent to
-`api.elevenlabs.io` — see [SECURITY.md](SECURITY.md) for the exact egress
-contract. The API key is session-only ([#73]).
+The **v0.2.0 release** speaks through **ElevenLabs** (the `elevenlabs-tts` feature
+is the default build). The page text you ask to be read aloud is sent to
+`api.elevenlabs.io`. The API key is session-only ([#73]).
+
+**Current source is ahead of that release:** its narration settings also expose
+Groq and a configured local TTS service. A service labelled local is still a
+destination receiving PDF-derived text; do not assume it means on-device or
+no network traffic. See [SECURITY.md](SECURITY.md) for the egress contract and
+check the version you actually installed.
 
 There is also a `native-tts` Cargo feature (Speech Dispatcher), **not enabled
 by default** and not part of any shipped build yet. The packaged E2E suites use
@@ -127,6 +159,7 @@ Lectrice uses its built-in defaults and writes nothing. To start from a
 commented template covering every key:
 
 ```bash
+mkdir -p ~/.config/lectrice
 lectrice --generate-config > ~/.config/lectrice/config.toml
 ```
 
@@ -167,6 +200,26 @@ See [`specs/078-config-file/spec.md`](specs/078-config-file/spec.md).
 
 ## Development
 
+You do not need a development toolchain to try the Linux release above.
+For source builds, install Node.js, pnpm and Rust compatible with the repository's
+lockfiles/toolchain configuration, plus the upstream Tauri prerequisites below.
+
+### Linux (Ubuntu/Debian build dependencies)
+
+```bash
+sudo apt update
+sudo apt install -y \
+  libwebkit2gtk-4.1-dev build-essential curl wget file \
+  libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+```
+
+On macOS, source builds outside Nix need Xcode Command Line Tools. Windows
+contributors need [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+with "Desktop development with C++" and WebView2; this is an upstream build
+prerequisite, not a supported Lectrice release claim.
+
+### Build and run
+
 ```bash
 # Install dependencies
 pnpm install
@@ -191,7 +244,8 @@ cd src-tauri && cargo test --features test-mocks -j 1   # Rust, single-threaded
 ./scripts/verify.sh  # full gate (CI parity) — heavy, only before final commit
 ```
 
-Packaged E2E (Linux, needs the `nix` devShell + Xvfb; **not** run in CI):
+Packaged E2E (Linux, needs the `nix` devShell + Xvfb). CI runs the critical-loop
+PR-fast lane; the additional journeys below can be run explicitly:
 
 ```bash
 pnpm test:e2e:all    # critical-loop + native-play

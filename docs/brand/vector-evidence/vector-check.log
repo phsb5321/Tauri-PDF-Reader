@@ -1,0 +1,3 @@
+Negative control rejected: missing-transform
+Negative control rejected: background-polarity
+PASS: 36 renders; transforms, foreground bounds, polarity, transparent corners; two negative controls rejected.

@@ -1,0 +1,44 @@
+{
+  "basename": "synthetic-example.pdf",
+  "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "lang": "en",
+  "checked": {
+    "pass1": "synthetic (self-authored, no PDF)",
+    "pass2": "synthetic (self-authored, no PDF)",
+    "date": "2026-09-23"
+  },
+  "pages": [
+    {
+      "page": 1,
+      "defectTags": ["hyphen-broken", "header-footer"],
+      "goldText": "The workshop studied a cooperative design for the nightingale observatory. Figure 3-1 shows the feeder layout, and the spring budget was $1,234.56.",
+      "readingOrder": ["b1", "b2"],
+      "blocks": [
+        { "id": "b1", "anchor": "The workshop studied" },
+        { "id": "b2", "anchor": "Figure 3-1 shows" }
+      ],
+      "excludedSpans": [
+        { "role": "header", "text": "Field Notes on Songbirds" },
+        { "role": "page-number", "text": "1" }
+      ],
+      "spoken": [
+        {
+          "source": "Figure 3-1",
+          "spoken": "figure three one",
+          "note": "dash = digit sequence, not 'to'"
+        },
+        {
+          "source": "$1,234.56",
+          "spoken": "one thousand two hundred thirty-four dollars and fifty-six cents"
+        }
+      ]
+    },
+    {
+      "page": 2,
+      "defectTags": ["clean-control"],
+      "goldText": "Every evening the river carried three small boats past the mill.",
+      "readingOrder": ["b1"],
+      "blocks": [{ "id": "b1", "anchor": "Every evening" }]
+    }
+  ]
+}
