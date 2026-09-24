@@ -1,20 +1,22 @@
-import { useCallback, useId, useMemo, useState } from 'react';
-import { useAiTts } from '../../hooks/useAiTts';
-import type { AiVoiceInfo } from '../../lib/api/ai-tts';
-import './AiVoiceSelector.css';
+import { useCallback, useId, useMemo, useState } from "react";
+import { useAiTts } from "../../hooks/useAiTts";
+import type { AiVoiceInfo } from "../../lib/api/ai-tts";
+import "./AiVoiceSelector.css";
 
 interface AiVoiceSelectorProps {
   disabled?: boolean;
 }
 
-const PROVIDER_GROUP_LABELS: Record<AiVoiceInfo['provider'], string> = {
-  elevenlabs: 'ElevenLabs',
-  local: 'Local',
-  groq: 'Groq',
+const PROVIDER_GROUP_LABELS: Record<AiVoiceInfo["provider"], string> = {
+  elevenlabs: "ElevenLabs",
+  local: "Local",
+  groq: "Groq",
 };
 
 /** Deterministic provider grouping in first-seen API order. */
-function groupVoicesByProvider(voices: AiVoiceInfo[]): Array<[string, AiVoiceInfo[]]> {
+function groupVoicesByProvider(
+  voices: AiVoiceInfo[],
+): Array<[string, AiVoiceInfo[]]> {
   const groups = new Map<string, AiVoiceInfo[]>();
   for (const voice of voices) {
     const key = voice.provider;
@@ -32,8 +34,8 @@ function optionLabel(voice: AiVoiceInfo): string {
   const labels = voice.labels
     ? Object.values(voice.labels)
         .filter((value): value is string => Boolean(value))
-        .join(', ')
-    : '';
+        .join(", ")
+    : "";
   return labels ? `${voice.name} (${labels})` : voice.name;
 }
 
@@ -69,7 +71,7 @@ export function AiVoiceSelector({ disabled = false }: AiVoiceSelectorProps) {
         setPendingVoiceId(null);
       }
     },
-    [setVoice]
+    [setVoice],
   );
 
   const groups = useMemo(() => groupVoicesByProvider(voices), [voices]);
@@ -80,30 +82,35 @@ export function AiVoiceSelector({ disabled = false }: AiVoiceSelectorProps) {
   // is tied to an actual connecting connection — never invented, never
   // perpetual.
   const connecting = Object.values(connections).some(
-    (connection) => connection.status === 'connecting',
+    (connection) => connection.status === "connecting",
   );
   const errorMessage = initError ?? error;
 
+  // The four notes below are <output>, not a <p> carrying an explicit ARIA
+  // status role: <output> is the native element for that role
+  // (typescript:S6819), so the live-region semantics are identical while the
+  // redundant ARIA role goes away. The .ai-voice-selector-note class already
+  // pins display, so the tag swap is layout-neutral.
   if (!initialized || voices.length === 0) {
     if (connecting) {
       return (
-        <p role="status" className="ai-voice-selector-note is-loading">
+        <output className="ai-voice-selector-note is-loading">
           Loading voices…
-        </p>
+        </output>
       );
     }
     if (errorMessage) {
       return (
-        <p role="status" className="ai-voice-selector-note is-error">
+        <output className="ai-voice-selector-note is-error">
           {errorMessage}
-        </p>
+        </output>
       );
     }
     if (!initialized) return null;
     return (
-      <p role="status" className="ai-voice-selector-note is-muted">
+      <output className="ai-voice-selector-note is-muted">
         No voices available
-      </p>
+      </output>
     );
   }
 
@@ -111,8 +118,10 @@ export function AiVoiceSelector({ disabled = false }: AiVoiceSelectorProps) {
   // explicit placeholder, never the browser's first-option fallback (which
   // would fake a selection). A failed setVoice keeps the store value, so the
   // control truthfully keeps showing the previous selection.
-  const hasKnownSelection = voices.some((voice) => voice.id === selectedVoiceId);
-  const selectValue = hasKnownSelection ? (selectedVoiceId as string) : '';
+  const hasKnownSelection = voices.some(
+    (voice) => voice.id === selectedVoiceId,
+  );
+  const selectValue = hasKnownSelection ? (selectedVoiceId as string) : "";
   const busy = pendingVoiceId !== null;
 
   return (
@@ -122,7 +131,7 @@ export function AiVoiceSelector({ disabled = false }: AiVoiceSelectorProps) {
       </label>
       <select
         id={selectId}
-        className={`ai-voice-selector-select${busy ? ' is-pending' : ''}`}
+        className={`ai-voice-selector-select${busy ? " is-pending" : ""}`}
         value={selectValue}
         onChange={handleChange}
         disabled={disabled || !initialized}
@@ -137,7 +146,11 @@ export function AiVoiceSelector({ disabled = false }: AiVoiceSelectorProps) {
           ? groups.map(([providerKey, providerVoices]) => (
               <optgroup
                 key={providerKey}
-                label={PROVIDER_GROUP_LABELS[providerKey as AiVoiceInfo['provider']] ?? providerKey}
+                label={
+                  PROVIDER_GROUP_LABELS[
+                    providerKey as AiVoiceInfo["provider"]
+                  ] ?? providerKey
+                }
               >
                 {providerVoices.map((voice) => (
                   <option key={voice.id} value={voice.id}>
@@ -154,9 +167,9 @@ export function AiVoiceSelector({ disabled = false }: AiVoiceSelectorProps) {
       </select>
       {/* Visible error text backs aria-invalid when voices are populated. */}
       {errorMessage ? (
-        <p role="status" className="ai-voice-selector-note is-error">
+        <output className="ai-voice-selector-note is-error">
           {errorMessage}
-        </p>
+        </output>
       ) : null}
     </div>
   );

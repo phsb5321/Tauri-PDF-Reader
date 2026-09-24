@@ -1,3 +1,4 @@
+import { IconSing } from "../../ui/icons/lectrice-icons";
 import "./ParagraphActionOverlay.css";
 
 export interface ParagraphActionLayout {
@@ -47,9 +48,7 @@ export function ParagraphActionOverlay({
           }
         >
           <span className="paragraph-action-tick" aria-hidden="true" />
-          <svg viewBox="0 0 16 16" aria-hidden="true">
-            <path d="M5 3.5v9L12 8z" fill="currentColor" />
-          </svg>
+          <IconSing size={22} />
         </button>
       ))}
     </fieldset>

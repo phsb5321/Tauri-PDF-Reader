@@ -5,6 +5,7 @@ import { useAnnounce, ANNOUNCEMENTS } from "../hooks/useAnnounce";
 import { aiTtsStop } from "../lib/tauri-invoke";
 import { commands } from "../lib/bindings";
 import { enqueueProgressWrite } from "../hooks/useAutoSave";
+import { IconBack, IconForwardBird } from "../ui/icons/lectrice-icons";
 import "./PageNavigation.css";
 
 /**
@@ -176,12 +177,15 @@ export function PageNavigation() {
         title="Previous page (Left Arrow)"
         aria-label="Previous page"
       >
-        <svg viewBox="0 0 24 24" className="nav-icon" aria-hidden="true">
-          <path d="M15 18l-6-6 6-6" />
-        </svg>
+        <IconBack size={18} className="nav-icon nav-icon-solid" />
       </button>
 
-      <div className="page-input-container" role="group" aria-label="Page position">
+      {/* Native grouping: a <fieldset> carries the implicit "group" role and
+          a <legend> names it, which is what typescript:S6819 asks for — the
+          ARIA role on a <div> was the only new-code finding the 257 landing
+          left on the quality gate. */}
+      <fieldset className="page-input-container">
+        <legend className="sr-only">Page position</legend>
         <input
           type="text"
           className="page-input"
@@ -199,7 +203,7 @@ export function PageNavigation() {
         <span className="total-pages" id="page-total-readout">
           {totalPages}
         </span>
-      </div>
+      </fieldset>
 
       <button
         type="button"
@@ -209,9 +213,7 @@ export function PageNavigation() {
         title="Next page (Right Arrow)"
         aria-label="Next page"
       >
-        <svg viewBox="0 0 24 24" className="nav-icon" aria-hidden="true">
-          <path d="M9 18l6-6-6-6" />
-        </svg>
+        <IconForwardBird size={18} className="nav-icon nav-icon-solid" />
       </button>
     </div>
   );

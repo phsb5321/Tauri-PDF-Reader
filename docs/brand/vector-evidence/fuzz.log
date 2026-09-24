@@ -1,0 +1,22 @@
+
+> lectrice@0.2.0 test:fuzz /home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing
+> vitest run src/hooks/usePageNavigation.property.test.ts src/hooks/useTtsProviderRouting.property.test.ts src/lib/pdf-zoom.property.test.ts src/lib/narration-cockpit.property.test.ts --pool=forks --poolOptions.forks.singleFork
+
+
+ RUN  v2.1.9 /home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing
+
+ ✓ src/hooks/useTtsProviderRouting.property.test.ts (1 test) 1215ms
+   ✓ TTS provider routing model > never activates a disconnected route or persists a cloud key 1212ms
+stderr | src/hooks/usePageNavigation.property.test.ts > page navigation model > preserves page bounds and the stop-before-navigation contract across action sequences
+{"version":1,"modelRevision":"page-navigation-v1","buildRevision":"8e8a6b1c39914be69aa0c55c5a36a4d0842a9f5a","seed":20260921,"numRuns":100,"initialState":{"page":1995,"totalPages":1995},"actions":[{"kind":"navigate","delta":6,"playback":"paused"},{"kind":"navigate","delta":-6,"playback":"paused"},{"kind":"navigate","delta":1,"playback":"playing"},{"kind":"navigate","delta":-6,"playback":"idle"},{"kind":"navigate","delta":-4,"playback":"playing"},{"kind":"navigate","delta":-10,"playback":"idle"},{"kind":"navigate","delta":10,"playback":"idle"},{"kind":"navigate","delta":5,"playback":"playing"}],"failingAssertion":null,"minimizedActions":null,"failed":false,"replayCommand":"FC_SEED=20260921 FC_NUM_RUNS=100 pnpm test:fuzz"}
+
+ ✓ src/hooks/usePageNavigation.property.test.ts (2 tests) 85ms
+ ✓ src/lib/pdf-zoom.property.test.ts (2 tests) 677ms
+   ✓ real PDF zoom model > keeps every manual action truthful, bounded, and WebKit-committable 649ms
+ ✓ src/lib/narration-cockpit.property.test.ts (3 tests) 351ms
+
+ Test Files  4 passed (4)
+      Tests  8 passed (8)
+   Start at  13:28:41
+   Duration  4.68s (transform 580ms, setup 263ms, collect 775ms, tests 2.33s, environment 761ms, prepare 165ms)
+
