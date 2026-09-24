@@ -167,6 +167,18 @@ no raw hex in components (tokens only).
 
 ---
 
+## 🔍 Design process — no critique, no "done"
+
+**Every design slice ends with `review.md`: a 5-dimension critique written against the render, at the
+sizes the product actually renders** — 1200×800 (window default) and 640×600 (window minimum),
+per `src-tauri/tauri.conf.json`. Slices start from a per-flow brief (`docs/design/flows/<flow>/brief.md`,
+created from `docs/design/BRIEF-TEMPLATE.md`) and the critique lands beside its artifacts. The rule,
+the rubric mapping, and the text-only-lane split live in **`docs/design/README.md`**; the critique's
+scoring template is `.claude/skills/huashu-design/references/critique-guide.md`. A design change
+without its critique is not done — however confidently it was reported.
+
+---
+
 ## Shipped (this PR)
 
 - [x] Name **Lectrice** (collision-vetted) → `productName`, window title, `index.html`, README, `package.json`
