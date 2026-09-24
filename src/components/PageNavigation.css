@@ -50,6 +50,12 @@
   stroke-linejoin: round;
 }
 
+/* Icon-set glyphs are filled; the chevron stroke rules above must not
+   outline them (inherited stroke would thicken IconBack). */
+.nav-icon-solid {
+  stroke: none;
+}
+
 .page-input-container {
   display: flex;
   align-items: center;
