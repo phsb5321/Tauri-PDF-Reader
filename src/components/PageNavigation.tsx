@@ -180,11 +180,12 @@ export function PageNavigation() {
         <IconBack size={18} className="nav-icon nav-icon-solid" />
       </button>
 
-      <div
-        className="page-input-container"
-        role="group"
-        aria-label="Page position"
-      >
+      {/* Native grouping: a <fieldset> carries the implicit "group" role and
+          a <legend> names it, which is what typescript:S6819 asks for — the
+          ARIA role on a <div> was the only new-code finding the 257 landing
+          left on the quality gate. */}
+      <fieldset className="page-input-container">
+        <legend className="sr-only">Page position</legend>
         <input
           type="text"
           className="page-input"
@@ -202,7 +203,7 @@ export function PageNavigation() {
         <span className="total-pages" id="page-total-readout">
           {totalPages}
         </span>
-      </div>
+      </fieldset>
 
       <button
         type="button"
