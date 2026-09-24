@@ -1,0 +1,33 @@
+Lockfile is up to date, resolution step is skipped
+Packages: +927
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 0, reused 0, downloaded 1, added 0
+Progress: resolved 0, reused 0, downloaded 69, added 10
+Progress: resolved 0, reused 0, downloaded 142, added 23
+Progress: resolved 0, reused 0, downloaded 228, added 39
+Progress: resolved 0, reused 0, downloaded 384, added 66
+Progress: resolved 0, reused 0, downloaded 481, added 82
+Progress: resolved 0, reused 0, downloaded 582, added 101
+Progress: resolved 0, reused 0, downloaded 752, added 139
+Progress: resolved 0, reused 0, downloaded 854, added 203
+Progress: resolved 0, reused 0, downloaded 856, added 360
+Progress: resolved 0, reused 0, downloaded 857, added 760
+Progress: resolved 0, reused 0, downloaded 857, added 927
+Progress: resolved 0, reused 0, downloaded 857, added 927, done
+node_modules/esbuild postinstall$ node install.js
+node_modules/tsx/node_modules/esbuild postinstall$ node install.js
+node_modules/vitest/node_modules/esbuild postinstall$ node install.js
+node_modules/esbuild postinstall: Done
+node_modules/tsx/node_modules/esbuild postinstall: Done
+node_modules/vitest/node_modules/esbuild postinstall: Done
+
+. prepare$ husky
+. prepare: Done
+╭ Warning ─────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│   Ignored build scripts: edgedriver@6.3.0, geckodriver@6.1.0.                │
+│   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+│   to run scripts.                                                            │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+Done in 22.5s using pnpm v10.34.5
