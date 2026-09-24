@@ -15,7 +15,8 @@ export type SpeechNumberRule =
   | "decimal"
   | "percent"
   | "currency"
-  | "time";
+  | "time"
+  | "reference";
 
 export interface SpeechNumberReplacement {
   sourceStart: number;
@@ -438,6 +439,33 @@ function isBlocked(source: string, index: number): boolean {
   return character !== undefined && BLOCKING_NEIGHBOR.test(character);
 }
 
+/**
+ * Figure/section references (spec 293): a heading word followed by a
+ * hyphenated digit composite ("Figure 3-1") — the composite is normally
+ * blocked from the numeric pass by its hyphen neighbors, so this pattern
+ * owns it and speaks it as per-group integer words ("three one"),
+ * range-preserving like every other rule. Bare composites without a
+ * reference word ("2026-09-15", "config 3-1"), letter suffixes ("3-1a"),
+ * and dotted refs ("Figure 3.1" → existing decimal rule) are untouched.
+ */
+const REFERENCE_PATTERNS: Record<SpeechNumberLocale, RegExp> = {
+  en: /\b(?:figures?|figs?|sections?|secs?)[.:]?[\s\u00A0]+(?<ref>\d+(?:-\d+)+)(?![\p{L}\p{N}])/giu,
+  "pt-BR":
+    /\b(?:figuras?|figs?|se[çc](?:ões|oes|ão|ao)|secs?)[.:]?[\s\u00A0]+(?<ref>\d+(?:-\d+)+)(?![\p{L}\p{N}])/giu,
+};
+
+/**
+ * Per-group integer words over the composite ("3-1" → "three one" /
+ * "três um"). Leading-zero groups lose the zero ("3-01" → "three one") —
+ * documented limitation until a real PDF demands digit words.
+ */
+function referenceWords(composite: string, locale: SpeechNumberLocale): string {
+  return composite
+    .split("-")
+    .map((group) => integerWords(Number(group), locale))
+    .join(" ");
+}
+
 type SpokenReplacementPayload = {
   spokenText: string;
   rule: SpeechNumberReplacement["rule"];
@@ -489,7 +517,27 @@ export function findSpeechNumberReplacements(
   source: string,
   locale: SpeechNumberLocale,
 ): SpeechNumberReplacement[] {
+  const references: SpeechNumberReplacement[] = [];
   const replacements: SpeechNumberReplacement[] = [];
+
+  // Figure/section references first. Their digit composites can never be
+  // claimed by the numeric pass below: every composite part touches a
+  // hyphen neighbor, which `isBlocked` always rejects — so the two result
+  // sets are structurally disjoint and a merge keeps source order without
+  // any per-pair overlap scan.
+  const referencePattern = REFERENCE_PATTERNS[locale];
+  referencePattern.lastIndex = 0;
+  for (const match of source.matchAll(referencePattern)) {
+    const composite = match.groups?.ref ?? "";
+    const start = (match.index ?? 0) + match[0].length - composite.length;
+    references.push({
+      sourceStart: start,
+      sourceEnd: start + composite.length,
+      spokenText: referenceWords(composite, locale),
+      rule: "reference",
+    });
+  }
+
   NUMERIC_TOKEN.lastIndex = 0;
 
   for (const match of source.matchAll(NUMERIC_TOKEN)) {
@@ -502,5 +550,7 @@ export function findSpeechNumberReplacements(
     replacements.push({ sourceStart: start, sourceEnd: end, ...replacement });
   }
 
-  return replacements;
+  return [...references, ...replacements].sort(
+    (a, b) => a.sourceStart - b.sourceStart,
+  );
 }

@@ -91,9 +91,21 @@ function inferBoundary(
 }
 
 /**
+ * A word broken at a line end ("dese-" + "jo"): a letter followed by the
+ * trailing hyphen and a lowercase continuation. Compound splits ("well-" +
+ * "known") also qualify — a dictionary-free rule cannot tell them apart,
+ * which is the documented limitation of this join.
+ */
+function isSoftHyphenJoin(previousText: string, nextText: string): boolean {
+  return /\p{L}-$/u.test(previousText) && /^\p{Ll}/u.test(nextText);
+}
+
+/**
  * Build the one normalized page string used by TTS and highlight offsets while
  * retaining PDF.js structure evidence. Boundaries are metadata only: normalized
  * source text remains the same one-space model used by the rendered text layer.
+ * Hyphen-broken words are re-joined at their line join (no hyphen, no space),
+ * and the joined segments stay slice-consistent with the new string.
  */
 export function buildPdfText(items: readonly unknown[]): BuiltPdfText {
   const segments: PdfTextSegment[] = [];
@@ -105,8 +117,22 @@ export function buildPdfText(items: readonly unknown[]): BuiltPdfText {
     if (!parsed) continue;
     if (text) {
       const kind = previous ? inferBoundary(previous, parsed) : null;
-      if (kind) boundaries.push({ offset: text.length, kind });
-      text += " ";
+      // Soft hyphenation only at a plain line (or unknown) join: drop the
+      // trailing hyphen and add no space, so "dese-"+"jo" reads "desejo".
+      // A paragraph/section gap keeps the one-space model, and a re-joined
+      // word carries no prosodic boundary.
+      if (
+        (kind === null || kind === "line") &&
+        isSoftHyphenJoin(text, parsed.text)
+      ) {
+        text = text.slice(0, -1);
+        const joined = segments[segments.length - 1];
+        joined.end -= 1;
+        joined.text = joined.text.slice(0, -1);
+      } else {
+        if (kind) boundaries.push({ offset: text.length, kind });
+        text += " ";
+      }
     }
     const start = text.length;
     text += parsed.text;
@@ -133,11 +159,19 @@ export function annotatePdfTextLayer(
   for (const span of spans) {
     const normalized = (span.textContent ?? "").replaceAll(/\s+/gu, " ").trim();
     if (!normalized) continue;
-    const start = text.indexOf(normalized, searchStart);
+    let matchedText = normalized;
+    let start = text.indexOf(matchedText, searchStart);
+    if (start < 0 && matchedText.length > 1 && matchedText.endsWith("-")) {
+      // Soft-hyphen companion: the join dropped the hyphen ("dese-"+"jo" ->
+      // "desejo"), so the unstripped key cannot match; attribute the
+      // de-hyphenated word part instead of dropping the span's offsets.
+      matchedText = matchedText.slice(0, -1);
+      start = text.indexOf(matchedText, searchStart);
+    }
     if (start < 0) continue;
     span.dataset.ttsStart = String(start);
-    span.dataset.ttsText = normalized;
-    searchStart = start + normalized.length;
+    span.dataset.ttsText = matchedText;
+    searchStart = start + matchedText.length;
   }
   return built;
 }
