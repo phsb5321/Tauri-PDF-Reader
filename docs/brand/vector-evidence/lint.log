@@ -1,0 +1,171 @@
+
+> lectrice@0.2.0 lint /home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing
+> eslint .
+
+
+/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing/src/__tests__/hooks/useRovingTabindex.test.tsx
+  171:25  warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+  175:25  warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+  179:25  warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+
+/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing/src/__tests__/integration/kokoro-word-timings.test.ts
+  153:12  warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+  157:12  warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+
+/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing/src/__tests__/integration/session-flow.test.ts
+  202:7  warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+
+/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing/src/__tests__/ui/AudioExportDialog.test.tsx
+  562:25  warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+  610:25  warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+
+/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing/src/__tests__/ui/ListRow.test.tsx
+  33:21  warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+  50:21  warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+
+/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing/src/__tests__/ui/tts-read-along-highlight.test.tsx
+  120:12  warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+  121:7   warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+  134:12  warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+  147:7   warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+
+/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing/src/adapters/mock/tts.adapter.ts
+  51:5  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+
+/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing/src/components/PageNavigation.tsx
+  91:11  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+
+/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing/src/components/PdfViewer.tsx
+  155:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  168:5   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  171:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  177:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  180:5   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  222:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  229:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  235:5   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  244:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  252:9   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  258:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  269:5   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  273:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  564:9   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  711:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  778:11  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  813:11  warning  Forbidden non-null assertion                                                       @typescript-eslint/no-non-null-assertion
+  815:11  warning  Forbidden non-null assertion                                                       @typescript-eslint/no-non-null-assertion
+  833:9   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+
+/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing/src/components/pdf-viewer/HighlightToolbar.tsx
+  43:3  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+
+/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing/src/components/pdf-viewer/PdfPage.tsx
+   69:7  warning  Unexpected console statement. Only these console methods are allowed: warn, error                                                no-console
+  161:6  warning  React Hook useEffect has missing dependencies: 'displayInfo' and 'settings'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing/src/components/playback-bar/AiPlaybackBar.tsx
+  513:7  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  528:9  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  534:7  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  646:7  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+
+/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing/src/e2e-native-bootstrap.ts
+  351:22  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  352:5   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+
+/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing/src/hooks/useAiTts.ts
+  237:13  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  262:13  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  275:13  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  281:11  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  292:13  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  300:13  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  308:13  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  357:9   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  381:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  392:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  447:5   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+
+/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing/src/hooks/useOpenPdf.ts
+  283:5  warning  React Hook useCallback has a missing dependency: 'showInReader'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing/src/hooks/usePageCache.ts
+  205:16  warning  The ref value 'cacheRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'cacheRef.current' to a variable inside the effect, and use that variable in the cleanup function                react-hooks/exhaustive-deps
+  206:23  warning  The ref value 'preRenderingRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'preRenderingRef.current' to a variable inside the effect, and use that variable in the cleanup function  react-hooks/exhaustive-deps
+
+/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing/src/hooks/usePdfDropSession.property.test.ts
+  209:38  warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+  211:19  warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+
+/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing/src/hooks/usePdfDropSession.test.ts
+  357:11  warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+  423:23  warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+  473:20  warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+  519:13  warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+
+/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing/src/hooks/useTtsPrebuffer.ts
+  103:9   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  115:11  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  157:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  166:11  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  220:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  235:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+
+/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing/src/hooks/useTtsWordHighlight.ts
+   69:5   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+   99:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  120:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  147:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  185:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  216:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  225:9   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  251:9   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  295:9   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  347:9   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  361:11  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  372:11  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  417:13  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+
+/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing/src/lib/db-init.ts
+  335:5  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  340:5  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  346:5  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  350:5  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  367:5  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+
+/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing/src/lib/selection-narration.test.ts
+   15:21  warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+  100:20  warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+  106:23  warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+
+/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing/src/main.tsx
+  48:23  warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+
+/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing/src/services/pdf-service.ts
+  257:5  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  270:7  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  276:7  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  286:7  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+
+/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing/src/stores/ai-tts-store.ts
+  265:9   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  289:9   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  378:9   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  385:11  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  400:9   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+
+/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing/src/stores/toast-store.ts
+  39:3  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+
+/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing/src/stores/tts-highlight-store.ts
+   68:5  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+   88:5  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  108:7  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  119:7  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+
+/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing/src/ui/components/Dialog/Dialog.test.tsx
+  65:21  warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+  88:21  warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+
+✖ 108 problems (0 errors, 108 warnings)
+

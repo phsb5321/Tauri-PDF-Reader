@@ -92,13 +92,20 @@ Use the favicon cut for `favicon.ico`-scale UI and the detail cut for everything
 
 ### Wordmark
 
+**Brand wordmark:** **Lectrice** in **Fraunces 600**, optical size **144**, **WONK enabled**.
+Use real type, never traced or generated lettering. Ink type accompanies the vermilion mark;
+align the wordmark optically to the bird's chest, with the singing head rising above the cap line.
+
 **Lectrice** in **Fraunces 600**, optical size **144**, **WONK on**, SOFT 0,
 tracking −0.035em. Ink `#14110D` on paper `#F4EFE4`; the bird carries vermilion
 `#C8462C`. Use the real local font, never image-model lettering. Align the wordmark
 optically with the bird's body, not its full bounding box; the singing head rises
 above the cap line. The [GitHub composition](../../.github/assets/lectrice-social-preview.html)
-is a reproducible example. Space Grotesk below remains a product UI implementation
-detail, not the identity wordmark.
+is a reproducible example. **Current app display font:** **Space Grotesk** remains
+in `src/ui/tokens/typography.css` — a product UI implementation detail, not the
+identity wordmark, and an intentional distinction between brand assets and the
+shipped app pending a separate typography-migration slice and its UI verification. Vector finishing does
+not change the font tokens.
 
 ---
 
@@ -134,11 +141,11 @@ For identity artwork use Fraunces/Newsreader from [the asset index](./README.md)
 The following table records the existing product implementation; it does not
 supersede the wordmark specification above.
 
-| Role               | Family                                                   | Token                   |
-| ------------------ | -------------------------------------------------------- | ----------------------- |
-| Display / wordmark | **Space Grotesk** (500/700)                              | `--font-family-display` |
-| Body / UI          | **IBM Plex Sans** (400/500/600) — Zed's actual body face | `--font-family`         |
-| Mono / data        | **IBM Plex Mono** (400/500)                              | `--font-family-mono`    |
+| Role                                     | Family                                                   | Token                   |
+| ---------------------------------------- | -------------------------------------------------------- | ----------------------- |
+| Current app display (not brand wordmark) | **Space Grotesk** (500/700)                              | `--font-family-display` |
+| Body / UI                                | **IBM Plex Sans** (400/500/600) — Zed's actual body face | `--font-family`         |
+| Mono / data                              | **IBM Plex Mono** (400/500)                              | `--font-family-mono`    |
 
 Imported in `src/ui/tokens/index.css`. Replaced the `-apple-system` / `SF Mono` stacks
 (incl. a hardcoded `body` font in `src/styles/App.css`).
@@ -159,6 +166,20 @@ Imported in `src/ui/tokens/index.css`. Replaced the `-apple-system` / `SF Mono` 
 2. **The voice is the feature** — blue is the app, mauve is the voice; speaking state always visible.
 3. **Developer-grade restraint** — mono for data, one accent, sharp geometry.
 4. **Honest surfaces** — real page, real waveform, real progress; no skeuomorphic book.
+
+## Vector states, illustrations, and UI optical cuts
+
+- States: [`public/brand/states/`](../../public/brand/states/) — `idle`, `singing`,
+  `paused`, `asleep`, `working`; 24-unit square grid, common bird scale and baseline.
+  Use at 24/48px. Ink birds; the moon and voice line are vermilion. These are state
+  assets, not replacements for the vermilion brand mark. State-machine wiring is separate.
+- Illustration: [`empty-library.svg`](../../public/brand/illustrations/empty-library.svg)
+  — traced bird on two books; designed for illustration sizes, not a 16px control.
+- Branded UI icons: `src/ui/icons/lectrice-icons.tsx` retains `IconProps` and selects
+  the simplified cut for **size < 24**, detail for **size >= 24** (default 24).
+  This UI cutoff is distinct from the logo's <=24 / >=32 rule. General icons are unchanged.
+  All UI cuts inherit `currentColor`; controls retain responsibility for their accessible name.
+- Provenance, reproducible commands and visual limitations: [vector-finishing.md](./vector-finishing.md).
 
 ## ⛔ Don't
 
