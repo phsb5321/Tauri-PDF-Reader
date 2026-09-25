@@ -224,7 +224,7 @@ const canonicalDoc = loadWorkflow(CANONICAL);
 // concurrency.group is semantic (two spellings, above); normalize before the
 // byte-strict comparison so every other key stays pinned.
 const normalizeGroup = (doc) => {
-  const d = structuredClone(doc);
+  const d = JSON.parse(JSON.stringify(doc));
   if (d && d.concurrency && typeof d.concurrency === "object") d.concurrency.group = "<group>";
   return d;
 };

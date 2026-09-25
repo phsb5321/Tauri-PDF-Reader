@@ -308,7 +308,7 @@ const canonicalDoc = loadWorkflow(CANONICAL);
 // `concurrency.group` is validated semantically above (two accepted spellings);
 // normalize it on BOTH sides so every other key stays byte-strict.
 const normalizeGroup = (doc) => {
-  const d = structuredClone(doc);
+  const d = JSON.parse(JSON.stringify(doc));
   if (d && d.concurrency && typeof d.concurrency === "object") d.concurrency.group = "<group>";
   return d;
 };
