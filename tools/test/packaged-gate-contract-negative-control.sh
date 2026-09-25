@@ -48,6 +48,21 @@ expect_violation() {
 }
 echo "baseline: both shipped fixtures pass"
 
+# Positive controls (291): the per-ref group spelling must PASS both checkers —
+# this is the head execution workflow #239 adopts, kept green by the same suite
+# that proves unknown spellings still fail (tampers 18 / A8).
+sed 's|^  group: packaged-user-gate$|  group: ${{ github.workflow }}-${{ github.ref }}|' "$WF" >"$WORK/per-ref.yml"
+"$CONTRACT" "$WORK/per-ref.yml" >/dev/null || {
+  echo "POSITIVE CONTROL FAILED: per-ref execution group must be accepted since 291" >&2
+  exit 1
+}
+sed 's|^  group: packaged-gate-trust-anchor$|  group: ${{ github.workflow }}-${{ github.ref }}|' "$ANCHOR_WF" >"$WORK/per-ref-anchor.yml"
+"$ANCHOR_CONTRACT" "$WORK/per-ref-anchor.yml" >/dev/null || {
+  echo "POSITIVE CONTROL FAILED: per-ref anchor group must be accepted since 291" >&2
+  exit 1
+}
+echo "positive controls: per-ref group accepted by both checkers"
+
 # ── EXECUTION WORKFLOW — lane / invocation tamper classes ────────────────────
 # Tamper 1: remove the lane invocation from the PR-fast job.
 sed 's|bash e2e/run-critical-loop.sh|# (lane removed)|' "$WF" >"$WORK/tampered.yml"
@@ -108,9 +123,10 @@ expect_violation "pr-fast same-repo guard removed" "pr-fast job-level if: is not
 sed '/Prerequisite receipt enforced/,+3d' "$WF" >"$WORK/tampered.yml"
 expect_violation "receipt enforcement step removed" "lacks the prerequisite-receipt enforcement step" "$CONTRACT"
 
-# Tamper 18: concurrency group back to per-ref.
-sed 's|^  group: packaged-user-gate$|  group: packaged-user-gate-${{ github.ref }}|' "$WF" >"$WORK/tampered.yml"
-expect_violation "concurrency group per-ref reintroduced" "concurrency group is not the fixed runner-wide packaged-user-gate" "$CONTRACT"
+# Tamper 18: a THIRD group spelling — neither the fixed runner-wide name nor
+# the accepted per-ref form (291 accepts per-ref; an unknown spelling must fail).
+sed 's|^  group: packaged-user-gate$|  group: packaged-user-gate-evil-${{ github.ref }}|' "$WF" >"$WORK/tampered.yml"
+expect_violation "unknown concurrency group spelling" "concurrency group is not the fixed runner-wide packaged-user-gate" "$CONTRACT"
 
 # Tamper 19: full-matrix allowed to run on pull_request.
 sed "s|^    if: github.event_name != 'pull_request'$|    if: github.event_name == 'pull_request'|" "$WF" >"$WORK/tampered.yml"
@@ -354,9 +370,9 @@ expect_violation "anchor head sha shell interpolation" "event-payload head sha m
 sed 's|^  contents: read$|  contents: write|' "$ANCHOR_WF" >"$WORK/tampered.yml"
 expect_violation "anchor permissions widened" "permissions must be exactly contents: read" "$ANCHOR_CONTRACT"
 
-# Tamper A8: anchor concurrency per-ref.
-sed 's|^  group: packaged-gate-trust-anchor$|  group: packaged-gate-trust-anchor-${{ github.ref }}|' "$ANCHOR_WF" >"$WORK/tampered.yml"
-expect_violation "anchor concurrency per-ref" "concurrency group is not the fixed packaged-gate-trust-anchor" "$ANCHOR_CONTRACT"
+# Tamper A8: anchor with an unknown (third) concurrency group spelling.
+sed 's|^  group: packaged-gate-trust-anchor$|  group: packaged-gate-trust-anchor-evil-${{ github.ref }}|' "$ANCHOR_WF" >"$WORK/tampered.yml"
+expect_violation "anchor unknown concurrency group" "concurrency group is not the fixed packaged-gate-trust-anchor" "$ANCHOR_CONTRACT"
 
 # Tamper A9: arbitrary nested key in the anchor.
 sed '/^  contract:$/a\    invisible-key: true' "$ANCHOR_WF" >"$WORK/tampered.yml"
