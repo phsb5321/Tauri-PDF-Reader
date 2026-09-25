@@ -1,3 +1,5 @@
+import { smallCuts } from "./lectrice-small-cuts";
+
 /**
  * Lectrice icon set - general + branded pairs.
  *
@@ -9,6 +11,7 @@
  *
  * Every icon shares the 24px box. The branded marks reuse the logo's own traced
  * geometry, so they stay on-brand by construction rather than by convention.
+ * Branded icons select a simplified optical cut below 24px; callers keep IconProps.
  */
 export interface IconProps {
   /** Square size in px. 24 is the grid; the app renders 16-20 most often. */
@@ -123,8 +126,8 @@ export function IconNarrate({ size = 24, className }: IconProps) {
           d="M14.4 9.2a4 4 0 0 1 0 5.6M16.8 7a7 7 0 0 1 0 10"
           fill="none"
           stroke="currentColor"
-          stroke-width="1.6"
-          stroke-linecap="round"
+          strokeWidth="1.6"
+          strokeLinecap="round"
         />
       </g>
     </svg>
@@ -158,17 +161,21 @@ export function IconSing({ size = 24, className }: IconProps) {
       aria-hidden="true"
       focusable="false"
     >
-      <g transform="translate(12.0 11.0) scale(0.02503) translate(-384.50 -431.50)">
-        <metadata>
-          Created by potrace 1.16, written by Peter Selinger 2001-2019
-        </metadata>
-        <g
-          transform="translate(0.000000,863.000000) scale(0.100000,-0.100000)"
-          fill="currentColor"
-          stroke="none"
-        >
-          <path
-            d="M6975 8166 c-90 -31 -234 -92 -518 -218 -228 -102 -228 -102 -320
+      {size < 24 ? (
+        smallCuts.play
+      ) : (
+        <>
+          <g transform="translate(12.0 11.0) scale(0.02503) translate(-384.50 -431.50)">
+            <metadata>
+              Created by potrace 1.16, written by Peter Selinger 2001-2019
+            </metadata>
+            <g
+              transform="translate(0.000000,863.000000) scale(0.100000,-0.100000)"
+              fill="currentColor"
+              stroke="none"
+            >
+              <path
+                d="M6975 8166 c-90 -31 -234 -92 -518 -218 -228 -102 -228 -102 -320
 -84 -378 74 -713 -24 -985 -288 -187 -181 -279 -376 -337 -718 -66 -383 -209
 -633 -485 -847 -383 -296 -710 -627 -935 -946 -135 -191 -312 -475 -527 -845
 -367 -630 -616 -1065 -613 -1068 2 -2 112 77 246 176 134 99 245 178 247 177
@@ -192,16 +199,18 @@ export function IconSing({ size = 24, className }: IconProps) {
 27 -33 94 -17 133 28 68 131 92 188 44z m-1332 -4845 c125 -131 235 -251 245
 -267 25 -37 24 -74 -2 -107 -28 -36 -69 -34 -163 9 -117 55 -139 79 -218 245
 -100 208 -188 408 -188 426 0 27 88 -55 326 -306z"
+              />
+            </g>
+          </g>
+          <path
+            d="M14.2 7.4c1.6-.9 3.2-1.2 4.8-.9"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.1"
+            strokeLinecap="round"
           />
-        </g>
-      </g>
-      <path
-        d="M14.2 7.4c1.6-.9 3.2-1.2 4.8-.9"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="1.1"
-        stroke-linecap="round"
-      />
+        </>
+      )}
     </svg>
   );
 }
@@ -217,22 +226,26 @@ export function IconLibraryBird({ size = 24, className }: IconProps) {
       aria-hidden="true"
       focusable="false"
     >
-      <g fill="currentColor">
-        <rect x="4.6" y="14.2" width="9.4" height="2.1" rx=".6" />
-        <rect x="4.6" y="16.9" width="9.4" height="2.1" rx=".6" />
-        <rect x="4.6" y="19.6" width="9.4" height="2.1" rx=".6" />
-      </g>
-      <g transform="translate(12.0 7.4) scale(0.01724) translate(-384.50 -431.50)">
-        <metadata>
-          Created by potrace 1.16, written by Peter Selinger 2001-2019
-        </metadata>
-        <g
-          transform="translate(0.000000,863.000000) scale(0.100000,-0.100000)"
-          fill="currentColor"
-          stroke="none"
-        >
-          <path
-            d="M6975 8166 c-90 -31 -234 -92 -518 -218 -228 -102 -228 -102 -320
+      {size < 24 ? (
+        smallCuts.library
+      ) : (
+        <>
+          <g fill="currentColor">
+            <rect x="4.6" y="14.2" width="9.4" height="2.1" rx=".6" />
+            <rect x="4.6" y="16.9" width="9.4" height="2.1" rx=".6" />
+            <rect x="4.6" y="19.6" width="9.4" height="2.1" rx=".6" />
+          </g>
+          <g transform="translate(12.0 7.4) scale(0.01724) translate(-384.50 -431.50)">
+            <metadata>
+              Created by potrace 1.16, written by Peter Selinger 2001-2019
+            </metadata>
+            <g
+              transform="translate(0.000000,863.000000) scale(0.100000,-0.100000)"
+              fill="currentColor"
+              stroke="none"
+            >
+              <path
+                d="M6975 8166 c-90 -31 -234 -92 -518 -218 -228 -102 -228 -102 -320
 -84 -378 74 -713 -24 -985 -288 -187 -181 -279 -376 -337 -718 -66 -383 -209
 -633 -485 -847 -383 -296 -710 -627 -935 -946 -135 -191 -312 -475 -527 -845
 -367 -630 -616 -1065 -613 -1068 2 -2 112 77 246 176 134 99 245 178 247 177
@@ -256,9 +269,11 @@ export function IconLibraryBird({ size = 24, className }: IconProps) {
 27 -33 94 -17 133 28 68 131 92 188 44z m-1332 -4845 c125 -131 235 -251 245
 -267 25 -37 24 -74 -2 -107 -28 -36 -69 -34 -163 9 -117 55 -139 79 -218 245
 -100 208 -188 408 -188 426 0 27 88 -55 326 -306z"
-          />
-        </g>
-      </g>
+              />
+            </g>
+          </g>
+        </>
+      )}
     </svg>
   );
 }
@@ -274,15 +289,18 @@ export function IconBookmarkFeather({ size = 24, className }: IconProps) {
       aria-hidden="true"
       focusable="false"
     >
-      <g transform="translate(12.0 12.0) scale(0.06857) translate(-123.00 -164.50)">
-        <g>
-          <g
-            transform="translate(0.000000,329.000000) scale(0.100000,-0.100000)"
-            fill="currentColor"
-            stroke="none"
-          >
-            <path
-              d="M1982 2539 c-140 -17 -307 -92 -522 -234 -199 -132 -302 -243 -393
+      {size < 24 ? (
+        smallCuts.bookmark
+      ) : (
+        <g transform="translate(12.0 12.0) scale(0.06857) translate(-123.00 -164.50)">
+          <g>
+            <g
+              transform="translate(0.000000,329.000000) scale(0.100000,-0.100000)"
+              fill="currentColor"
+              stroke="none"
+            >
+              <path
+                d="M1982 2539 c-140 -17 -307 -92 -522 -234 -199 -132 -302 -243 -393
 -424 -40 -81 -47 -90 -42 -56 8 48 31 142 41 169 23 59 -171 -130 -259 -251
 -120 -168 -176 -320 -180 -494 -1 -53 -5 -95 -8 -93 -4 2 -17 30 -29 61 -33
 82 -40 85 -40 17 0 -77 13 -151 52 -292 31 -113 31 -113 -20 -282 -29 -93 -52
@@ -294,10 +312,11 @@ c209 83 334 183 402 318 22 44 40 89 40 99 0 17 -4 16 -55 -6 -30 -14 -74 -27
 -35 2 -70 -2z m-518 -602 c-244 -261 -400 -484 -644 -923 -67 -120 -126 -223
 -131 -228 -48 -50 25 151 131 360 144 283 319 511 570 740 69 63 127 114 129
 114 2 0 -23 -28 -55 -63z"
-            />
+              />
+            </g>
           </g>
         </g>
-      </g>
+      )}
     </svg>
   );
 }
@@ -313,21 +332,25 @@ export function IconNightBird({ size = 24, className }: IconProps) {
       aria-hidden="true"
       focusable="false"
     >
-      <path
-        d="M15.2 4.2a7.6 7.6 0 1 0 3.4 13.9 8.8 8.8 0 0 1-3.4-13.9z"
-        fill="currentColor"
-      />
-      <g transform="translate(12.0 15.4) scale(0.01390) translate(-384.50 -431.50)">
-        <metadata>
-          Created by potrace 1.16, written by Peter Selinger 2001-2019
-        </metadata>
-        <g
-          transform="translate(0.000000,863.000000) scale(0.100000,-0.100000)"
-          fill="currentColor"
-          stroke="none"
-        >
+      {size < 24 ? (
+        smallCuts.night
+      ) : (
+        <>
           <path
-            d="M6975 8166 c-90 -31 -234 -92 -518 -218 -228 -102 -228 -102 -320
+            d="M15.2 4.2a7.6 7.6 0 1 0 3.4 13.9 8.8 8.8 0 0 1-3.4-13.9z"
+            fill="currentColor"
+          />
+          <g transform="translate(12.0 15.4) scale(0.01390) translate(-384.50 -431.50)">
+            <metadata>
+              Created by potrace 1.16, written by Peter Selinger 2001-2019
+            </metadata>
+            <g
+              transform="translate(0.000000,863.000000) scale(0.100000,-0.100000)"
+              fill="currentColor"
+              stroke="none"
+            >
+              <path
+                d="M6975 8166 c-90 -31 -234 -92 -518 -218 -228 -102 -228 -102 -320
 -84 -378 74 -713 -24 -985 -288 -187 -181 -279 -376 -337 -718 -66 -383 -209
 -633 -485 -847 -383 -296 -710 -627 -935 -946 -135 -191 -312 -475 -527 -845
 -367 -630 -616 -1065 -613 -1068 2 -2 112 77 246 176 134 99 245 178 247 177
@@ -351,9 +374,11 @@ export function IconNightBird({ size = 24, className }: IconProps) {
 27 -33 94 -17 133 28 68 131 92 188 44z m-1332 -4845 c125 -131 235 -251 245
 -267 25 -37 24 -74 -2 -107 -28 -36 -69 -34 -163 9 -117 55 -139 79 -218 245
 -100 208 -188 408 -188 426 0 27 88 -55 326 -306z"
-          />
-        </g>
-      </g>
+              />
+            </g>
+          </g>
+        </>
+      )}
     </svg>
   );
 }
@@ -369,17 +394,21 @@ export function IconNarrateBird({ size = 24, className }: IconProps) {
       aria-hidden="true"
       focusable="false"
     >
-      <g transform="translate(12.0 13.4) scale(0.02336) translate(-384.50 -431.50)">
-        <metadata>
-          Created by potrace 1.16, written by Peter Selinger 2001-2019
-        </metadata>
-        <g
-          transform="translate(0.000000,863.000000) scale(0.100000,-0.100000)"
-          fill="currentColor"
-          stroke="none"
-        >
-          <path
-            d="M6975 8166 c-90 -31 -234 -92 -518 -218 -228 -102 -228 -102 -320
+      {size < 24 ? (
+        smallCuts.narrate
+      ) : (
+        <>
+          <g transform="translate(12.0 13.4) scale(0.02336) translate(-384.50 -431.50)">
+            <metadata>
+              Created by potrace 1.16, written by Peter Selinger 2001-2019
+            </metadata>
+            <g
+              transform="translate(0.000000,863.000000) scale(0.100000,-0.100000)"
+              fill="currentColor"
+              stroke="none"
+            >
+              <path
+                d="M6975 8166 c-90 -31 -234 -92 -518 -218 -228 -102 -228 -102 -320
 -84 -378 74 -713 -24 -985 -288 -187 -181 -279 -376 -337 -718 -66 -383 -209
 -633 -485 -847 -383 -296 -710 -627 -935 -946 -135 -191 -312 -475 -527 -845
 -367 -630 -616 -1065 -613 -1068 2 -2 112 77 246 176 134 99 245 178 247 177
@@ -403,16 +432,18 @@ export function IconNarrateBird({ size = 24, className }: IconProps) {
 27 -33 94 -17 133 28 68 131 92 188 44z m-1332 -4845 c125 -131 235 -251 245
 -267 25 -37 24 -74 -2 -107 -28 -36 -69 -34 -163 9 -117 55 -139 79 -218 245
 -100 208 -188 408 -188 426 0 27 88 -55 326 -306z"
+              />
+            </g>
+          </g>
+          <path
+            d="M18.4 8.2a3.4 3.4 0 0 1 0 5M20.6 6.4a6 6 0 0 1 0 8.6"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
           />
-        </g>
-      </g>
-      <path
-        d="M18.4 8.2a3.4 3.4 0 0 1 0 5M20.6 6.4a6 6 0 0 1 0 8.6"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="1.5"
-        stroke-linecap="round"
-      />
+        </>
+      )}
     </svg>
   );
 }
@@ -428,15 +459,18 @@ export function IconForwardBird({ size = 24, className }: IconProps) {
       aria-hidden="true"
       focusable="false"
     >
-      <g transform="translate(12.0 12.0) scale(0.06345) translate(-174.00 -129.50)">
-        <g>
-          <g
-            transform="translate(0.000000,259.000000) scale(0.100000,-0.100000)"
-            fill="currentColor"
-            stroke="none"
-          >
-            <path
-              d="M1519 1973 c-227 -230 -249 -260 -318 -433 -40 -100 -79 -131 -166
+      {size < 24 ? (
+        smallCuts.next
+      ) : (
+        <g transform="translate(12.0 12.0) scale(0.06345) translate(-174.00 -129.50)">
+          <g>
+            <g
+              transform="translate(0.000000,259.000000) scale(0.100000,-0.100000)"
+              fill="currentColor"
+              stroke="none"
+            >
+              <path
+                d="M1519 1973 c-227 -230 -249 -260 -318 -433 -40 -100 -79 -131 -166
 -129 -126 3 -124 -9 -39 178 41 90 72 166 69 169 -2 3 -154 -94 -337 -216
 -331 -221 -331 -221 -282 -251 293 -182 600 -368 602 -366 2 2 -26 51 -62 108
 -36 58 -66 108 -66 111 0 3 18 -1 41 -9 88 -31 167 -83 259 -170 124 -118 210
@@ -452,10 +486,11 @@ export function IconForwardBird({ size = 24, className }: IconProps) {
 179 170 18 34 31 64 28 67 -3 3 -47 -13 -98 -36 -51 -22 -94 -39 -96 -38 -1 2
 27 23 64 47 104 69 203 175 203 218 0 14 -80 17 -95 4 -6 -5 -32 -21 -60 -36
 -50 -27 -50 -27 -10 8 40 36 40 36 -136 36 l-175 0 -215 -217z"
-            />
+              />
+            </g>
           </g>
         </g>
-      </g>
+      )}
     </svg>
   );
 }
