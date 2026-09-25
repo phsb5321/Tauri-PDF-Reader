@@ -1,0 +1,12 @@
+
+ RUN  v2.1.9 /home/notroot/Documents/Code/personal/tauri-pdf-reader-269-pdf-boundaries
+
+ ✓ src/lib/prosody-plan.test.ts (20 tests) 44ms
+ ✓ src/lib/pdf-text.test.ts (18 tests) 129ms
+ ✓ src/lib/tts-tracking.test.ts (12 tests) 309ms
+
+ Test Files  3 passed (3)
+      Tests  50 passed (50)
+   Start at  17:18:40
+   Duration  1.94s (transform 352ms, setup 636ms, collect 430ms, tests 482ms, environment 2.01s, prepare 404ms)
+

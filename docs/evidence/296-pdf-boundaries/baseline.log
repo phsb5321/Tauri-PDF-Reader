@@ -1,0 +1,72 @@
+
+ RUN  v2.1.9 /home/notroot/Documents/Code/personal/tauri-pdf-reader-269-pdf-boundaries
+
+ ✓ src/lib/prosody-plan.test.ts (20 tests) 45ms
+ ❯ src/lib/pdf-text.test.ts (18 tests | 2 failed) 134ms
+   × shared PDF text model > recovers boundaries from pdf.js empty hasEOL carriers (W2 S0 regression) 16ms
+     → expected [] to deeply equal [ { offset: 26, kind: 'line' }, …(1) ]
+   × shared PDF text model > attaches repeated and trailing EOL carriers to the preceding segment 4ms
+     → expected [] to deeply equal [ { offset: 6, kind: 'line' } ]
+ ✓ src/lib/tts-tracking.test.ts (12 tests) 332ms
+   ✓ segmentSpeechWithOffsets > aggregates very many chunks without an argument-spread limit 307ms
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  2 failed | 48 passed (50)
+   Start at  17:17:51
+   Duration  2.04s (transform 348ms, setup 720ms, collect 489ms, tests 510ms, environment 2.11s, prepare 435ms)
+
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lib/pdf-text.test.ts > shared PDF text model > recovers boundaries from pdf.js empty hasEOL carriers (W2 S0 regression)
+AssertionError: expected [] to deeply equal [ { offset: 26, kind: 'line' }, …(1) ]
+
+- Expected
++ Received
+
+- Array [
+-   Object {
+-     "kind": "line",
+-     "offset": 26,
+-   },
+-   Object {
+-     "kind": "paragraph",
+-     "offset": 60,
+-   },
+- ]
++ Array []
+
+ ❯ src/lib/pdf-text.test.ts:80:30
+     78|       "Primeiro parágrafo falado. Segunda linha do mesmo parágrafo. Se…
+     79|     );
+     80|     expect(built.boundaries).toEqual([
+       |                              ^
+     81|       { offset: 26, kind: "line" },
+     82|       { offset: 60, kind: "paragraph" },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/lib/pdf-text.test.ts > shared PDF text model > attaches repeated and trailing EOL carriers to the preceding segment
+AssertionError: expected [] to deeply equal [ { offset: 6, kind: 'line' } ]
+
+- Expected
++ Received
+
+- Array [
+-   Object {
+-     "kind": "line",
+-     "offset": 6,
+-   },
+- ]
++ Array []
+
+ ❯ src/lib/pdf-text.test.ts:93:30
+     91| 
+     92|     expect(built.text).toBe("😀 Olá Fim");
+     93|     expect(built.boundaries).toEqual([{ offset: 6, kind: "line" }]);
+       |                              ^
+     94|     expect(built.segments.map(({ hasEol }) => hasEol)).toEqual([true, …
+     95|     for (const segment of built.segments) {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
