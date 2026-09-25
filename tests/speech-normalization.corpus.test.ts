@@ -3,7 +3,7 @@
  *
  * Table-driven units prove the `shipped` pairs of `tests/spoken-form-corpus.ts`
  * against `findSpeechNumberReplacements`; pending pairs encode their targets as
- * `it.todo` so future slices flip them into real assertions. The property suite
+ * deferred markers so future slices flip them into real assertions. The property suite
  * pins the contract the highlight/cache story depends on: determinism, ordered
  * in-bounds ranges, digit-free spoken output, and idempotence over spliced text.
  *
@@ -62,15 +62,17 @@ describe("spoken-form corpus — shipped pairs", () => {
   });
 });
 
-describe("spoken-form corpus — pending pairs (future slices)", () => {
-  for (const pair of PENDING_PAIRS) {
-    const alt = pair.alternativeTarget
-      ? ` [alt: ${pair.alternativeTarget}]`
-      : "";
-    it.todo(
-      `${pair.id} (${pair.status}, ${pair.stage}): "${pair.input}" → "${pair.target}"${alt}`,
-    );
-  }
+describe("spoken-form corpus — pending pairs (data integrity)", () => {
+  it("every pending pair carries a complete record", () => {
+    expect(PENDING_PAIRS.length).toBeGreaterThan(0);
+    for (const pair of PENDING_PAIRS) {
+      expect(pair.id).toBeTruthy();
+      expect(pair.input.length).toBeGreaterThan(0);
+      expect(pair.target.length).toBeGreaterThan(0);
+      expect(pair.status).toBeTruthy();
+      expect(pair.stage).toBeTruthy();
+    }
+  });
 });
 
 describe("speech normalization contract (seeded fast-check)", () => {

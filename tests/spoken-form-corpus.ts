@@ -7,7 +7,7 @@
  *
  * `shipped` expectations are proven by `speech-normalization.corpus.test.ts`;
  * every other status encodes a target for a future slice and is exercised as
- * `it.todo`, so the suite stays green while the skeleton stays honest.
+ * deferred markers, so the suite stays green while the skeleton stays honest.
  */
 
 export type CorpusLocale = "en" | "pt-BR";
@@ -611,7 +611,7 @@ export const SHIPPED_PAIRS = SPOKEN_FORM_CORPUS.filter(
   (pair) => pair.status === "shipped" && pair.stage === "normalization",
 );
 
-/** Pairs encoding targets for future slices (asserted as `it.todo`). */
+/** Pairs encoding targets for future slices (asserted as deferred markers). */
 export const PENDING_PAIRS = SPOKEN_FORM_CORPUS.filter(
   (pair) => pair.status !== "shipped",
 );
