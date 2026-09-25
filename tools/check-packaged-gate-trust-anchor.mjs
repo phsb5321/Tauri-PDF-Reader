@@ -125,8 +125,12 @@ else {
 if (JSON.stringify(wf.permissions || null) !== JSON.stringify({ contents: "read" }))
   fail("permissions must be exactly contents: read");
 
-// 3. Fixed concurrency group.
-if (!wf.concurrency || wf.concurrency.group !== "packaged-gate-trust-anchor")
+// 3. Concurrency group — fixed runner-wide or the per-ref form (same two-step
+// contract change as the execution checker: 291 widens, 239 adopts the per-ref
+// spelling). The single-slot vm103 runner keeps one-anchor-at-a-time either way.
+const ANCHOR_GROUP_FIXED = "packaged-gate-trust-anchor";
+const ANCHOR_GROUP_PER_REF = "${{ github.workflow }}-${{ github.ref }}";
+if (!wf.concurrency || ![ANCHOR_GROUP_FIXED, ANCHOR_GROUP_PER_REF].includes(wf.concurrency.group))
   fail("concurrency group is not the fixed packaged-gate-trust-anchor");
 
 // 4. Exactly ONE job, named contract, with the exact same-repo guard.
@@ -217,6 +221,13 @@ else {
 
 // ── Deep structural equality to the canonical anchor (LAST) ─────────────────
 const canonicalDoc = loadWorkflow(CANONICAL);
+// concurrency.group is semantic (two spellings, above); normalize before the
+// byte-strict comparison so every other key stays pinned.
+const normalizeGroup = (doc) => {
+  const d = JSON.parse(JSON.stringify(doc));
+  if (d && d.concurrency && typeof d.concurrency === "object") d.concurrency.group = "<group>";
+  return d;
+};
 const deepEqual = (a, b) => {
   if (a === b) return true;
   if (a === null || b === null || typeof a !== typeof b) return false;
@@ -237,7 +248,7 @@ const deepEqual = (a, b) => {
   }
   return false;
 };
-if (!deepEqual(wf, canonicalDoc.toJS({ maxAliasCount: 100 })))
+if (!deepEqual(normalizeGroup(wf), normalizeGroup(canonicalDoc.toJS({ maxAliasCount: 100 }))))
   fail("candidate anchor is not deep-structural-equal to the canonical trust anchor");
 
 process.exit(status);
