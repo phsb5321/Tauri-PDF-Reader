@@ -1,0 +1,51 @@
+
+ RUN  v2.1.9 /home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing
+
+stderr | src/ui/icons/lectrice-icons.test.tsx
+Warning: Invalid DOM property `stroke-width`. Did you mean `strokeWidth`?
+    at path
+    at svg
+    at IconSing (/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing/src/ui/icons/lectrice-icons.tsx:260:21)
+Warning: Invalid DOM property `stroke-linecap`. Did you mean `strokeLinecap`?
+    at path
+    at svg
+    at IconSing (/home/notroot/Documents/Code/personal/tauri-pdf-reader-282-vector-finishing/src/ui/icons/lectrice-icons.tsx:260:21)
+
+ ❯ src/ui/icons/lectrice-icons.test.tsx (6 tests | 6 failed) 166ms
+   × branded optical cuts > play: automatically switches below 24, preserving IconProps 125ms
+     → expected '<svg  viewBox="0 0 24 24" fill="none"…' not to be '<svg  viewBox="0 0 24 24" fill="none"…' // Object.is equality
+   × branded optical cuts > library: automatically switches below 24, preserving IconProps 6ms
+     → expected '<svg  viewBox="0 0 24 24" fill="none"…' not to be '<svg  viewBox="0 0 24 24" fill="none"…' // Object.is equality
+   × branded optical cuts > bookmark: automatically switches below 24, preserving IconProps 5ms
+     → expected '<svg  viewBox="0 0 24 24" fill="none"…' not to be '<svg  viewBox="0 0 24 24" fill="none"…' // Object.is equality
+   × branded optical cuts > night: automatically switches below 24, preserving IconProps 12ms
+     → expected '<svg  viewBox="0 0 24 24" fill="none"…' not to be '<svg  viewBox="0 0 24 24" fill="none"…' // Object.is equality
+   × branded optical cuts > narrate: automatically switches below 24, preserving IconProps 5ms
+     → expected '<svg  viewBox="0 0 24 24" fill="none"…' not to be '<svg  viewBox="0 0 24 24" fill="none"…' // Object.is equality
+   × branded optical cuts > next: automatically switches below 24, preserving IconProps 4ms
+     → expected '<svg  viewBox="0 0 24 24" fill="none"…' not to be '<svg  viewBox="0 0 24 24" fill="none"…' // Object.is equality
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/icons/lectrice-icons.test.tsx > branded optical cuts > play: automatically switches below 24, preserving IconProps
+ FAIL  src/ui/icons/lectrice-icons.test.tsx > branded optical cuts > library: automatically switches below 24, preserving IconProps
+ FAIL  src/ui/icons/lectrice-icons.test.tsx > branded optical cuts > bookmark: automatically switches below 24, preserving IconProps
+ FAIL  src/ui/icons/lectrice-icons.test.tsx > branded optical cuts > night: automatically switches below 24, preserving IconProps
+ FAIL  src/ui/icons/lectrice-icons.test.tsx > branded optical cuts > narrate: automatically switches below 24, preserving IconProps
+ FAIL  src/ui/icons/lectrice-icons.test.tsx > branded optical cuts > next: automatically switches below 24, preserving IconProps
+AssertionError: expected '<svg  viewBox="0 0 24 24" fill="none"…' not to be '<svg  viewBox="0 0 24 24" fill="none"…' // Object.is equality
+ ❯ src/ui/icons/lectrice-icons.test.tsx:29:41
+     27|       expect(geometry(rendered[0])).toBe(geometry(rendered[1]));
+     28|       expect(geometry(rendered[2])).toBe(geometry(rendered[3]));
+     29|       expect(geometry(rendered[0])).not.toBe(geometry(rendered[2]));
+       |                                         ^
+     30|       expect(renderToStaticMarkup(<Icon />)).toBe(renderToStaticMarkup…
+     31|       expect(geometry(renderToStaticMarkup(<General size={16} />)))
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ Test Files  1 failed (1)
+      Tests  6 failed (6)
+   Start at  13:13:12
+   Duration  8.76s (transform 1.09s, setup 1.18s, collect 1.11s, tests 166ms, environment 4.19s, prepare 500ms)
+
