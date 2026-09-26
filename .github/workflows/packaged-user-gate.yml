@@ -11,11 +11,13 @@ permissions:
   contents: read
 
 concurrency:
-  # ONE fixed runner-wide group (never github.ref): the lane scripts write
-  # global /tmp evidence paths, so only one packaged-user-gate run may ever
-  # execute at a time. The single-slot runner serializes anyway; the group
-  # makes it structural and cancels superseded heads.
-  group: packaged-user-gate
+  # Per-ref group: cancel-in-progress must only cancel superseded runs of
+  # the SAME PR. A repo-wide group cancels sibling PRs' REQUIRED checks
+  # (runs 198-203, #233/#235). The repo's single vm103 runner serializes
+  # execution anyway, so concurrent /tmp evidence collisions cannot happen
+  # today; revisit before adding a second runner (or give the lane scripts
+  # mktemp-unique paths).
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:

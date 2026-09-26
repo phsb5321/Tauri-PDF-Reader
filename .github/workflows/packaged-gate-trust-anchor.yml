@@ -8,9 +8,9 @@ permissions:
   contents: read
 
 concurrency:
-  # ONE fixed runner-wide group: the anchor never runs concurrently with
-  # itself or anything else in the packaged-gate family.
-  group: packaged-gate-trust-anchor
+  # Per-ref group: cancel-in-progress must only cancel superseded runs of
+  # the same PR; a repo-wide group cancels sibling PRs' required anchor.
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
