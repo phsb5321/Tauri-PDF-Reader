@@ -1,5 +1,24 @@
 # Lectrice — Agent Backlog State
 
+## PDF EOL carriers — slice 296 — 25/09/2026
+
+Targeted extraction fix: preserve empty/whitespace PDF.js `hasEOL` carriers on
+both the preceding parsed item and its published segment. Leading carriers do
+not leak into the first item; repeated/trailing carriers are safe. Source items
+are not mutated and UTF-16 slices remain consistent.
+
+The initial geometry-only paragraph proposal was rejected: it created false
+paragraphs before detached footnotes in the existing page-19 fixture, violating
+its micro-run floor. No prosody planner logic or existing expectations changed.
+The final fix retains the original paragraph evidence gate and section heuristic.
+
+Acceptance: `pnpm lint`, `pnpm typecheck`, `make harness-check` pass; targeted
+`pdf-text`, `prosody-plan`, and `tts-tracking` suites pass **50/50**. Same tests
+against unchanged `pdf-text.ts` at base fail **2/50**, specifically carrier
+recovery and segment EOL metadata. Logs: `docs/evidence/296-pdf-boundaries/`.
+No backend, permissions, cloud routing, or installed-app changes. Packaged
+acceptance/PR merge are separate delivery gates, not claimed by these unit results.
+
 ## Sonar follow-through249 — 15/09/2026
 
 Scope: ten first-party findings in seven files, preserving provider generation ownership, speech UTF-16/UTF-8 boundaries and fail-closed behavior, settings/status output and DOM theme/selection behavior. No workflow, secret, rule/exclusion/threshold, backend or deployment changes. Manual branch-bound spec artifacts used because the installed speckit-make driver pins incompatible models; no pipeline-execution claim.
