@@ -114,7 +114,21 @@ export function buildPdfText(items: readonly unknown[]): BuiltPdfText {
   let previous: ParsedPdfItem | null = null;
   for (const item of items) {
     const parsed = parseItem(item);
-    if (!parsed) continue;
+    if (!parsed) {
+      if (
+        item &&
+        typeof item === "object" &&
+        "str" in item &&
+        (item as Record<string, unknown>).hasEOL === true &&
+        previous
+      ) {
+        // PDF.js may emit an empty EOL carrier after the text it terminates.
+        // Keep the published segment and boundary inference in agreement.
+        previous.hasEol = true;
+        segments[segments.length - 1].hasEol = true;
+      }
+      continue;
+    }
     if (text) {
       const kind = previous ? inferBoundary(previous, parsed) : null;
       // Soft hyphenation only at a plain line (or unknown) join: drop the
