@@ -40,6 +40,79 @@ describe("shared PDF text model", () => {
     });
   });
 
+  it("recovers boundaries from pdf.js empty hasEOL carriers (W2 S0 regression)", () => {
+    // Real pdf.js shape: `hasEOL` rides on EMPTY items between text items,
+    // and text items themselves carry hasEOL: false. Before the S0 fix this
+    // page produced no boundaries because the carriers were dropped.
+    const carrier = { str: "", hasEOL: true };
+    const built = buildPdfText([
+      {
+        str: "Primeiro parágrafo falado.",
+        hasEOL: false,
+        transform: [1, 0, 0, 1, 72, 700],
+        width: 120,
+        height: 10,
+        fontName: "Body",
+      },
+      carrier,
+      {
+        str: "Segunda linha do mesmo parágrafo.",
+        hasEOL: false,
+        transform: [1, 0, 0, 1, 72, 690],
+        width: 150,
+        height: 10,
+        fontName: "Body",
+      },
+      carrier,
+      {
+        str: "Segundo parágrafo.",
+        hasEOL: false,
+        transform: [1, 0, 0, 1, 72, 650],
+        width: 90,
+        height: 10,
+        fontName: "Body",
+      },
+    ]);
+
+    expect(built.text).toBe(
+      "Primeiro parágrafo falado. Segunda linha do mesmo parágrafo. Segundo parágrafo.",
+    );
+    expect(built.boundaries).toEqual([
+      { offset: 26, kind: "line" },
+      { offset: 60, kind: "paragraph" },
+    ]);
+  });
+
+  it("attaches repeated and trailing EOL carriers to the preceding segment", () => {
+    const carrier = { str: " \t", hasEOL: true };
+    const items = [
+      carrier,
+      { str: "😀 Olá" },
+      carrier,
+      carrier,
+      { str: "Fim" },
+      carrier,
+    ];
+    const before = JSON.stringify(items);
+    const built = buildPdfText(items);
+
+    expect(built.text).toBe("😀 Olá Fim");
+    expect(built.boundaries).toEqual([{ offset: 6, kind: "line" }]);
+    expect(built.segments.map(({ hasEol }) => hasEol)).toEqual([true, true]);
+    for (const segment of built.segments) {
+      expect(built.text.slice(segment.start, segment.end)).toBe(segment.text);
+    }
+    expect(JSON.stringify(items)).toBe(before);
+  });
+
+  it("does not invent paragraph evidence from detached glyph geometry", () => {
+    const built = buildPdfText([
+      { str: "Body.", height: 15, transform: [15, 0, 0, 15, 72, 700] },
+      { str: "1", height: 10, transform: [10, 0, 0, 10, 72, 100] },
+    ]);
+    expect(built.boundaries).toEqual([]);
+  });
+
   it("retains line evidence without changing source offsets", () => {
     const built = buildPdfText([
       {
